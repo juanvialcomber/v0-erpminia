@@ -37,7 +37,7 @@ test('stale legacy hashes can recover only through the linked Supabase Auth iden
   const legacyCheck = loginRoute.indexOf('bcrypt.compare(password, profile.password_hash)');
   const authFallback = loginRoute.indexOf('auth.signInWithPassword({ email, password })');
   const identityLookup = loginRoute.indexOf(".from('auth_profile_identity_links')");
-  const exactProfileCheck = loginRoute.indexOf('identityLink?.profile_id === profile.id');
+  const exactProfileCheck = loginRoute.indexOf('confirmedLink?.profile_id === profile.id');
 
   assert.ok(legacyCheck >= 0, 'expected legacy bcrypt verification');
   assert.ok(authFallback > legacyCheck, 'Supabase Auth should be a recovery path after legacy verification fails');

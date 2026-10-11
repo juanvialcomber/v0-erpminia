@@ -69,7 +69,40 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
         }
 
-        passwordMatch = identityLink?.profile_id === profile.id;
+        if (identityLink) {
+          passwordMatch = identityLink.profile_id === profile.id;
+        } else if (authData.user.email_confirmed_at &&
+          authData.user.email?.trim().toLowerCase() === email) {
+          // Bridge only a verified Supabase identity after a successful password check.
+          // Never replace an existing identity link or trust an unverified email.
+          const { data: profileLink, error: profileLinkError } = await supabase
+            .from('auth_profile_identity_links')
+            .select('auth_user_id').eq('profile_id', profile.id).maybeSingle();
+          if (profileLinkError) {
+            console.error('[auth] Existing profile link check failed:', profileLinkError.message);
+            return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
+          }
+          if (!profileLink) {
+            const { error: linkError } = await supabase.from('auth_profile_identity_links').insert({
+              auth_user_id: authData.user.id,
+              profile_id: profile.id,
+              linked_email: email,
+              link_reason: 'verified_email_new_user_bridge',
+            });
+            if (linkError && linkError.code !== '23505') {
+              console.error('[auth] Verified identity bridge failed:', linkError.message);
+              return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
+            }
+          }
+          const { data: confirmedLink, error: confirmedLinkError } = await supabase
+            .from('auth_profile_identity_links')
+            .select('profile_id').eq('auth_user_id', authData.user.id).maybeSingle();
+          if (confirmedLinkError) {
+            console.error('[auth] Linked identity confirmation failed:', confirmedLinkError.message);
+            return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
+          }
+          passwordMatch = confirmedLink?.profile_id === profile.id;
+        }
       }
     }
 
