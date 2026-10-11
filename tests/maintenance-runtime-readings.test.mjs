@@ -24,7 +24,7 @@ test('runtime API is tenant scoped and records authenticated actor', () => {
   assert.match(api, /eq\('organization_id', context\.organizationId\)/);
   assert.match(api, /recorded_by: context\.userId/);
   assert.match(api, /MODULE_KEYS\.MANT_OPERACIONES/);
-  assert.match(api, /MODULE_KEYS\.MANT_GERENCIAL/);
+  assert.match(api, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
 });
 
 test('runtime workspace refuses false rate metrics without enough evidence', () => {
