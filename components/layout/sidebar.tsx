@@ -40,9 +40,9 @@ const groupOrder: GroupKey[] = ['main','areas','admin','help'];
 function isItemActive(pathname:string,href:string){if(href==='/dashboard')return pathname===href;return pathname===href||pathname.startsWith(`${href}/`)}
 export function Sidebar({ dictionary, locale }:{ dictionary:Dictionary; locale:Locale }){
   const t = dictionary.app.nav;
-  const pathname=usePathname(); const router=useRouter(); const {role,logout}=useAuth(); const {enforced,canView}=useModuleAccess();
+  const pathname=usePathname(); const router=useRouter(); const {role,logout}=useAuth(); const {enforced,canView,ready}=useModuleAccess();
   const [isOpen,setIsOpen]=useState(false); const [expandedGroups,setExpandedGroups]=useState<Partial<Record<GroupKey,boolean>>>({main:true,areas:true});
-  const filteredItems=useMemo(()=>{if(!role)return[];return menuItems.filter((item)=>{if(enforced&&item.itemKey==='production'&&!canView('prod_operaciones')&&canView('prod_topografia'))return true;if(enforced&&item.moduleKey)return canView(item.moduleKey);const roleAllowed=role==='superadmin'||role==='admin'||(role==='gerente_operaciones'&&item.group!=='admin')||!item.roles||item.roles.includes(role);if(!roleAllowed)return false;if(!enforced||!item.moduleKey)return true;return canView(item.moduleKey)}).map((item)=>item.itemKey==='production'&&enforced&&!canView('prod_operaciones')&&canView('prod_topografia')?{...item,href:'/dashboard/produccion/topografia'}:item)},[role,enforced,canView]);
+  const filteredItems=useMemo(()=>{if(!role||!ready)return[];return menuItems.filter((item)=>{const roleAllowed=role==='superadmin'||role==='admin'||!item.roles||item.roles.includes(role);if(!roleAllowed)return false;if(enforced&&item.itemKey==='production'&&!canView('prod_operaciones')&&canView('prod_topografia'))return true;if(!item.moduleKey)return true;return canView(item.moduleKey)}).map((item)=>item.itemKey==='production'&&enforced&&!canView('prod_operaciones')&&canView('prod_topografia')?{...item,href:'/dashboard/produccion/topografia'}:item)},[role,enforced,canView,ready]);
   const activeGroup=useMemo(()=>filteredItems.find((item)=>isItemActive(pathname,item.href))?.group,[filteredItems,pathname]);
   useEffect(()=>{if(activeGroup)setExpandedGroups((current)=>({...current,[activeGroup]:true}))},[activeGroup]);
   const navigate=(href:string)=>{router.push(href);setIsOpen(false)};

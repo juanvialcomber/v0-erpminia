@@ -33,4 +33,4 @@ jobs:
           MOTIL_QA_PASSWORD: ${{ inputs.role == 'ariel' && secrets.MOTIL_QA_ARIEL_PASSWORD || secrets.MOTIL_QA_JOAQUIN_PASSWORD }}
         run: |
           test -n "$MOTIL_QA_EMAIL" && test -n "$MOTIL_QA_PASSWORD" || { echo "QA credentials not configured"; exit 1; }
-          pnpm exec playwright test tests/e2e/auth-login-readonly.spec.ts tests/e2e/role-navigation-readonly.spec.ts tests/e2e/maintenance-access-readonly.spec.ts --project=desktop-chromium --project=mobile-chromium --reporter=line
+          pnpm exec playwright test tests/e2e/auth-login-readonly.spec.ts tests/e2e/role-navigation-readonly.spec.ts tests/e2e/maintenance-access-readonly.spec.ts tests/e2e/ariel-menu-permissions.spec.ts --project=desktop-chromium --project=mobile-chromium --reporter=line

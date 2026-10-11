@@ -14,7 +14,7 @@ export interface ModuleAccessResponse {
 const fetcher = async (url: string): Promise<ModuleAccessResponse> => {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) {
-    // Unauthenticated or error: fall back to legacy (unrestricted) behavior.
+    // Unauthenticated or error: deny access. Never fail open.
     return { isAdmin: false, hasCargo: false, role: null, access: {} };
   }
   return res.json();
@@ -39,11 +39,11 @@ export function useModuleAccess() {
   const hasCargo = data?.hasCargo ?? false;
   const access = data?.access ?? {};
 
-  // Enforcement is only active for non-admin users who have a cargo assigned.
-  // Admins and users without a cargo keep unrestricted (legacy) access.
-  const enforced = hasCargo && !isAdmin;
+  // Only verified admins bypass the module matrix. Missing cargo/access is denied.
+  const enforced = !isAdmin;
 
   const getLevel = (moduleKey: string): AccessLevel => {
+    if (!data || error) return 'SR';
     if (!enforced) return 'ED';
     return access[moduleKey] ?? 'SR';
   };
