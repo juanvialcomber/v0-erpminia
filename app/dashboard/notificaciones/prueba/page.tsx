@@ -77,8 +77,8 @@ export default function PushPilotPage() {
       setMessage(error instanceof Error ? error.message : 'Error enviando notificación');
     } finally { setBusy(false); }
   }
-  return <main className="mx-auto max-w-lg space-y-6 px-4 py-8">
-    <div><p className="text-sm text-muted-foreground">MOTIL · Piloto</p><h1 className="text-2xl font-semibold">Notificaciones a mi dispositivo</h1><p className="mt-2 text-sm text-muted-foreground">Primero activa las notificaciones desde este teléfono o computador. Después prueba un aviso personal.</p></div>
+  return <main className="mx-auto w-full min-w-0 max-w-lg space-y-6 overflow-x-hidden px-4 py-8">
+    <div className="min-w-0"><p className="text-sm text-muted-foreground">MOTIL · Piloto</p><h1 className="break-words text-2xl font-semibold">Notificaciones a mi dispositivo</h1><p className="mt-2 break-words text-sm text-muted-foreground">Primero activa las notificaciones desde este teléfono o computador. Después prueba un aviso personal.</p></div>
     <div className="space-y-3">
       <Button className="w-full min-h-14" disabled={busy} onClick={() => void activate()}>1. Activar notificaciones</Button>
       <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>\n      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
