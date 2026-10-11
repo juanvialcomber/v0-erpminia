@@ -1,0 +1,36 @@
+name: MOTIL role-based read-only QA
+on:
+  workflow_dispatch:
+    inputs:
+      role:
+        description: "QA role (no operational writes)"
+        type: choice
+        required: true
+        options:
+          - ariel
+          - joaquin
+permissions:
+  contents: read
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Read-only role authentication
+        env:
+          PLAYWRIGHT_BASE_URL: https://motil.app
+          MOTIL_QA_EMAIL: ${{ inputs.role == 'ariel' && 'ariellopez@lapatagua.cl' || 'joaquinmartinez@lapatagua.cl' }}
+          MOTIL_QA_PASSWORD: ${{ inputs.role == 'ariel' && secrets.MOTIL_QA_ARIEL_PASSWORD || secrets.MOTIL_QA_JOAQUIN_PASSWORD }}
+        run: |
+          test -n "$MOTIL_QA_EMAIL" && test -n "$MOTIL_QA_PASSWORD" || { echo "QA credentials not configured"; exit 1; }
+          pnpm exec playwright test tests/e2e/auth-login-readonly.spec.ts --project=desktop-chromium --reporter=line
