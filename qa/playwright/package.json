@@ -1,0 +1,12 @@
+{
+  "name": "motil-browser-qa",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "smoke": "node smoke.cjs",
+    "install:browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "1.58.2"
+  }
+}

@@ -1,0 +1,63 @@
+name: Playwright browser QA
+on:
+  workflow_dispatch:
+    inputs:
+      run_authenticated:
+        description: "Run protected, read-only login smoke against motil.app (requires secrets)"
+        required: false
+        type: boolean
+        default: false
+      target_url:
+        description: "HTTPS target for read-only browser smoke (defaults to motil.app)"
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - 'qa/playwright/**'
+      - '.github/workflows/playwright-browser-qa.yml'
+permissions:
+  contents: read
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated Playwright dependency
+        run: npm install --prefix qa/playwright --no-audit --no-fund --ignore-scripts
+      - name: Install Chromium
+        run: ./qa/playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Browser smoke (no production writes)
+        env:
+          MOTIL_QA_URL: ${{ inputs.target_url || 'https://motil.app' }}
+        run: node qa/playwright/smoke.cjs
+      - name: Keep screenshots on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: motil-playwright-screenshots
+          path: qa/playwright/artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+  authenticated-read-only:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_authenticated == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: motil-qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated Playwright dependency
+        run: npm install --prefix qa/playwright --no-audit --no-fund --ignore-scripts
+      - name: Install Chromium
+        run: ./qa/playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Authorized login smoke (no writes or captures)
+        env:
+          MOTIL_QA_EMAIL: ${{ secrets.MOTIL_QA_EMAIL }}
+          MOTIL_QA_PASSWORD: ${{ secrets.MOTIL_QA_PASSWORD }}
+        run: node qa/playwright/auth-smoke.cjs
