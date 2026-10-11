@@ -50,6 +50,23 @@ export default function PushPilotPage() {
       setMessage(error instanceof Error ? error.message : 'Error activando notificaciones');
     } finally { setBusy(false); }
   }
+  async function resetBrowser() {
+    setBusy(true);
+    setMessage('');
+    try {
+      if (!('serviceWorker' in navigator)) throw new Error('Este navegador no admite notificaciones.');
+      const registration = await navigator.serviceWorker.ready;
+      const previous = await registration.pushManager.getSubscription();
+      if (previous) {
+        const removed = await previous.unsubscribe();
+        if (!removed) throw new Error('El navegador no pudo cancelar la suscripción anterior.');
+      }
+      setDevices(null);
+      setMessage('Suscripción local anterior cancelada. Presiona Activar notificaciones para registrar esta cuenta.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo restablecer este navegador');
+    } finally { setBusy(false); }
+  }
   async function test() {
     setBusy(true);
     setMessage('');
@@ -64,10 +81,10 @@ export default function PushPilotPage() {
     <div><p className="text-sm text-muted-foreground">MOTIL · Piloto</p><h1 className="text-2xl font-semibold">Notificaciones a mi dispositivo</h1><p className="mt-2 text-sm text-muted-foreground">Primero activa las notificaciones desde este teléfono o computador. Después prueba un aviso personal.</p></div>
     <div className="space-y-3">
       <Button className="w-full min-h-14" disabled={busy} onClick={() => void activate()}>1. Activar notificaciones</Button>
-      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>
+      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>\n      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
     </div>
     {devices !== null ? <p className="text-sm text-muted-foreground">Dispositivos activos: {devices}</p> : null}
     {message ? <p role="status" className="rounded-lg border p-4 text-sm">{message}</p> : null}
-    <p className="text-xs text-muted-foreground">Prueba habilitada exclusivamente para juan@n3uralia.com. Las notificaciones requieren permiso del dispositivo; iOS requiere instalar la PWA.</p>
+    <p className="text-xs text-muted-foreground">Si este navegador se usó con otra cuenta, restablece la suscripción antes de activarla. No modifica los datos de otros usuarios. Prueba habilitada exclusivamente para juan@n3uralia.com. Las notificaciones requieren permiso del dispositivo; iOS requiere instalar la PWA.</p>
   </main>;
 }
