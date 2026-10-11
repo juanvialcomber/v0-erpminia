@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { requireMeterAssetAssignment } from '@/lib/maintenance/meter-asset-access';
 
 const SOURCE_TYPES = new Set(['manual', 'import', 'telemetry']);
 
@@ -88,11 +89,12 @@ export async function GET(request: NextRequest) {
       return String(a.asset_code || a.asset_name || '').localeCompare(String(b.asset_code || b.asset_name || ''));
     });
 
+    // Temporary policy: all organization assets visible to authorized operators.
     return NextResponse.json({
       assets: assetsResult.data || [],
       runtime: summaryResult.data || [],
       readings: readingsResult.data || [],
-      reconciliationQueue,
+      reconciliationQueue: reconciliationQueue,
       canEdit: access.canWrite,
       source: 'asset_runtime_readings',
     });
@@ -129,6 +131,8 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (assetError) throw assetError;
     if (!asset) return NextResponse.json({ error: 'Activo no pertenece a la organización' }, { status: 404 });
+    const denied = await requireMeterAssetAssignment(request, context, canonicalAssetId);
+    if (denied) return denied;
 
     const { data: latest, error: latestError } = await context.supabase
       .from('asset_runtime_readings')

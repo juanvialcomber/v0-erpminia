@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { requireMeterAssetAssignment } from '@/lib/maintenance/meter-asset-access';
+import { checkMeterConsistency } from '@/lib/maintenance/meter-consistency';
 
 const BUCKET = 'maintenance-work-order-evidence';
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -35,6 +37,8 @@ export async function POST(request: NextRequest) {
       .eq('organization_id', context.organizationId).eq('id', canonicalAssetId).maybeSingle();
     if (assetError) throw assetError;
     if (!asset) return NextResponse.json({ error: 'Equipo no disponible para esta organización.' }, { status: 404 });
+    const denied = await requireMeterAssetAssignment(request, context, canonicalAssetId);
+    if (denied) return denied;
 
     const submissionId = String(form.get('submissionId') || '').trim();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(submissionId)) {
@@ -59,10 +63,34 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: latest, error: latestError } = await context.supabase.from('asset_runtime_readings')
-      .select('meter_hours').eq('organization_id', context.organizationId)
+      .select('meter_hours,recorded_at').eq('organization_id', context.organizationId)
       .eq('canonical_asset_id', canonicalAssetId).order('recorded_at', { ascending: false })
       .limit(1).maybeSingle();
     if (latestError) throw latestError;
+
+    const consistency = checkMeterConsistency(latest, { meter_hours: meterHours, recorded_at: recordedAt });
+    if (consistency.status === 'review') {
+      // Preserve disputed readings and their evidence for supervisors, never as canonical runtime.
+      const { error: queueError } = await context.supabase.from('maintenance_meter_review_queue').insert({
+        organization_id: context.organizationId,
+        canonical_asset_id: canonicalAssetId,
+        submitted_hours: meterHours,
+        previous_hours: latest?.meter_hours ?? null,
+        previous_recorded_at: latest?.recorded_at ?? null,
+        attempted_at: recordedAt,
+        attempted_by: context.userId,
+        reason: consistency.reason,
+        evidence_path: storedPath,
+      });
+      if (queueError) throw queueError;
+      storedPath = null; // Review record and its evidence are durable.
+      return NextResponse.json({
+        error: 'Lectura incoherente con el horómetro anterior. Solicita revisión de Ariel o Mauricio.',
+        reason: consistency.reason, previousMeterHours: latest?.meter_hours ?? null,
+        deltaHours: consistency.deltaHours, elapsedHours: consistency.elapsedHours,
+        requiresSupervisorReview: true,
+      }, { status: 409 });
+    }
 
     const { data: reading, error } = await context.supabase.from('asset_runtime_readings')
       .insert({

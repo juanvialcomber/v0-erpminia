@@ -21,6 +21,8 @@ export default function RuntimeReadingsPage() {
   const [assetId, setAssetId] = useState('');
   const [meterHours, setMeterHours] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [submissionId, setSubmissionId] = useState(() => crypto.randomUUID());
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -33,6 +35,35 @@ export default function RuntimeReadingsPage() {
     setMeterHours('');
     setPhoto(null);
     document.getElementById('registrar-lectura')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async function analyzeMeterPhoto(file: File) {
+    setAnalyzingPhoto(true);
+    setPhotoMessage('Leyendo horómetro con IA...');
+    try {
+      if (!assetId) {
+        setPhotoMessage('Selecciona primero el equipo.');
+        return;
+      }
+      const form = new FormData();
+      form.set('canonicalAssetId', assetId);
+      form.set('photo', file);
+      const response = await fetch('/api/maintenance/runtime-readings/analyze-photo', {
+        method: 'POST', credentials: 'include', body: form,
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || 'No se pudo analizar la foto.');
+      if (typeof result?.meterHours === 'number') {
+        setMeterHours(String(result.meterHours));
+        setPhotoMessage('Lectura detectada: comprueba las horas antes de guardar.');
+      } else {
+        setPhotoMessage(result?.message || 'Escribe las horas que muestra la foto.');
+      }
+    } catch (cause) {
+      setPhotoMessage(cause instanceof Error ? cause.message : 'Escribe las horas manualmente.');
+    } finally {
+      setAnalyzingPhoto(false);
+    }
   }
 
   async function saveReading() {
@@ -95,9 +126,10 @@ export default function RuntimeReadingsPage() {
         <Input aria-label="Horas del horómetro" type="number" min="0" step="0.1" inputMode="decimal" value={meterHours} onChange={(event) => setMeterHours(event.target.value)} placeholder="Horas"/>
         <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-md border px-4 text-sm sm:col-span-2">
           {photo ? `Foto lista: ${photo.name}` : 'Tomar foto del horómetro (opcional)'}
-          <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => setPhoto(event.target.files?.[0] || null)}/>
+          <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" onChange={(event) => { const file = event.target.files?.[0] || null; setPhoto(file); setPhotoMessage(null); if (file) void analyzeMeterPhoto(file); }}/>
         </label>
-        <Button className="min-h-12 sm:col-span-2" onClick={() => void saveReading()} disabled={saving || !data?.canEdit}>{saving ? 'Guardando...' : 'Guardar lectura'}</Button>
+        {photoMessage ? <p role="status" className="text-sm text-muted-foreground sm:col-span-2">{photoMessage}</p> : null}
+        <Button className="min-h-12 sm:col-span-2" onClick={() => void saveReading()} disabled={saving || analyzingPhoto || !data?.canEdit}>{saving ? 'Guardando...' : 'Guardar lectura'}</Button>
         {actionMessage ? <p role="status" className="text-sm text-muted-foreground sm:col-span-2">{actionMessage}</p> : null}
       </CardContent>
     </Card>
