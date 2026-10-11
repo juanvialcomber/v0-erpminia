@@ -20,3 +20,9 @@ node_modules
 /data/*.xlsx
 /data/*.xls
 /data/*.csv
+
+# Playwright reports and authenticated QA sessions
+playwright-report/
+test-results/
+playwright/.auth/
+*.storage-state.json

@@ -1,0 +1,38 @@
+name: Playwright Chromium smoke
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'playwright.config.ts'
+      - 'package.json'
+      - '.github/workflows/playwright.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Read-only smoke tests against deployed app
+        env:
+          PLAYWRIGHT_BASE_URL: https://motil.app
+        run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
