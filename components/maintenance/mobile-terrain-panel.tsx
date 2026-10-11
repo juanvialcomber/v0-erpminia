@@ -54,7 +54,7 @@ export function MobileTerrainPanel() {
 
       <div className="grid gap-3" aria-label="Acciones principales">
         <Button asChild size="lg" className="h-16 w-full justify-between px-5 text-base">
-          <Link href="/dashboard/mantenimiento/horometros">
+          <Link href="/dashboard/mantenimiento/horometros/registrar">
             <span className="flex items-center gap-3"><Gauge className="h-5 w-5" />Registrar horómetro</span>
             <ArrowRight className="h-5 w-5" />
           </Link>

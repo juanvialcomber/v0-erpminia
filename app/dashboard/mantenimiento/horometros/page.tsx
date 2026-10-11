@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -15,12 +14,14 @@ const fetcher = async (url: string) => { const response = await fetch(url, { cre
 const number = (value: unknown) => value == null ? '—' : new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(Number(value));
 const money = (value: unknown) => value == null ? '—' : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value));
 
-export default function RuntimeReadingsPage() {
+export default function RuntimeReadingsPage({ captureOnly = false }: { captureOnly?: boolean }) {
   const { data: viewer } = useSWR('/api/maintenance/viewer-context', fetcher, { revalidateOnFocus: false });
-  const isMechanic = viewer?.mode === 'execution';
+  const isMechanic = captureOnly || viewer?.mode === 'execution';
   const { data, error, isLoading, mutate } = useSWR('/api/maintenance/runtime-readings', fetcher, { revalidateOnFocus: false });
   const { data: audit, mutate: refreshAudit } = useSWR(!isMechanic ? '/api/maintenance/runtime-readings/history' : null, fetcher, { revalidateOnFocus: false });
   const [assetId, setAssetId] = useState('');
+  const [assetQuery, setAssetQuery] = useState('');
+  const [assetSearchOpen, setAssetSearchOpen] = useState(false);
   const [meterHours, setMeterHours] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
@@ -31,9 +32,17 @@ export default function RuntimeReadingsPage() {
 
   const runtimeWithEvidence = useMemo(() => (data?.runtime || []).filter((row: any) => Number(row.reading_count || 0) > 0), [data]);
   const reconciliationQueue = Array.isArray(data?.reconciliationQueue) ? data.reconciliationQueue : [];
+  const matchingAssets = useMemo(() => {
+    const query = assetQuery.trim().toLocaleLowerCase('es');
+    if (!query) return [];
+    return (data?.assets || []).filter((asset: any) =>
+      `${asset.asset_code || ''} ${asset.name || ''}`.toLocaleLowerCase('es').includes(query)
+    ).slice(0, 20);
+  }, [data?.assets, assetQuery]);
 
   function reviewAsset(item: any) {
     setAssetId(item.canonical_asset_id);
+    setAssetQuery([item.asset_code, item.asset_name].filter(Boolean).join(' · '));
     setMeterHours('');
     setPhoto(null);
     document.getElementById('registrar-lectura')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -113,7 +122,32 @@ export default function RuntimeReadingsPage() {
     <Card id="registrar-lectura" className="scroll-mt-24 shadow-none">
       <CardHeader><CardTitle className="text-lg">{isMechanic ? 'Lectura de hoy' : 'Registrar lectura observada'}</CardTitle><CardDescription>{isMechanic ? 'Selecciona una máquina y fotografía el contador. Confirma las horas antes de guardar.' : 'Elige el equipo, escribe las horas y, si puedes, toma una foto. La fecha se guarda automáticamente.'}</CardDescription></CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-[1fr_160px]">
-        <Select value={assetId} onValueChange={setAssetId}><SelectTrigger><SelectValue placeholder="Elegir equipo"/></SelectTrigger><SelectContent>{(data?.assets || []).map((asset: any) => <SelectItem key={asset.id} value={asset.id}>{asset.asset_code ? `${asset.asset_code} · ` : ''}{asset.name || 'Sin nombre'}</SelectItem>)}</SelectContent></Select>
+        <div className="relative sm:col-span-2">
+          <Input
+            aria-label="Buscar máquina por código o nombre"
+            role="combobox"
+            aria-expanded={assetSearchOpen && matchingAssets.length > 0}
+            aria-controls="meter-asset-results"
+            aria-autocomplete="list"
+            autoComplete="off"
+            value={assetQuery}
+            placeholder="Escribe código o nombre de máquina"
+            onFocus={() => setAssetSearchOpen(true)}
+            onChange={(event) => { setAssetQuery(event.target.value); setAssetId(''); setAssetSearchOpen(true); setMeterHours(''); setPhoto(null); }}
+            onKeyDown={(event) => { if (event.key === 'Escape') setAssetSearchOpen(false); }}
+          />
+          {assetSearchOpen && assetQuery.trim() && !assetId ? <div id="meter-asset-results" role="listbox" aria-label="Máquinas encontradas" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-popover p-1 shadow-lg">
+            {matchingAssets.length ? matchingAssets.map((asset: any) => <button
+              key={asset.id}
+              type="button"
+              role="option"
+              aria-selected={false}
+              className="w-full rounded-sm px-3 py-3 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
+              onClick={() => { setAssetId(asset.id); setAssetQuery([asset.asset_code, asset.name].filter(Boolean).join(' · ')); setAssetSearchOpen(false); }}
+            >{[asset.asset_code, asset.name].filter(Boolean).join(' · ') || 'Sin nombre'}</button>) : <p className="px-3 py-3 text-sm text-muted-foreground">No se encontraron máquinas.</p>}
+          </div> : null}
+          {assetId ? <p className="mt-1 text-xs text-muted-foreground">Máquina seleccionada</p> : null}
+        </div>
         <Input aria-label="Horas del horómetro" type="number" min="0" step="0.1" inputMode="decimal" value={meterHours} onChange={(event) => setMeterHours(event.target.value)} placeholder="Horas"/>
         <label className="flex min-h-12 cursor-pointer items-center justify-center rounded-md border px-4 text-sm sm:col-span-2">
           {photo ? `Foto lista: ${photo.name}` : 'Tomar foto del horómetro (opcional)'}
