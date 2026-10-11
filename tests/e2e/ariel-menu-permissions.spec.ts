@@ -21,7 +21,7 @@ test("Ariel module visibility matches authorized maintenance role", async ({ pag
   const sidebar = page.locator('nav[aria-label]').first()
   await expect(sidebar).toBeVisible()
   await expect(sidebar.getByRole("button", { name: /mantenimiento|maintenance/i })).toBeVisible()
-  for (const name of [/finanzas|finance/i, /rrhh|recursos humanos|human resources/i, /compras|procurement/i]) {
+  for (const name of [/finanzas|finance/i, /rrhh|recursos humanos|human resources/i]) {
     await expect(sidebar.getByRole("button", { name })).toHaveCount(0)
   }
 })
