@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest) {
   // Pilot: self-test only, never allows sending to another user.
   if (ctx.userEmail?.trim().toLowerCase() !== 'juan@n3uralia.com')
     return NextResponse.json({ error: 'Prueba reservada al usuario piloto' }, { status: 403 });
-  if (!process.env.WEB_PUSH_VAPID_PUBLIC_KEY || !process.env.WEB_PUSH_VAPID_PRIVATE_KEY || !process.env.WEB_PUSH_VAPID_SUBJECT)
+  if (!process.env.WEB_PUSH_VAPID_PUBLIC_KEY || !(process.env.WEB_PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY) || !(process.env.WEB_PUSH_VAPID_SUBJECT || process.env.VAPID_SUBJECT))
     return NextResponse.json({ error: 'Falta configurar las claves Web Push en Vercel' }, { status: 503 });
   const { data: subscriptions, error } = await ctx.supabase.from('user_push_subscriptions')
     .select('id,endpoint,p256dh,auth_secret,last_test_at').eq('organization_id', ctx.organizationId).eq('user_id', ctx.userId).eq('enabled', true).limit(5);

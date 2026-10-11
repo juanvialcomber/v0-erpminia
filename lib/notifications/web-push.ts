@@ -18,8 +18,8 @@ function hkdf(salt: Buffer, input: Buffer, info: Buffer, length: number): Buffer
 
 function vapidAuthorization(endpoint: string): string {
   const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY;
-  const subject = process.env.WEB_PUSH_VAPID_SUBJECT;
+  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.WEB_PUSH_VAPID_SUBJECT || process.env.VAPID_SUBJECT;
   if (!publicKey || !privateKey || !subject) throw new Error('Web Push VAPID no configurado');
   const pub = decode(publicKey);
   if (pub.length !== 65 || pub[0] !== 4 || decode(privateKey).length !== 32) throw new Error('VAPID inválido');
