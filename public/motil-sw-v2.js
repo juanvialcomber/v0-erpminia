@@ -58,3 +58,27 @@ self.addEventListener('message', (event) => {
     event.ports[0]?.postMessage({ ready: true, cache: OFFLINE_SHELL_CACHE });
   }
 });
+
+self.addEventListener('push', (event) => {
+  let notification;
+  try { notification = event.data?.json(); } catch { notification = null; }
+  if (!notification || typeof notification.title !== 'string') return;
+  const title = notification.title.slice(0, 120);
+  const body = typeof notification.body === 'string' ? notification.body.slice(0, 400) : '';
+  const url = typeof notification.url === 'string' && notification.url.startsWith('/') && !notification.url.startsWith('//')
+    ? notification.url : '/dashboard';
+  event.waitUntil(self.registration.showNotification(title, {
+    body, icon: '/icon-192.png', badge: '/icon-192.png', data: { url }, tag: 'motil-test-push',
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/dashboard', self.location.origin);
+  if (target.origin !== self.location.origin) return;
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+    const match = windows.find((windowClient) => new URL(windowClient.url).origin === target.origin);
+    if (match) { await match.focus(); return match.navigate(target.href); }
+    return clients.openWindow(target.href);
+  }));
+});
