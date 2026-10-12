@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api/guard';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { isAuthorizedPataguaEmail } from '@/lib/auth/patagua-email-policy';
 import {
   createOrganizationUser,
   deleteOrganizationUser,
@@ -43,6 +44,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Debes seleccionar un cargo' }, { status: 400 });
     }
 
+    if (!isAuthorizedPataguaEmail(email)) {
+      return NextResponse.json({ error: 'Solo se permiten correos @lapatagua.cl y el administrador autorizado.' }, { status: 400 });
+    }
+
     const user = await createOrganizationUser({
       organizationId: auth.organizationId,
       email,
@@ -81,13 +86,16 @@ export async function PATCH(request: NextRequest) {
     const db = getSupabaseServerClient();
     const { data: existing, error: existingError } = await db
       .from('profiles')
-      .select('id')
+      .select('id,email')
       .eq('id', userId)
       .eq('organization_id', auth.organizationId)
       .maybeSingle();
 
     if (existingError) throw existingError;
     if (!existing) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
+    if (status === 'active' && !isAuthorizedPataguaEmail(existing.email)) {
+      return NextResponse.json({ error: 'No se puede activar un usuario fuera de la política de correos.' }, { status: 403 });
+    }
 
     if (cargo_id) {
       const { data: cargo, error: cargoError } = await db
