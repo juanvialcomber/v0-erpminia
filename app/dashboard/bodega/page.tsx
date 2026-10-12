@@ -20,8 +20,8 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-const number = (value: unknown) => new Intl.NumberFormat('es-CL').format(Number(value || 0));
-const money = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
+const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('es-CL').format(value) : '—';
+const money = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value) : '—';
 const dateTime = (value: unknown) => value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeZone: 'America/Santiago' }).format(new Date(String(value))) : 'Sin fecha';
 const dateOnly = (value: unknown) => value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00Z`)) : 'Sin evidencia';
 const statusLabels: Record<string, string> = { healthy: 'Disponible', reorder: 'Reponer', out_of_stock: 'Sin stock', negative: 'Revisar saldo', expired: 'Vencido', expiring: 'Próximo a vencer' };
@@ -42,9 +42,9 @@ export default function BodegaPage() {
   const [status, setStatus] = useState(initialStatus);
   const endpoint = useMemo(() => { const params = new URLSearchParams(); if (query.trim()) params.set('q', query.trim()); if (status !== 'all') params.set('status', status); return `/api/inventory/intelligence?${params.toString()}`; }, [query, status]);
   const { data, error, isLoading, mutate } = useSWR(endpoint, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
-  const overview = data?.overview || {};
-  const positions: InventoryPosition[] = data?.positions || [];
-  const diesel: DieselEvidence | null = data?.diesel || null;
+  const overview = error ? {} : data?.overview || {};
+  const positions: InventoryPosition[] = error ? [] : data?.positions || [];
+  const diesel: DieselEvidence | null = error ? null : data?.diesel || null;
   const dieselCurrent = diesel?.current || null;
   const dieselReference = diesel?.reference || null;
   const dieselReferenceQuantity = dieselReference?.source_payload?.quantity_available ?? dieselReference?.source_payload?.quantity_on_hand;
@@ -88,13 +88,13 @@ export default function BodegaPage() {
 
     {!negativeStockMode ? <section className="space-y-3" aria-labelledby="attention-title">
       <div className="flex items-end justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prioridad operacional</p><h2 id="attention-title" className="mt-1 text-lg font-semibold">Qué requiere atención hoy</h2></div><p className="hidden text-xs text-muted-foreground sm:block">Las cifras son derivadas del inventario canónico; no modifican stock.</p></div>
-      <div className="grid gap-3 md:grid-cols-3">{attention.map((item) => <Link key={item.label} href={item.href} className="group rounded-lg border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">{item.label}</p><p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{isLoading ? '—' : number(item.value)}</p></div><ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" /></div><p className="mt-3 text-xs leading-5 text-muted-foreground">{item.detail}</p></Link>)}</div>
+      <div className="grid gap-3 md:grid-cols-3">{attention.map((item) => <Link key={item.label} href={item.href} className="group rounded-lg border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">{item.label}</p><p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{isLoading || error ? '—' : number(item.value)}</p></div><ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" /></div><p className="mt-3 text-xs leading-5 text-muted-foreground">{item.detail}</p></Link>)}</div>
     </section> : null}
 
     {!negativeStockMode ? <section aria-label="Posición de inventario" className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
-      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4"/>Productos disponibles</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading ? '—' : number(overview.products_with_stock)}</p></div>
-      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Boxes className="h-4 w-4"/>Valor del inventario</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading ? '—' : valuationTrusted ? money(overview.total_stock_value) : 'En conciliación'}</p>{!valuationTrusted && !isLoading ? <p className="mt-1 text-xs text-muted-foreground">Petróleo impide una valorización confiable hasta conciliar fuentes.</p> : null}</div>
-      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="h-4 w-4"/>Conteos pendientes</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading ? '—' : number(overview.count_overdue_products)}</p></div>
+      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4"/>Productos disponibles</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : number(overview.products_with_stock)}</p></div>
+      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Boxes className="h-4 w-4"/>Valor del inventario</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : valuationTrusted ? money(overview.total_stock_value) : 'En conciliación'}</p>{!valuationTrusted && !isLoading ? <p className="mt-1 text-xs text-muted-foreground">Petróleo impide una valorización confiable hasta conciliar fuentes.</p> : null}</div>
+      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="h-4 w-4"/>Conteos pendientes</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : number(overview.count_overdue_products)}</p></div>
     </section> : null}
 
     <section className="space-y-4">

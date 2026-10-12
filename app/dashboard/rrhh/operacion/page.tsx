@@ -14,7 +14,7 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-const number = (value: unknown) => new Intl.NumberFormat('es-CL').format(Number(value || 0));
+const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('es-CL').format(value) : '—';
 
 type PersonRow = {
   person_id: string;
@@ -38,8 +38,8 @@ export default function RrhhOperationalPeoplePage() {
   const params = new URLSearchParams();
   if (query.trim()) params.set('q', query.trim());
   const { data, error, isLoading } = useSWR(`/api/people/intelligence?${params.toString()}`, fetcher);
-  const overview = data?.overview || {};
-  const people: PersonRow[] = Array.isArray(data?.people) ? data.people : [];
+  const overview = error ? {} : data?.overview || {};
+  const people: PersonRow[] = !error && Array.isArray(data?.people) ? data.people : [];
 
   return (
     <div className="space-y-6">
@@ -71,7 +71,7 @@ export default function RrhhOperationalPeoplePage() {
             <span>Persona</span><span>OT</span><span>Activos</span><span>Competencias</span><span>Estado</span>
           </div>
           {isLoading ? <p className="p-6 text-sm text-muted-foreground">Cargando personas...</p> : null}
-          {!isLoading && !people.length ? <p className="p-8 text-center text-sm text-muted-foreground">No hay personas para los filtros seleccionados.</p> : null}
+          {!isLoading && !error && !people.length ? <p className="p-8 text-center text-sm text-muted-foreground">No hay personas para los filtros seleccionados.</p> : null}
           {people.map((person) => {
             const incomplete = person.work_order_count > 0 && person.valid_competency_count === 0;
             return (

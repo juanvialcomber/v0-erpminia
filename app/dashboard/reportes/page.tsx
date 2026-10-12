@@ -25,8 +25,14 @@ export default function ReportesPage() {
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload) throw new Error('No fue posible cargar el resumen documental');
 
-      const pending = Number(payload.pending || 0);
-      const total = Number(payload.totalDocuments || 0);
+      // DocumentService.getDashboardStats returns { total, pending, approved, expired }.
+      // Missing or invalid counts must not be presented as real zeroes.
+      const validCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+      if (!validCount(payload.total) || !validCount(payload.pending)) {
+        throw new Error('Resumen documental sin conteos válidos');
+      }
+      const pending = payload.pending as number;
+      const total = payload.total as number;
       setSummary({
         total,
         pending,

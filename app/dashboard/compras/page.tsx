@@ -9,6 +9,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { OperationalPipelineBoard } from '@/components/pipeline/operational-pipeline-board';
 
 type Overview = {
+  canEdit: boolean;
   canonical: {
     purchaseOrders: number;
     suppliers: number;
@@ -50,7 +51,7 @@ export default function ComprasPage() {
         </PageHeaderContent>
         <PageHeaderActions>
           <Button asChild>
-            <Link href="/dashboard/compras/flujo"><Plus className="h-4 w-4" />Nueva compra</Link>
+            <Link href="/dashboard/compras/flujo">{data?.canEdit === true ? <Plus className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}{data?.canEdit === true ? 'Nueva compra' : 'Ver seguimiento'}</Link>
           </Button>
         </PageHeaderActions>
       </PageHeader>
@@ -76,7 +77,7 @@ export default function ComprasPage() {
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-card px-4 py-4">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">{isLoading || value === undefined ? '—' : Number(value).toLocaleString('es-CL')}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{isLoading || error || typeof value !== 'number' || !Number.isFinite(value) ? '—' : value.toLocaleString('es-CL')}</p>
           </div>
         ))}
       </section>
@@ -98,17 +99,17 @@ export default function ComprasPage() {
         <Link href="/dashboard/compras/flujo" className="rounded-lg border p-4 hover:bg-muted/30">
           <PackageCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Flujo operacional</p>
-          <p className="mt-1 text-xs text-muted-foreground">{data?.operational.receipts ?? '—'} recepciones · {data?.operational.invoices ?? '—'} facturas.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error ? '—' : data?.operational.receipts ?? '—'} recepciones · {error ? '—' : data?.operational.invoices ?? '—'} facturas.</p>
         </Link>
         <Link href="/dashboard/compras/facturas" className="rounded-lg border p-4 hover:bg-muted/30">
           <FileText className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Finanzas de proveedor</p>
-          <p className="mt-1 text-xs text-muted-foreground">{data?.operational.accountsPayable ?? '—'} cuentas por pagar registradas.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error ? '—' : data?.operational.accountsPayable ?? '—'} cuentas por pagar registradas.</p>
         </Link>
         <Link href="/dashboard/compras/documentos" className="rounded-lg border p-4 hover:bg-muted/30">
           <FileText className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Documentos</p>
-          <p className="mt-1 text-xs text-muted-foreground">{data?.operational.documents ?? '—'} documentos activos en el núcleo documental.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error ? '—' : data?.operational.documents ?? '—'} documentos activos en el núcleo documental.</p>
         </Link>
         <Link href="/dashboard/compras/fuentes" className="rounded-lg border p-4 hover:bg-muted/30">
           <Database className="h-4 w-4 text-muted-foreground" />
