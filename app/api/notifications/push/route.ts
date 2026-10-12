@@ -90,11 +90,11 @@ export async function PUT(request: NextRequest) {
   const configError = getWebPushConfigError();
   if (configError) return NextResponse.json({ error: configMessages[configError], code: configError }, { status: 503, headers: noStore });
   const body = await request.json().catch(() => null);
-  if (body?.endpoint !== undefined && (typeof body.endpoint !== 'string' || !validEndpoint(body.endpoint)))
-    return NextResponse.json({ error: 'Dispositivo inválido' }, { status: 400 });
+  if (typeof body?.endpoint !== 'string' || !validEndpoint(body.endpoint))
+    return NextResponse.json({ error: 'Selecciona una suscripción válida del dispositivo actual' }, { status: 400 });
   let subscriptionsQuery = ctx.supabase.from('user_push_subscriptions')
     .select('id,endpoint,p256dh,auth_secret,last_test_at').eq('organization_id', ctx.organizationId).eq('user_id', ctx.userId).eq('enabled', true);
-  if (body?.endpoint) subscriptionsQuery = subscriptionsQuery.eq('endpoint', body.endpoint);
+  subscriptionsQuery = subscriptionsQuery.eq('endpoint', body.endpoint);
   const { data: subscriptions, error } = await subscriptionsQuery.limit(5);
   if (error) return NextResponse.json({ error: 'No fue posible cargar dispositivos' }, { status: 500 });
   if (!subscriptions?.length) return NextResponse.json({ error: 'Activa las notificaciones en este dispositivo primero' }, { status: 409 });

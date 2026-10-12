@@ -54,7 +54,24 @@ export default function PushPilotPage() {
   }
   async function checkReceipt() {
     setBusy(true);
-    try { await refreshReceiptStatus(); setMessage('Recepción actualizada. Un aviso creado aún necesita comprobación visual en Windows.'); }
+    try {
+      const updated = await refreshReceiptStatus();
+      if (!updated.length) {
+        setMessage('No hay pruebas de envío registradas. Revisar recepción no envía una notificación; usa «Enviar prueba a mi dispositivo».');
+      } else {
+        const latest = updated[0];
+        const provider = latest.providerStatus === null ? 'sin respuesta registrada'
+          : latest.providerStatus >= 200 && latest.providerStatus < 300 ? 'aceptó el envío'
+          : latest.providerStatus === 0 ? 'sin respuesta del proveedor'
+          : 'rechazó el envío (HTTP ' + latest.providerStatus + ')';
+        const receiver = latest.clickedAt ? 'aviso pulsado'
+          : latest.displayedAt ? 'aviso creado por el navegador; banner de Windows sin verificar'
+          : latest.displayError ? 'no se pudo crear el aviso'
+          : latest.receivedAt ? 'evento Push recibido; aviso todavía sin confirmar'
+          : 'sin recepción confirmada por el navegador';
+        setMessage('Última prueba: proveedor ' + provider + '; ' + receiver + '. Esta consulta no envía una prueba nueva.');
+      }
+    }
     catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible revisar la recepción.'); }
     finally { setBusy(false); }
   }
@@ -150,7 +167,8 @@ export default function PushPilotPage() {
     try {
       const registration = await readyPushReceiver();
       const subscription = await registration.pushManager.getSubscription();
-      const result: PushTestResult = await api('PUT', subscription ? { endpoint: subscription.endpoint } : undefined);
+      if (!subscription) throw new Error('Activa las notificaciones en este dispositivo antes de enviar una prueba.');
+      const result: PushTestResult = await api('PUT', { endpoint: subscription.endpoint });
       const summary = `Proveedor Push: ${result.accepted} de ${result.attempted} envíos aceptados.`;
       const failures = result.results.filter((item) => !item.accepted)
         .map((item) => item.status === 0 ? 'sin respuesta (red o configuración)' : `HTTP ${item.status}`);
