@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 type Status = { publicKey: string | null; devices: number };
+type PushTestResult = { attempted: number; accepted: number; results: { status: number; accepted: boolean }[] };
 function urlBase64ToUint8Array(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
   const bytes = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
@@ -71,8 +72,17 @@ export default function PushPilotPage() {
     setBusy(true);
     setMessage('');
     try {
-      const result = await api('PUT');
-      setMessage(result.accepted ? 'Notificación aceptada por el servicio Push. Comprueba el dispositivo.' : 'No se pudo entregar la notificación al servicio Push.');
+      const result: PushTestResult = await api('PUT');
+      const summary = `Proveedor Push: ${result.accepted} de ${result.attempted} envíos aceptados.`;
+      const failures = result.results.filter((item) => !item.accepted)
+        .map((item) => item.status === 0 ? 'sin respuesta (red o configuración)' : `HTTP ${item.status}`);
+      setMessage([
+        summary,
+        result.accepted > 0
+          ? 'La aceptación del proveedor no confirma recepción. Comprueba que el aviso aparezca y que al pulsarlo abra MOTIL.'
+          : 'No se confirmó aceptación del proveedor.',
+        failures.length ? `Fallos: ${failures.join(', ')}.` : '',
+      ].filter(Boolean).join(' '));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Error enviando notificación');
     } finally { setBusy(false); }
@@ -81,7 +91,8 @@ export default function PushPilotPage() {
     <div className="min-w-0"><p className="text-sm text-muted-foreground">MOTIL · Piloto</p><h1 className="break-words text-2xl font-semibold">Notificaciones a mi dispositivo</h1><p className="mt-2 break-words text-sm text-muted-foreground">Primero activa las notificaciones desde este teléfono o computador. Después prueba un aviso personal.</p></div>
     <div className="space-y-3">
       <Button className="w-full min-h-14" disabled={busy} onClick={() => void activate()}>1. Activar notificaciones</Button>
-      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>\n      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
+      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>
+      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
     </div>
     {devices !== null ? <p className="text-sm text-muted-foreground">Dispositivos activos: {devices}</p> : null}
     {message ? <p role="status" className="rounded-lg border p-4 text-sm">{message}</p> : null}
