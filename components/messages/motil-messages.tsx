@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { RecipientSearch } from '@/components/messages/recipient-search';
-import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, X } from 'lucide-react';
+import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/dictionaries';
 
@@ -25,6 +26,10 @@ type SearchResult = {
   kind: 'general' | 'direct'; text: string; createdAt: string;
 };
 type SearchResponse = { results: SearchResult[] };
+type ChatWorkOrderContext = {
+  id: string; number: string; title: string; status: string | null; linkedAt: string;
+};
+type ChatWorkOrderContexts = { contexts: ChatWorkOrderContext[] };
 
 const copy = {
   es: {
@@ -51,6 +56,7 @@ const copy = {
     searchHint: 'Escribe al menos 2 caracteres', searching: 'Buscando…',
     searchEmpty: 'No hay mensajes que coincidan.', searchError: 'No se pudo buscar. Reintenta.',
     located: 'Mensaje encontrado', returnToRecent: 'Volver a recientes',
+    relatedWorkOrders: 'Órdenes de trabajo vinculadas',
   },
   en: {
     title: 'Messages', subtitle: 'Your organization conversations',
@@ -76,6 +82,7 @@ const copy = {
     searchHint: 'Enter at least 2 characters', searching: 'Searching…',
     searchEmpty: 'No matching messages.', searchError: 'Search failed. Retry.',
     located: 'Found message', returnToRecent: 'Back to recent',
+    relatedWorkOrders: 'Linked work orders',
   },
 };
 
@@ -156,6 +163,13 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     ? inbox?.conversations.find((conversation) => conversation.id === preferredThread)
     : undefined;
   const threadId = selected?.id || null;
+  const requestedWorkOrder = searchParams.get('workOrder');
+  const { data: workOrderContexts } = useSWR<ChatWorkOrderContexts>(
+    threadId && selected?.kind === 'direct'
+      ? '/api/messages/work-order-contexts?threadId=' + encodeURIComponent(threadId) : null,
+    (url: string) => requestJson<ChatWorkOrderContexts>(url),
+    { revalidateOnFocus: true, refreshInterval: 30000 },
+  );
 
   const { data: history, error: historyError, isLoading: loadingHistory, mutate: reloadHistory } = useSWR<History>(
     threadId ? '/api/messages/thread/' + threadId +
@@ -499,6 +513,21 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                     <RefreshCw className="h-4 w-4"/>
                   </Button>
                 </div>
+                {workOrderContexts?.contexts.length ? (
+                  <div className="flex items-center gap-2 overflow-x-auto border-b px-4 py-2 text-xs"
+                    aria-label={t.relatedWorkOrders}>
+                    <Wrench className="h-4 w-4 shrink-0 text-muted-foreground"/>
+                    {workOrderContexts.contexts.map((order) => (
+                      <Link key={order.id}
+                        href={'/dashboard/mantenimiento/ordenes-trabajo/' + encodeURIComponent(order.id)}
+                        title={order.title}
+                        className={'shrink-0 rounded-md border px-2 py-1 font-medium hover:bg-muted ' +
+                          (requestedWorkOrder === order.id ? 'border-primary/50 bg-primary/10' : '')}>
+                        {order.number}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="relative min-h-0 flex-1">
                   <div ref={scrollRef} onScroll={updateScrollPosition}
                     className="h-full space-y-4 overflow-y-auto bg-muted/10 px-4 py-5" aria-live="polite">

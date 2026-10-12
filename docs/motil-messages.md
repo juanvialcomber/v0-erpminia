@@ -61,3 +61,40 @@ Keep `WEB_PUSH_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` config
 Later integration must use server-only encrypted environment variables for Green API instance ID and token; register a verified webhook and never trust incoming contact identity or file content automatically. Verify webhook origin/secret and deduplicate events before any human-facing message is created. Unmatched contacts remain in quarantine. Outgoing WhatsApp should be opt-in for urgent alerts or ingestion workflows; it must not replace the canonical MOTIL message archive. No Green API HTTP calls or webhooks are enabled in this release.
 
 **Credential note:** Green API screenshots can reveal API tokens. Rotate any token that was exposed in a screenshot before configuring this integration.
+
+
+## Contextual work-order links (OT) — additive extension
+
+An OT can be associated with an existing or newly opened **direct conversation**
+using the official MOTIL chat. No parallel OT chat table is created, no
+synthetic message is emitted, and the maintenance work order's status, assigned
+employee, timer, evidence and closure remain unchanged.
+
+- Table: public.motil_message_work_order_contexts, unique on
+  (organization_id,thread_id,work_order_id).
+- A composite FK prevents cross-organization chat-thread references; a
+  database insert trigger independently verifies the OT belongs to the same
+  organization and the actor is an active participant of a direct thread.
+- A server-side guard checks BOTH chat participants can read the actual OT
+  (MANT_OPERACIONES role permission OR assigned operational executor) and
+  obey workshop-head site restrictions. Every contextual OT title/number
+  lookup rechecks the viewer's permission. General channel is excluded.
+- An authorized OT page lists only direct conversations where the current
+  reader is a participant. Searching a colleague links or reuses the canonical
+  unordered-pair DM, then opens /dashboard/mensajes?thread=...&workOrder=...
+- Chat displays authorized OT tags that return to the canonical OT detail.
+- The link action does NOT mark any message as read or create/alter a message.
+  A user must actively send a message in the existing composer for a
+  notification and permanent message history.
+- Each link has created_by and created_at for audit. Links are not a separate
+  communication log, and their deletion is not exposed in the application.
+
+### Validation requirements
+
+Verify user A and B can both read the OT, including workshop head scope,
+before allowing a link; user C in another organization and a direct-message
+nonparticipant must not see it. Repeated POST must not duplicate rows.
+Existing OT timer/close flows and the canonical chat's message count must
+remain unchanged during link setup. Run authenticated checks with two
+different human sessions; do not use a service-role DB response to claim
+browser-level authorization is correct.
