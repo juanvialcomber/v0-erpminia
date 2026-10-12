@@ -49,7 +49,7 @@ export function MessageUnreadBadge() {
 export function MessageNotifications({
   locale, showOperationalAlerts = false,
 }: { locale: Locale; showOperationalAlerts?: boolean }) {
-  const { data, error, isLoading } = useUnreadMessages();
+  const { data, error, isLoading, mutate } = useUnreadMessages();
   const es = locale !== 'en';
   const title = es ? 'Notificaciones' : 'Notifications';
   const number = data?.totalUnread || 0;
@@ -78,9 +78,14 @@ export function MessageNotifications({
           {es ? 'Mensajes sin leer' : 'Unread messages'}
         </DropdownMenuLabel>
         {error ? (
-          <p className="px-2 py-3 text-xs text-muted-foreground">
-            {es ? 'No se pudo consultar la bandeja.' : 'Could not load the inbox.'}
-          </p>
+          <div role="alert" className="flex items-center justify-between gap-2 px-2 py-3">
+            <p className="text-xs text-muted-foreground">
+              {es ? 'No se pudo consultar la bandeja.' : 'Could not load the inbox.'}
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void mutate()}>
+              {es ? 'Reintentar' : 'Retry'}
+            </Button>
+          </div>
         ) : isLoading || !data ? (
           <p className="px-2 py-3 text-xs text-muted-foreground">
             {es ? 'Consultando mensajes…' : 'Checking messages…'}

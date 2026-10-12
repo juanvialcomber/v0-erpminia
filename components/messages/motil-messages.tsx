@@ -161,6 +161,8 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   const pendingOlderScrollRef = useRef<{ threadId: string; height: number; top: number } | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const pendingMessageId = useRef<string | null>(null);
+  const draftsByThread = useRef<Record<string, string>>({});
+  const composerThreadRef = useRef<string | null>(null);
   const acknowledged = useRef<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +200,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     (url: string) => requestJson<History>(url),
     { refreshInterval: 4000, revalidateOnFocus: true },
   );
+
+  useEffect(() => {
+    composerThreadRef.current = threadId;
+    setDraft(threadId ? draftsByThread.current[threadId] || '' : '');
+  }, [threadId]);
 
   useEffect(() => {
     setOlder([]);
@@ -299,7 +306,6 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     setPreferredThread(id);
     setTargetMessageId(messageId || null);
     setMobileConversation(true);
-    setDraft('');
     setStatus('');
     router.replace('/dashboard/mensajes?thread=' + encodeURIComponent(id) +
       (messageId ? '&message=' + encodeURIComponent(messageId) : ''), { scroll: false });
@@ -329,7 +335,8 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     try {
       await postJson('/api/messages', { threadId, text, clientMessageId });
       pendingMessageId.current = null;
-      setDraft('');
+      delete draftsByThread.current[threadId];
+      setDraft((current) => composerThreadRef.current === threadId ? '' : current);
       await Promise.all([reloadHistory(), reloadInbox(), mutateGlobal('/api/messages/unread')]);
       const el = scrollRef.current;
       if (el) el.scrollTop = el.scrollHeight;
@@ -405,9 +412,15 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   };
 
   const totalUnread = (inbox?.conversations || []).reduce((total, conversation) => total + conversation.unread, 0);
-  const visibleConversations = (inbox?.conversations || []).filter(
-    (conversation) => !unreadOnly || conversation.unread > 0 || conversation.id === threadId,
-  );
+  // Actionable unread conversations first; use activity time and a stable ID tie-breaker.
+  // Sorting a copy preserves the canonical order returned by the server.
+  const visibleConversations = (inbox?.conversations || [])
+    .filter((conversation) => !unreadOnly || conversation.unread > 0 || conversation.id === threadId)
+    .sort((a, b) =>
+      Number(b.unread > 0) - Number(a.unread > 0)
+      || (b.lastMessageAt || '').localeCompare(a.lastMessageAt || '')
+      || a.id.localeCompare(b.id),
+    );
 
   return (
     <section className="mx-auto w-full max-w-6xl space-y-4">
@@ -637,7 +650,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                   <div className="flex items-end gap-2">
                     <textarea ref={composerRef} aria-label={t.placeholder} placeholder={t.placeholder} value={draft}
                       maxLength={2000} rows={2} disabled={saving || creating || Boolean(recipientId)}
-                      onChange={(event) => { setDraft(event.target.value); pendingMessageId.current = null; }}
+                      onChange={(event) => { setDraft(event.target.value); if (threadId) draftsByThread.current[threadId] = event.target.value; pendingMessageId.current = null; }}
                       onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }}
                       className="max-h-40 min-h-14 min-w-0 flex-1 resize-y rounded-lg border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
                     <Button type="button" className="min-h-12" disabled={!draft.trim() || saving || creating || Boolean(recipientId)} onClick={() => void send()}>
