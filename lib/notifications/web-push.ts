@@ -77,7 +77,7 @@ function encryptPayload(subscription: Subscription, message: string): Buffer {
   return Buffer.concat([salt, rs, Buffer.from([senderPublic.length]), senderPublic, encrypted]);
 }
 
-export async function sendWebPush(subscription: Subscription, payload: { title: string; body: string; url: string }) {
+export async function sendWebPush(subscription: Subscription, payload: { title: string; body: string; url: string; receipt?: { testId: string; token: string } }) {
   const endpoint = new URL(subscription.endpoint);
   if (endpoint.protocol !== 'https:' || !['443', ''].includes(endpoint.port)) throw new Error('Endpoint Web Push inseguro');
   const authorization = vapidAuthorization(endpoint.href);
@@ -88,8 +88,8 @@ export async function sendWebPush(subscription: Subscription, payload: { title: 
       Authorization: authorization,
       'Content-Encoding': 'aes128gcm',
       'Content-Type': 'application/octet-stream',
-      'TTL': '60',
-      'Urgency': 'normal',
+      'TTL': '300',
+      'Urgency': 'high',
     },
     body: new Uint8Array(ciphertext),
     signal: AbortSignal.timeout(10000),

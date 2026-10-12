@@ -48,6 +48,9 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_PUSH_PILOT_CAPABILITIES') {
+    event.ports[0]?.postMessage({ receipts: true });
+  }
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
@@ -59,6 +62,16 @@ self.addEventListener('message', (event) => {
   }
 });
 
+function reportPilotReceipt(receipt, stage) {
+  if (!receipt || typeof receipt.testId !== 'string' || typeof receipt.token !== 'string' ||
+      !/^[0-9a-f-]{36}$/i.test(receipt.testId) || !/^[a-zA-Z0-9_-]{43}$/.test(receipt.token)) return Promise.resolve();
+  return fetch('/api/notifications/push/receipt', {
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ testId: receipt.testId, token: receipt.token, stage }),
+    signal: AbortSignal.timeout(4000),
+  }).catch(() => undefined);
+}
+
 self.addEventListener('push', (event) => {
   let notification;
   try { notification = event.data?.json(); } catch { notification = null; }
@@ -67,18 +80,28 @@ self.addEventListener('push', (event) => {
   const body = typeof notification.body === 'string' ? notification.body.slice(0, 400) : '';
   const url = typeof notification.url === 'string' && notification.url.startsWith('/') && !notification.url.startsWith('//')
     ? notification.url : '/dashboard';
-  event.waitUntil(self.registration.showNotification(title, {
-    body, icon: '/icon-192.png', badge: '/icon-192.png', data: { url }, tag: 'motil-test-push', renotify: true, requireInteraction: true,
-  }));
+  const received = reportPilotReceipt(notification.receipt, 'received');
+  const displayed = Promise.resolve().then(() => self.registration.showNotification(title, {
+    body, icon: '/icon-192.png', badge: '/icon-192.png',
+    data: { url, receipt: notification.receipt }, tag: 'motil-test-push',
+    renotify: true, requireInteraction: true,
+  })).then(
+    () => reportPilotReceipt(notification.receipt, 'displayed'),
+    () => reportPilotReceipt(notification.receipt, 'display_failed'),
+  );
+  event.waitUntil(Promise.allSettled([received, displayed]));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const target = new URL(event.notification.data?.url || '/dashboard', self.location.origin);
   if (target.origin !== self.location.origin) return;
-  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
-    const match = windows.find((windowClient) => new URL(windowClient.url).origin === target.origin);
-    if (match) { await match.focus(); return match.navigate(target.href); }
-    return clients.openWindow(target.href);
-  }));
+  event.waitUntil(Promise.allSettled([
+    reportPilotReceipt(event.notification.data?.receipt, 'clicked'),
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
+      const match = windows.find((windowClient) => new URL(windowClient.url).origin === target.origin);
+      if (match) { await match.focus(); return match.navigate(target.href); }
+      return clients.openWindow(target.href);
+    }),
+  ]));
 });
