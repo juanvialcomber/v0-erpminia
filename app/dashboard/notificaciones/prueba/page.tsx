@@ -78,6 +78,27 @@ export default function PushPilotPage() {
       setMessage(error instanceof Error ? error.message : 'No se pudo restablecer este navegador');
     } finally { setBusy(false); }
   }
+  async function testLocal() {
+    setBusy(true);
+    setMessage('');
+    try {
+      if (!('Notification' in window) || !('serviceWorker' in navigator))
+        throw new Error('Este navegador no admite notificaciones.');
+      const permission = Notification.permission === 'default'
+        ? await Notification.requestPermission() : Notification.permission;
+      if (permission !== 'granted') throw new Error('Las notificaciones de MOTIL están bloqueadas en Chrome.');
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification('MOTIL · Prueba en este equipo', {
+        body: 'Este aviso se creó directamente en tu navegador. Pulsa para abrir MOTIL.',
+        data: { url: '/dashboard' }, tag: 'motil-local-test',
+        renotify: true, requireInteraction: true,
+      });
+      setMessage('El navegador aceptó crear el aviso local. Si no aparece, revisa Windows → Sistema → Notificaciones: Chrome, banners y No molestar. Esto todavía no confirma recepción de un mensaje Push.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible mostrar el aviso local.');
+    } finally { setBusy(false); }
+  }
+
   async function test() {
     setBusy(true);
     setMessage('');
@@ -102,6 +123,7 @@ export default function PushPilotPage() {
     <div className="space-y-3">
       <Button className="w-full min-h-14" disabled={busy} onClick={() => void activate()}>1. Activar notificaciones</Button>
       <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>
+      <Button className="w-full" variant="outline" disabled={busy} onClick={() => void testLocal()}>Comprobar aviso en este equipo</Button>
       <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
     </div>
     {devices !== null ? <p className="text-sm text-muted-foreground">Dispositivos activos: {devices}</p> : null}
