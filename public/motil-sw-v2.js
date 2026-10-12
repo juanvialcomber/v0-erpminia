@@ -1,4 +1,4 @@
-const MOTIL_SW_VERSION = 'motil-pwa-v3-push';
+const MOTIL_SW_VERSION = 'motil-pwa-v4-push';
 const OFFLINE_SHELL_CACHE = 'motil-offline-shell-v3';
 const OFFLINE_SHELL_URL = '/offline-maintenance.html';
 const TERRAIN_ASSETS = [OFFLINE_SHELL_URL, '/motil-terrain.mjs', '/motil-terrain-ui.mjs'];
@@ -16,13 +16,18 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter((name) => LEGACY_CACHES.has(name) || (name.startsWith('motil-offline-shell-') && name !== OFFLINE_SHELL_CACHE))
-          .map((name) => caches.delete(name)),
-      );
+      // Cache failures must not block the notification receiver.
       await self.clients.claim();
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames
+            .filter((name) => LEGACY_CACHES.has(name) || (name.startsWith('motil-offline-shell-') && name !== OFFLINE_SHELL_CACHE))
+            .map((name) => caches.delete(name).catch(() => false)),
+        );
+      } catch {
+        // Cache storage is optional; push delivery remains available.
+      }
     })(),
   );
 });
@@ -66,11 +71,17 @@ self.addEventListener('message', (event) => {
 function reportPilotReceipt(receipt, stage) {
   if (!receipt || typeof receipt.testId !== 'string' || typeof receipt.token !== 'string' ||
       !/^[0-9a-f-]{36}$/i.test(receipt.testId) || !/^[a-zA-Z0-9_-]{43}$/.test(receipt.token)) return Promise.resolve();
-  return fetch('/api/notifications/push/receipt', {
-    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ testId: receipt.testId, token: receipt.token, stage }),
-    signal: AbortSignal.timeout(4000),
-  }).catch(() => undefined);
+  try {
+    const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+      ? AbortSignal.timeout(4000) : undefined;
+    return fetch('/api/notifications/push/receipt', {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testId: receipt.testId, token: receipt.token, stage }),
+      ...(signal ? { signal } : {}),
+    }).catch(() => undefined);
+  } catch {
+    return Promise.resolve();
+  }
 }
 
 self.addEventListener('push', (event) => {
@@ -85,7 +96,7 @@ self.addEventListener('push', (event) => {
     ? notification.tag : 'motil-test-push';
   const received = reportPilotReceipt(notification.receipt, 'received');
   const displayed = Promise.resolve().then(() => self.registration.showNotification(title, {
-    body, icon: '/icon-192.png', badge: '/icon-192.png',
+    body, icon: '/icon-512.png', badge: '/icon-512.png',
     data: { url, receipt: notification.receipt }, tag,
     renotify: true, requireInteraction: true,
   })).then(
