@@ -1,4 +1,4 @@
-const MOTIL_SW_VERSION = 'motil-pwa-v2';
+const MOTIL_SW_VERSION = 'motil-pwa-v3-push';
 const OFFLINE_SHELL_CACHE = 'motil-offline-shell-v3';
 const OFFLINE_SHELL_URL = '/offline-maintenance.html';
 const TERRAIN_ASSETS = [OFFLINE_SHELL_URL, '/motil-terrain.mjs', '/motil-terrain-ui.mjs'];
@@ -8,8 +8,9 @@ const LEGACY_CACHES = new Set([
 ]);
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(OFFLINE_SHELL_CACHE).then((cache) => cache.addAll(TERRAIN_ASSETS)));
-  self.skipWaiting();
+  // Push receipt activation must not depend on offline asset availability.
+  // Offline pre-caching is postponed until its reliability is verified separately.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {

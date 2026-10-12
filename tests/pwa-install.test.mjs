@@ -94,7 +94,7 @@ test('Android migrates away from stale legacy service worker registrations', () 
   assert.match(registrar, /endsWith\('\/sw\.js'\)/);
   assert.match(registrar, /registration\.unregister\(\)/);
   assert.match(registrar, /motil-sw-v2\.js/);
-  assert.match(serviceWorker, /MOTIL_SW_VERSION = 'motil-pwa-v2'/);
+  assert.match(serviceWorker, /MOTIL_SW_VERSION = 'motil-pwa-v3-push'/);
 });
 
 
