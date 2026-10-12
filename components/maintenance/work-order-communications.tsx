@@ -55,7 +55,7 @@ export function WorkOrderCommunications({ workOrderId, locale }: { workOrderId: 
   };
 
   return (
-    <Card id="motil-wo-communications" className="shadow-none">
+    <Card id="motil-wo-communications" className="scroll-mt-20 shadow-none">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageSquareText className="h-4 w-4"/>

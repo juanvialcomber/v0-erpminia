@@ -62,3 +62,12 @@ test('OT and chat both navigate the single preserved canonical conversation', ()
   assert.match(chat, /\/dashboard\/mantenimiento\/ordenes-trabajo\//);
   assert.doesNotMatch(component, /\/api\/maintenance\/work-orders\//);
 });
+
+test('OT communication shortcut remains visible above long completed reports', () => {
+  const card = read('components/maintenance/work-order-communications.tsx');
+  assert.match(detailPage, /href="#motil-wo-communications"/);
+  assert.match(detailPage, /Mensajes OT/);
+  assert.match(detailPage, /<MessageSquareText/);
+  assert.match(card, /id="motil-wo-communications"/);
+  assert.match(card, /scroll-mt-20/);
+});
