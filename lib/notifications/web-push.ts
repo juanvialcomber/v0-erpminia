@@ -37,7 +37,7 @@ function getVapidDetails() {
   return { publicKey, privateKey, subject };
 }
 
-export async function sendWebPush(subscription: Subscription, payload: { title: string; body: string; url: string; receipt?: { testId: string; token: string } }) {
+export async function sendWebPush(subscription: Subscription, payload: { title: string; body: string; url: string; receipt?: { testId: string; token: string }; tag?: string }) {
   const endpoint = new URL(subscription.endpoint);
   if (endpoint.protocol !== 'https:' || !['443', ''].includes(endpoint.port)) throw new Error('Endpoint Web Push inseguro');
   const details = getVapidDetails();

@@ -81,10 +81,12 @@ self.addEventListener('push', (event) => {
   const body = typeof notification.body === 'string' ? notification.body.slice(0, 400) : '';
   const url = typeof notification.url === 'string' && notification.url.startsWith('/') && !notification.url.startsWith('//')
     ? notification.url : '/dashboard';
+  const tag = typeof notification.tag === 'string' && /^motil-msg-[0-9a-f-]{36}$/i.test(notification.tag)
+    ? notification.tag : 'motil-test-push';
   const received = reportPilotReceipt(notification.receipt, 'received');
   const displayed = Promise.resolve().then(() => self.registration.showNotification(title, {
     body, icon: '/icon-192.png', badge: '/icon-192.png',
-    data: { url, receipt: notification.receipt }, tag: 'motil-test-push',
+    data: { url, receipt: notification.receipt }, tag,
     renotify: true, requireInteraction: true,
   })).then(
     () => reportPilotReceipt(notification.receipt, 'displayed'),

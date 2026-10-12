@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, CalendarDays, Boxes, ChevronDown, CircleDollarSign, FileCheck, Gem, HelpCircle, Home, Leaf, LogOut, Menu, ShieldCheck, ShoppingCart, Users, Wrench, X, Zap, type LucideIcon } from 'lucide-react';
+import { Activity, CalendarDays, Boxes, ChevronDown, CircleDollarSign, FileCheck, Gem, HelpCircle, Home, Leaf, LogOut, Menu, MessageSquare, ShieldCheck, ShoppingCart, Users, Wrench, X, Zap, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,7 @@ const menuItems: MenuItem[] = [
   { itemKey: 'home', href: '/dashboard', icon: Home, group: 'main', roles: allStandardRoles },
   { itemKey: 'daily', href: '/dashboard/daily-management', icon: Activity, group: 'main', roles: operationalRoles },
   { itemKey: 'calendar', href: '/dashboard/tareas', icon: CalendarDays, group: 'main', roles: allStandardRoles },
+  { itemKey: 'messages', href: '/dashboard/mensajes', icon: MessageSquare, group: 'main' },
   { itemKey: 'production', href: '/dashboard/produccion', icon: Zap, group: 'areas', moduleKey: 'prod_operaciones', roles: ['superadmin','admin','Operaciones-Supervisor','jefe_mantencion','jefe_planta','jefe_produccion'] },
   { itemKey: 'geology', href: '/dashboard/produccion/geologia', icon: Gem, group: 'areas', moduleKey: 'prod_geologia' },
   { itemKey: 'maintenance', href: '/dashboard/mantenimiento', icon: Wrench, group: 'areas', moduleKey: 'mant_operaciones', roles: ['superadmin','admin','Operaciones-Supervisor','jefe_mantencion'] },
