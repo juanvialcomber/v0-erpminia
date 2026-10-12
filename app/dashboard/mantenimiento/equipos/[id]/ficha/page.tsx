@@ -1,4 +1,5 @@
 import { Asset360Overview } from '@/components/maintenance/asset-360-overview';
+import { getDictionaryForRequest } from '@/lib/i18n/server';
 import { AssetEconomicOperationalHistory } from '@/components/maintenance/asset-economic-operational-history';
 import { AssetEconomicConditionTrend } from '@/components/maintenance/asset-economic-condition-trend';
 
@@ -14,10 +15,11 @@ type FichaPageProps = {
 export default async function FichaPage({ params }: FichaPageProps) {
   const { id } = await params;
   const assetId = decodeURIComponent(id);
+  const { locale } = await getDictionaryForRequest();
 
   return (
     <div className="space-y-4">
-      <Asset360Overview assetId={assetId} />
+      <Asset360Overview assetId={assetId} locale={locale} />
       <details className="group rounded-lg border border-border bg-card">
         <summary className="cursor-pointer list-none px-5 py-4">
           <span className="block text-sm font-semibold">Análisis histórico avanzado</span>

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { RecipientSearch } from '@/components/messages/recipient-search';
-import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, Wrench, X } from 'lucide-react';
+import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, Wrench, Gauge, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/dictionaries';
 
@@ -30,6 +30,8 @@ type ChatWorkOrderContext = {
   id: string; number: string; title: string; status: string | null; linkedAt: string;
 };
 type ChatWorkOrderContexts = { contexts: ChatWorkOrderContext[] };
+type ChatAssetContext = { id: string; code: string; name: string; linkedAt: string };
+type ChatAssetContexts = { contexts: ChatAssetContext[] };
 
 const copy = {
   es: {
@@ -57,6 +59,7 @@ const copy = {
     searchEmpty: 'No hay mensajes que coincidan.', searchError: 'No se pudo buscar. Reintenta.',
     located: 'Mensaje encontrado', returnToRecent: 'Volver a recientes',
     relatedWorkOrders: 'Órdenes de trabajo vinculadas',
+    relatedAssets: 'Activos vinculados',
   },
   en: {
     title: 'Messages', subtitle: 'Your organization conversations',
@@ -83,6 +86,7 @@ const copy = {
     searchEmpty: 'No matching messages.', searchError: 'Search failed. Retry.',
     located: 'Found message', returnToRecent: 'Back to recent',
     relatedWorkOrders: 'Linked work orders',
+    relatedAssets: 'Linked assets',
   },
 };
 
@@ -164,10 +168,17 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     : undefined;
   const threadId = selected?.id || null;
   const requestedWorkOrder = searchParams.get('workOrder');
+  const requestedAsset = searchParams.get('asset');
   const { data: workOrderContexts } = useSWR<ChatWorkOrderContexts>(
     threadId && selected?.kind === 'direct'
       ? '/api/messages/work-order-contexts?threadId=' + encodeURIComponent(threadId) : null,
     (url: string) => requestJson<ChatWorkOrderContexts>(url),
+    { revalidateOnFocus: true, refreshInterval: 30000 },
+  );
+  const { data: assetContexts } = useSWR<ChatAssetContexts>(
+    threadId && selected?.kind === 'direct'
+      ? '/api/messages/asset-contexts?threadId=' + encodeURIComponent(threadId) : null,
+    (url: string) => requestJson<ChatAssetContexts>(url),
     { revalidateOnFocus: true, refreshInterval: 30000 },
   );
 
@@ -524,6 +535,21 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                         className={'shrink-0 rounded-md border px-2 py-1 font-medium hover:bg-muted ' +
                           (requestedWorkOrder === order.id ? 'border-primary/50 bg-primary/10' : '')}>
                         {order.number}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+                {assetContexts?.contexts.length ? (
+                  <div className="flex items-center gap-2 overflow-x-auto border-b px-4 py-2 text-xs"
+                    aria-label={t.relatedAssets}>
+                    <Gauge className="h-4 w-4 shrink-0 text-muted-foreground"/>
+                    {assetContexts.contexts.map((asset) => (
+                      <Link key={asset.id}
+                        href={'/dashboard/mantenimiento/equipos/' + encodeURIComponent(asset.id) + '/ficha#motil-asset-communications'}
+                        title={asset.name}
+                        className={'max-w-48 shrink-0 truncate rounded-md border px-2 py-1 font-medium hover:bg-muted ' +
+                          (requestedAsset === asset.id ? 'border-primary/50 bg-primary/10' : '')}>
+                        {asset.code}
                       </Link>
                     ))}
                   </div>

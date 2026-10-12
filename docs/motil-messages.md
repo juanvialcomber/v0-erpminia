@@ -98,3 +98,36 @@ Existing OT timer/close flows and the canonical chat's message count must
 remain unchanged during link setup. Run authenticated checks with two
 different human sessions; do not use a service-role DB response to claim
 browser-level authorization is correct.
+
+
+## Asset 360 contextual links — extension
+
+Equipment and vehicle 360 fichas can associate a direct MOTIL conversation
+with a canonical asset without creating a second chat log.
+
+- Table public.motil_message_asset_contexts stores organization_id, asset_id,
+  thread_id, created_by and created_at, not a copy of any messages.
+- Asset FK points to canonical.assets(id); a trigger validates SAME tenant for
+  asset/thread and checks the actor is an active direct-thread participant.
+  Unique (organization_id,thread_id,asset_id) makes it idempotent.
+- RLS is enabled; anonymous and authenticated browser roles have no direct
+  table permissions. The server uses the privileged client after auth checks.
+- BOTH direct-message users must be active same-tenant profiles with
+  MANT_OPERACIONES access ED or LEC; matches the operational-360 endpoint.
+- GET /api/messages/asset-contexts?assetId=UUID returns only linked DMs
+  containing the current user. GET ?threadId=UUID returns only assets the
+  current user can still access.
+- POST /api/messages/asset-contexts accepts assetId and recipientId; reuses
+  the canonical direct conversation. Never creates a synthetic message.
+- A compact lazy section is available on equipment AND vehicle fichas;
+  the existing chat displays asset tags linked to the canonical 360 ficha.
+- A link is a reference, NOT evidence of a discussion, approval or activity.
+  Only actual messages create read/audit/Push events.
+
+### Security verification
+
+Never grant asset access based solely on a DM ID or URL. Recheck current
+module permission on every asset lookup; when role membership changes,
+the contextual asset tag must disappear. Verify a real pair of user
+sessions and a denied-role case before declaring end-to-end access tested.
+No canonical asset, work-order or message records are seeded by this feature.

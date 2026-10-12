@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
+import type { Locale } from '@/lib/i18n/dictionaries';
+import { AssetCommunications } from '@/components/maintenance/asset-communications';
 import {
   Activity,
   AlertTriangle,
@@ -209,9 +211,11 @@ const fetcher = async (url: string): Promise<Asset360Response> => {
 export function Asset360Overview({
   assetId,
   scope = 'equipos',
+  locale = 'es',
 }: {
   assetId: string;
   scope?: 'equipos' | 'vehiculos';
+  locale?: Locale;
 }) {
   const [origin, setOrigin] = useState('https://www.motil.app');
   const { data, error, isLoading, mutate } = useSWR<Asset360Response>(
@@ -480,6 +484,8 @@ export function Asset360Overview({
         displayStatus={displayStatus}
         metrics={metrics}
       />
+
+      <AssetCommunications assetId={asset.id} locale={locale} />
 
       <Asset360AttentionCard
         criticalOpen={summary.criticalOpen}
