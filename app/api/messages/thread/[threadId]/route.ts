@@ -19,8 +19,12 @@ export async function GET(
   if (!UUID_PATTERN.test(threadId)) return NextResponse.json({ error: 'Conversación inválida' }, { status: 400 });
 
   const cursor = request.nextUrl.searchParams.get('before');
+  const beforeId = request.nextUrl.searchParams.get('beforeId');
+  const anchorId = request.nextUrl.searchParams.get('anchor');
   const before = cursor ? new Date(cursor) : null;
-  if (cursor && (!before || Number.isNaN(before.getTime()))) {
+  if ((cursor && (Number.isNaN(before?.getTime() ?? NaN) || Boolean(beforeId) || Boolean(anchorId))) ||
+      (beforeId && (!UUID_PATTERN.test(beforeId) || Boolean(anchorId))) ||
+      (anchorId && !UUID_PATTERN.test(anchorId))) {
     return NextResponse.json({ error: 'Cursor inválido' }, { status: 400 });
   }
 
@@ -33,7 +37,23 @@ export async function GET(
       .eq('organization_id', ctx.organizationId).eq('thread_id', threadId)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false }).limit(41);
-    if (before) query = query.lt('created_at', before.toISOString());
+    if (beforeId || anchorId) {
+      // A verified, same-thread message is the pagination/search anchor. Using
+      // both timestamp AND UUID preserves deterministic order on timestamp ties.
+      const cursorId = beforeId || anchorId;
+      const { data: anchor, error: anchorError } = await ctx.supabase.from('motil_message_entries')
+        .select('created_at').eq('organization_id', ctx.organizationId)
+        .eq('thread_id', thread.id).eq('id', cursorId).maybeSingle();
+      if (anchorError) throw anchorError;
+      if (!anchor) return NextResponse.json({ error: 'Mensaje de referencia no disponible' },
+        { status: 404, headers: CHAT_NO_STORE });
+      query = query.or(
+        `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.${anchorId ? 'lte' : 'lt'}.${cursorId})`,
+      );
+    } else if (before) {
+      // Backward compatible with older clients; new clients use beforeId.
+      query = query.lt('created_at', before.toISOString());
+    }
     const { data, error } = await query;
     if (error) throw error;
     const rows = ((data || []) as StoredMessage[]).slice(0, 40);

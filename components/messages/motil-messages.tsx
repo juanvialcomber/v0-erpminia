@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { RecipientSearch } from '@/components/messages/recipient-search';
-import { Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Send, Users } from 'lucide-react';
+import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/dictionaries';
 
@@ -20,6 +20,11 @@ type Message = {
   pushStatus?: string | null;
 };
 type History = { messages: Message[]; hasMore: boolean; peerLastReadAt?: string | null };
+type SearchResult = {
+  id: string; threadId: string; threadName: string; senderName: string;
+  kind: 'general' | 'direct'; text: string; createdAt: string;
+};
+type SearchResponse = { results: SearchResult[] };
 
 const copy = {
   es: {
@@ -41,6 +46,11 @@ const copy = {
     back: 'Conversaciones', newLabel: 'Nuevo mensaje', chars: 'Máximo 2000 caracteres',
     allConversations: 'Todos', unreadConversations: 'Sin leer', noneUnread: 'Sin mensajes pendientes.',
     awaitingRead: 'Pendiente de lectura', readBy: 'Leído por', pushUnavailableLabel: 'Aviso móvil no confirmado',
+    newest: 'Ir a mensajes recientes', newUnread: 'Nuevos mensajes',
+    search: 'Buscar mensajes', searchPlaceholder: 'Buscar en conversaciones…',
+    searchHint: 'Escribe al menos 2 caracteres', searching: 'Buscando…',
+    searchEmpty: 'No hay mensajes que coincidan.', searchError: 'No se pudo buscar. Reintenta.',
+    located: 'Mensaje encontrado', returnToRecent: 'Volver a recientes',
   },
   en: {
     title: 'Messages', subtitle: 'Your organization conversations',
@@ -61,6 +71,11 @@ const copy = {
     back: 'Conversations', newLabel: 'New message', chars: '2000 characters maximum',
     allConversations: 'All', unreadConversations: 'Unread', noneUnread: 'No unread messages.',
     awaitingRead: 'Awaiting read', readBy: 'Read by', pushUnavailableLabel: 'Phone alert unconfirmed',
+    newest: 'Go to recent messages', newUnread: 'New messages',
+    search: 'Search messages', searchPlaceholder: 'Search conversations…',
+    searchHint: 'Enter at least 2 characters', searching: 'Searching…',
+    searchEmpty: 'No matching messages.', searchError: 'Search failed. Retry.',
+    located: 'Found message', returnToRecent: 'Back to recent',
   },
 };
 
@@ -82,6 +97,12 @@ function displayTime(iso: string, locale: Locale) {
       { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
   } catch { return ''; }
 }
+function displayDate(iso: string, locale: Locale) {
+  try {
+    return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-CL',
+      { dateStyle: 'medium' }).format(new Date(iso));
+  } catch { return ''; }
+}
 function base64ToBytes(value: string) {
   const padded = value + '='.repeat((4 - value.length % 4) % 4);
   const text = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
@@ -98,6 +119,10 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     { refreshInterval: 6000, revalidateOnFocus: true },
   );
   const [preferredThread, setPreferredThread] = useState<string | null>(null);
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [recipientId, setRecipientId] = useState('');
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
@@ -109,6 +134,10 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [mobileConversation, setMobileConversation] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
+  const atBottomRef = useRef(true);
+  const activeThreadRef = useRef<string | null>(null);
+  const pendingOlderScrollRef = useRef<{ threadId: string; height: number; top: number } | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const pendingMessageId = useRef<string | null>(null);
   const acknowledged = useRef<Record<string, string>>({});
@@ -117,6 +146,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   useEffect(() => {
     const thread = searchParams.get('thread');
     setPreferredThread(thread);
+    setTargetMessageId(searchParams.get('message'));
     setMobileConversation(Boolean(thread));
   }, [searchParams]);
 
@@ -128,12 +158,30 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   const threadId = selected?.id || null;
 
   const { data: history, error: historyError, isLoading: loadingHistory, mutate: reloadHistory } = useSWR<History>(
-    threadId ? '/api/messages/thread/' + threadId : null,
+    threadId ? '/api/messages/thread/' + threadId +
+      (targetMessageId ? '?anchor=' + encodeURIComponent(targetMessageId) : '') : null,
     (url: string) => requestJson<History>(url),
     { refreshInterval: 4000, revalidateOnFocus: true },
   );
 
-  useEffect(() => { setOlder([]); setStatus(''); pendingMessageId.current = null; }, [threadId]);
+  useEffect(() => {
+    setOlder([]);
+    setStatus('');
+    pendingMessageId.current = null;
+    pendingOlderScrollRef.current = null;
+  }, [threadId, targetMessageId]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setSearchTerm(searchText.trim()), 280);
+    return () => window.clearTimeout(handle);
+  }, [searchText]);
+
+  const { data: searchData, error: searchError, isLoading: searching } = useSWR<SearchResponse>(
+    searchOpen && searchTerm.length >= 2
+      ? '/api/messages/search?q=' + encodeURIComponent(searchTerm) : null,
+    (url: string) => requestJson<SearchResponse>(url),
+    { revalidateOnFocus: false, keepPreviousData: false },
+  );
 
   const messages = useMemo(() => {
     const unique = new Map<string, Message>();
@@ -142,8 +190,58 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   }, [older, history?.messages]);
 
   const lastMessage = history?.messages.at(-1);
+
+  const updateScrollPosition = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    if (nearBottom !== atBottomRef.current) {
+      atBottomRef.current = nearBottom;
+      setAtBottom(nearBottom);
+    }
+  }, []);
+
+  const jumpToRecent = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    atBottomRef.current = true;
+    setAtBottom(true);
+  }, []);
+
+  // Keep the viewer's position when an old page is prepended. Otherwise a
+  // 40-message history load jumps the user away from what they were reading.
+  useLayoutEffect(() => {
+    const pending = pendingOlderScrollRef.current;
+    const el = scrollRef.current;
+    if (!pending || pending.threadId !== threadId || !el) return;
+    el.scrollTop = pending.top + el.scrollHeight - pending.height;
+    pendingOlderScrollRef.current = null;
+    updateScrollPosition();
+  }, [older, threadId, updateScrollPosition]);
+
   useEffect(() => {
-    if (!threadId || !lastMessage || document.visibilityState !== 'visible') return;
+    if (!threadId) {
+      activeThreadRef.current = null;
+      return;
+    }
+    const viewportKey = threadId + ':' + (targetMessageId || 'latest');
+    if (activeThreadRef.current !== viewportKey) {
+      activeThreadRef.current = viewportKey;
+      atBottomRef.current = true;
+      setAtBottom(true);
+    }
+    // Automatically follow new messages only while the viewer is already
+    // near the bottom. Never pull them out of historical messages.
+    if (atBottomRef.current) {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+  }, [threadId, targetMessageId, lastMessage?.id]);
+
+  const acknowledgeVisibleMessage = useCallback(() => {
+    if (!threadId || !lastMessage || document.visibilityState !== 'visible' ||
+        !document.hasFocus() || !atBottomRef.current) return;
     if (window.matchMedia('(max-width: 767px)').matches && !mobileConversation) return;
     if (acknowledged.current[threadId] === lastMessage.id) return;
     acknowledged.current[threadId] = lastMessage.id;
@@ -153,19 +251,24 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   }, [threadId, lastMessage?.id, mobileConversation, reloadInbox, mutateGlobal]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 280) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [threadId, lastMessage?.id]);
+    acknowledgeVisibleMessage();
+    document.addEventListener('visibilitychange', acknowledgeVisibleMessage);
+    window.addEventListener('focus', acknowledgeVisibleMessage);
+    return () => {
+      document.removeEventListener('visibilitychange', acknowledgeVisibleMessage);
+      window.removeEventListener('focus', acknowledgeVisibleMessage);
+    };
+  }, [acknowledgeVisibleMessage, atBottom]);
 
-  const openConversation = (id: string) => {
+  const openConversation = (id: string, messageId?: string) => {
     setPreferredThread(id);
+    setTargetMessageId(messageId || null);
     setMobileConversation(true);
     setDraft('');
     setStatus('');
-    router.replace('/dashboard/mensajes?thread=' + encodeURIComponent(id), { scroll: false });
-    window.setTimeout(() => composerRef.current?.focus(), 80);
+    router.replace('/dashboard/mensajes?thread=' + encodeURIComponent(id) +
+      (messageId ? '&message=' + encodeURIComponent(messageId) : ''), { scroll: false });
+    if (!messageId) window.setTimeout(() => composerRef.current?.focus(), 80);
   };
 
   const createDirect = async (targetId: string) => {
@@ -201,18 +304,24 @@ export function MotilMessages({ locale }: { locale: Locale }) {
 
   const loadOlder = async () => {
     if (!threadId || !history?.hasMore || loadingOlder) return;
-    const before = older[0]?.createdAt || history.messages[0]?.createdAt;
-    if (!before) return;
+    const beforeId = older[0]?.id || history.messages[0]?.id;
+    if (!beforeId) return;
     setLoadingOlder(true);
     try {
-      const page = await requestJson<History>('/api/messages/thread/' + threadId + '?before=' + encodeURIComponent(before));
-      setOlder((current) => [...page.messages, ...current]);
-      if (!page.hasMore) {
-        // Keep the existing latest page but do not offer another older request.
-        setOldestReached(true);
+      const page = await requestJson<History>('/api/messages/thread/' + threadId +
+        '?beforeId=' + encodeURIComponent(beforeId));
+      const viewport = scrollRef.current;
+      if (viewport && page.messages.length > 0) {
+        pendingOlderScrollRef.current = {
+          threadId, top: viewport.scrollTop, height: viewport.scrollHeight,
+        };
       }
-    } catch (error) { setStatus(error instanceof Error ? error.message : t.unavailable); }
-    finally { setLoadingOlder(false); }
+      setOlder((current) => [...page.messages, ...current]);
+      if (!page.hasMore || page.messages.length === 0) setOldestReached(true);
+    } catch (error) {
+      pendingOlderScrollRef.current = null;
+      setStatus(error instanceof Error ? error.message : t.unavailable);
+    } finally { setLoadingOlder(false); }
   };
   const [oldestReached, setOldestReached] = useState(false);
   useEffect(() => setOldestReached(false), [threadId]);
@@ -269,12 +378,60 @@ export function MotilMessages({ locale }: { locale: Locale }) {
           <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
           <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void enablePush()} disabled={pushBusy}>
-          {pushBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bell className="mr-2 h-4 w-4"/>}
-          {t.enablePush}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" size="sm"
+            onClick={() => setSearchOpen((previous) => !previous)}
+            aria-expanded={searchOpen} aria-controls="motil-message-search">
+            <Search className="mr-2 h-4 w-4"/>{t.search}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void enablePush()} disabled={pushBusy}>
+            {pushBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bell className="mr-2 h-4 w-4"/>}
+            {t.enablePush}
+          </Button>
+        </div>
       </div>
       {pushStatus ? <p className="text-sm" role="status">{pushStatus}</p> : null}
+      {searchOpen ? (
+        <section id="motil-message-search" aria-label={t.search} className="rounded-xl border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground"/>
+            <input type="search" aria-label={t.search} autoFocus
+              value={searchText} maxLength={80} placeholder={t.searchPlaceholder}
+              onChange={(event) => setSearchText(event.target.value)}
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"/>
+            <Button type="button" variant="ghost" size="icon" aria-label={t.back}
+              onClick={() => { setSearchOpen(false); setSearchText(''); }}>
+              <X className="h-4 w-4"/>
+            </Button>
+          </div>
+          <div className="max-h-64 space-y-1 overflow-y-auto border-t pt-2" role="list">
+            {searchText.trim().length < 2 ? (
+              <p className="p-3 text-xs text-muted-foreground">{t.searchHint}</p>
+            ) : searching || searchText.trim() !== searchTerm ? (
+              <p className="p-3 text-xs text-muted-foreground">{t.searching}</p>
+            ) : searchError ? (
+              <p className="p-3 text-xs text-destructive">{t.searchError}</p>
+            ) : searchData?.results.length ? (
+              searchData.results.map((result) => (
+                <button key={result.id} type="button" role="listitem"
+                  onClick={() => {
+                    openConversation(result.threadId, result.id);
+                    setSearchOpen(false);
+                    setSearchText('');
+                  }}
+                  className="block w-full rounded-lg px-3 py-2 text-left hover:bg-muted focus-visible:bg-muted">
+                  <span className="block truncate text-xs font-medium">
+                    {result.threadName} · {result.senderName} · {displayDate(result.createdAt, locale)}
+                  </span>
+                  <span className="mt-1 block line-clamp-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                    {result.text}
+                  </span>
+                </button>
+              ))
+            ) : <p className="p-3 text-xs text-muted-foreground">{t.searchEmpty}</p>}
+          </div>
+        </section>
+      ) : null}
       {inboxError ? (
         <div className="rounded-lg border p-6 text-sm">
           <p>{t.unavailable}</p>
@@ -283,7 +440,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
       ) : isLoading ? (
         <p className="py-8 text-sm text-muted-foreground">{t.loading}</p>
       ) : (
-        <div className="grid min-h-[550px] overflow-hidden rounded-xl border bg-card md:grid-cols-[270px_minmax(0,1fr)]">
+        <div className="grid h-[min(74vh,760px)] min-h-[430px] overflow-hidden rounded-xl border bg-card md:min-h-[520px] md:grid-cols-[270px_minmax(0,1fr)]">
           <aside className={(mobileConversation ? 'hidden md:flex ' : 'flex ') + 'min-h-0 flex-col border-r'} aria-label={t.back}>
             <div className="border-b p-3">
               <RecipientSearch locale={locale} busy={creating} onSelect={(targetId) => {
@@ -321,7 +478,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
               ) : <p className="p-4 text-sm text-muted-foreground">{unreadOnly ? t.noneUnread : t.noChats}</p>}
             </div>
           </aside>
-          <div className={(mobileConversation ? 'flex ' : 'hidden md:flex ') + 'min-w-0 flex-col'}>
+          <div className={(mobileConversation ? 'flex ' : 'hidden md:flex ') + 'min-h-0 min-w-0 flex-col'}>
             {selected ? (
               <>
                 <div className="flex min-h-16 items-center gap-3 border-b px-4 py-3">
@@ -330,13 +487,21 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                   </Button>
                   <div className="min-w-0 flex-1">
                     <h2 className="truncate font-medium">{selected.name}</h2>
-                    <p className="text-xs text-muted-foreground">{selected.kind === 'general' ? t.general : t.direct} · {t.refresh}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {selected.kind === 'general' ? t.general : t.direct} · {targetMessageId ? t.located : t.refresh}
+                    </p>
                   </div>
+                  {targetMessageId ? (
+                    <Button type="button" variant="outline" size="sm" className="shrink-0"
+                      onClick={() => openConversation(selected.id)}>{t.returnToRecent}</Button>
+                  ) : null}
                   <Button size="icon" variant="ghost" aria-label={t.retry} onClick={() => { void reloadInbox(); void reloadHistory(); }}>
                     <RefreshCw className="h-4 w-4"/>
                   </Button>
                 </div>
-                <div ref={scrollRef} className="min-h-[340px] flex-1 space-y-4 overflow-y-auto bg-muted/10 px-4 py-5" aria-live="polite">
+                <div className="relative min-h-0 flex-1">
+                  <div ref={scrollRef} onScroll={updateScrollPosition}
+                    className="h-full space-y-4 overflow-y-auto bg-muted/10 px-4 py-5" aria-live="polite">
                   {history?.hasMore && !oldestReached ? (
                     <div className="text-center">
                       <Button type="button" variant="ghost" size="sm" disabled={loadingOlder} onClick={() => void loadOlder()}>{t.older}</Button>
@@ -345,11 +510,22 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                   {loadingHistory && !history ? <p className="text-sm text-muted-foreground">{t.loading}</p> : null}
                   {historyError ? <p className="text-sm text-destructive">{t.unavailable}</p> : null}
                   {!messages.length && !loadingHistory && !historyError ? <p className="pt-20 text-center text-sm text-muted-foreground">{t.noMessages}</p> : null}
-                  {messages.map((m) => {
+                  {messages.map((m, index) => {
                     const own = m.senderId === inbox?.me.id;
-                    return <div key={m.id} className={'flex ' + (own ? 'justify-end' : 'justify-start')}>
-                      <div className={'max-w-[88%] rounded-xl border px-3 py-2 shadow-sm sm:max-w-[75%] ' +
-                        (own ? 'border-primary/15 bg-primary/10' : 'bg-card')}>
+                    const previousDay = index ? new Date(messages[index - 1].createdAt).toDateString() : null;
+                    const day = new Date(m.createdAt).toDateString();
+                    return <div key={m.id} className="space-y-3">
+                      {previousDay !== day ? (
+                        <div role="separator" className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
+                          <span className="h-px flex-1 bg-border"/>
+                          <time dateTime={m.createdAt}>{displayDate(m.createdAt, locale)}</time>
+                          <span className="h-px flex-1 bg-border"/>
+                        </div>
+                      ) : null}
+                      <div className={'flex ' + (own ? 'justify-end' : 'justify-start')}>
+                        <div className={'max-w-[88%] rounded-xl border px-3 py-2 shadow-sm sm:max-w-[75%] ' +
+                        (own ? 'border-primary/15 bg-primary/10' : 'bg-card') +
+                          (m.id === targetMessageId ? ' ring-2 ring-primary' : '')}>
                         {!own && <p className="mb-1 text-xs font-semibold">{m.senderName}</p>}
                         <p className="whitespace-pre-wrap break-words text-sm">{m.text}</p>
                         <p className="mt-1 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
@@ -368,9 +544,19 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                             {t.pushUnavailableLabel}
                           </p>
                         ) : null}
+                        </div>
                       </div>
                     </div>;
                   })}
+                  </div>
+                  {!atBottom && !targetMessageId && messages.length > 0 ? (
+                    <Button type="button" size="sm" variant="secondary"
+                      className="absolute bottom-3 right-3 gap-2 border shadow-md"
+                      onClick={jumpToRecent} aria-label={t.newest}>
+                      <ArrowDown className="h-4 w-4"/>
+                      {selected.unread > 0 ? `${t.newUnread} (${selected.unread})` : t.newest}
+                    </Button>
+                  ) : null}
                 </div>
                 <div className="border-t p-3">
                   {status ? <p role="status" className="mb-2 text-xs text-destructive">{status}</p> : null}
@@ -378,7 +564,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                     <textarea ref={composerRef} aria-label={t.placeholder} placeholder={t.placeholder} value={draft}
                       maxLength={2000} rows={2} disabled={saving || creating || Boolean(recipientId)}
                       onChange={(event) => { setDraft(event.target.value); pendingMessageId.current = null; }}
-                      onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }}
+                      onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }}
                       className="max-h-40 min-h-14 min-w-0 flex-1 resize-y rounded-lg border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
                     <Button type="button" className="min-h-12" disabled={!draft.trim() || saving || creating || Boolean(recipientId)} onClick={() => void send()}>
                       {saving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
