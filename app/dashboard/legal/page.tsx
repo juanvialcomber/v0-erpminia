@@ -26,7 +26,7 @@ type CompliancePayload = {
   expiring_documents?: Array<{ id: string; title: string; expiry_date?: string }>;
 };
 
-type CasesPayload = { summary?: { total: number; new: number; in_review: number; action_required: number; waiting_area: number; closed: number } };
+type CasesPayload = { data?: Array<{ id: string; title: string; status: string; evidence_status: string; action_required?: string | null }>; summary?: { total: number; new: number; in_review: number; action_required: number; waiting_area: number; closed: number } };
 
 type RegulatoryPayload = {
   summary?: {
@@ -77,6 +77,7 @@ export default function LegalPage() {
   ].slice(0, 5);
 
   const openCases = casesData?.summary ? casesData.summary.total - casesData.summary.closed : undefined;
+  const closureCases = casesError ? [] : (casesData?.data || []).filter((item) => item.status !== 'closed' && /cierre|sernageomin|garant[ií]a|relave|resoluci[oó]n/i.test(item.title));
   const hasError = complianceError || regulatoryError || casesError;
 
   return (
@@ -98,6 +99,13 @@ export default function LegalPage() {
           className="min-h-0"
         />
       ) : null}
+
+      <section aria-labelledby="closure-evidence-title" className="space-y-3 rounded-md border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="closure-evidence-title" className="text-base font-semibold">Evidencia regulatoria por conciliar</h2><p className="mt-1 text-sm text-muted-foreground">Casos canónicos abiertos asociados por título a cierre minero o SERNAGEOMIN. La coincidencia no acredita aplicabilidad ni cumplimiento.</p></div><Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/casos">Revisar expedientes <ArrowRight className="h-4 w-4" /></Link></Button></div>
+        {casesError ? <p className="text-sm text-destructive">No se pudo consultar la cola de expedientes.</p> : !casesData ? <p className="text-sm text-muted-foreground">Cargando expedientes...</p> : closureCases.length === 0 ? <p className="text-sm text-muted-foreground">Sin casos abiertos identificados por este filtro. Esto no acredita ausencia de obligaciones.</p> : <div className="divide-y rounded-md border">{closureCases.slice(0, 8).map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 p-3"><div className="min-w-0"><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">Caso {item.status} · Evidencia {item.evidence_status || 'sin evaluar'} · Requiere revisión humana</p>{item.action_required ? <p className="mt-1 text-xs text-muted-foreground">{item.action_required}</p> : null}</div><Link className="text-sm font-medium text-primary hover:underline" href="/dashboard/legal/casos">Revisar caso</Link></div>)}</div>}
+        <div className="flex flex-wrap gap-4 text-xs"><Link href="/dashboard/centros-costos" className="text-primary hover:underline">Consultar centros de costo</Link><Link href="/dashboard/finanzas" className="text-primary hover:underline">Ver control financiero</Link></div>
+        <p className="text-xs text-muted-foreground">Sin resolución ni garantía acreditada no se calcula valorización de cierre, suficiencia de garantías ni estado de cumplimiento.</p>
+      </section>
 
       <section className="grid overflow-hidden rounded-md border sm:grid-cols-5">
         {[
