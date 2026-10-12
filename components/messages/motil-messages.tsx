@@ -384,8 +384,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
         const bytes = previousKey ? new Uint8Array(previousKey) : null;
         if (!bytes || bytes.length !== publicKey.length ||
           bytes.some((byte, index) => byte !== publicKey[index])) {
-          throw new Error(locale === 'en' ? 'The Push key changed. Reset your browser subscription in notification settings.' :
-            'La clave Push cambió. Restablece la suscripción en la página de notificaciones.');
+          // Recover obsolete VAPID subscriptions only after an explicit user click.
+          // Never silently change a browser permission or subscription.
+          const removed = await subscription.unsubscribe();
+          if (!removed) throw new Error(t.pushUnavailable);
+          subscription = null;
         }
       }
       if (!subscription) {
