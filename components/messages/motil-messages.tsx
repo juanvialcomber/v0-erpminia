@@ -43,6 +43,8 @@ const copy = {
     placeholder: 'Escribe un mensaje…', send: 'Enviar', older: 'Ver mensajes anteriores',
     unavailable: 'No se pudo cargar la mensajería.', retry: 'Reintentar',
     sending: 'Enviando…', sendFailure: 'No se pudo enviar. Puedes reintentar sin duplicar el mensaje.',
+    pushHint: 'Los mensajes llegan dentro de MOTIL aunque no actives los avisos. Actívalos aquí para recibir notificaciones con la aplicación cerrada.',
+    pushConfigured: 'Hay dispositivos registrados para recibir avisos.',
     enablePush: 'Activar avisos', pushReady: 'Avisos activados en este dispositivo.',
     pushDenied: 'Permite las notificaciones en la configuración del navegador.',
     pushUnsupported: 'Este dispositivo no admite Web Push. En iPhone, instala MOTIL en Inicio.',
@@ -70,6 +72,8 @@ const copy = {
     placeholder: 'Write a message…', send: 'Send', older: 'Load older messages',
     unavailable: 'Messages could not be loaded.', retry: 'Retry',
     sending: 'Sending…', sendFailure: 'Could not send. Retry without duplicating the message.',
+    pushHint: 'Messages still arrive in MOTIL without alerts. Enable them here to receive notifications when the app is closed.',
+    pushConfigured: 'Devices are registered for alerts.',
     enablePush: 'Enable alerts', pushReady: 'Alerts enabled on this device.',
     pushDenied: 'Allow notifications in your browser settings.',
     pushUnsupported: 'This device does not support Web Push. On iPhone, add MOTIL to Home Screen.',
@@ -141,6 +145,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
   const [status, setStatus] = useState('');
   const [pushStatus, setPushStatus] = useState('');
   const [pushBusy, setPushBusy] = useState(false);
+  const { data: pushInfo, mutate: reloadPushInfo } = useSWR<{ devices: number; publicKey: string | null }>(
+    inbox ? '/api/notifications/push' : null,
+    (url: string) => requestJson<{ devices: number; publicKey: string | null }>(url),
+    { revalidateOnFocus: true },
+  );
   const [older, setOlder] = useState<Message[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [mobileConversation, setMobileConversation] = useState(false);
@@ -385,6 +394,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
         });
       }
       await postJson('/api/notifications/push', subscription.toJSON());
+      await reloadPushInfo();
       setPushStatus(t.pushReady);
     } catch (error) { setPushStatus(error instanceof Error ? error.message : t.pushUnavailable); }
     finally { setPushBusy(false); }
@@ -415,6 +425,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
           </Button>
         </div>
       </div>
+      {pushInfo && pushInfo.devices === 0 ? (
+        <p className="text-xs text-muted-foreground" role="status">{t.pushHint}</p>
+      ) : pushInfo && pushInfo.devices > 0 ? (
+        <p className="text-xs text-muted-foreground">{t.pushConfigured}</p>
+      ) : null}
       {pushStatus ? <p className="text-sm" role="status">{pushStatus}</p> : null}
       {searchOpen ? (
         <section id="motil-message-search" aria-label={t.search} className="rounded-xl border bg-card p-3">
