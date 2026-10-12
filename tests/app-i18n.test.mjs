@@ -40,7 +40,7 @@ test('header breadcrumbs, roles and actions come from the dictionary', () => {
   assert.match(header, /sidebarAction=sidebarCollapsed\?t\.showMenu:t\.hideMenu/);
   assert.match(header, /aria-label=\{t\.breadcrumbLabel\}/);
   assert.match(header, /aria-label=\{t\.viewCalendar\}/);
-  assert.match(header, /aria-label=\{t\.viewAlerts\}/);
+  assert.match(header, /showOperationalAlerts=\{canSeeAlerts\}/);
   assert.match(header, /\{t\.signOut\}/);
   assert.doesNotMatch(header, /const routeLabels/);
   assert.doesNotMatch(header, /Mostrar menú/);

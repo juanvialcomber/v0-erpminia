@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { MessageSquare } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -46,19 +46,21 @@ export function MessageUnreadBadge() {
   return <Count count={data.totalUnread} />;
 }
 
-export function MessageNotifications({ locale }: { locale: Locale }) {
-  const { data, error } = useUnreadMessages();
+export function MessageNotifications({
+  locale, showOperationalAlerts = false,
+}: { locale: Locale; showOperationalAlerts?: boolean }) {
+  const { data, error, isLoading } = useUnreadMessages();
   const es = locale !== 'en';
-  const title = es ? 'Mensajes' : 'Messages';
+  const title = es ? 'Notificaciones' : 'Notifications';
   const number = data?.totalUnread || 0;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="ghost" size="icon-sm"
           className="relative" aria-label={
-            number ? `${title}: ${number} ${es ? 'sin leer' : 'unread'}` : title
+            number ? `${title}: ${number} ${es ? (number === 1 ? 'mensaje sin leer' : 'mensajes sin leer') : (number === 1 ? 'unread message' : 'unread messages')}` : title
           } title={title}>
-          <MessageSquare className="h-4 w-4"/>
+          <Bell className="h-4 w-4"/>
           {number > 0 ? (
             <span className="absolute -right-1 -top-1"><Count count={number}/></span>
           ) : null}
@@ -72,9 +74,16 @@ export function MessageNotifications({ locale }: { locale: Locale }) {
           </span> : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator/>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">
+          {es ? 'Mensajes sin leer' : 'Unread messages'}
+        </DropdownMenuLabel>
         {error ? (
           <p className="px-2 py-3 text-xs text-muted-foreground">
             {es ? 'No se pudo consultar la bandeja.' : 'Could not load the inbox.'}
+          </p>
+        ) : isLoading || !data ? (
+          <p className="px-2 py-3 text-xs text-muted-foreground">
+            {es ? 'Consultando mensajes…' : 'Checking messages…'}
           </p>
         ) : data?.conversations.length ? (
           data.conversations.map((conversation) =>
@@ -102,6 +111,13 @@ export function MessageNotifications({ locale }: { locale: Locale }) {
             {es ? 'Abrir todas las conversaciones' : 'Open all conversations'}
           </Link>
         </DropdownMenuItem>
+        {showOperationalAlerts ? (
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/dashboard/alertas">
+              {es ? 'Ver alertas operacionales' : 'View operational alerts'}
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -23,7 +23,7 @@ test('header notification and channel badges share the authenticated unread sour
   assert.match(notifier, /'\/api\/messages\/unread'/);
   assert.match(notifier, /refreshInterval: 6000/);
   assert.match(notifier, /thread=\$\{encodeURIComponent\(conversation\.id\)\}/);
-  assert.match(header, /<MessageNotifications locale=\{locale\}/);
+  assert.match(header, /<MessageNotifications locale=\{locale\} showOperationalAlerts=\{canSeeAlerts\}/);
   assert.match(sidebar, /<MessageUnreadBadge\/>/);
 });
 
@@ -75,4 +75,20 @@ test('Green API is only staged, never enabled or supplied with secrets by defaul
   assert.match(migration, /select id,'greenapi',false/);
   assert.doesNotMatch(migration, /apiTokenInstance|apiToken:|Authorization: Bearer/);
   assert.doesNotMatch(dispatcher, /greenapi\.com/);
+});
+
+
+test('one bell carries private unread messages and preserves role-gated operational alerts', () => {
+  assert.match(notifier, /<Bell className="h-4 w-4"\/>/);
+  assert.doesNotMatch(notifier, /<MessageSquare className="h-4 w-4"\/>/);
+  assert.match(notifier, /const number = data\?\.totalUnread \|\| 0;/);
+  assert.match(notifier, /number === 1 \? 'mensaje sin leer' : 'mensajes sin leer'/);
+  assert.match(notifier, /'Mensajes sin leer'/);
+  assert.match(notifier, /isLoading \|\| !data/);
+  assert.match(notifier, /showOperationalAlerts \? \(/);
+  assert.match(notifier, /href="\/dashboard\/alertas"/);
+  assert.match(notifier, /href="\/dashboard\/mensajes"/);
+  assert.doesNotMatch(header, /<Link href="\/dashboard\/alertas"><Bell/);
+  assert.equal((header.match(/<MessageNotifications locale=/g) || []).length, 1);
+  assert.match(header, /showOperationalAlerts=\{canSeeAlerts\}/);
 });
