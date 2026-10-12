@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { sendWebPush } from '@/lib/notifications/web-push';
+import { sendWebPush, getWebPushConfigError } from '@/lib/notifications/web-push';
 
 function validEndpoint(endpoint: string) {
   try {
@@ -14,6 +14,13 @@ function validKey(value: unknown, min: number, max: number) {
   return typeof value === 'string' && value.length >= min && value.length <= max && /^[a-zA-Z0-9_-]+$/.test(value);
 }
 const noStore = { 'Cache-Control': 'no-store' };
+const configMessages = {
+  missing_config: 'Falta configurar las claves Web Push en Vercel.',
+  invalid_public_key: 'La clave pública Web Push no tiene un formato válido.',
+  invalid_private_key: 'La clave privada Web Push no tiene un formato válido.',
+  key_pair_mismatch: 'Las claves pública y privada Web Push no corresponden al mismo par.',
+  invalid_subject: 'El contacto VAPID debe ser una URL HTTPS o una dirección mailto válida.',
+} as const;
 
 export async function GET(request: NextRequest) {
   const ctx = await getOrganizationContext(request);
@@ -21,7 +28,11 @@ export async function GET(request: NextRequest) {
   const { count, error } = await ctx.supabase.from('user_push_subscriptions')
     .select('id', { count: 'exact', head: true }).eq('organization_id', ctx.organizationId).eq('user_id', ctx.userId).eq('enabled', true);
   if (error) return NextResponse.json({ error: 'No fue posible consultar los dispositivos' }, { status: 500 });
-  return NextResponse.json({ publicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY || null, devices: count || 0 }, { headers: noStore });
+  const configError = ctx.userEmail?.trim().toLowerCase() === 'juan@n3uralia.com' ? getWebPushConfigError() : null;
+  return NextResponse.json({ publicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY || null, devices: count || 0,
+    pilot: ctx.userEmail?.trim().toLowerCase() === 'juan@n3uralia.com',
+    ...(configError ? { configurationError: configMessages[configError] } : {}),
+  }, { headers: noStore });
 }
 
 export async function POST(request: NextRequest) {
@@ -62,8 +73,8 @@ export async function PUT(request: NextRequest) {
   // Pilot: self-test only, never allows sending to another user.
   if (ctx.userEmail?.trim().toLowerCase() !== 'juan@n3uralia.com')
     return NextResponse.json({ error: 'Prueba reservada al usuario piloto' }, { status: 403 });
-  if (!process.env.WEB_PUSH_VAPID_PUBLIC_KEY || !(process.env.WEB_PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY) || !(process.env.WEB_PUSH_VAPID_SUBJECT || process.env.VAPID_SUBJECT))
-    return NextResponse.json({ error: 'Falta configurar las claves Web Push en Vercel' }, { status: 503 });
+  const configError = getWebPushConfigError();
+  if (configError) return NextResponse.json({ error: configMessages[configError], code: configError }, { status: 503, headers: noStore });
   const { data: subscriptions, error } = await ctx.supabase.from('user_push_subscriptions')
     .select('id,endpoint,p256dh,auth_secret,last_test_at').eq('organization_id', ctx.organizationId).eq('user_id', ctx.userId).eq('enabled', true).limit(5);
   if (error) return NextResponse.json({ error: 'No fue posible cargar dispositivos' }, { status: 500 });

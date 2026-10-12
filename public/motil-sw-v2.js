@@ -68,7 +68,7 @@ self.addEventListener('push', (event) => {
   const url = typeof notification.url === 'string' && notification.url.startsWith('/') && !notification.url.startsWith('//')
     ? notification.url : '/dashboard';
   event.waitUntil(self.registration.showNotification(title, {
-    body, icon: '/icon-192.png', badge: '/icon-192.png', data: { url }, tag: 'motil-test-push',
+    body, icon: '/icon-192.png', badge: '/icon-192.png', data: { url }, tag: 'motil-test-push', renotify: true, requireInteraction: true,
   }));
 });
 

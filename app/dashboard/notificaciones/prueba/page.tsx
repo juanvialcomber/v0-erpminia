@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-type Status = { publicKey: string | null; devices: number };
+type Status = { publicKey: string | null; devices: number; configurationError?: string; pilot: boolean };
+type PushTestResult = { attempted: number; accepted: number; results: { status: number; accepted: boolean }[] };
 function urlBase64ToUint8Array(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
   const bytes = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
@@ -30,16 +31,26 @@ export default function PushPilotPage() {
       if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window))
         throw new Error('Este navegador no admite Web Push. En iPhone instala MOTIL en la pantalla de inicio.');
       const status: Status = await api('GET');
+      if (status.configurationError) throw new Error(status.configurationError);
       if (!status.publicKey) throw new Error('El administrador debe configurar Web Push en Vercel.');
       if (Notification.permission === 'denied') throw new Error('Notificaciones bloqueadas en el navegador.');
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') throw new Error('No se otorgó permiso para notificaciones.');
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
+      const applicationServerKey = urlBase64ToUint8Array(status.publicKey);
+      if (subscription) {
+        const currentKey = subscription.options.applicationServerKey;
+        const bytes = currentKey ? new Uint8Array(currentKey) : null;
+        if (!bytes || bytes.length !== applicationServerKey.length ||
+            bytes.some((byte, index) => byte !== applicationServerKey[index])) {
+          throw new Error('La clave Web Push cambió. Presiona Restablecer suscripción de este navegador y vuelve a activar las notificaciones.');
+        }
+      }
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(status.publicKey) as BufferSource,
+          applicationServerKey: applicationServerKey as BufferSource,
         });
       }
       await api('POST', subscription.toJSON());
@@ -67,12 +78,43 @@ export default function PushPilotPage() {
       setMessage(error instanceof Error ? error.message : 'No se pudo restablecer este navegador');
     } finally { setBusy(false); }
   }
+  async function testLocal() {
+    setBusy(true);
+    setMessage('');
+    try {
+      if (!('Notification' in window) || !('serviceWorker' in navigator))
+        throw new Error('Este navegador no admite notificaciones.');
+      if (Notification.permission !== 'granted') throw new Error('Activa primero las notificaciones de MOTIL en Chrome.');
+      const status: Status = await api('GET');
+      if (!status.pilot) throw new Error('Prueba reservada al usuario piloto.');
+      const registration = await navigator.serviceWorker.ready;
+      const options: NotificationOptions & { renotify: boolean } = {
+        body: 'Este aviso se creó directamente en tu navegador. Pulsa para abrir MOTIL.',
+        data: { url: '/dashboard' }, tag: 'motil-local-test',
+        renotify: true, requireInteraction: true,
+      };
+      await registration.showNotification('MOTIL · Prueba en este equipo', options);
+      setMessage('El navegador aceptó crear el aviso local. Si no aparece, revisa Windows → Sistema → Notificaciones: Chrome, banners y No molestar. Esto todavía no confirma recepción de un mensaje Push.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible mostrar el aviso local.');
+    } finally { setBusy(false); }
+  }
+
   async function test() {
     setBusy(true);
     setMessage('');
     try {
-      const result = await api('PUT');
-      setMessage(result.accepted ? 'Notificación aceptada por el servicio Push. Comprueba el dispositivo.' : 'No se pudo entregar la notificación al servicio Push.');
+      const result: PushTestResult = await api('PUT');
+      const summary = `Proveedor Push: ${result.accepted} de ${result.attempted} envíos aceptados.`;
+      const failures = result.results.filter((item) => !item.accepted)
+        .map((item) => item.status === 0 ? 'sin respuesta (red o configuración)' : `HTTP ${item.status}`);
+      setMessage([
+        summary,
+        result.accepted > 0
+          ? 'La aceptación del proveedor no confirma recepción. Comprueba que el aviso aparezca y que al pulsarlo abra MOTIL.'
+          : 'No se confirmó aceptación del proveedor.',
+        failures.length ? `Fallos: ${failures.join(', ')}.` : '',
+      ].filter(Boolean).join(' '));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Error enviando notificación');
     } finally { setBusy(false); }
@@ -81,7 +123,9 @@ export default function PushPilotPage() {
     <div className="min-w-0"><p className="text-sm text-muted-foreground">MOTIL · Piloto</p><h1 className="break-words text-2xl font-semibold">Notificaciones a mi dispositivo</h1><p className="mt-2 break-words text-sm text-muted-foreground">Primero activa las notificaciones desde este teléfono o computador. Después prueba un aviso personal.</p></div>
     <div className="space-y-3">
       <Button className="w-full min-h-14" disabled={busy} onClick={() => void activate()}>1. Activar notificaciones</Button>
-      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>\n      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
+      <Button className="w-full min-h-14" variant="outline" disabled={busy} onClick={() => void test()}>2. Enviar prueba a mi dispositivo</Button>
+      <Button className="w-full" variant="outline" disabled={busy} onClick={() => void testLocal()}>Comprobar aviso en este equipo</Button>
+      <Button className="w-full" variant="ghost" disabled={busy} onClick={() => void resetBrowser()}>Restablecer suscripción de este navegador</Button>
     </div>
     {devices !== null ? <p className="text-sm text-muted-foreground">Dispositivos activos: {devices}</p> : null}
     {message ? <p role="status" className="rounded-lg border p-4 text-sm">{message}</p> : null}
