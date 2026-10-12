@@ -51,6 +51,7 @@ export async function dispatchPendingMessagePush(batchSize = 6): Promise<Deliver
       if (messageError || profileError) throw new Error('lookup_failed');
       if (!message || !profile) {
         status = 'skipped';
+        diagnostic = !message ? 'message_unavailable' : 'recipient_inactive_or_unavailable';
       } else {
         const { data: subscriptions, error: subscriptionError } = await db.from('user_push_subscriptions')
           .select('id,endpoint,p256dh,auth_secret')
