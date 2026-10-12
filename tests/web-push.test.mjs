@@ -8,7 +8,7 @@ import webpush from 'web-push';
 const source = readFileSync(new URL('../lib/notifications/web-push.ts', import.meta.url), 'utf8');
 const moduleSource = stripTypeScriptTypes(source).replace("from 'web-push'", "from '" + import.meta.resolve('web-push') + "'");
 const { getWebPushConfigError, sendWebPush } = await import('data:text/javascript;base64,' + Buffer.from(moduleSource).toString('base64'));
-const generate = () => { const e = createECDH('prime256v1'); e.generateKeys(); return { pub: e.getPublicKey().toString('base64url'), priv: e.getPrivateKey().toString('base64url') }; };
+const generate = () => { const e = createECDH('prime256v1'); e.generateKeys(); const privateKey = e.getPrivateKey(); const padded = Buffer.concat([Buffer.alloc(32), privateKey]).subarray(-32); return { pub: e.getPublicKey().toString('base64url'), priv: padded.toString('base64url') }; };
 
 test('VAPID rejects missing and mismatched credentials', () => {
  const a=generate(), b=generate();
