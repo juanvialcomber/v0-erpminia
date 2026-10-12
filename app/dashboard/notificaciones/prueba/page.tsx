@@ -38,10 +38,19 @@ export default function PushPilotPage() {
       if (permission !== 'granted') throw new Error('No se otorgó permiso para notificaciones.');
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
+      const applicationServerKey = urlBase64ToUint8Array(status.publicKey);
+      if (subscription) {
+        const currentKey = subscription.options.applicationServerKey;
+        const bytes = currentKey ? new Uint8Array(currentKey) : null;
+        if (!bytes || bytes.length !== applicationServerKey.length ||
+            bytes.some((byte, index) => byte !== applicationServerKey[index])) {
+          throw new Error('La clave Web Push cambió. Presiona Restablecer suscripción de este navegador y vuelve a activar las notificaciones.');
+        }
+      }
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(status.publicKey) as BufferSource,
+          applicationServerKey: applicationServerKey as BufferSource,
         });
       }
       await api('POST', subscription.toJSON());
