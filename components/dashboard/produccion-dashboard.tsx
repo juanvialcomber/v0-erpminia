@@ -142,7 +142,7 @@ function CoverageOverview({data}:{data:Overview}){
     </div>
 
     <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
-      <div className="rounded-lg border bg-card px-4 py-3"><div className="flex items-center gap-3">{qualityOk?<CheckCircle2 className="h-4 w-4"/>:<AlertTriangle className="h-4 w-4"/>}<div><p className="text-sm font-medium">Calidad de datos · {data.quality.pass} PASS · {data.quality.hold} HOLD</p><p className="mt-1 text-xs text-muted-foreground">{data.quality.sourceFiles}/7 archivos · {data.quality.sourceSheets}/172 hojas · {data.quality.sourceAnomalies} anomalías fuente</p></div></div></div>
+      <div className="rounded-lg border bg-card px-4 py-3"><div className="flex items-center gap-3">{qualityOk?<CheckCircle2 className="h-4 w-4"/>:<AlertTriangle className="h-4 w-4"/>}<div><p className="text-sm font-medium">Calidad de datos · {data.quality.pass} PASS · {data.quality.hold} HOLD</p><p className="mt-1 text-xs text-muted-foreground">{n(data.quality.sourceFiles)} archivos fuente · {n(data.quality.sourceSheets)} hojas registradas · {n(data.quality.sourceAnomalies)} anomalías fuente</p></div></div></div>
       <div className="rounded-lg border bg-card px-4 py-3"><p className="text-sm font-medium">Revisiones de datos</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{reviewItems.join(' · ')}. Las colas pueden solaparse y no se suman como un único total.</p></div>
     </div>
   </section>;
