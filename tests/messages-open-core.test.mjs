@@ -44,8 +44,8 @@ test('Direct Push is queued transactionally with a bounded and secured worker', 
   assert.match(migration, /after insert on public\.motil_message_entries/);
   assert.match(migration, /for update skip locked/);
   assert.match(dispatcher, /motil_message_claim_push/);
-  assert.match(dispatcher, /acceptedDevices > 0 \? 'accepted'/);
-  assert.match(dispatcher, /lease_until: null/);
+  assert.match(dispatcher, /status = acceptedDevices > 0/);
+  assert.match(dispatcher, /motil_message_finish_push/);
   assert.match(cron, /process\.env\.CRON_SECRET/);
   assert.match(cron, /request\.headers\.get\('authorization'\)/);
   assert.match(webPush, /tag\?: string/);
@@ -65,10 +65,11 @@ test('Chat supports persistent history, retries, people selection and both local
 });
 
 test('Choosing a recipient opens their direct thread and blocks accidental General sends', () => {
-  assert.match(ui, /if \(targetId\) void createDirect\(targetId\)/);
-  assert.match(ui, /const targetId = event\.target\.value;/);
+  const finder = source('components/messages/recipient-search.tsx');
+  assert.match(ui, /onSelect=\{\(targetId\) =>/);
+  assert.match(finder, /onClick=\{\(\) => choose\(person\.id\)\}/);
   assert.match(ui, /\{ recipientId: targetId \}/);
-  assert.doesNotMatch(ui, /onClick=\{\(\) => void createDirect\(\)\}/);
+  assert.doesNotMatch(ui, /<select id="motil-message-recipient"/);
   assert.match(ui, /saving \|\| creating \|\| recipientId\) return;/);
   assert.match(ui, /disabled=\{saving \|\| creating \|\| Boolean\(recipientId\)\}/);
   assert.match(ui, /No se enviará a General/);

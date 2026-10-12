@@ -60,6 +60,7 @@ export async function dispatchPendingMessagePush(batchSize = 6): Promise<Deliver
 
         if (!subscriptions?.length) {
           status = 'skipped';
+          diagnostic = 'no_active_push_device';
         } else {
           const results = await Promise.allSettled(subscriptions.map(async (sub) => {
             const sent = await sendWebPush(
@@ -79,7 +80,12 @@ export async function dispatchPendingMessagePush(batchSize = 6): Promise<Deliver
             return sent;
           }));
           acceptedDevices = results.filter((r) => r.status === 'fulfilled' && r.value.ok).length;
-          status = acceptedDevices > 0 ? 'accepted' : (job.attempts >= 5 ? 'failed' : 'retry');
+          const allExpired = results.length > 0 && results.every(
+            (result) => result.status === 'fulfilled' && result.value.expired,
+          );
+          status = acceptedDevices > 0
+            ? 'accepted'
+            : allExpired ? 'skipped' : (job.attempts >= 5 ? 'failed' : 'retry');
           if (!acceptedDevices) {
             diagnostic = results.map((r) => r.status === 'fulfilled' ? String(r.value.status) : 'network')
               .slice(0, 8).join(',');
@@ -92,16 +98,17 @@ export async function dispatchPendingMessagePush(batchSize = 6): Promise<Deliver
     }
 
     const retrySeconds = Math.min(60 * 2 ** Math.max(0, job.attempts - 1), 3600);
-    const { error: updateError } = await db.from('motil_message_push_outbox')
-      .update({
-        status, accepted_devices: acceptedDevices,
-        next_attempt_at: status === 'retry' ? new Date(Date.now() + retrySeconds * 1000).toISOString() : new Date().toISOString(),
-        lease_until: null, last_error: diagnostic, updated_at: new Date().toISOString(),
-      })
-      .eq('id', job.id).eq('organization_id', job.organization_id)
-      .eq('status', 'sending').eq('attempts', job.attempts);
-    if (updateError) throw new Error('Could not persist message push outcome: ' + updateError.code);
-    totals[status] += 1;
+    const { data: saved, error: updateError } = await db.rpc('motil_message_finish_push', {
+      p_job_id: job.id,
+      p_organization_id: job.organization_id,
+      p_attempt: job.attempts,
+      p_state: status,
+      p_accepted_devices: acceptedDevices,
+      p_error_code: diagnostic,
+      p_retry_at: new Date(Date.now() + retrySeconds * 1000).toISOString(),
+    });
+    if (updateError) throw new Error('Could not persist message Push outcome: ' + updateError.code);
+    if (saved === true) totals[status] += 1;
   };
 
   // Limit external HTTP concurrency to bound runtime and gateway load.

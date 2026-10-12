@@ -11,36 +11,44 @@ export async function GET(request: NextRequest) {
   const ctx = await getOrganizationContext(request);
   if (!ctx.ok) return ctx.response;
 
-  const [inboxResult, peopleResult] = await Promise.all([
-    ctx.supabase.rpc('motil_message_inbox', {
-      p_organization_id: ctx.organizationId, p_profile_id: ctx.userId,
-    }),
-    ctx.supabase.from('profiles')
-      .select('id,full_name,first_name,last_name,email')
-      .eq('organization_id', ctx.organizationId)
-      .eq('status', 'active')
-      .order('full_name', { ascending: true }).limit(300),
-  ]);
-  if (inboxResult.error || peopleResult.error) {
-    console.error('[messages] inbox query failed', inboxResult.error?.code || peopleResult.error?.code);
+  const inboxResult = await ctx.supabase.rpc('motil_message_inbox', {
+    p_organization_id: ctx.organizationId, p_profile_id: ctx.userId,
+  });
+  if (inboxResult.error) {
+    console.error('[messages] inbox query failed', inboxResult.error.code);
     return NextResponse.json({ error: 'No fue posible cargar mensajes. Comprueba que la migración esté aplicada.' },
       { status: 503, headers: CHAT_NO_STORE });
   }
 
-  const people = (peopleResult.data || []).map((p) => ({
-    id: p.id, name: profileLabel(p),
-  }));
-  const names = new Map(people.map((p) => [p.id, p.name]));
   type InboxRow = {
     id: string; kind: 'general' | 'direct'; title: string | null;
     participant_a: string | null; participant_b: string | null;
     last_message: string | null; last_message_at: string | null; unread_count: number | string;
   };
-  const conversations = ((inboxResult.data || []) as InboxRow[]).map((t) => {
+  const inboxRows = (inboxResult.data || []) as InboxRow[];
+  const contactIds = [...new Set(inboxRows
+    .filter((thread) => thread.kind === 'direct')
+    .map((thread) => thread.participant_a === ctx.userId ? thread.participant_b : thread.participant_a)
+    .filter((id): id is string => Boolean(id)))];
+  const { data: people, error: peopleError } = contactIds.length
+    ? await ctx.supabase.from('profiles')
+      .select('id,full_name,first_name,last_name,email')
+      .eq('organization_id', ctx.organizationId).in('id', contactIds)
+    : { data: [], error: null };
+  if (peopleError) {
+    return NextResponse.json({ error: 'No fue posible cargar participantes' }, {
+      status: 503, headers: CHAT_NO_STORE,
+    });
+  }
+  const names = new Map((people || []).map((person: {
+    id: string; full_name: string | null; first_name: string | null;
+    last_name: string | null; email: string | null;
+  }) => [person.id, profileLabel(person)]));
+  const conversations = inboxRows.map((t) => {
     const contactId = t.kind === 'direct'
       ? (t.participant_a === ctx.userId ? t.participant_b : t.participant_a) : null;
     return {
-      id: t.id, kind: t.kind, name: t.kind === 'general' ? 'General' : (names.get(contactId) || 'Usuario no disponible'),
+      id: t.id, kind: t.kind, name: t.kind === 'general' ? 'General' : (contactId ? names.get(contactId) || 'Usuario no disponible' : 'Usuario no disponible'),
       contactId, lastMessage: t.last_message || null, lastMessageAt: t.last_message_at || null,
       unread: Math.max(0, Number(t.unread_count) || 0),
     };
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     me: { id: ctx.userId, name: ctx.userName || 'Usuario' },
-    conversations, people: people.filter((p) => p.id !== ctx.userId),
+    conversations,
     refreshIntervalSeconds: 5,
   }, { headers: CHAT_NO_STORE });
 }

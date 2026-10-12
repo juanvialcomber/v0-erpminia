@@ -43,3 +43,21 @@ Keep `WEB_PUSH_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` config
 - Authorize private Supabase Realtime Broadcast using short-lived application-bound JWTs, with polling fallback.
 - Add mentions, restricted team channels, attachments and contextual OT threads.
 - Integrate Green API with a separate consent/notification policy, webhook signature validation, replay protection and deduplication.
+
+## Official communications — unread messages and receipt audit
+
+- **Unread badges are recipient-specific.** A person's outgoing messages never count as unread for that same person. For a coworker who has not opened either conversation, one message in General and one direct message produce two unread notifications (one in each channel).
+- The global Messages icon, the sidebar badge, and the in-chat unread filter use the same authenticated `/api/messages/unread` endpoint and `motil_message_inbox` SQL function.
+- Visiting the Messages page without choosing a conversation **does not mark General as read**. A read acknowledgement requires the selected conversation to be visible. Mobile's hidden pane never acknowledges reads.
+- The read cursor is monotonic; `motil_message_read_events` records genuine cursor advances, including the recipient and the latest acknowledged message.
+- Authors can see `Awaiting read` or `Read` on direct messages, and `Read by X/Y` for General messages based on eligible, currently active organization members. These are **in-app reads**, not evidence that a phone displayed a notification.
+- The append-only `motil_message_transport_events` table records each completed Push attempt with the provider outcome. This is committed transactionally with the retry queue via `motil_message_finish_push`. A 410/404 disables an expired subscription and stops wasteful retries when all devices are expired.
+- Recipients with invalid device subscriptions must re-enable notifications on their **own** devices; sending a message cannot silently repair an external Push subscription.
+
+### Green API — future second channel (disabled by default)
+
+`motil_message_provider_settings` stores enablement flags, **not credentials**. `motil_message_external_events` reserves a quarantine/deduplication ledger for future incoming and delivery events; a stable provider event ID prevents replay.
+
+Later integration must use server-only encrypted environment variables for Green API instance ID and token; register a verified webhook and never trust incoming contact identity or file content automatically. Verify webhook origin/secret and deduplicate events before any human-facing message is created. Unmatched contacts remain in quarantine. Outgoing WhatsApp should be opt-in for urgent alerts or ingestion workflows; it must not replace the canonical MOTIL message archive. No Green API HTTP calls or webhooks are enabled in this release.
+
+**Credential note:** Green API screenshots can reveal API tokens. Rotate any token that was exposed in a screenshot before configuring this integration.
