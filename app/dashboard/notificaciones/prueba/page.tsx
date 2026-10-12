@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-type Status = { publicKey: string | null; devices: number };
+type Status = { publicKey: string | null; devices: number; configurationError?: string };
 type PushTestResult = { attempted: number; accepted: number; results: { status: number; accepted: boolean }[] };
 function urlBase64ToUint8Array(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -31,6 +31,7 @@ export default function PushPilotPage() {
       if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window))
         throw new Error('Este navegador no admite Web Push. En iPhone instala MOTIL en la pantalla de inicio.');
       const status: Status = await api('GET');
+      if (status.configurationError) throw new Error(status.configurationError);
       if (!status.publicKey) throw new Error('El administrador debe configurar Web Push en Vercel.');
       if (Notification.permission === 'denied') throw new Error('Notificaciones bloqueadas en el navegador.');
       const permission = await Notification.requestPermission();
