@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { RecipientSearch } from '@/components/messages/recipient-search';
+import { MessagesInboxSkeleton, MessagesHistorySkeleton } from '@/components/messages/messages-loading-skeletons';
 import { ArrowDown, Bell, Check, CheckCheck, ChevronLeft, Loader2, MessageCircle, RefreshCw, Search, Send, Users, Wrench, Gauge, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/dictionaries';
@@ -481,7 +482,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
           <Button variant="outline" className="mt-3" onClick={() => void reloadInbox()}>{t.retry}</Button>
         </div>
       ) : isLoading ? (
-        <p className="py-8 text-sm text-muted-foreground">{t.loading}</p>
+        <MessagesInboxSkeleton label={t.loading} />
       ) : (
         <div className="grid h-[min(74vh,760px)] min-h-[430px] overflow-hidden rounded-xl border bg-card md:min-h-[520px] md:grid-cols-[270px_minmax(0,1fr)]">
           <aside className={(mobileConversation ? 'hidden md:flex ' : 'flex ') + 'min-h-0 flex-col border-r'} aria-label={t.back}>
@@ -580,8 +581,8 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                       <Button type="button" variant="ghost" size="sm" disabled={loadingOlder} onClick={() => void loadOlder()}>{t.older}</Button>
                     </div>
                   ) : null}
-                  {loadingHistory && !history ? <p className="text-sm text-muted-foreground">{t.loading}</p> : null}
-                  {historyError ? <p className="text-sm text-destructive">{t.unavailable}</p> : null}
+                  {loadingHistory && !history ? <MessagesHistorySkeleton label={t.loading} /> : null}
+                  {historyError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4"><p className="text-sm text-destructive">{t.unavailable}</p><Button type="button" size="sm" variant="outline" onClick={() => void reloadHistory()}>{t.retry}</Button></div> : null}
                   {!messages.length && !loadingHistory && !historyError ? <p className="pt-20 text-center text-sm text-muted-foreground">{t.noMessages}</p> : null}
                   {messages.map((m, index) => {
                     const own = m.senderId === inbox?.me.id;
