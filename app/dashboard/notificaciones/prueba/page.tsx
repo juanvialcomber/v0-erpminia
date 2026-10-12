@@ -88,11 +88,12 @@ export default function PushPilotPage() {
       const status: Status = await api('GET');
       if (!status.pilot) throw new Error('Prueba reservada al usuario piloto.');
       const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification('MOTIL · Prueba en este equipo', {
+      const options: NotificationOptions & { renotify: boolean } = {
         body: 'Este aviso se creó directamente en tu navegador. Pulsa para abrir MOTIL.',
         data: { url: '/dashboard' }, tag: 'motil-local-test',
         renotify: true, requireInteraction: true,
-      });
+      };
+      await registration.showNotification('MOTIL · Prueba en este equipo', options);
       setMessage('El navegador aceptó crear el aviso local. Si no aparece, revisa Windows → Sistema → Notificaciones: Chrome, banners y No molestar. Esto todavía no confirma recepción de un mensaje Push.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No fue posible mostrar el aviso local.');
