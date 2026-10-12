@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Bell, Check, ChevronLeft, Loader2, MessageCircle, Plus, RefreshCw, Send, Users } from 'lucide-react';
+import { Bell, Check, ChevronLeft, Loader2, MessageCircle, RefreshCw, Send, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/dictionaries';
 
@@ -19,6 +19,7 @@ const copy = {
   es: {
     title: 'Mensajes', subtitle: 'Conversaciones de tu organización',
     newChat: 'Mensaje directo', selectUser: 'Seleccionar persona', open: 'Abrir',
+    openingChat: 'Abriendo conversación privada…', pendingChat: 'La conversación privada no está abierta. No se enviará a General.',
     general: 'Organización', direct: 'Directos', noChats: 'Aún no hay conversaciones.',
     noMessages: 'No hay mensajes todavía. Escribe el primero.',
     placeholder: 'Escribe un mensaje…', send: 'Enviar', older: 'Ver mensajes anteriores',
@@ -36,6 +37,7 @@ const copy = {
   en: {
     title: 'Messages', subtitle: 'Your organization conversations',
     newChat: 'Direct message', selectUser: 'Select a colleague', open: 'Open',
+    openingChat: 'Opening private conversation…', pendingChat: 'The private conversation is not open. This will not be sent to General.',
     general: 'Organization', direct: 'Direct', noChats: 'No conversations yet.',
     noMessages: 'No messages yet. Write the first one.',
     placeholder: 'Write a message…', send: 'Send', older: 'Load older messages',
@@ -148,11 +150,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
     window.history.replaceState(null, '', url.pathname + url.search);
   };
 
-  const createDirect = async () => {
-    if (!recipientId) return;
+  const createDirect = async (targetId: string) => {
+    if (!targetId) return;
     setCreating(true); setStatus('');
     try {
-      const row = await postJson<{ id: string }>('/api/messages/direct', { recipientId });
+      const row = await postJson<{ id: string }>('/api/messages/direct', { recipientId: targetId });
       await reloadInbox();
       openConversation(row.id);
       setRecipientId('');
@@ -162,7 +164,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
 
   const send = async () => {
     const text = draft.trim();
-    if (!threadId || !text || text.length > 2000 || saving) return;
+    if (!threadId || !text || text.length > 2000 || saving || creating || recipientId) return;
     const clientMessageId = pendingMessageId.current || crypto.randomUUID();
     pendingMessageId.current = clientMessageId;
     setSaving(true); setStatus('');
@@ -260,16 +262,20 @@ export function MotilMessages({ locale }: { locale: Locale }) {
           <aside className={(mobileConversation ? 'hidden md:flex ' : 'flex ') + 'min-h-0 flex-col border-r'} aria-label={t.back}>
             <div className="border-b p-3">
               <label htmlFor="motil-message-recipient" className="mb-2 block text-xs font-medium text-muted-foreground">{t.newChat}</label>
-              <div className="flex gap-2">
-                <select id="motil-message-recipient" className="min-w-0 flex-1 rounded-md border bg-background px-2 text-sm"
-                  value={recipientId} onChange={(event) => setRecipientId(event.target.value)}>
-                  <option value="">{t.selectUser}</option>
-                  {(inbox?.people || []).map((p) => <option value={p.id} key={p.id}>{p.name}</option>)}
-                </select>
-                <Button type="button" size="icon" variant="outline" aria-label={t.open} disabled={!recipientId || creating} onClick={() => void createDirect()}>
-                  {creating ? <Loader2 className="h-4 w-4 animate-spin"/> : <Plus className="h-4 w-4"/>}
-                </Button>
-              </div>
+              <select id="motil-message-recipient"
+                className="h-10 w-full min-w-0 rounded-md border bg-background px-2 text-sm"
+                value={recipientId} disabled={creating}
+                onChange={(event) => {
+                  const targetId = event.target.value;
+                  setRecipientId(targetId);
+                  if (targetId) void createDirect(targetId);
+                }}>
+                <option value="">{t.selectUser}</option>
+                {(inbox?.people || []).map((p) => <option value={p.id} key={p.id}>{p.name}</option>)}
+              </select>
+              {recipientId ? <p role="status" className="mt-2 text-xs text-muted-foreground">
+                {creating ? t.openingChat : t.pendingChat}
+              </p> : null}
             </div>
             <div className="flex-1 space-y-1 overflow-y-auto p-2">
               {inbox?.conversations.length ? inbox.conversations.map((c) =>
@@ -332,11 +338,11 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                   {status ? <p role="status" className="mb-2 text-xs text-destructive">{status}</p> : null}
                   <div className="flex items-end gap-2">
                     <textarea aria-label={t.placeholder} placeholder={t.placeholder} value={draft}
-                      maxLength={2000} rows={2} disabled={saving}
+                      maxLength={2000} rows={2} disabled={saving || creating || Boolean(recipientId)}
                       onChange={(event) => { setDraft(event.target.value); pendingMessageId.current = null; }}
                       onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }}
                       className="max-h-40 min-h-14 min-w-0 flex-1 resize-y rounded-lg border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
-                    <Button type="button" className="min-h-12" disabled={!draft.trim() || saving} onClick={() => void send()}>
+                    <Button type="button" className="min-h-12" disabled={!draft.trim() || saving || creating || Boolean(recipientId)} onClick={() => void send()}>
                       {saving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
                       <span className="ml-2 hidden sm:inline">{saving ? t.sending : t.send}</span>
                     </Button>

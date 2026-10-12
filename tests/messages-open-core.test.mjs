@@ -63,3 +63,13 @@ test('Chat supports persistent history, retries, people selection and both local
   const sidebar = source('components/layout/sidebar.tsx');
   assert.match(sidebar, /href: '\/dashboard\/mensajes'/);
 });
+
+test('Choosing a recipient opens their direct thread and blocks accidental General sends', () => {
+  assert.match(ui, /if \(targetId\) void createDirect\(targetId\)/);
+  assert.match(ui, /const targetId = event\.target\.value;/);
+  assert.match(ui, /\{ recipientId: targetId \}/);
+  assert.doesNotMatch(ui, /onClick=\{\(\) => void createDirect\(\)\}/);
+  assert.match(ui, /saving \|\| creating \|\| recipientId\) return;/);
+  assert.match(ui, /disabled=\{saving \|\| creating \|\| Boolean\(recipientId\)\}/);
+  assert.match(ui, /No se enviará a General/);
+});
