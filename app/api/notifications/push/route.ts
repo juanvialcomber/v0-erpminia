@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ error: 'No fue posible consultar los dispositivos' }, { status: 500 });
   const configError = ctx.userEmail?.trim().toLowerCase() === 'juan@n3uralia.com' ? getWebPushConfigError() : null;
   return NextResponse.json({ publicKey: process.env.WEB_PUSH_VAPID_PUBLIC_KEY || null, devices: count || 0,
+    pilot: ctx.userEmail?.trim().toLowerCase() === 'juan@n3uralia.com',
     ...(configError ? { configurationError: configMessages[configError] } : {}),
   }, { headers: noStore });
 }

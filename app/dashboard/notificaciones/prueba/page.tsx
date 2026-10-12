@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-type Status = { publicKey: string | null; devices: number; configurationError?: string };
+type Status = { publicKey: string | null; devices: number; configurationError?: string; pilot: boolean };
 type PushTestResult = { attempted: number; accepted: number; results: { status: number; accepted: boolean }[] };
 function urlBase64ToUint8Array(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -84,9 +84,9 @@ export default function PushPilotPage() {
     try {
       if (!('Notification' in window) || !('serviceWorker' in navigator))
         throw new Error('Este navegador no admite notificaciones.');
-      const permission = Notification.permission === 'default'
-        ? await Notification.requestPermission() : Notification.permission;
-      if (permission !== 'granted') throw new Error('Las notificaciones de MOTIL están bloqueadas en Chrome.');
+      if (Notification.permission !== 'granted') throw new Error('Activa primero las notificaciones de MOTIL en Chrome.');
+      const status: Status = await api('GET');
+      if (!status.pilot) throw new Error('Prueba reservada al usuario piloto.');
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification('MOTIL · Prueba en este equipo', {
         body: 'Este aviso se creó directamente en tu navegador. Pulsa para abrir MOTIL.',
