@@ -66,14 +66,16 @@ export function Asset360AttentionCard({
         </div>
         {actionableWorkOrder ? (
           <Button asChild size="sm">
-            <Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${encodeURIComponent(actionableWorkOrder.work_order_id)}`}>
-              Continuar trabajo
+            <Link href={actionableWorkOrder.ready_to_close
+                ? `/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${encodeURIComponent(actionableWorkOrder.work_order_id)}`
+                : `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(actionableWorkOrder.work_order_id)}`}>
+              {actionableWorkOrder.ready_to_close ? 'Revisar cierre' : 'Continuar trabajo'}
               <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
         ) : null}
         {!actionableWorkOrder && maintenancePriority ? (
-          <div className="text-right text-xs text-muted-foreground">
+          <div className="flex flex-col items-start gap-2 text-xs text-muted-foreground sm:items-end">
             {maintenancePriority.remaining_meter != null ? (
               <p>
                 Margen: {number(maintenancePriority.remaining_meter, 0)} {maintenancePriority.meter_unit || ''}
@@ -84,6 +86,12 @@ export function Asset360AttentionCard({
             ) : maintenancePriority.scheduled_date ? (
               <p className="mt-1">Programado: {date(maintenancePriority.scheduled_date)}</p>
             ) : null}
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/mantenimiento/planificacion">
+                Ver planificación
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         ) : null}
       </CardContent>
