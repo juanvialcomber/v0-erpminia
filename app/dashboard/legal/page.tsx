@@ -98,6 +98,10 @@ export default function LegalPage() {
         </p>
       </header>
 
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4" aria-label="Compliance 360">
+        <div><h2 className="font-semibold">Compliance 360 · SERNAGEOMIN</h2><p className="mt-1 text-sm text-muted-foreground">Obligaciones, evidencias candidatas y acciones que requieren validación de Legal.</p></div>
+        <Button asChild size="sm"><Link href="/dashboard/legal/compliance-360">Abrir matriz <ArrowRight className="ml-2 size-4"/></Link></Button>
+      </section>
       <section aria-labelledby="legal-work-title" className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">01 / Acciones</p><h2 id="legal-work-title" className="mt-1 text-lg font-semibold">Qué debes resolver</h2><p className="text-sm text-muted-foreground">Empieza por las carpetas que esperan una decisión de Legal.</p></div>
