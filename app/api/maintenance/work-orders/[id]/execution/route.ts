@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
     if (scope === 'missing') return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
 
-    const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult] = await Promise.all([
+    const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult, materialsResult] = await Promise.all([
       context.supabase.from('maintenance_work_orders').select('id, work_order_number, title, description, status, assigned_to_name, scheduled_date, start_date, completion_date, actual_duration_hours, down_time_hours, root_cause, preventive_actions').eq('organization_id', context.organizationId).eq('id', id).maybeSingle(),
       context.supabase.from('work_order_parts').select('*, stock:warehouse_stock(id, part_code, part_name, unit_cost)').eq('organization_id', context.organizationId).eq('work_order_id', id).order('created_at', { ascending: false }),
       context.supabase.from('work_order_labor_entries').select('*').eq('organization_id', context.organizationId).eq('work_order_id', id).order('created_at', { ascending: false }),
@@ -41,11 +41,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       context.supabase.from('work_order_events').select('*').eq('organization_id', context.organizationId).eq('work_order_id', id).order('event_at', { ascending: false }).limit(100),
       context.supabase.from('work_order_final_cost_v1').select('*').eq('organization_id', context.organizationId).eq('work_order_id', id).maybeSingle(),
       context.supabase.from('work_order_closure_cost_snapshots').select('closure_sequence,parts_cost,labor_cost,effective_external_cost,procurement_received_cost,procurement_currency,procurement_currency_count,total_cost,external_cost_basis,closed_at').eq('organization_id', context.organizationId).eq('work_order_id', id).order('closure_sequence', { ascending: false }).limit(1),
+      context.supabase.from('work_order_material_requirements').select('id,canonical_product_id,quantity_required,quantity_available,quantity_shortage,status,notes').eq('organization_id', context.organizationId).eq('work_order_id', id),
     ]);
 
-    const firstError = orderResult.error || partsResult.error || laborResult.error || servicesResult.error || eventsResult.error || costsResult.error || snapshotResult.error;
+    const firstError = orderResult.error || partsResult.error || laborResult.error || servicesResult.error || eventsResult.error || costsResult.error || snapshotResult.error || materialsResult.error;
     if (firstError) throw firstError;
     if (!orderResult.data) return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
+
+    const productIds = Array.from(new Set((materialsResult.data || []).map(row => row.canonical_product_id).filter((id): id is string => Boolean(id))));
+    const { data: materialProducts, error: materialProductsError } = productIds.length
+      ? await context.supabase.from('canonical_products_v1').select('id,product_code,name,unit').eq('organization_id',context.organizationId).in('id',productIds)
+      : { data: [], error: null };
+    if (materialProductsError) throw materialProductsError;
+    const materialNames = new Map((materialProducts || []).map(row => [row.id, row]));
+    const enrichedMaterials = (materialsResult.data || []).map(row => ({ ...row, product: row.canonical_product_id ? materialNames.get(row.canonical_product_id) || null : null }));
 
     const { data: workers, error: workersError } = await context.supabase
       .from('people')
@@ -77,6 +86,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({
       workOrder: orderResult.data,
       parts: partsResult.data || [],
+      materialRequirements: enrichedMaterials,
       labor: laborResult.data || [],
       workers: workers || [],
       externalServices: servicesResult.data || [],

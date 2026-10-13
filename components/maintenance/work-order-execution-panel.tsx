@@ -113,12 +113,30 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
   const workOrder = (data?.workOrder || {}) as WorkOrderSummary;
   const parts = (Array.isArray(data?.parts) ? data.parts : []) as WorkOrderPart[];
   const labor = (Array.isArray(data?.labor) ? data.labor : []) as LaborEntry[];
+  const materialRequirements = (Array.isArray(data?.materialRequirements) ? data.materialRequirements : []) as Array<{ id: string; canonical_product_id?: string | null; quantity_required: number; status: string; notes?: string | null; product?: { name?: string | null; product_code?: string | null; unit?: string | null } | null }>;
   const workers = (Array.isArray(data?.workers) ? data.workers : []) as MaintenanceWorker[];
   const selectedWorker = workers.find((worker) => worker.id === technicianId);
   const services = (Array.isArray(data?.externalServices) ? data.externalServices : []) as ExternalService[];
   const events = (Array.isArray(data?.events) ? data.events : []) as WorkOrderEvent[];
   const costs = data?.costs || {};
-  const reportPhotos = (Array.isArray(photoData?.evidence) ? photoData.evidence : []).filter((photo: { signed_url?: string | null }) => Boolean(photo.signed_url)).slice(0, 2) as Array<{ id: string; signed_url: string; file_name?: string | null }>;
+  const reportPhotos = (Array.isArray(photoData?.evidence) ? photoData.evidence : []).filter((photo: { signed_url?: string | null }) => Boolean(photo.signed_url)) as Array<{ id: string; signed_url: string; file_name?: string | null }>;
+
+  const printReport = async () => {
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>('#work-order-final-report img'));
+    await Promise.all(images.map(async (img) => {
+      if (img.complete && img.naturalWidth > 0) return;
+      try { await img.decode(); } catch { /* Allow printing with accessible evidence even if one image fails. */ }
+    }));
+    const previousTitle = document.title;
+    const clean = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 70);
+    const date = (workOrder.completion_date || workOrder.scheduled_date || new Date().toISOString()).slice(0, 10).replace(/-/g, '');
+    const order = clean(workOrder.work_order_number || workOrderId);
+    const name = clean(workOrder.title || 'Orden_de_Trabajo');
+    document.title = `${date}_${order}_${name}`;
+    window.print();
+    // Printing is asynchronous; restore the application title after closing the print dialog.
+    window.addEventListener('afterprint', () => { document.title = previousTitle; }, { once: true });
+  };
 
   const execute = async (payload: Record<string, unknown>, key: string) => {
     setBusyKey(key);
@@ -193,12 +211,31 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
         #work-order-final-report, #work-order-final-report * { visibility: visible !important; }
         #work-order-final-report { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; border: none !important; box-shadow: none !important; background: white !important; color: black !important; }
         #work-order-final-report button { display: none !important; }
-        #work-order-final-report img { max-height: 185px !important; object-fit: contain !important; }
+        #work-order-final-report img { object-fit: contain !important; }
+        #work-order-final-report { font-family: Arial, sans-serif !important; font-size: 10pt !important; }
+        #work-order-final-report .ot-print-header { display: flex !important; border-bottom: 3px solid #CE814C !important; padding-bottom: 14px !important; }
+        #work-order-final-report .ot-print-header img { max-height: 58px !important; }
+        #work-order-final-report .ot-print-registry { background: #F4EEE7 !important; border: 2px solid #CE814C !important; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+        #work-order-final-report .ot-print-primary img { height: 250px !important; width: 100% !important; }
+        #work-order-final-report .ot-print-thumbs img { height: 125px !important; width: 100% !important; }
+        #work-order-final-report .ot-print-photo { break-inside: avoid !important; page-break-inside: avoid !important; }
+        #work-order-final-report section { break-inside: avoid; }
+        #work-order-final-report .ot-print-title { color: #293B38 !important; }
       }`}</style>
       <Card className="shadow-none print:shadow-none" id="work-order-final-report">
+        <div className="ot-print-header hidden items-center justify-between gap-8 px-6 pt-5 print:flex">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/la-patagua-official.svg" alt="La Patagua" className="h-14 w-auto max-w-[45%] object-contain" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/motil-wordmark.png" alt="MOTIL" className="h-10 w-auto max-w-[30%] object-contain" />
+        </div>
+        <div className="hidden px-6 pt-4 print:block">
+          <h1 className="ot-print-title text-2xl font-bold">Informe final de orden de trabajo</h1>
+          <p className="text-sm">La Patagua · MOTIL · Registro de mantenimiento</p>
+        </div>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" />Informe final de la orden</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="print:hidden"><Printer className="mr-2 h-4 w-4" />Imprimir / Guardar PDF</Button>
+          <Button variant="outline" size="sm" onClick={() => void printReport()} className="print:hidden"><Printer className="mr-2 h-4 w-4" />Imprimir / Guardar PDF</Button>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-xl border bg-muted/30 px-5 py-6 sm:px-7">
@@ -210,8 +247,8 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
               <span>Estado: <strong className="font-medium text-foreground">{workOrder.status === 'completed' ? 'Cerrada' : 'En proceso'}</strong></span>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><p className="text-xs text-muted-foreground">Orden</p><p className="mt-1 font-medium">{workOrder.work_order_number ? formatWorkOrderNumber(workOrder.work_order_number, 'es') : 'Sin número'}</p></div>
+          <div className="ot-print-registry grid gap-4 rounded-lg p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div><p className="text-xs font-semibold text-muted-foreground">Registro / Orden</p><p className="mt-1 font-medium">{workOrder.work_order_number ? formatWorkOrderNumber(workOrder.work_order_number, 'es') : 'Sin número'}</p></div>
             <div><p className="text-xs text-muted-foreground">Responsable</p><p className="mt-1 font-medium">{workOrder.assigned_to_name || 'Sin asignar'}</p></div>
             <div><p className="text-xs text-muted-foreground">Fecha programada</p><p className="mt-1 font-medium">{dateLabel(workOrder.scheduled_date)}</p></div>
             <div><p className="text-xs text-muted-foreground">Fecha de cierre</p><p className="mt-1 font-medium">{dateLabel(workOrder.completion_date)}</p></div>
@@ -222,24 +259,39 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
             <div><p className="text-xs text-muted-foreground">Acción aplicada</p><p className="mt-1 text-sm">{workOrder.preventive_actions || 'No registrada'}</p></div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><p className="text-xs text-muted-foreground">Técnicos</p><p className="mt-1 font-medium">{labor.length}</p></div>
-            <div><p className="text-xs text-muted-foreground">Costo total</p><p className="mt-1 font-medium">{money(costs.total_cost)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Personal asignado</p><p className="mt-1 font-medium">{workOrder.assigned_to_name || 'Sin asignar'}</p><p className="text-xs text-muted-foreground">{labor.length ? `${labor.length} registro(s) de mano de obra` : 'Horas de mano de obra sin registrar'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Costo registrado</p><p className="mt-1 font-medium">{Number(costs.total_cost || 0) > 0 ? money(costs.total_cost) : 'Pendiente de valorización'}</p></div>
           </div>
           {reportPhotos.length > 0 ? (
             <section className="hidden print:block">
-              <p className="mb-2 text-sm font-semibold">Evidencia fotográfica</p>
-              <div className="grid grid-cols-2 gap-3">
-                {reportPhotos.map((photo) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={photo.id} src={photo.signed_url} alt={photo.file_name || 'Evidencia de OT'} className="h-44 w-full rounded border object-contain" />
+              <p className="mb-2 text-sm font-semibold">Evidencia fotográfica ({reportPhotos.length})</p>
+              <div className="ot-print-primary grid grid-cols-2 gap-3">
+                {reportPhotos.slice(0, 2).map((photo) => (
+                  <div key={photo.id} className="ot-print-photo rounded border p-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.signed_url} alt={photo.file_name || 'Evidencia de OT'} className="w-full object-contain" />
+                  </div>
                 ))}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">Hasta dos fotografías. Las demás permanecen en la ficha digital.</p>
+              {reportPhotos.length > 2 ? (
+                <div className="ot-print-thumbs mt-3 grid grid-cols-3 gap-3">
+                  {reportPhotos.slice(2).map((photo) => (
+                    <div key={photo.id} className="ot-print-photo rounded border p-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo.signed_url} alt={photo.file_name || 'Evidencia adicional de OT'} className="w-full object-contain" />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
-          <div className="grid gap-5 lg:grid-cols-3">
-            <div><p className="text-sm font-medium">Repuestos instalados</p><ul className="mt-2 space-y-1 text-sm text-muted-foreground">{parts.filter((part) => Number(part.quantity_installed || 0) > 0).map((part) => <li key={part.id}>{part.stock?.part_name || 'Repuesto'} · {part.quantity_installed}</li>)}{parts.every((part) => Number(part.quantity_installed || 0) <= 0) ? <li>Sin repuestos instalados</li> : null}</ul></div>
-            <div><p className="text-sm font-medium">Mano de obra</p><ul className="mt-2 space-y-1 text-sm text-muted-foreground">{labor.map((entry) => <li key={entry.id}>{entry.technician_name} · {entry.hours} h</li>)}{labor.length === 0 ? <li>Sin mano de obra registrada</li> : null}</ul></div>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div><p className="text-sm font-medium">Materiales y repuestos vinculados</p><ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+              {parts.map(part=><li key={part.id}>{part.stock?.part_name || part.stock?.part_code || 'Material sin nombre'} · solicitados {part.quantity_issued || 0} entregados / {part.quantity_installed || 0} instalados · {part.status}</li>)}
+              {materialRequirements.map(item=><li key={item.id}>Requerimiento {item.product?.name || item.product?.product_code || item.notes || 'material no identificado'} · cantidad {item.quantity_required} · {item.status} (pendiente de conciliación)</li>)}
+              {!parts.length && !materialRequirements.length?<li>No hay materiales registrados en la OT; las fotografías no constituyen un movimiento de bodega.</li>:null}
+            </ul></div>
+            
             <div><p className="text-sm font-medium">Servicios externos</p><ul className="mt-2 space-y-1 text-sm text-muted-foreground">{services.map((service) => <li key={service.id}>{service.provider_name} · {money(service.amount)}</li>)}{services.length === 0 ? <li>Sin servicios externos</li> : null}</ul></div>
           </div>
         </CardContent>
