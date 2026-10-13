@@ -69,14 +69,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: existingSlot } = await supabase
     .from('carpeta_documentos')
-    .select('id, file_path')
+    .select('id, file_path, file_name, l1_status, l2_status')
     .eq('carpeta_id', carpetaId)
     .eq('slot_index', slotIndex)
     .maybeSingle();
 
-  if (existingSlot?.file_path) {
-    await supabase.storage.from(BUCKET).remove([existingSlot.file_path]);
+  // Keep approved documents and earlier file versions immutable during correction.
+  if (carpetaResult.carpeta.status === 'rechazado' && existingSlot?.l1_status !== 'no_cumple' && existingSlot?.l2_status !== 'no_cumple') {
+    return NextResponse.json({ error: 'Solo puedes corregir documentos observados' }, { status: 409 });
   }
+  const oldPath = existingSlot?.file_path || null;
 
   const timestamp = Date.now();
   const filePath = `carpetas/${sanitize(carpetaId)}/${slotIndex}_${timestamp}_${sanitize(file.name)}`;
@@ -114,5 +116,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: docError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ document: doc, message: 'Documento cargado exitosamente' });
+  // Old object intentionally retained for audit/recovery. Never delete a reviewed version.
+  return NextResponse.json({ document: doc, previous_path: oldPath, message: 'Documento cargado exitosamente' });
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, FileText, Scale, ShieldCheck } from 'lucide-react';
+import { ArrowRight, FileText, Scale, ShieldCheck, FolderCheck, Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -25,6 +25,10 @@ type CompliancePayload = {
   contracts_missing_file?: Array<{ id: string; title: string }>;
   expiring_documents?: Array<{ id: string; title: string; expiry_date?: string }>;
 };
+
+type ContractorFolder = { id: string; empresa_nombre: string; status: string; submitted_at: string | null; carpeta_documentos?: Array<{ file_name: string | null; l1_status: string | null }> };
+type ContractorPayload = { carpetas?: ContractorFolder[] };
+type EeccCoverage = { summary: {registered:number;with_folder:number;without_folder:number} };
 
 type CasesPayload = { data?: Array<{ id: string; title: string; status: string; evidence_status: string; action_required?: string | null }>; summary?: { total: number; new: number; in_review: number; action_required: number; waiting_area: number; closed: number } };
 
@@ -53,6 +57,10 @@ export default function LegalPage() {
     { revalidateOnFocus: false },
   );
 
+  const { data: contractorData, error: contractorError, mutate: mutateContractors } = useSWR<ContractorPayload>('/api/carpeta-arranque', fetcher, { revalidateOnFocus: false });
+  const {data: coverage, error: coverageError} = useSWR<EeccCoverage>('/api/legal/eecc-coverage', fetcher, {revalidateOnFocus:false});
+  const l1Queue = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l1');
+  const secondReview = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l2');
   const compliance = complianceData?.summary;
   const regulatory = regulatoryData?.summary;
   const attention = [
@@ -89,6 +97,30 @@ export default function LegalPage() {
           Casos, vencimientos y evidencia que requieren seguimiento legal.
         </p>
       </header>
+
+      <section aria-labelledby="legal-work-title" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">01 / Acciones</p><h2 id="legal-work-title" className="mt-1 text-lg font-semibold">Qué debes resolver</h2><p className="text-sm text-muted-foreground">Empieza por las carpetas que esperan una decisión de Legal.</p></div>
+          <Button asChild size="sm"><Link href="/dashboard/legal/contratistas-documentos">Abrir bandeja <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+        </div>
+        <div className="overflow-hidden rounded-md border">
+          <div className="flex flex-wrap gap-4 border-b px-4 py-3 text-sm text-muted-foreground" role="status">
+            {coverageError ? 'Cobertura de EECC no disponible' : coverage ? <><span><strong className="text-foreground">{coverage.summary.registered}</strong> contratistas registradas</span><span><strong className="text-foreground">{coverage.summary.with_folder}</strong> con carpeta</span><span><strong className="text-foreground">{coverage.summary.without_folder}</strong> aún sin carpeta</span></> : 'Consultando cobertura de contratistas…'}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/20 px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-medium"><FolderCheck className="h-4 w-4" />Contratistas · Primera revisión</span>
+            <span className="text-sm tabular-nums text-muted-foreground">{contractorError ? 'No disponible' : contractorData ? `${l1Queue.length} pendientes` : 'Cargando…'}</span>
+          </div>
+          {contractorError ? <p className="p-4 text-sm text-destructive">No se pudo cargar la bandeja. <button className="underline" onClick={() => void mutateContractors()}>Reintentar</button></p>
+            : !contractorData ? <p className="p-4 text-sm text-muted-foreground">Consultando carpetas…</p>
+            : l1Queue.length ? <div className="divide-y">{l1Queue.slice(0, 5).map(c => <Link key={c.id} href="/dashboard/legal/contratistas-documentos" className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-muted/30"><span className="min-w-0 truncate font-medium">{c.empresa_nombre}</span><span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">{(c.carpeta_documentos || []).filter(d => d.file_name).length} archivos <ArrowRight className="h-4 w-4" /></span></Link>)}</div>
+            : <p className="p-4 text-sm text-muted-foreground">No hay carpetas en primera revisión.</p>}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 text-muted-foreground"><Clock3 className="h-4 w-4" />Segunda firma, solo si Legal la solicita</span>
+            <span className="tabular-nums">{contractorError ? '—' : contractorData ? secondReview.length : '…'}</span>
+          </div>
+        </div>
+      </section>
 
       {hasError ? (
         <StatePanel

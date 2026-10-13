@@ -9,7 +9,7 @@ import {
   verifySubcontractorCookieValue,
 } from '@/lib/subcontractor-session';
 
-const REVIEWERS_EMAIL = ['dennyse@motil.cl', 'javier.vargas@motil.cl', 'gonzalo.canales@motil.cl'];
+const REVIEWERS_EMAIL = ['eliasfernandez@lapatagua.cl'];
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await verifySubcontractorCookieValue(
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: carpeta, error: carpetaError } = await supabase
     .from('carpetas_arranque')
-    .select('*, carpeta_documentos(id, file_name)')
+    .select('*, carpeta_documentos(id, file_name, l1_status, l2_status)')
     .eq('id', carpetaId)
     .single();
 
@@ -45,11 +45,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
   }
 
-  if (carpeta.status !== 'pendiente') {
+  if (!['pendiente', 'rechazado'].includes(carpeta.status)) {
     return NextResponse.json({ error: 'La carpeta ya fue enviada a revision' }, { status: 400 });
   }
 
   const docsWithFiles = carpeta.carpeta_documentos.filter((d: { file_name: string | null }) => d.file_name);
+  if (carpeta.status === 'rechazado') {
+    const remaining = carpeta.carpeta_documentos.filter((d: { l1_status: string | null; l2_status: string | null }) => d.l1_status === 'no_cumple' || d.l2_status === 'no_cumple');
+    if (remaining.length) return NextResponse.json({ error: 'Corrige todos los documentos observados antes de reenviar' }, { status: 409 });
+  }
   if (docsWithFiles.length === 0) {
     return NextResponse.json({ error: 'Debes cargar al menos un documento antes de enviar' }, { status: 400 });
   }
@@ -57,7 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { error: updateError } = await supabase
     .from('carpetas_arranque')
     .update({ status: 'en_revision_l1', submitted_at: new Date().toISOString() })
-    .eq('id', carpetaId);
+    .eq('id', carpetaId)
+    .eq('status', carpeta.status);
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 

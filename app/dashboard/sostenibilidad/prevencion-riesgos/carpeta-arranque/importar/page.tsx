@@ -84,7 +84,7 @@ async function parseImportFile(file: File) {
   throw new Error('Formato no soportado. Usa CSV, XLS o XLSX.');
 }
 
-export default function CarpetaArranqueImportPage() {
+export default function CarpetaArranqueImportPage({ legalContext = false }: { legalContext?: boolean } = {}) {
   const [dragActive, setDragActive] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -225,7 +225,7 @@ export default function CarpetaArranqueImportPage() {
             Plantilla Excel
           </Button>
           <Button asChild>
-            <Link href="/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque">
+            <Link href={legalContext ? "/dashboard/legal/contratistas-documentos" : "/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque"}>
               <ArrowRight className="mr-2 h-4 w-4" />
               Volver
             </Link>

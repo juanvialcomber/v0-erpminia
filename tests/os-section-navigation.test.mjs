@@ -59,8 +59,8 @@ test('non-sequential areas separate operational context from tools instead of fa
   assert.match(sustainability, /Ámbitos de Sostenibilidad y HSE/);
   assert.match(sustainability, /Soporte de Sostenibilidad y HSE/);
   assert.doesNotMatch(sustainability, /insideRiskPrevention/);
-  assert.match(legal, /Control legal/);
-  assert.match(legal, /Herramientas legales/);
+  assert.match(legal, /Navegación principal de Legal/);
+  assert.match(legal, /Más áreas/);
   assert.match(hse, /Controles locales de Seguridad y salud/);
   assert.doesNotMatch(hse, /ArrowLeft/);
 });
@@ -73,7 +73,6 @@ test('all converted area rails use the compact pescamar-style visual language', 
     purchasesUrl,
     financeUrl,
     sustainabilityUrl,
-    legalUrl,
   ].map((url) => readFile(url, 'utf8')));
 
   for (const source of sources) {
@@ -81,4 +80,11 @@ test('all converted area rails use the compact pescamar-style visual language', 
     assert.match(source, /scrollbar-width:none/);
     assert.match(source, /bottom-0 h-0\.5 bg-primary/);
   }
+});
+
+test('Legal navigation prioritizes destinations without horizontal overflow', async () => {
+ const legal = await readFile(legalUrl, 'utf8');
+ assert.match(legal,/flex flex-wrap gap-1/);
+ assert.match(legal,/Navegación principal de Legal/);
+ assert.match(legal,/href: '\/dashboard\/legal\/contratistas-documentos'/);
 });

@@ -91,7 +91,7 @@ const fetcher = async (url: string) => {
 function statusBadge(status: string) {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'aprobado') {
-    return <Badge className="bg-green-500/15 text-green-400 border-green-500/30">Aprobado</Badge>;
+    return <Badge className="bg-green-500/15 text-green-400 border-green-500/30">Documentos aprobados</Badge>;
   }
   if (normalized === 'en_revision_l1' || normalized === 'en_revision_l2') {
     return <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">En revisión</Badge>;
@@ -136,16 +136,16 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Card className="border-border/70 bg-card/90 shadow-xl shadow-black/20">
+    <Card className="border-border/60 bg-card shadow-none">
       <CardHeader className="space-y-3">
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+        <div className="inline-flex w-fit items-center gap-2 text-xs font-medium text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5" />
           Portal para subcontratistas
         </div>
         <div>
-          <CardTitle className="text-2xl">Ingreso por RUT</CardTitle>
-          <CardDescription className="mt-2 text-base">
-            Usa tu RUT y la clave <span className="font-semibold">lapatagua</span> + los 4 digitos antes del guion.
+          <CardTitle className="text-xl">Ingresar</CardTitle>
+          <CardDescription className="mt-1 text-sm">
+            Accede con el RUT y la clave asignada a tu empresa.
           </CardDescription>
         </div>
       </CardHeader>
@@ -175,7 +175,7 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
             <Input
               id="password"
               type="password"
-              placeholder="lapatagua5678"
+              placeholder="Contraseña"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="off"
@@ -183,9 +183,6 @@ function LoginPanel({ onSuccess }: { onSuccess: () => void }) {
             />
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-            Solo necesitas el RUT y la clave generada para tu empresa.
-          </div>
 
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -201,17 +198,23 @@ function PortalDocRow({
   doc,
   carpetaId,
   onUploaded,
+  canUpload,
+  isCorrection,
 }: {
   doc: PortalDoc;
   carpetaId: string;
   onUploaded: () => void;
+  canUpload: boolean;
+  isCorrection: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
+  const observed = doc.l1_status === 'no_cumple' || doc.l2_status === 'no_cumple';
+  const canReplace = canUpload && (!isCorrection || observed);
   const [fileName, setFileName] = useState('');
 
   const uploadFile = async (file: File) => {
-    if (!carpetaId) {
-      toast.error('No hay una carpeta disponible para subir documentos');
+    if (!carpetaId || !canReplace) {
+      toast.error('La carpeta no está disponible para cargar documentos');
       return;
     }
 
@@ -245,13 +248,13 @@ function PortalDocRow({
 
   return (
     <div className={cn(
-      'rounded-xl border p-4 transition-colors',
-      doc.file_name ? 'border-green-500/30 bg-green-500/5' : 'border-border bg-background/60'
+      'rounded-md border px-4 py-3 transition-colors',
+      doc.file_name ? 'border-border/60 bg-muted/10' : 'border-border/60 bg-background'
     )}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            <span className="mt-0.5 flex h-6 w-6 items-center justify-center text-xs font-medium text-muted-foreground">
               {doc.slot_index}
             </span>
             <div className="min-w-0">
@@ -267,19 +270,20 @@ function PortalDocRow({
             ) : (
               <Badge variant="outline">Pendiente</Badge>
             )}
-            {statusBadge(doc.l1_status || doc.l2_status || 'pendiente')}
+            {(doc.l1_status || doc.l2_status) ? statusBadge(doc.l1_status || doc.l2_status || 'pendiente') : null}
           </div>
         </div>
 
+        {observed ? <p className="text-xs text-destructive">{doc.l1_observaciones || doc.l2_observaciones || 'Documento observado: cargar corrección'}</p> : null}
         <div className="flex flex-col items-start gap-2 md:items-end">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted/60">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted/60 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            {carpetaId ? (uploading ? 'Subiendo...' : 'Cargar archivo') : 'Sin carpeta'}
+            {!canReplace ? 'Solo lectura' : uploading ? 'Subiendo...' : doc.file_name ? 'Reemplazar' : 'Subir archivo'}
             <input
               type="file"
               accept=".pdf,.doc,.docx,.xls,.xlsx"
               className="hidden"
-              disabled={!carpetaId || uploading}
+              disabled={!carpetaId || !canReplace || uploading}
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (file) {
@@ -355,97 +359,45 @@ function PortalContent({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <Card className="border-border/70 bg-card/90">
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <CardTitle className="text-2xl">Portal de subcontratistas</CardTitle>
-                <CardDescription>
-                  RUT {session.session.rut_display} - {session.eecc?.name || 'EECC'}
-                </CardDescription>
-              </div>
-              <Button variant="outline" className="gap-2" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-                Cerrar sesion
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-background/60 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Documentos cargados</p>
-              <p className="mt-2 text-3xl font-semibold tabular-nums">
-                {session.uploaded_count}/{session.total_documents}
-              </p>
-              <Progress value={(session.uploaded_count / session.total_documents) * 100} className="mt-3" />
-            </div>
-            <div className="rounded-xl border border-border bg-background/60 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Estado de carpeta</p>
-              <div className="mt-2">{statusBadge(session.carpeta?.status || 'pendiente')}</div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                {session.carpeta ? 'La carpeta ya está lista para continuar.' : 'No se pudo crear la carpeta todavía.'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-background/60 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Accion</p>
-              <p className="mt-2 text-sm font-medium">Sube documentos y envíalos a revisión cuando termines.</p>
-              <Button
-                className="mt-3 w-full gap-2"
-                disabled={!session.carpeta || session.carpeta.status !== 'pendiente' || submitting}
-                onClick={submitCarpeta}
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Enviar a revisión
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/90">
-          <CardHeader>
-            <CardTitle className="text-lg">Datos de la empresa</CardTitle>
-            <CardDescription>La informacion se toma desde la EECC asociada al RUT.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />
-              <span className="font-medium">{session.eecc?.name || 'Sin empresa'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>{session.eecc?.representative || 'Sin representante'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <ClipboardList className="h-4 w-4" />
-              <span>{session.eecc?.rut || session.session.rut_display}</span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Search className="h-4 w-4" />
-              <span>{session.eecc?.email || 'Sin correo'}</span>
-            </div>
-            {session.warning ? (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                {session.warning}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-5">
+      <header className="space-y-5 border-b border-border/70 pb-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">MOTIL / Contratistas</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{session.eecc?.name || 'Documentos'}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">RUT {session.session.rut_display}</p>
+          </div>
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" /> Salir
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-medium tabular-nums">{session.uploaded_count} / {session.total_documents} documentos</span>
+            {statusBadge(session.carpeta?.status || 'pendiente')}
+          </div>
+          <Button size="sm" disabled={!session.carpeta || !['pendiente', 'rechazado'].includes(session.carpeta.status) || submitting} onClick={submitCarpeta}>
+            {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {session.carpeta?.status === 'rechazado' ? 'Reenviar correcciones' : 'Enviar a revisión'}
+          </Button>
+        </div>
+        <Progress value={session.total_documents > 0 ? session.uploaded_count / session.total_documents * 100 : 0} className="h-1" />
+        {session.warning ? <p role="alert" className="text-sm text-destructive">{session.warning}</p> : null}
+      </header>
 
       <Tabs defaultValue="documentos" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[520px]">
+        <TabsList className="grid w-full grid-cols-3 sm:w-[340px]">
           <TabsTrigger value="documentos">Documentos</TabsTrigger>
-          <TabsTrigger value="eecc">EECC</TabsTrigger>
+          <TabsTrigger value="eecc">Empresa</TabsTrigger>
           <TabsTrigger value="estado">Estado</TabsTrigger>
         </TabsList>
 
         <TabsContent value="documentos" className="space-y-4">
-          <Card className="border-border/70 bg-card/90">
+          <Card className="border-border/60 bg-card shadow-none">
             <CardHeader>
-              <CardTitle>Subida de documentos</CardTitle>
+              <CardTitle className="text-base">Documentos requeridos</CardTitle>
               <CardDescription>
-                Carga los documentos requeridos uno por uno. El avance se guarda en linea.
+                Primero los pendientes. PDF, Word o Excel, hasta 50 MB por archivo.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -459,17 +411,19 @@ function PortalContent({
                   {session.uploaded_count} de {session.total_documents} documentos cargados
                 </div>
                 <div className="text-sm font-medium text-primary">
-                  {Math.round((session.uploaded_count / session.total_documents) * 100)}%
+                  {(session.total_documents > 0 ? Math.round(session.uploaded_count / session.total_documents * 100) : 0)}%
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {session.docs.map((doc) => (
+              <div className="space-y-2">
+                {[...session.docs].sort((a, b) => Number(Boolean(a.file_name)) - Number(Boolean(b.file_name)) || a.slot_index - b.slot_index).map((doc) => (
                   <PortalDocRow
                     key={doc.id}
                     doc={doc}
                     carpetaId={session.carpeta?.id || ''}
                     onUploaded={onRefresh}
+                    canUpload={session.can_upload && !!session.carpeta && !['aprobado', 'en_revision_l1', 'en_revision_l2'].includes(session.carpeta.status)}
+                    isCorrection={session.carpeta?.status === 'rechazado'}
                   />
                 ))}
               </div>
@@ -603,16 +557,16 @@ export function SubcontractorPortal() {
 
   if (error || !data?.authenticated) {
     return (
-      <div className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center px-4 py-10">
+      <div className="mx-auto flex min-h-[70vh] w-full max-w-md items-center px-4 py-10">
         <div className="w-full space-y-4">
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1 text-xs text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
               Portal de subcontratistas
             </div>
-            <h1 className="text-3xl font-semibold text-balance">Ingreso simple por RUT</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Acceso a documentos</h1>
             <p className="text-sm text-muted-foreground">
-              Ingresa tu RUT y la clave generada para subir documentos.
+              Revisa y entrega los antecedentes de tu empresa.
             </p>
           </div>
           <LoginPanel onSuccess={refresh} />
@@ -622,7 +576,7 @@ export function SubcontractorPortal() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8">
+    <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:py-12">
       <PortalContent session={data} onRefresh={refresh} />
     </div>
   );

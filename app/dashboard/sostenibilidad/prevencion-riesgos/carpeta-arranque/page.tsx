@@ -24,9 +24,9 @@ function formatPeriodLabel(dateValue?: string | null) {
   return date.toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
 }
 
-export default function CarpetaArranquePage() {
+export default function CarpetaArranquePage({ legalContext = false }: { legalContext?: boolean } = {}) {
   const [showNewForm, setShowNewForm] = useState(false);
-  const [activeTab, setActiveTab] = useState('mis-carpetas');
+  const [activeTab, setActiveTab] = useState('bandeja');
   const [stats, setStats] = useState<Stats>({ total: 0, pendientes: 0, en_revision: 0, aprobadas: 0, rechazadas: 0 });
   const [listKey, setListKey] = useState(0);
   const [carpetas, setCarpetas] = useState<any[]>([]);
@@ -53,7 +53,7 @@ export default function CarpetaArranquePage() {
   const handleFormSuccess = () => {
     setShowNewForm(false);
     setListKey((k) => k + 1);
-    setActiveTab('mis-carpetas');
+    setActiveTab('bandeja');
   };
 
   const handleExportCsv = () => {
@@ -93,16 +93,16 @@ export default function CarpetaArranquePage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
         <h1 className="text-3xl font-bold tracking-tight">Carpeta de Arranque</h1>
-        <p className="text-muted-foreground">Sistema de validación de documentos para empresas contratistas (EECC)</p>
+        <p className="text-muted-foreground">Revisión documental de empresas contratistas · Responsable operativo: Elías</p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" className="gap-2">
-            <Link href="/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque/importar">
+            <Link href={legalContext ? "/dashboard/legal/contratistas-documentos/importar" : "/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque/importar"}>
               Plantilla
             </Link>
           </Button>
           <Button asChild variant="outline" className="gap-2">
-            <Link href="/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque/importar">
+            <Link href={legalContext ? "/dashboard/legal/contratistas-documentos/importar" : "/dashboard/sostenibilidad/prevencion-riesgos/carpeta-arranque/importar"}>
               <Plus className="h-4 w-4" />
               Importar Excel
             </Link>
@@ -113,7 +113,7 @@ export default function CarpetaArranquePage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Carpetas registradas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -134,7 +134,7 @@ export default function CarpetaArranquePage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <CircleDot className="h-4 w-4 text-blue-500" />
-              En revisión
+              Segunda revisión
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -166,18 +166,24 @@ export default function CarpetaArranquePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="mis-carpetas">Mis Carpetas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="bandeja">Documentos por revisar ({carpetas.reduce((count, c) => count + ((c.status === 'en_revision_l1' || c.status === 'pendiente') ? (c.carpeta_documentos || []).filter((d: { file_name?: string | null; l1_status?: string | null }) => d.file_name && !d.l1_status).length : 0), 0)})</TabsTrigger>
+          <TabsTrigger value="mis-carpetas">Todas</TabsTrigger>
             <TabsTrigger value="en-revision" className="gap-2">
              En revisión
-            {stats.en_revision > 0 && (
+            {carpetas.filter(c => c.status === 'en_revision_l2').length > 0 && (
               <span className="rounded-full bg-blue-500 px-1.5 py-0.5 text-xs font-bold leading-none text-white">
-                {stats.en_revision}
+                {carpetas.filter(c => c.status === 'en_revision_l2').length}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="documentos-std">Documentos Requeridos</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="bandeja" className="space-y-4">
+          <div><h2 className="text-lg font-semibold">Bandeja de primera revisión</h2><p className="text-sm text-muted-foreground">Elías revisa documentos, registra observaciones y decide si corresponde solicitar otra firma.</p></div>
+          <CarpetaArranqueList key={`l1-${listKey}`} status="en_revision_l1" />
+        </TabsContent>
 
         <TabsContent value="mis-carpetas" className="space-y-4">
           <div className="flex items-center justify-between">
@@ -213,10 +219,10 @@ export default function CarpetaArranquePage() {
           <div>
             <h2 className="text-lg font-semibold">Carpetas en revisión</h2>
             <p className="text-sm text-muted-foreground">
-              Documentos pendientes de validación por los revisores asignados.
+              Carpetas derivadas a una segunda firma, cuando Legal lo solicita.
             </p>
           </div>
-          <CarpetaArranqueList key={`rev-${listKey}`} status="en-revision" />
+          <CarpetaArranqueList key={`rev-${listKey}`} status="en_revision_l2" />
         </TabsContent>
 
         <TabsContent value="documentos-std" className="space-y-4">
@@ -225,7 +231,7 @@ export default function CarpetaArranquePage() {
             <CardHeader>
               <CardTitle className="text-base">19 Documentos Obligatorios</CardTitle>
               <CardDescription>
-                Toda empresa contratista debe cargar estos documentos en su carpeta de arranque.
+                Esta es la lista base de la carpeta. Legal debe confirmar la aplicabilidad de cada documento según actividad y normativa.
               </CardDescription>
             </CardHeader>
             <CardContent>

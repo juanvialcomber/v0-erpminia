@@ -5,9 +5,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const controlItems = [
-  { href: '/dashboard/legal', label: 'Resumen' },
-  { href: '/dashboard/legal/inbox', label: 'Inbox' },
+const primary = [
+  { href: '/dashboard/legal', label: 'Inicio' },
+  { href: '/dashboard/legal/asistente', label: 'Asistente IA' },
+  { href: '/dashboard/legal/inbox', label: 'Pendientes' },
+  { href: '/dashboard/legal/contratistas-documentos', label: 'Contratistas · Documentos' },
+  { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
+  { href: '/dashboard/legal/documentos', label: 'Archivo Legal' },
+];
+const secondary = [
   { href: '/dashboard/legal/casos', label: 'Casos' },
   { href: '/dashboard/legal/control-contractual', label: 'Control contractual' },
   { href: '/dashboard/legal/avances-contractistas', label: 'Avances' },
@@ -15,80 +21,33 @@ const controlItems = [
   { href: '/dashboard/legal/plazos-fatales', label: 'Plazos fatales' },
   { href: '/dashboard/legal/propiedad-minera', label: 'Propiedad minera' },
   { href: '/dashboard/legal/permisos-licencias', label: 'Permisos y licencias' },
-  { href: '/dashboard/legal/documentos', label: 'Documentos' },
-];
-
-const supportItems = [
   { href: '/dashboard/legal/importar', label: 'Importar' },
 ];
-
-function isActive(pathname: string, href: string) {
-  return href === '/dashboard/legal'
-    ? pathname === href
-    : pathname === href || pathname.startsWith(`${href}/`);
-}
-
-export default function LegalLayout({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
-
-  return (
-    <div className="space-y-5">
-      <section className="border-b border-border" aria-label="Área Legal y cumplimiento">
-        <div className="flex min-h-12 items-stretch overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex shrink-0 items-stretch">
-            <span className="flex items-center px-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-              Control
-            </span>
-            <nav className="flex items-stretch" aria-label="Control legal">
-              {controlItems.map((item) => {
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'relative inline-flex min-h-12 shrink-0 items-center px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                      active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    {active ? <span className="absolute inset-x-2.5 bottom-0 h-0.5 bg-primary" aria-hidden="true" /> : null}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className="mx-2 my-3 w-px shrink-0 bg-border" aria-hidden="true" />
-
-          <div className="flex shrink-0 items-stretch">
-            <span className="flex items-center px-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-              Herramientas
-            </span>
-            <nav className="flex items-stretch" aria-label="Herramientas legales">
-              {supportItems.map((item) => {
-                const active = isActive(pathname, item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'relative inline-flex min-h-12 shrink-0 items-center px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                      active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    {active ? <span className="absolute inset-x-2.5 bottom-0 h-0.5 bg-primary" aria-hidden="true" /> : null}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-      </section>
-      {children}
-    </div>
-  );
+const isActive = (pathname: string, href: string) => href === '/dashboard/legal'
+ ? pathname === href : pathname === href || pathname.startsWith(href + '/');
+export default function LegalLayout({ children }: {children:ReactNode}) {
+ const pathname=usePathname();
+ const otherActive=secondary.some(item=>isActive(pathname,item.href));
+ const link=(item:{href:string;label:string})=>{
+   const active=isActive(pathname,item.href);
+   return <Link key={item.href} href={item.href} aria-current={active?'page':undefined}
+     className={cn('inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+       active?'bg-muted text-foreground':'text-muted-foreground hover:bg-muted/60 hover:text-foreground')}>{item.label}</Link>;
+ };
+ return <div className="space-y-5">
+  <div className="rounded-lg border border-border/70 bg-background p-2">
+   <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+     <Link href="/dashboard/legal" className="text-xs font-semibold uppercase tracking-[0.12em]">Legal / Espacio de trabajo</Link>
+     <span className="text-xs text-muted-foreground">Documentación · Contratos · Cumplimiento</span>
+   </div>
+   <nav className="flex flex-wrap gap-1" aria-label="Navegación principal de Legal">
+    {primary.map(link)}
+    <details className="group relative">
+      <summary className={cn('flex min-h-11 cursor-pointer list-none items-center rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',otherActive?'bg-muted':'text-muted-foreground hover:bg-muted/60')}>Más áreas <span aria-hidden="true" className="ml-2">⌄</span></summary>
+      <div className="absolute right-0 z-30 mt-1 grid min-w-52 gap-1 rounded-md border bg-background p-2 shadow-lg">{secondary.map(link)}</div>
+    </details>
+   </nav>
+  </div>
+  {children}
+ </div>;
 }

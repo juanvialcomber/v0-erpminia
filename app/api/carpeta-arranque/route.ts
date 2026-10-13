@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveAuthContext } from '@/lib/api/auth-session';
+import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,13 @@ async function ensureDocumentSlots(supabase: ReturnType<typeof getSupabaseServer
 export async function GET(request: NextRequest) {
   const auth = await resolveAuthContext(request);
   if (!auth) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+  const [legalAccess, hseAccess] = await Promise.all([
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.LEGAL_EECC),
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.HSE_DOCUMENTACION),
+  ]);
+  if (legalAccess === 'SR' && hseAccess === 'SR') {
+    return NextResponse.json({ error: 'Sin acceso a carpetas de contratistas' }, { status: 403 });
+  }
 
   const supabase = getSupabaseServerClient();
 
@@ -79,7 +87,7 @@ export async function GET(request: NextRequest) {
       revisor_l1_nombre, revisor_l1_status, revisor_l1_fecha,
       revisor_l2_nombre, revisor_l2_status, revisor_l2_fecha,
       submitted_at, created_at, updated_at,
-      carpeta_documentos ( id, slot_index, file_name, l1_status, l2_status )
+      carpeta_documentos ( id, slot_index, documento_nombre, file_name, file_path, uploaded_at, l1_status, l1_observaciones, l2_status, l2_observaciones )
     `)
     .order('created_at', { ascending: false });
 
@@ -92,6 +100,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await resolveAuthContext(request);
   if (!auth) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+  const [legalAccess, hseAccess] = await Promise.all([
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.LEGAL_EECC),
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.HSE_DOCUMENTACION),
+  ]);
+  if (legalAccess === 'SR' && hseAccess === 'SR') {
+    return NextResponse.json({ error: 'Sin acceso a carpetas de contratistas' }, { status: 403 });
+  }
+
+  if (legalAccess !== 'ED' && hseAccess !== 'ED') {
+    return NextResponse.json({ error: 'Sin permiso para crear carpetas' }, { status: 403 });
+  }
 
   const body = await request.json();
   const { empresa_nombre, empresa_rut, contacto_email } = body;

@@ -56,7 +56,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; clas
   pendiente:  { label: 'Pendiente',  icon: <Clock className="h-3 w-3" />,  className: 'bg-orange-500/10 text-orange-500 border-orange-500/20' },
   en_revision_l1:  { label: 'Revisión Nivel 1',  icon: <CircleDot className="h-3 w-3" />,  className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
   en_revision_l2:  { label: 'Revisión Nivel 2',  icon: <CircleDot className="h-3 w-3" />,  className: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
-  aprobado:  { label: 'Aprobado',  icon: <CheckCircle2 className="h-3 w-3" />, className: 'bg-green-500/10 text-green-500 border-green-500/20' },
+  aprobado:  { label: 'Documentos aprobados',  icon: <CheckCircle2 className="h-3 w-3" />, className: 'bg-green-500/10 text-green-500 border-green-500/20' },
   rechazado:  { label: 'Rechazado',  icon: <AlertCircle className="h-3 w-3" />, className: 'bg-red-500/10 text-red-500 border-red-500/20' },
 };
 function StatusBadge({ status }: { status: string }) {
@@ -87,15 +87,17 @@ interface ReviewState {
 function ReviewModal({
   carpeta,
   level,
+  slotIndex,
   onClose,
   onSaved,
 }: {
   carpeta: Carpeta;
   level: 1 | 2;
+  slotIndex?: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const uploadedDocs = carpeta.carpeta_documentos.filter(d => d.file_name);
+  const uploadedDocs = carpeta.carpeta_documentos.filter(d => d.file_name && (slotIndex === undefined || d.slot_index === slotIndex));
   const [reviews, setReviews] = useState<ReviewState[]>(
     uploadedDocs.map(d => ({
       slot_index: d.slot_index,
@@ -103,6 +105,7 @@ function ReviewModal({
       observaciones: level === 1 ? d.l1_observaciones || '' : d.l2_observaciones || '',
     }))
   );
+  const [requireSecondReview, setRequireSecondReview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const setReview = (slotIndex: number, update: Partial<ReviewState>) => {
@@ -127,7 +130,7 @@ function ReviewModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ level, reviews: filledReviews }),
+        body: JSON.stringify({ level, reviews: filledReviews, ...(level === 1 ? { requireSecondReview } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
@@ -149,6 +152,7 @@ function ReviewModal({
             Marca cada documento como <strong>Cumple</strong> o <strong>No Cumple</strong>.
             Las observaciones son obligatorias al rechazar.
           </p>
+          {level === 1 ? <a href="/dashboard/legal/aplicabilidad-eecc" target="_blank" rel="noopener noreferrer" className="inline-flex w-fit text-sm font-medium text-primary underline underline-offset-4">Verificar requisitos aplicables antes de aprobar ↗</a> : null}
         </DialogHeader>
         <div className="overflow-y-auto flex-1 space-y-3 py-2 pr-1">
           {uploadedDocs.map(doc => {
@@ -214,6 +218,12 @@ function ReviewModal({
             );
           })}
         </div>
+        {level === 1 ? (
+          <label className="flex items-start gap-3 rounded-md border border-border/70 p-3 text-sm">
+            <input type="checkbox" className="mt-1" checked={requireSecondReview} onChange={event => setRequireSecondReview(event.target.checked)} />
+            <span><strong>Solicitar segunda aprobación</strong><span className="block text-xs text-muted-foreground">Opcional. Legal puede cerrar la revisión inicial o escalar a otro responsable. Los documentos observados siempre requieren corrección.</span></span>
+          </label>
+        ) : null}
         {error && (
           <p className="text-sm text-destructive flex items-center gap-2">
             <AlertCircle className="h-4 w-4" />{error}
@@ -234,7 +244,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
   const [carpetas, setCarpetas] = useState<Carpeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [reviewing, setReviewing] = useState<{ carpeta: Carpeta; level: 1 | 2 } | null>(null);
+  const [reviewing, setReviewing] = useState<{ carpeta: Carpeta; level: 1 | 2; slotIndex?: number } | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -249,6 +259,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
   useEffect(() => { load(); }, [load]);
   const filtered = carpetas.filter(c => {
     if (status === 'todas') return true;
+    if (status === 'en_revision_l1') return c.status === 'en_revision_l1' || (c.status === 'pendiente' && c.carpeta_documentos.some(d => d.file_name && !d.l1_status));
     if (status === 'en-revision') return ['en_revision_l1', 'en_revision_l2'].includes(c.status);
     return c.status === status;
   });
@@ -276,7 +287,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
           const docs = carpeta.carpeta_documentos || [];
           const uploadedDocs = docs.filter(d => d.file_name);
           const isExpanded = expanded === carpeta.id;
-          const totalDocs = 19;
+          const totalDocs = docs.length;
           return (
             <Card key={carpeta.id} className="overflow-hidden">
               <CardContent className="p-0">
@@ -320,7 +331,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${(uploadedDocs.length / totalDocs) * 100}%` }}
+                        style={{ width: `${totalDocs ? (uploadedDocs.length / totalDocs) * 100 : 0}%` }}
                       />
                     </div>
                   </div>
@@ -335,7 +346,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
                       )} />
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">
-                          {carpeta.revisor_l1_nombre || 'Dennyse'} - L1
+                          {carpeta.revisor_l1_nombre || 'Sin asignar'} - L1
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {carpeta.revisor_l1_status === 'cumple' ? 'Cumple' :
@@ -352,7 +363,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
                       )} />
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">
-                          {carpeta.revisor_l2_nombre || 'Javier / Gonzalo'} - L2
+                          {carpeta.revisor_l2_nombre || 'Sin asignar'} - L2
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {carpeta.revisor_l2_status === 'cumple' ? 'Cumple' :
@@ -361,6 +372,9 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
                       </div>
                     </div>
                   </div>
+                  {carpeta.status === 'pendiente' && uploadedDocs.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Esperando documentos de la contratista. Sin archivos enviados, Legal no puede aprobar ni rechazar.</p>
+                  )}
                   {/* Action buttons */}
                   <div className="flex gap-2 flex-wrap">
                     {carpeta.status === 'en_revision_l1' && (
@@ -415,6 +429,9 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
                             ) : (
                               <Badge variant="outline" className="text-xs text-muted-foreground">Pendiente</Badge>
                             )}
+                            {doc.file_name && ['pendiente', 'en_revision_l1'].includes(carpeta.status) && (
+                              <Button size="sm" variant="outline" onClick={() => setReviewing({ carpeta, level: 1, slotIndex: doc.slot_index })}>Revisar documento</Button>
+                            )}
                             {doc.file_path && (
                               <button
                                 className="text-muted-foreground hover:text-primary transition-colors"
@@ -444,6 +461,7 @@ export default function CarpetaArranqueList({ status }: { status: string }) {
         <ReviewModal
           carpeta={reviewing.carpeta}
           level={reviewing.level}
+          slotIndex={reviewing.slotIndex}
           onClose={() => setReviewing(null)}
           onSaved={() => { setReviewing(null); load(); }}
         />

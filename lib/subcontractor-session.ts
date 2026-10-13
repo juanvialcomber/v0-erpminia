@@ -174,7 +174,7 @@ export function buildSubcontractorSessionPayload(input: {
 export async function createSubcontractorCookieValue(payload: SubcontractorSessionPayload) {
   const secret = getSessionSecret();
   if (!secret) {
-    return JSON.stringify(payload);
+    throw new Error('Subcontractor session signing key is not configured');
   }
 
   const json = JSON.stringify(payload);
@@ -189,14 +189,10 @@ export async function verifySubcontractorCookieValue(token?: string | null) {
   if (!token) return null;
 
   const secret = getSessionSecret();
-  if (!secret) {
-    const legacyPayload = safeJsonParse<Partial<SubcontractorSessionPayload>>(token);
-    if (!isSessionPayload(legacyPayload)) return null;
-    return legacyPayload;
-  }
+  if (!secret) return null;
 
   const [encodedPayload, encodedSignature] = token.split('.');
-  if (!encodedPayload || !encodedSignature) return null;
+  if (!encodedPayload || !encodedSignature || token.split('.').length !== 2) return null;
 
   try {
     const payloadBytes = fromBase64Url(encodedPayload);
