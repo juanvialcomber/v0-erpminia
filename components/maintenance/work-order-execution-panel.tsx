@@ -111,6 +111,7 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
   const [message, setMessage] = useState<string | null>(null);
 
   const workOrder = (data?.workOrder || {}) as WorkOrderSummary;
+  const supervisorReview = (data?.supervisorReview || null) as {status:string;reviewed_by_name:string|null;reviewed_at:string|null;decision_note:string|null}|null;
   const parts = (Array.isArray(data?.parts) ? data.parts : []) as WorkOrderPart[];
   const labor = (Array.isArray(data?.labor) ? data.labor : []) as LaborEntry[];
   const materialRequirements = (Array.isArray(data?.materialRequirements) ? data.materialRequirements : []) as Array<{ id: string; canonical_product_id?: string | null; quantity_required: number; status: string; notes?: string | null; product?: { name?: string | null; product_code?: string | null; unit?: string | null } | null }>;
@@ -262,6 +263,17 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
             <div><p className="text-xs text-muted-foreground">Personal asignado</p><p className="mt-1 font-medium">{workOrder.assigned_to_name || 'Sin asignar'}</p><p className="text-xs text-muted-foreground">{labor.length ? `${labor.length} registro(s) de mano de obra` : 'Horas de mano de obra sin registrar'}</p></div>
             <div><p className="text-xs text-muted-foreground">Costo registrado</p><p className="mt-1 font-medium">{Number(costs.total_cost || 0) > 0 ? money(costs.total_cost) : 'Pendiente de valorización'}</p></div>
           </div>
+          <section className="rounded-lg border-2 border-[#CE814C] bg-[#F4EEE7] p-4 text-[#293B38] print:break-inside-avoid" aria-label="Validación de supervisor">
+            <h2 className="text-sm font-bold uppercase tracking-wide">Validación de supervisor</h2>
+            {supervisorReview?.status === 'approved' ? (
+              <div className="mt-2 space-y-1 text-sm">
+                <p className="text-lg font-bold">APROBADA</p>
+                <p>Aprobado por: <strong>{supervisorReview.reviewed_by_name || 'Identidad no disponible'}</strong></p>
+                <p>Fecha de aprobación: {supervisorReview.reviewed_at ? new Date(supervisorReview.reviewed_at).toLocaleString('es-CL',{timeZone:'America/Santiago',dateStyle:'long',timeStyle:'short'}) : 'Sin fecha registrada'}</p>
+                {supervisorReview.decision_note ? <p>Observación: {supervisorReview.decision_note}</p> : null}
+              </div>
+            ) : <p className="mt-2 text-sm font-semibold">{supervisorReview?.status === 'rejected' ? 'Revisión rechazada' : 'Sin aprobación de supervisor registrada'}</p>}
+          </section>
           {reportPhotos.length > 0 ? (
             <section className="hidden print:block">
               <p className="mb-2 text-sm font-semibold">Evidencia fotográfica ({reportPhotos.length})</p>

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
     if (scope === 'missing') return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
 
-    const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult, materialsResult] = await Promise.all([
+    const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult, materialsResult, approvalResult] = await Promise.all([
       context.supabase.from('maintenance_work_orders').select('id, work_order_number, title, description, status, assigned_to_name, scheduled_date, start_date, completion_date, actual_duration_hours, down_time_hours, root_cause, preventive_actions').eq('organization_id', context.organizationId).eq('id', id).maybeSingle(),
       context.supabase.from('work_order_parts').select('*, stock:warehouse_stock(id, part_code, part_name, unit_cost)').eq('organization_id', context.organizationId).eq('work_order_id', id).order('created_at', { ascending: false }),
       context.supabase.from('work_order_labor_entries').select('*').eq('organization_id', context.organizationId).eq('work_order_id', id).order('created_at', { ascending: false }),
@@ -42,9 +42,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       context.supabase.from('work_order_final_cost_v1').select('*').eq('organization_id', context.organizationId).eq('work_order_id', id).maybeSingle(),
       context.supabase.from('work_order_closure_cost_snapshots').select('closure_sequence,parts_cost,labor_cost,effective_external_cost,procurement_received_cost,procurement_currency,procurement_currency_count,total_cost,external_cost_basis,closed_at').eq('organization_id', context.organizationId).eq('work_order_id', id).order('closure_sequence', { ascending: false }).limit(1),
       context.supabase.from('work_order_material_requirements').select('id,canonical_product_id,quantity_required,quantity_available,quantity_shortage,status,notes').eq('organization_id', context.organizationId).eq('work_order_id', id),
+      context.supabase.from('work_order_supervisor_reviews').select('id,status,reviewed_by_name,reviewed_at,decision_note').eq('organization_id',context.organizationId).eq('work_order_id',id).order('reviewed_at',{ascending:false}).limit(1),
     ]);
 
-    const firstError = orderResult.error || partsResult.error || laborResult.error || servicesResult.error || eventsResult.error || costsResult.error || snapshotResult.error || materialsResult.error;
+    const firstError = orderResult.error || partsResult.error || laborResult.error || servicesResult.error || eventsResult.error || costsResult.error || snapshotResult.error || materialsResult.error || approvalResult.error;
     if (firstError) throw firstError;
     if (!orderResult.data) return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
 
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       workOrder: orderResult.data,
       parts: partsResult.data || [],
       materialRequirements: enrichedMaterials,
+      supervisorReview: approvalResult.data?.[0] || null,
       labor: laborResult.data || [],
       workers: workers || [],
       externalServices: servicesResult.data || [],
