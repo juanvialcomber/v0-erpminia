@@ -212,6 +212,18 @@ export default function InspeccionesExternasPage() {
         </Card>
       </div>
 
+      {filteredInspecciones.some((insp) => insp.hallazgos_count > 0) && (
+        <div className="mb-5 flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-medium">Hallazgos que requieren clasificación</p>
+            <p className="text-sm text-muted-foreground">Un hallazgo de inspección no constituye automáticamente una no conformidad. Revise el informe de origen antes de registrar seguimiento; conserve el número de inspección como referencia.</p>
+          </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link href="/dashboard/sostenibilidad/no-conformidades">Revisar no conformidades</Link>
+          </Button>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Listado de Inspecciones</CardTitle>

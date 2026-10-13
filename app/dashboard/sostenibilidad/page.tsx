@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertTriangle, ArrowRight, FileCheck2, Leaf, ShieldCheck, Upload, Users } from 'lucide-react';
+import { ArrowRight, FileCheck2, Leaf, ShieldCheck, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -84,51 +84,39 @@ export default function SostenibilidadDashboard() {
     { label: 'Documentos HSE', value: value(docCount), detail: 'Biblioteca HSE' },
   ];
 
+  // Cuatro pilares originales de Sostenibilidad (estructura canónica anterior al dashboard).
   const areas: AreaCard[] = [
     {
-      title: 'HSE / Prevención',
-      description: 'Documentos, capacitación y EPP permanecen como fuentes distintas.',
+      title: 'HSE / Prevención de Riesgos',
+      description: 'Documentos, capacitación, EPP, inspecciones, no conformidades y acciones correctivas.',
       href: '/dashboard/sostenibilidad/prevencion-riesgos',
       icon: ShieldCheck,
       facts: [
         { label: 'Documentos', value: docCount },
-        { label: 'Capacitaciones', value: capCount },
-        { label: 'EPP', value: eppCount },
-      ],
-    },
-    {
-      title: 'Inspecciones',
-      description: 'Internas y externas se cuentan por separado; una no sustituye a la otra.',
-      href: '/dashboard/sostenibilidad/prevencion-riesgos/inspecciones',
-      icon: FileCheck2,
-      facts: [
-        { label: 'Internas', value: internalInspectionCount },
-        { label: 'Externas', value: externalInspectionCount },
-      ],
-    },
-    {
-      title: 'No conformidades',
-      description: 'Registro y acciones correctivas sin convertir un porcentaje en un conteo.',
-      href: '/dashboard/sostenibilidad/no-conformidades',
-      icon: AlertTriangle,
-      facts: [
-        { label: 'Registros', value: ncCount },
-        { label: 'Acciones correctivas', value: correctiveActionCount },
+        { label: 'Inspecciones internas', value: internalInspectionCount },
+        { label: 'No conformidades', value: ncCount },
       ],
     },
     {
       title: 'Medio Ambiente',
-      description: 'Sólo se muestra el total del registro ambiental disponible; no se inventan subtotales de permisos o monitoreos.',
+      description: 'Monitoreos, permisos y planes de acción; no se inventan subtotales de permisos o monitoreos.',
       href: '/dashboard/sostenibilidad/medio-ambiente',
       icon: Leaf,
       facts: [{ label: 'Registros ambientales', value: environmentCount }],
     },
     {
       title: 'Comunidades',
-      description: 'El total de la fuente no se reutiliza como partes interesadas, compromisos y licencia social.',
+      description: 'Partes interesadas, compromisos y licencia social; el total de la fuente no se reutiliza como partes interesadas, compromisos y licencia social.',
       href: '/dashboard/sostenibilidad/comunidades',
       icon: Users,
       facts: [{ label: 'Registros de comunidades', value: communityCount }],
+    },
+    {
+      title: 'Proyectos de Sostenibilidad',
+      description: 'Iniciativas, presupuesto y seguimiento de retorno.',
+      href: '/dashboard/sostenibilidad/reportes',
+      icon: FileCheck2,
+      facts: [{ label: 'Ver seguimiento', value: null }],
     },
   ];
 
@@ -138,7 +126,7 @@ export default function SostenibilidadDashboard() {
         <PageHeaderContent>
           <PageHeaderEyebrow>HSE · Sostenibilidad</PageHeaderEyebrow>
           <PageHeaderTitle>Sostenibilidad</PageHeaderTitle>
-          <PageHeaderDescription>Cumplimiento, no conformidades y trabajo HSE desde sus fuentes reales. “—” significa que la fuente no respondió.</PageHeaderDescription>
+          <PageHeaderDescription>Conoce la normativa, revisa si aplica a La Patagua y gestiona sólo las obligaciones confirmadas. Una obligación sin evaluar no es incumplimiento. “—” significa que la fuente no respondió.</PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
           <Button asChild variant="outline"><Link href="/dashboard/sostenibilidad/prevencion-riesgos/inspecciones/importar"><Upload className="h-4 w-4"/>Importar inspecciones</Link></Button>
@@ -146,6 +134,16 @@ export default function SostenibilidadDashboard() {
       </PageHeader>
 
       {overviewError ? <StatePanel tone="warning" title="Resumen HSE no disponible" description="Las demás fuentes siguen visibles por separado. No se muestran ceros de reemplazo para cumplimiento, no conformidades o acciones vencidas." actions={<Button variant="outline" onClick={() => void refreshOverview()}>Reintentar</Button>} className="min-h-0 py-5"/> : null}
+
+      <section aria-label="Pendientes HSE" className="rounded-lg border bg-card p-4">
+        <div className="mb-3"><h2 className="text-base font-semibold">Qué requiere atención</h2><p className="text-sm text-muted-foreground">Accesos directos a los registros de la faena. Sin inferir incidentes ni cumplimiento a partir de fuentes vacías.</p></div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Link href="/dashboard/sostenibilidad/no-conformidades" className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/30"><span>No conformidades abiertas</span><strong className="tabular-nums">{overview ? value(overview.open_ncs) : 'Sin dato'}</strong></Link>
+          <Link href="/dashboard/sostenibilidad/no-conformidades" className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/30"><span>Acciones correctivas vencidas</span><strong className="tabular-nums">{overview ? value(overview.overdue_cas) : 'Sin dato'}</strong></Link>
+          <Link href="/dashboard/sostenibilidad/prevencion-riesgos/inspecciones" className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/30"><span>Consultar inspecciones</span><ArrowRight className="size-4 text-muted-foreground"/></Link>
+          <Link href="/dashboard/legal" className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/30"><span>Escalar a Legal cuando corresponda</span><ArrowRight className="size-4 text-muted-foreground"/></Link>
+        </div>
+      </section>
 
       <section aria-label="Estado de Sostenibilidad" className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6">
         {metrics.map((metric) => <div key={metric.label} className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">{metric.label}</p><p className="mt-1 text-2xl font-semibold tracking-tight">{overviewLoading && ['Cumplimiento','NC abiertas','Acciones vencidas'].includes(metric.label) ? '—' : metric.value}</p><p className="mt-1 text-xs text-muted-foreground">{metric.detail}</p></div>)}

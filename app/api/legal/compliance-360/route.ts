@@ -59,6 +59,7 @@ export async function POST(request:NextRequest){
  const {data:existing,error:lookupError}=await a.context.supabase.from('legal_cases').select('id,metadata,status,evidence_status,operational_owner,due_at').eq('organization_id',a.context.organizationId).eq('source_type','sernageomin_obligation').contains('metadata',{obligationId:obligation.id}).limit(1).maybeSingle();
  if(lookupError)return NextResponse.json({error:lookupError.message},{status:500});
  const oldMeta=(existing?.metadata&&typeof existing.metadata==='object'&&!Array.isArray(existing.metadata))?existing.metadata as Record<string,unknown>:{};
+ if(['request_evidence','approve_evidence','return_evidence'].includes(action)&&oldMeta.applicability!=='applicable')return NextResponse.json({error:'Primero Legal debe confirmar que la obligación aplica a La Patagua; si no aplica, no se exigen antecedentes'},{status:409});
  if(action==='approve_evidence'&&oldMeta.applicability!=='applicable')return NextResponse.json({error:'Antes de validar evidencia, Legal debe confirmar que la obligación aplica a esta faena'},{status:409});
  const history=Array.isArray(oldMeta.history)?oldMeta.history:[];
  const at=new Date().toISOString();

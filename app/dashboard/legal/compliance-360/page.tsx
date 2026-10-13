@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 
 type Obligation = {
+  legalBasis?: string[]; sourceUrl?: string; applicabilityNote?: string; trigger?: string;
   id?: string; code?: string; title?: string; label?: string; priority: 'critical'|'high'|'medium';
   nextAction?: string; evidenceCount: number; reviewState: string;
   applicabilityState: string; timingRule?: string; sourceModules?: string[];
@@ -20,7 +21,7 @@ export default function Compliance360Page(){
   const [query,setQuery]=useState('');
   const {data:work,mutate:reloadWork}=useSWR<{items:Array<{id:string;title:string;status:string;metadata:{obligationId?:string;applicability?:'applicable'|'not_applicable'|'undetermined';history?:Array<{action:string;note:string;at:string}>}}>;canWrite:boolean}>('/api/legal/compliance-360',fetcher as never);
   const [selected,setSelected]=useState<string|null>(null);
-  const [action,setAction]=useState('request_evidence');
+  const [action,setAction]=useState('applicability');
   const [decision,setDecision]=useState('undetermined');
   const [note,setNote]=useState('');
   const [owner,setOwner]=useState('');
@@ -39,13 +40,13 @@ export default function Compliance360Page(){
   };
   const obligations=useMemo(()=>(data?.obligations||[]).filter(item=>{
     const record=work?.items?.find(row=>row.metadata?.obligationId===item.id);
-    if(filter==='pending'&&record?.metadata?.applicability==='not_applicable')return false;
+    if(filter==='pending'&&record?.metadata?.applicability&&record.metadata.applicability!=='undetermined')return false;
     return [item.title,item.label,item.code,item.nextAction].join(' ').toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es'));
   }),[data,work,filter,query]);
   return <div className="mx-auto max-w-6xl space-y-6">
     <header className="space-y-3 border-b pb-5">
       <Link href="/dashboard/legal" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4"/>Legal</Link>
-      <div className="flex items-start gap-3"><ShieldCheck className="mt-1 size-7 text-primary"/><div><h1 className="text-2xl font-semibold">Cumplimiento SERNAGEOMIN · La Patagua</h1><p className="mt-1 text-sm text-muted-foreground">Elías revisa obligaciones, solicita documentos y registra decisiones. Ninguna coincidencia documental acredita cumplimiento.</p></div></div>
+      <div className="flex items-start gap-3"><ShieldCheck className="mt-1 size-7 text-primary"/><div><h1 className="text-2xl font-semibold">Cumplimiento SERNAGEOMIN · La Patagua</h1><p className="mt-1 text-sm text-muted-foreground">Consulta la norma y decide si aplica a La Patagua antes de solicitar antecedentes. Lo no evaluado no es incumplimiento.</p></div></div>
     </header>
     {error||data?.available===false?<div className="rounded-lg border p-5"><p>No se pudo cargar el contexto regulatorio. No se presentan estados estimados.</p><button type="button" className="mt-3 text-sm underline" onClick={()=>void mutate()}>Reintentar</button></div>:null}
     {isLoading?<p className="text-sm text-muted-foreground">Consultando fuentes regulatorias y evidencia canónica…</p>:null}
@@ -58,7 +59,8 @@ export default function Compliance360Page(){
       <div className="flex flex-wrap items-center gap-2"><input aria-label="Buscar obligación" placeholder="Buscar obligación…" value={query} onChange={event=>setQuery(event.target.value)} className="min-w-56 flex-1 rounded-md border bg-background px-3 py-2 text-sm"/>{([{key:'pending',label:'Por resolver'},{key:'all',label:'Todas'}] as const).map(option=><button key={option.key} type="button" onClick={()=>setFilter(option.key)} aria-pressed={filter===option.key} className={`rounded-md border px-3 py-2 text-sm ${filter===option.key?'border-primary bg-primary/10 font-semibold':'hover:bg-muted'}`}>{option.label}</button>)}</div>
       <div className="space-y-3">{obligations.length===0?<p className="rounded-lg border p-5 text-sm text-muted-foreground">No hay obligaciones para este filtro.</p>:obligations.map((item,index)=><article key={item.id||item.code||index} className="rounded-lg border bg-card p-4 space-y-3">
         <div className="flex flex-wrap justify-between gap-2"><h2 className="max-w-3xl font-semibold">{item.title||item.label||item.code||'Obligación sin título'}</h2><span className="text-xs font-medium text-muted-foreground">{item.priority==='critical'?'Prioridad crítica':item.priority==='high'?'Prioridad alta':'Prioridad media'}</span></div>
-        <p className="text-xs text-muted-foreground">Aplicabilidad por revisar · No constituye certificación de cumplimiento</p>
+        <p className="text-xs text-muted-foreground">Estado: {work?.items?.find(row=>row.metadata?.obligationId===item.id)?.metadata?.applicability==='applicable'?'Aplica':work?.items?.find(row=>row.metadata?.obligationId===item.id)?.metadata?.applicability==='not_applicable'?'No aplica':'Por evaluar'} · No constituye certificación de cumplimiento</p>
+        <details className="text-sm"><summary className="cursor-pointer font-medium">Norma y condiciones de aplicabilidad</summary><p className="mt-2 text-muted-foreground">{item.applicabilityNote||'Requiere evaluación por Legal según las condiciones reales de la faena.'}</p>{item.trigger?<p className="mt-1 text-muted-foreground">Condición: {item.trigger}</p>:null}{item.legalBasis?.length?<p className="mt-1">Fundamento: {item.legalBasis.join(' · ')}</p>:null}{item.sourceUrl?<a className="mt-2 inline-block text-primary underline" href={item.sourceUrl} target="_blank" rel="noopener noreferrer">Consultar fuente normativa</a>:null}</details>
         <p className="text-sm">{item.nextAction||'Determinar la aplicabilidad y solicitar evidencia verificable.'}</p>
         <p className="text-sm text-muted-foreground">{item.evidenceCount>0?`${item.evidenceCount} evidencia(s) candidata(s) por verificar`:'Sin evidencia candidata encontrada; esto no significa ausencia documental definitiva.'}</p>
         {item.evidenceRefs?.length?<details className="text-sm"><summary className="cursor-pointer font-medium">Ver referencias de evidencia</summary><ul className="mt-2 space-y-1">{item.evidenceRefs.map(e=><li key={e.canonicalRef} className="break-words text-muted-foreground">{e.label} · {e.scope} · {e.canonicalRef}</li>)}</ul></details>:null}
@@ -66,12 +68,12 @@ export default function Compliance360Page(){
           <div className="flex flex-wrap justify-between gap-2"><span>{record?`Expediente: ${record.status}`:'Sin expediente de revisión todavía'}</span><button type="button" className="font-semibold text-primary underline" onClick={()=>{setSelected(selected===item.id?null:item.id||null);setFeedback('');}}> {selected===item.id?'Cerrar ficha':'Revisar obligación'}</button></div>
           {record?.metadata?.history?.length?<details><summary className="cursor-pointer">Historial de decisiones ({record.metadata.history.length})</summary><ul className="mt-2 space-y-2">{record.metadata.history.map((entry,i)=><li key={i} className="border-l-2 pl-2">{entry.action} · {new Date(entry.at).toLocaleString('es-CL',{timeZone:'America/Santiago'})} · {entry.note}</li>)}</ul></details>:null}
           {selected===item.id&&work?.canWrite?<div className="space-y-3 border-t pt-3">
-            <label className="block">Acción<select className="mt-1 w-full rounded border bg-background p-2" value={action} onChange={e=>setAction(e.target.value)}><option value="applicability">Determinar aplicabilidad</option><option value="request_evidence">Solicitar antecedentes</option><option value="approve_evidence">Validar evidencia</option><option value="return_evidence">Devolver con observaciones</option></select></label>
+            <label className="block">Acción<select className="mt-1 w-full rounded border bg-background p-2" value={action} onChange={e=>setAction(e.target.value)}><option value="applicability">Determinar aplicabilidad</option><option value="request_evidence" disabled={record?.metadata?.applicability!=='applicable'}>Solicitar antecedentes (solo si aplica)</option><option value="approve_evidence" disabled={record?.metadata?.applicability!=='applicable'}>Validar evidencia (solo si aplica)</option><option value="return_evidence" disabled={record?.metadata?.applicability!=='applicable'}>Devolver con observaciones (solo si aplica)</option></select></label>
             {action==='applicability'?<label className="block">Decisión<select className="mt-1 w-full rounded border bg-background p-2" value={decision} onChange={e=>setDecision(e.target.value)}><option value="undetermined">Por determinar</option><option value="applicable">Aplica</option><option value="not_applicable">No aplica</option></select></label>:null}
             <div className="grid gap-2 sm:grid-cols-2"><label>Área o encargado<input className="mt-1 w-full rounded border bg-background p-2" value={owner} onChange={e=>setOwner(e.target.value)} placeholder="Área responsable"/></label><label>Vencimiento operativo<input type="date" className="mt-1 w-full rounded border bg-background p-2" value={dueDate} onChange={e=>setDueDate(e.target.value)}/></label></div>
             {action==='approve_evidence'?<label className="block">Referencia de evidencia canónica<select className="mt-1 w-full rounded border bg-background p-2" value={evidenceRef} onChange={e=>setEvidenceRef(e.target.value)}><option value="">Selecciona evidencia canónica</option>{(item.evidenceRefs||[]).map(e=><option key={e.canonicalRef} value={e.canonicalRef}>{e.label} · {e.scope}</option>)}</select></label>:null}
             <label className="block">Fundamento y siguiente acción<textarea className="mt-1 w-full rounded border bg-background p-2" value={note} maxLength={1500} onChange={e=>setNote(e.target.value)} placeholder="Indica evidencia, criterio y acción concreta" rows={3}/></label>
-            <button type="button" disabled={saving||!note.trim()||(action==='approve_evidence'&&!evidenceRef.trim())} onClick={()=>void save(item.id||'')} className="rounded bg-primary px-4 py-2 font-medium text-primary-foreground disabled:opacity-40">{saving?'Guardando…':'Registrar decisión'}</button>
+            <button type="button" disabled={saving||!note.trim()||(action!=='applicability'&&record?.metadata?.applicability!=='applicable')||(action==='approve_evidence'&&!evidenceRef.trim())} onClick={()=>void save(item.id||'')} className="rounded bg-primary px-4 py-2 font-medium text-primary-foreground disabled:opacity-40">{saving?'Guardando…':'Registrar decisión'}</button>
             {feedback?<p role="status">{feedback}</p>:null}
           </div>:null}
         </div>;})()}
