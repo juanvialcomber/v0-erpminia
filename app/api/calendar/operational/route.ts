@@ -27,6 +27,9 @@ type OperationalCalendarItem = {
   historical: boolean;
   completed_at: string | null;
   image_urls?: string[];
+  asset_name?: string | null;
+  asset_code?: string | null;
+  asset_cost_center?: string | null;
   overdue: boolean;
   days_until: number;
 };
@@ -209,7 +212,7 @@ export async function GET(request: NextRequest) {
     const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult] = await Promise.all([
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name')
+        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,canonical_asset_id')
         .eq('organization_id', context.organizationId)
         .not('scheduled_date', 'is', null)
         .gte('scheduled_date', startDate)
@@ -305,6 +308,17 @@ export async function GET(request: NextRequest) {
     // Resolve evidence only for orders already scoped to the viewer's organization.
     const orderIds = (workOrdersResult.data || []).map((order) => order.id);
     const evidenceImages = new Map<string, string[]>();
+    const assetIds = Array.from(new Set((workOrdersResult.data || []).map(order => order.canonical_asset_id).filter((id): id is string => Boolean(id))));
+    const assetsById = new Map<string, { name: string | null; asset_code: string | null; cost_center_code: string | null }>();
+    if (assetIds.length) {
+      const { data: assets, error: assetError } = await context.supabase
+        .from('maintenance_canonical_assets_v1')
+        .select('id,name,asset_code,cost_center_code')
+        .eq('organization_id', context.organizationId)
+        .in('id', assetIds);
+      if (assetError) warnings.push('No se pudo cargar el contexto de activos.');
+      for (const asset of assets || []) assetsById.set(asset.id, asset);
+    }
     if (orderIds.length) {
       const { data: evidenceRows, error: evidenceError } = await context.supabase
         .from('work_order_evidence_files')
@@ -321,7 +335,7 @@ export async function GET(request: NextRequest) {
         for (const row of evidenceRows || []) {
           if (!row.storage_bucket || !row.storage_path) continue;
           const existing = candidates.get(row.work_order_id) || [];
-          if (existing.length < 3) existing.push({ bucket: row.storage_bucket, path: row.storage_path });
+          if (existing.length < 20) existing.push({ bucket: row.storage_bucket, path: row.storage_path });
           candidates.set(row.work_order_id, existing);
         }
         await Promise.all(Array.from(candidates, async ([orderId, images]) => {
@@ -358,6 +372,9 @@ export async function GET(request: NextRequest) {
         historical,
         completed_at: normalizeDate(row.completion_date || row.closed_at),
         image_urls: evidenceImages.get(row.id) || [],
+        asset_name: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.name || null : null,
+        asset_code: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.asset_code || null : null,
+        asset_cost_center: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.cost_center_code || null : null,
       }, today));
     }
 

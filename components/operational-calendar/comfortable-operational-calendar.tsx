@@ -54,6 +54,9 @@ type OperationalCalendarItem = {
   historical: boolean;
   completed_at: string | null;
   image_urls?: string[];
+  asset_name?: string | null;
+  asset_code?: string | null;
+  asset_cost_center?: string | null;
 };
 
 type CalendarResponse = {
@@ -73,6 +76,19 @@ type CalendarResponse = {
     scope: CalendarScope;
   };
 };
+
+function EvidenceImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed) {
+    return (
+      <div role="img" aria-label={`${alt}: imagen no disponible`} className={`${className} flex items-center justify-center bg-muted text-muted-foreground`}>
+        <ImageOff className="h-5 w-5" aria-hidden="true" />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={className} />;
+}
 
 const OT_STATES = [
   { id: 'open', label: 'Abierta / pendiente', color: 'bg-orange-500', bar: 'border-orange-500/60 bg-orange-500/20 text-foreground' },
@@ -188,6 +204,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState<OperationalCalendarItem | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<CalendarResponse>(
@@ -463,7 +480,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
 
                   <div className="sticky left-0 z-20 flex h-full items-center gap-3 border-r bg-card px-3" style={{ width: LABEL_WIDTH }}>
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-                      {item.image_urls?.[0] ? <img src={item.image_urls[0]} alt={`Evidencia de ${item.reference || item.title}`} loading="lazy" className="h-full w-full rounded object-cover" /> : <SourceIcon className="h-4 w-4 text-muted-foreground" />}
+                      {item.image_urls?.[0] ? <EvidenceImage src={item.image_urls[0]} alt={`Evidencia de ${item.reference || item.title}`} className="h-full w-full rounded object-cover" /> : <SourceIcon className="h-4 w-4 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
@@ -513,7 +530,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
               <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{SOURCE_META[selectedItem.source].label} · {selectedItem.kind}</span>
               <Button variant="ghost" size="icon" onClick={() => setSelectedItem(null)} aria-label="Cerrar detalle"><X className="h-4 w-4" /></Button>
             </div>
-            <Link href={selectedItem.href} aria-label={`Abrir orden o actividad completa: ${selectedItem.title}`} className="group mt-6 block rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/60 hover:bg-muted/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+            <div className="mt-6 rounded-lg border border-border bg-card p-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold tracking-wide text-muted-foreground">{selectedItem.reference || selectedItem.kind}</span>
                 <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
@@ -524,7 +541,9 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                   {selectedItem.image_urls?.length ? (
                     <div className="grid grid-cols-3 gap-1 p-1">
                       {selectedItem.image_urls.map((url, index) => (
-                        <img key={url} src={url} alt={`Evidencia ${index + 1} de ${selectedItem.reference || selectedItem.title}`} loading="lazy" className={`w-full rounded object-cover ${index === 0 ? 'col-span-3 h-44' : 'h-20'}`} />
+                        <button key={url} type="button" onClick={() => setGalleryIndex(index)} aria-label={`Ampliar evidencia ${index + 1}`} className={`overflow-hidden rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${index === 0 ? 'col-span-3' : ''}`}>
+                          <EvidenceImage src={url} alt={`Evidencia ${index + 1} de ${selectedItem.reference || selectedItem.title}`} className={`w-full object-cover ${index === 0 ? 'h-44' : 'h-20'}`} />
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -536,18 +555,43 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                 <span className={`rounded-md border px-2 py-1 font-semibold ${selectedItem.source === 'maintenance' ? otState(selectedItem).bar : SOURCE_META[selectedItem.source].bar}`}>{selectedItem.status_label}</span>
                 <span className="text-muted-foreground">{formatShortDate(selectedItem.date)}</span>
               </div>
+              {selectedItem.source === 'maintenance' && selectedItem.asset_name ? (
+                <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm">
+                  <p className="text-xs text-muted-foreground">Equipo / activo</p>
+                  <p className="mt-1 font-semibold">{selectedItem.asset_name}</p>
+                  {selectedItem.asset_code && selectedItem.asset_code !== selectedItem.asset_name ? <p className="mt-1 text-xs text-muted-foreground">{selectedItem.asset_code}</p> : null}
+                  {selectedItem.asset_cost_center ? <p className="mt-1 text-xs text-muted-foreground">Centro de costo: {selectedItem.asset_cost_center}</p> : null}
+                </div>
+              ) : null}
               <div className="mt-5 grid grid-cols-2 gap-4 border-t pt-4 text-sm">
                 <p><span className="text-xs text-muted-foreground">Responsable</span><span className="mt-1 block font-medium">{selectedItem.owner || 'Sin asignar'}</span></p>
                 <p><span className="text-xs text-muted-foreground">Programada</span><span className="mt-1 block font-medium">{formatShortDate(selectedItem.date)}</span></p>
                 {selectedItem.completed_at ? <p><span className="text-xs text-muted-foreground">Finalizada</span><span className="mt-1 block font-medium">{formatShortDate(selectedItem.completed_at)}</span></p> : null}
                 {selectedItem.location ? <p><span className="text-xs text-muted-foreground">Ubicación</span><span className="mt-1 block font-medium">{selectedItem.location}</span></p> : null}
               </div>
-              <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm font-medium text-foreground">
+              <Link href={selectedItem.href} className="mt-5 flex items-center justify-between border-t pt-4 text-sm font-medium text-foreground hover:underline">
                 Ver OT completa <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              </div>
-            </Link>
+              </Link>
+            </div>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">Vista previa de solo lectura. Selecciona la ficha para abrir el registro y sus evidencias.</p>
           </aside>
+          {galleryIndex !== null && selectedItem.image_urls?.[galleryIndex] ? (
+            <div role="dialog" aria-modal="true" aria-label="Fotografía de evidencia ampliada" className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/95 p-4" onKeyDown={event => {
+              if (event.key === 'Escape') setGalleryIndex(null);
+              if (event.key === 'ArrowLeft') setGalleryIndex(index => index === null ? null : (index - 1 + selectedItem.image_urls!.length) % selectedItem.image_urls!.length);
+              if (event.key === 'ArrowRight') setGalleryIndex(index => index === null ? null : (index + 1) % selectedItem.image_urls!.length);
+            }}>
+              <div className="mb-4 flex w-full max-w-5xl items-center justify-between text-white">
+                <span className="text-sm">{selectedItem.reference || selectedItem.title} · Evidencia {galleryIndex + 1} de {selectedItem.image_urls.length}</span>
+                <Button variant="outline" size="icon" onClick={() => setGalleryIndex(null)} aria-label="Cerrar galería"><X className="h-4 w-4" /></Button>
+              </div>
+              <EvidenceImage src={selectedItem.image_urls[galleryIndex]} alt={`Fotografía ${galleryIndex + 1} de ${selectedItem.reference || selectedItem.title}`} className="max-h-[75vh] max-w-full object-contain" />
+              <div className="mt-4 flex gap-3">
+                <Button variant="outline" onClick={() => setGalleryIndex((galleryIndex - 1 + selectedItem.image_urls!.length) % selectedItem.image_urls!.length)} aria-label="Foto anterior"><ChevronLeft className="mr-1 h-4 w-4" />Anterior</Button>
+                <Button variant="outline" onClick={() => setGalleryIndex((galleryIndex + 1) % selectedItem.image_urls!.length)} aria-label="Foto siguiente">Siguiente<ChevronRight className="ml-1 h-4 w-4" /></Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
