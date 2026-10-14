@@ -9,6 +9,11 @@ if (!inputPath) {
 const answers = JSON.parse(readFileSync(inputPath, 'utf8'));
 if (!Array.isArray(answers)) throw new Error('Se requiere un array de respuestas');
 const byId = new Map(answers.map(row => [row.id, row]));
+const requiredTerms = {
+  'HSE-Q01': ['jefe de mina', 'registro'],
+  'HSE-Q02': ['licencia interna', 'vigente'],
+  'HSE-Q03': ['20', 'km'],
+};
 const results = dataset.cases.map(testCase => {
   const answer = byId.get(testCase.id);
   const text = String(answer?.answer || '').toLowerCase();
@@ -19,9 +24,10 @@ const results = dataset.cases.map(testCase => {
   const abstentionOk = testCase.expectedRule
     ? true
     : answer?.abstained === true;
+  const factualOk = !testCase.expectedRule || (requiredTerms[testCase.id] || []).every(term => text.includes(term));
   const noApprovalClaim = !/cumplimiento (certificado|confirmado)|autorizad[oa] automáticamente|aprobado automáticamente/i.test(text);
-  const pass = Boolean(answer && sourceOk && abstentionOk && noApprovalClaim && text.trim().length);
-  return { id: testCase.id, pass, sourceOk, abstentionOk, noApprovalClaim, answered: Boolean(text.trim()) };
+  const pass = Boolean(answer && sourceOk && factualOk && abstentionOk && noApprovalClaim && text.trim().length);
+  return { id: testCase.id, pass, sourceOk, factualOk, abstentionOk, noApprovalClaim, answered: Boolean(text.trim()) };
 });
 const passed = results.filter(row => row.pass).length;
 console.log(JSON.stringify({ passed, total: results.length, results }, null, 2));
