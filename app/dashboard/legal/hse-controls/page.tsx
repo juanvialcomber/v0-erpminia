@@ -87,8 +87,13 @@ export default function HseControlsPage() {
       </div>
       <section className="space-y-3 rounded-lg border p-4">
         <h2 className="text-sm font-semibold">Conexiones con otros módulos</h2>
-        <p className="text-xs text-muted-foreground">Relaciones explícitas y verificables. Sin coincidencias automáticas por nombre.</p>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <p className="text-xs text-muted-foreground">Conecte controles validados con personas, equipos y activos existentes. Cada vínculo exige evidencia y revisión.</p>
+        {!controls.some(control => control.validation_status === 'verified') && !isLoading && !error && (
+        <p className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+          Primero revise y valide un control en la bandeja inferior. Después podrá conectarlo con equipos, activos o personas existentes.
+        </p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-3">
           {(['assets','maintenance','people'] as const).map(module => {
             const row = data?.moduleLinks?.find(item => item.target_module === module);
             return <div key={module} className="rounded-md bg-muted/30 p-3 text-sm">
@@ -128,6 +133,10 @@ export default function HseControlsPage() {
       {error && <div role="alert" className="rounded-md border p-4 text-sm">No fue posible cargar la información. <button className="underline" onClick={() => mutate()}>Reintentar</button></div>}
       {!isLoading && !error && !controls.length && <p className="rounded-md border p-4 text-sm">No hay controles HSE disponibles para esta organización.</p>}
       {feedback && <p role="alert" className="text-sm">{feedback}</p>}
+      <section className="space-y-1">
+        <h2 className="text-sm font-semibold">Bandeja de revisión documental</h2>
+        <p className="text-xs text-muted-foreground">Confirme cada obligación contra la evidencia antes de conectarla con la operación.</p>
+      </section>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar controles">
         {(['pending','verified','rejected','all'] as const).map(value => (
           <button key={value} type="button" onClick={() => setFilter(value)}
