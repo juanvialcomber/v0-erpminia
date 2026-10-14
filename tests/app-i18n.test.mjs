@@ -140,7 +140,7 @@ test('operational calendar is a server wrapper over a locale-aware client', () =
   const calendar = fs.readFileSync('components/calendar/operational-calendar.tsx', 'utf8');
 
   assert.match(calendarPage, /getDictionaryForRequest\(\)/);
-  assert.match(calendarPage, /<OperationalCalendar locale=\{locale\} dictionary=\{dictionary\} \/>/);
+  assert.match(calendarPage, /<ComfortableOperationalCalendar \/>/);
   assert.match(calendar, /const t = dictionary\.app\.calendar;/);
   assert.match(calendar, /t\.tabs\.(all|overdue|today|week)/);
   assert.match(calendar, /relativeLabel\(task\.days_until, t\)/);

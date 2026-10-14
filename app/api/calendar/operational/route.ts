@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { getUserModuleAccess, isAdminRole, MODULE_KEYS } from '@/lib/api/module-access';
 
 type CalendarSource = 'maintenance' | 'hse' | 'legal' | 'procurement' | 'finance' | 'people';
 type CalendarPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -593,7 +594,18 @@ export async function GET(request: NextRequest) {
       }, today));
     }
 
-    items.sort((a, b) => {
+    const access = isAdminRole(context.role) ? null : (await getUserModuleAccess(context.userId)).access;
+    const allowed = (key: string) => access === null || access[key] === 'ED' || access[key] === 'LEC';
+    const allowedSources: Record<CalendarSource, boolean> = {
+      maintenance: allowed(MODULE_KEYS.MANT_OPERACIONES),
+      hse: allowed(MODULE_KEYS.HSE_TABLERO) || allowed(MODULE_KEYS.SOS_CALENDARIO),
+      legal: allowed(MODULE_KEYS.LEGAL_MODULO),
+      procurement: allowed(MODULE_KEYS.FIN_COMPRAS),
+      finance: allowed(MODULE_KEYS.FIN_FINANZAS),
+      people: allowed(MODULE_KEYS.CORE_DESEMPENO),
+    };
+    const visibleItems = items.filter(item => allowedSources[item.source]);
+    visibleItems.sort((a, b) => {
       const byDate = scope === 'historical'
         ? b.date.localeCompare(a.date)
         : a.date.localeCompare(b.date);
@@ -603,15 +615,15 @@ export async function GET(request: NextRequest) {
       return a.title.localeCompare(b.title, 'es');
     });
 
-    const activeItems = items.filter((item) => !item.historical);
+    const activeItems = visibleItems.filter((item) => !item.historical);
     const summary = {
       overdue: activeItems.filter((item) => item.days_until < 0).length,
       today: activeItems.filter((item) => item.days_until === 0).length,
       next_7_days: activeItems.filter((item) => item.days_until > 0 && item.days_until <= 7).length,
-      total: items.length,
-      historical: items.filter((item) => item.historical).length,
+      total: visibleItems.length,
+      historical: visibleItems.filter((item) => item.historical).length,
       by_source: {
-        maintenance: items.filter((item) => item.source === 'maintenance').length,
+        maintenance: visibleItems.filter((item) => item.source === 'maintenance').length,
         hse: items.filter((item) => item.source === 'hse').length,
         legal: items.filter((item) => item.source === 'legal').length,
         procurement: items.filter((item) => item.source === 'procurement').length,
@@ -620,8 +632,11 @@ export async function GET(request: NextRequest) {
       },
     };
 
+    const { data: calendarProfile } = await context.supabase.from('profiles').select('full_name').eq('id', context.userId).eq('organization_id', context.organizationId).maybeSingle();
     return NextResponse.json({
-      data: items,
+      viewerName: calendarProfile?.full_name || null,
+      data: visibleItems,
+      allowedSources,
       summary,
       warnings,
       range: {

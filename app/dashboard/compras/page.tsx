@@ -43,6 +43,7 @@ export default function ComprasPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end"><Link href="/dashboard/compras/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Calendario del área →</Link></div>
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderEyebrow>Abastecimiento</PageHeaderEyebrow>

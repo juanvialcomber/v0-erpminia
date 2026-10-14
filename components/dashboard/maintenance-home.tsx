@@ -153,7 +153,8 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
   const showOwnedFlow = mode === 'planning' || mode === 'leadership';
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
-    <PageHeader>
+    <div className="mb-2 flex justify-end"><Link href="/dashboard/mantenimiento/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">Calendario de mantenimiento →</Link></div>
+      <PageHeader>
       <PageHeaderContent>
         <PageHeaderEyebrow>{t.eyebrow}{viewer?.cargoName ? ` · ${viewer.cargoName}` : ` · ${t.transversalAccess}`}</PageHeaderEyebrow>
         <PageHeaderTitle>{pageTitle}</PageHeaderTitle>

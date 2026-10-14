@@ -90,6 +90,7 @@ export default function LegalPage() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end"><Link href="/dashboard/legal/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Calendario del área →</Link></div>
       <header className="border-b border-border/70 pb-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Legal</h1>

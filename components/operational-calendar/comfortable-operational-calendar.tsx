@@ -43,6 +43,8 @@ type OperationalCalendarItem = {
   title: string;
   reference: string | null;
   status_label: string;
+  status: string;
+  overdue: boolean;
   owner: string | null;
   location: string | null;
   href: string;
@@ -51,6 +53,8 @@ type OperationalCalendarItem = {
 };
 
 type CalendarResponse = {
+  viewerName: string | null;
+  allowedSources: Record<CalendarSource, boolean>;
   data: OperationalCalendarItem[];
   summary: {
     overdue: number;
@@ -66,14 +70,33 @@ type CalendarResponse = {
   };
 };
 
-const LABEL_WIDTH = 420;
-const ROW_HEIGHT = 104;
-const HEADER_HEIGHT = 94;
-const BAR_HEIGHT = 66;
+const OT_STATES = [
+  { id: 'open', label: 'Abierta / pendiente', color: 'bg-orange-500', bar: 'border-orange-500/60 bg-orange-500/20 text-foreground' },
+  { id: 'progress', label: 'En curso', color: 'bg-sky-500', bar: 'border-sky-500/60 bg-sky-500/20 text-foreground' },
+  { id: 'paused', label: 'En pausa', color: 'bg-amber-300', bar: 'border-amber-400/60 bg-amber-400/15 text-foreground' },
+  { id: 'closed', label: 'Cerrada', color: 'bg-emerald-500', bar: 'border-emerald-500/60 bg-emerald-500/20 text-foreground' },
+  { id: 'overdue', label: 'Vencida', color: 'bg-red-500', bar: 'border-red-500/60 bg-red-500/20 text-foreground' },
+  { id: 'cancelled', label: 'Cancelada', color: 'bg-zinc-500', bar: 'border-zinc-500/60 bg-zinc-500/15 text-foreground' },
+] as const;
+
+function otState(item: OperationalCalendarItem) {
+  const state = (item.status || '').toLowerCase();
+  if (['cancelled', 'canceled', 'cancelada', 'void', 'voided'].includes(state)) return OT_STATES[5];
+  if (item.historical || ['completed', 'closed', 'completada', 'cerrada'].includes(state)) return OT_STATES[3];
+  if (['paused', 'on_hold', 'pausada', 'en_pausa'].includes(state)) return OT_STATES[2];
+  if (['in_progress', 'en_curso', 'started'].includes(state)) return OT_STATES[1];
+  if (item.overdue) return OT_STATES[4];
+  return OT_STATES[0];
+}
+
+const LABEL_WIDTH = 330;
+const ROW_HEIGHT = 70;
+const HEADER_HEIGHT = 76;
+const BAR_HEIGHT = 42;
 
 const PERIOD_CONFIG: Record<CalendarPeriod, { label: string; days: number; dayWidth: number }> = {
-  '7': { label: '7 días', days: 7, dayWidth: 122 },
-  '14': { label: '14 días', days: 14, dayWidth: 78 },
+  '7': { label: '7 días', days: 7, dayWidth: 112 },
+  '14': { label: '14 días', days: 14, dayWidth: 76 },
   month: { label: 'Mes', days: 31, dayWidth: 48 },
 };
 
@@ -152,10 +175,11 @@ function formatShortDate(value: string) {
   });
 }
 
-export function ComfortableOperationalCalendar() {
+export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: CalendarSource } = {}) {
   const [scope, setScope] = useState<CalendarScope>('all');
-  const [source, setSource] = useState<'all' | CalendarSource>('all');
-  const [period, setPeriod] = useState<CalendarPeriod>('7');
+  const [perspective, setPerspective] = useState<'mine' | 'area' | 'organization'>(initialArea ? 'area' : 'mine');
+  const [source, setSource] = useState<'all' | CalendarSource>(initialArea || 'all');
+  const [period, setPeriod] = useState<CalendarPeriod>('14');
   const [anchorDate, setAnchorDate] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -167,7 +191,8 @@ export function ComfortableOperationalCalendar() {
   );
 
   const today = data?.range.today || toDateKey(new Date());
-  const currentAnchor = anchorDate || today;
+  // Show ten previous days and the coming days; navigate by week without hiding closed work.
+  const currentAnchor = anchorDate || addDays(today, -10);
   const periodConfig = PERIOD_CONFIG[period];
   const dates = useMemo(
     () => buildDates(currentAnchor, periodConfig.days),
@@ -191,7 +216,11 @@ export function ComfortableOperationalCalendar() {
     const term = search.trim().toLocaleLowerCase('es-CL');
 
     return items.filter((item) => {
-      if (source !== 'all' && item.source !== source) return false;
+      if (perspective === 'area' && source !== 'all' && item.source !== source) return false;
+      if (perspective === 'mine') {
+        const viewer = data?.viewerName?.trim().toLocaleLowerCase('es-CL');
+        if (!viewer || item.owner?.trim().toLocaleLowerCase('es-CL') !== viewer) return false;
+      }
       if (term && ![item.title, item.reference, item.owner, item.kind, item.location]
         .some((value) => value?.toLocaleLowerCase('es-CL').includes(term))) return false;
 
@@ -201,15 +230,15 @@ export function ComfortableOperationalCalendar() {
 
       return item.date <= rangeEnd && itemEnd >= currentAnchor;
     });
-  }, [currentAnchor, items, rangeEnd, search, source]);
+  }, [currentAnchor, items, rangeEnd, search, source, perspective, data?.viewerName]);
 
   const goToToday = () => {
-    setAnchorDate(today);
+    setAnchorDate(null);
     timelineRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   };
 
   const shiftPeriod = (direction: -1 | 1) => {
-    setAnchorDate(addDays(currentAnchor, direction * periodConfig.days));
+    setAnchorDate(addDays(currentAnchor, direction * (period === 'month' ? 14 : 7)));
     timelineRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
   };
 
@@ -218,11 +247,11 @@ export function ComfortableOperationalCalendar() {
   }, [period, currentAnchor]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Calendario operativo continuo</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+          <h1 className="text-xl font-semibold tracking-tight">Calendario operativo continuo</h1>
+          <p className="mt-0.5 max-w-3xl text-xs leading-5 text-muted-foreground">
             Actividades de Mantenimiento, HSE, Legal, Abastecimiento, Finanzas y Personas en una sola línea de tiempo de la organización.
           </p>
         </div>
@@ -236,13 +265,22 @@ export function ComfortableOperationalCalendar() {
           <Button variant="outline" size="sm" onClick={() => shiftPeriod(1)}>
             Siguiente <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
+          <Button variant="outline" size="sm" onClick={() => { setPerspective("area"); setSource("maintenance"); setScope("historical"); setPeriod("14"); setAnchorDate(addDays(today, -13)); }} disabled={data?.allowedSources?.maintenance === false}>
+            <History className="mr-1 h-4 w-4" /> OT finalizadas
+          </Button>
           <Button variant="outline" size="sm" onClick={() => void mutate()} disabled={isValidating}>
             <RefreshCw className={`mr-1 h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} /> Actualizar
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(320px,1fr)_160px_210px_150px]">
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Perspectiva del calendario">
+        {([{ id: 'mine', label: 'Mi calendario' }, { id: 'area', label: 'Área' }, { id: 'organization', label: 'Organización' }] as const).map((option) => (
+          <Button key={option.id} size="sm" variant={perspective === option.id ? 'default' : 'outline'} onClick={() => { setPerspective(option.id); if (option.id === 'area' && source === 'all') setSource((Object.entries(data?.allowedSources || {}).find(([, allowed]) => allowed)?.[0] || 'maintenance') as CalendarSource); }} aria-pressed={perspective === option.id}>{option.label}</Button>
+        ))}
+      </div>
+      {perspective === 'mine' && !data?.viewerName && !isLoading ? <p className="text-xs text-muted-foreground">Tu identidad no está disponible; no se muestran actividades personales sin asignación verificable.</p> : null}
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_140px_200px_125px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -260,18 +298,18 @@ export function ComfortableOperationalCalendar() {
             <SelectItem value="historical">Históricos</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={source} onValueChange={(value) => setSource(value as 'all' | CalendarSource)}>
+        {perspective === 'area' ? <Select value={source} onValueChange={(value) => setSource(value as 'all' | CalendarSource)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas las áreas</SelectItem>
-            <SelectItem value="maintenance">Mantenimiento ({summary.by_source.maintenance})</SelectItem>
-            <SelectItem value="hse">HSE ({summary.by_source.hse})</SelectItem>
-            <SelectItem value="legal">Legal ({summary.by_source.legal})</SelectItem>
-            <SelectItem value="procurement">Abastecimiento ({summary.by_source.procurement})</SelectItem>
-            <SelectItem value="finance">Finanzas ({summary.by_source.finance})</SelectItem>
-            <SelectItem value="people">Personas ({summary.by_source.people})</SelectItem>
+            <SelectItem value="all">Todas las áreas autorizadas</SelectItem>
+            <SelectItem value="maintenance" disabled={data?.allowedSources?.maintenance === false}>Mantenimiento ({summary.by_source.maintenance})</SelectItem>
+            <SelectItem value="hse" disabled={data?.allowedSources?.hse === false}>HSE ({summary.by_source.hse})</SelectItem>
+            <SelectItem value="legal" disabled={data?.allowedSources?.legal === false}>Legal ({summary.by_source.legal})</SelectItem>
+            <SelectItem value="procurement" disabled={data?.allowedSources?.procurement === false}>Abastecimiento ({summary.by_source.procurement})</SelectItem>
+            <SelectItem value="finance" disabled={data?.allowedSources?.finance === false}>Finanzas ({summary.by_source.finance})</SelectItem>
+            <SelectItem value="people" disabled={data?.allowedSources?.people === false}>Personas ({summary.by_source.people})</SelectItem>
           </SelectContent>
-        </Select>
+        </Select> : <div className="flex items-center text-xs text-muted-foreground">{perspective === 'mine' ? 'Solo actividades asignadas a mí. Para ver las OT de otros responsables, selecciona Área u Organización.' : 'Todas las áreas autorizadas'}</div>}
         <Select value={period} onValueChange={(value) => setPeriod(value as CalendarPeriod)}>
           <SelectTrigger aria-label="Escala temporal"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -294,6 +332,16 @@ export function ComfortableOperationalCalendar() {
         </span>
       </div>
 
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground" aria-label="Leyenda de estados de órdenes de trabajo">
+        <span className="font-medium text-foreground">Estados OT</span>
+        {OT_STATES.map((state) => (
+          <span key={state.id} className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-sm ${state.color}`} />
+            {state.label}
+          </span>
+        ))}
+      </div>
+
       {data?.warnings?.length ? (
         <div className="flex gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -308,13 +356,13 @@ export function ComfortableOperationalCalendar() {
       ) : null}
 
       <Card className="overflow-hidden shadow-none">
-        <div ref={timelineRef} className="max-h-[72vh] overflow-auto bg-card">
+        <div ref={timelineRef} className="max-h-[78vh] overflow-auto bg-card">
           <div className="relative" style={{ width: totalWidth, minWidth: '100%' }}>
-            <div className="sticky top-0 z-30 flex border-b bg-card/95 backdrop-blur" style={{ height: HEADER_HEIGHT }}>
-              <div className="sticky left-0 z-40 flex shrink-0 items-end border-r bg-card px-5 pb-4" style={{ width: LABEL_WIDTH }}>
+            <div className="sticky top-0 z-30 flex border-b bg-card shadow-[0_3px_10px_rgba(0,0,0,.08)]" style={{ height: HEADER_HEIGHT }}>
+              <div className="sticky left-0 z-40 flex shrink-0 items-end border-r bg-card px-4 pb-2" style={{ width: LABEL_WIDTH }}>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Actividad</p>
-                  <p className="mt-1 text-base font-semibold">{filteredItems.length} registros en el período</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Actividad</p>
+                  <p className="mt-0.5 text-sm font-semibold">{filteredItems.length} registros en el período</p>
                 </div>
               </div>
 
@@ -336,10 +384,10 @@ export function ComfortableOperationalCalendar() {
                           {formatMonth(dateKey)}
                         </span>
                       ) : null}
-                      <div className="mt-7 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="mt-5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         {date.toLocaleDateString('es-CL', { weekday: 'short' })}
                       </div>
-                      <div className={`mt-1 text-lg font-semibold ${isToday ? 'text-orange-500' : 'text-foreground'}`}>
+                      <div className={`mt-0.5 text-base font-semibold ${isToday ? 'text-orange-500' : 'text-foreground'}`}>
                         {date.getDate()}
                       </div>
                     </div>
@@ -356,7 +404,7 @@ export function ComfortableOperationalCalendar() {
 
             {!isLoading && filteredItems.length === 0 ? (
               <div className="flex h-56 items-center justify-center px-6 text-center text-sm text-muted-foreground">
-                No hay registros dentro de este período. Usa Anterior, Siguiente o cambia la escala temporal.
+                No hay actividades en estos días. Usa Anterior para consultar el historial o cambia el período.
               </div>
             ) : null}
 
@@ -391,16 +439,16 @@ export function ComfortableOperationalCalendar() {
                     })}
                   </div>
 
-                  <div className="sticky left-0 z-20 flex h-full items-center gap-4 border-r bg-card px-5" style={{ width: LABEL_WIDTH }}>
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-muted/70">
-                      <SourceIcon className="h-5 w-5 text-muted-foreground" />
+                  <div className="sticky left-0 z-20 flex h-full items-center gap-3 border-r bg-card px-3" style={{ width: LABEL_WIDTH }}>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
+                      <SourceIcon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
-                        <p className="line-clamp-2 text-base font-semibold leading-5 text-foreground">{item.title}</p>
+                        <p className="truncate text-sm font-semibold leading-5 text-foreground">{item.title}</p>
                         {item.historical ? <History className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : null}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                      <p className="mt-0.5 truncate text-xs leading-4 text-muted-foreground">
                         {item.reference || item.kind}
                         {item.owner ? ` · ${item.owner}` : ''}
                         {item.location ? ` · ${item.location}` : ''}
@@ -411,12 +459,12 @@ export function ComfortableOperationalCalendar() {
                   <Link
                     href={item.href}
                     title={`${item.title} · ${item.status_label}`}
-                    className={`absolute z-10 flex items-center overflow-hidden rounded-lg border px-3 shadow-sm transition hover:z-20 hover:brightness-125 ${SOURCE_META[item.source].bar} ${item.historical ? 'opacity-80 saturate-75' : ''}`}
+                    className={`absolute z-10 flex items-center overflow-hidden rounded-md border px-2 shadow-none transition-colors hover:z-20 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${item.source === 'maintenance' ? otState(item).bar : SOURCE_META[item.source].bar} ${item.historical ? 'opacity-85' : ''}`}
                     style={{ left, width, height: BAR_HEIGHT, top: (ROW_HEIGHT - BAR_HEIGHT) / 2 }}
                   >
                     <div className="min-w-0">
-                      <p className="line-clamp-2 text-sm font-semibold leading-4">{barPrimary}</p>
-                      <p className="mt-1 truncate text-xs opacity-85">{barSecondary}</p>
+                      <p className="truncate text-xs font-semibold leading-4">{barPrimary}</p>
+                      <p className="mt-0.5 truncate text-[10px] opacity-85">{barSecondary}</p>
                     </div>
                   </Link>
                 </div>
@@ -425,8 +473,9 @@ export function ComfortableOperationalCalendar() {
 
             {todayIndex >= 0 ? (
               <div
-                className="pointer-events-none absolute bottom-0 top-0 z-10 border-l-2 border-orange-500/80"
-                style={{ left: LABEL_WIDTH + todayIndex * dayWidth + dayWidth / 2 }}
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-0 top-0 z-10 border-l border-orange-500/25"
+                style={{ left: LABEL_WIDTH + todayIndex * dayWidth }}
               />
             ) : null}
           </div>
@@ -434,7 +483,7 @@ export function ComfortableOperationalCalendar() {
       </Card>
 
       <p className="text-xs leading-5 text-muted-foreground">
-        Vista continua de solo lectura. Cada barra abre el registro original; las modificaciones se realizan en el módulo responsable.
+        Vista continua de solo lectura. Abre un registro para ver su detalle; usa Anterior para revisar días pasados. Las modificaciones se realizan en el módulo responsable.
       </p>
     </div>
   );
