@@ -76,11 +76,11 @@ try {
        output.push(extracted);
        await rm(image,{force:true});
      }
-     text=output.join('\\f');
+     text=output.join(String.fromCharCode(12));
      method='ocr_tesseract_spa_eng';
    }
    item.extraction_method=method;
-   const segments=ext==='pdf'?text.split('\\f'): [text];
+   const segments=ext==='pdf'?text.split(String.fromCharCode(12)): [text];
    for(let page=0;page<segments.length;page++){
     const raw=segments[page].replace(/\r\n/g,'\n').trim();
     if(!raw)continue;
