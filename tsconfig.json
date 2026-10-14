@@ -40,6 +40,7 @@
   ],
   "exclude": [
     "node_modules",
+    "supabase/functions",
     "cypress",
     "**/*.test.ts",
     "**/*.test.tsx",

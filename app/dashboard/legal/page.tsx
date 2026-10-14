@@ -194,6 +194,11 @@ export default function LegalPage() {
           <p className="mt-3 text-sm font-semibold">Contratos</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Vigencia, revisión y respaldo.</p>
         </Link>
+        <Link href="/dashboard/legal/hse-intake" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <FileText className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Diagnóstico HSE</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Comprobar acceso y lectura de originales privados.</p>
+        </Link>
         <Link href="/dashboard/legal/documentos" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
           <FileText className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Documentos</p>

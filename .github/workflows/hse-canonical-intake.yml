@@ -1,0 +1,54 @@
+name: MOTIL HSE canonical intake
+on:
+  workflow_dispatch:
+    inputs:
+      apply_pending_rows:
+        description: "Stage original spreadsheet rows as pending only (no canonical approval)"
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: motil-hse-canonical-intake
+  cancel-in-progress: false
+jobs:
+  intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: hse-intake
+    env:
+      SUPABASE_URL: ${{ secrets.MOTIL_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.MOTIL_SUPABASE_SERVICE_ROLE_KEY }}
+      DATABASE_URL: ${{ secrets.MOTIL_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: Check credential availability
+        shell: bash
+        run: |
+          test -n "$SUPABASE_URL" || { echo "Missing MOTIL_SUPABASE_URL"; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Missing MOTIL_SUPABASE_SERVICE_ROLE_KEY"; exit 1; }
+          test -n "$DATABASE_URL" || { echo "Missing MOTIL_DATABASE_URL"; exit 1; }
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate ingestion scripts
+        run: |
+          node --check scripts/canonical-hse-intake.mjs
+          node --check scripts/import-hse-spreadsheet-rows.mjs
+          node --test tests/import-hse-spreadsheet-guard.test.mjs
+      - name: Stage HSE spreadsheet originals
+        shell: bash
+        run: |
+          umask 077
+          if [ "${{ inputs.apply_pending_rows }}" = "true" ]; then
+            node scripts/import-hse-spreadsheet-rows.mjs --apply
+          else
+            node scripts/import-hse-spreadsheet-rows.mjs
+          fi
