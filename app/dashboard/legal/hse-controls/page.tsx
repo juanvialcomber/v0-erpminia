@@ -16,6 +16,21 @@ type Control = {
   validation_status: string;
   source_file_path: string;
 };
+const CONTROL_LABELS: Record<string, string> = {
+  'RTIMIN-2.1': 'Mantener actualizado el registro de conductores autorizados para ingresar a la mina.',
+  'RTIMIN-5.1.2': 'Todo conductor debe contar con licencia interna de conducción vigente.',
+  'RTIMIN-5.6.5': 'La velocidad máxima interior es de 20 km/h, o menor según señalización o condiciones.',
+};
+const DOMAINS: Record<string, string> = {
+  transport: 'Tránsito y conducción', emergency: 'Emergencias',
+  ground_control: 'Fortificación', drilling: 'Perforación',
+  personal_protection: 'Protección personal', general_hse: 'Seguridad y salud',
+};
+function sourceTitle(path: string): string {
+  const name = path.split('/').pop() || '';
+  return name.replace(/^\d+_/, '').replace(/\.(pdf|docx?|xlsx?)$/i, '')
+    .replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
 const fetcher = async (url: string): Promise<{ controls: Control[]; moduleLinks: ModuleLinkSummary[]; readOnly: boolean }> => {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw new Error('No fue posible consultar los controles HSE');
@@ -30,7 +45,7 @@ export default function HseControlsPage() {
   const [linkModule, setLinkModule] = useState<'assets'|'people'|'maintenance'>('assets');
   const [linkTarget, setLinkTarget] = useState('');
   const { data: targetData, error: targetError } = useSWR<{ options: Array<{id:string;label:string}> }>(
-    !data?.readOnly ? '/api/legal/hse-controls/targets?module=' + linkModule : null,
+    data && !data.readOnly && controls.some(control => control.validation_status === 'verified') ? '/api/legal/hse-controls/targets?module=' + linkModule : null,
     async (url: string) => {
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('No se pudieron cargar registros');
@@ -100,7 +115,7 @@ export default function HseControlsPage() {
         </Link>
       </nav>
       <section className="space-y-3 rounded-lg border p-4">
-        <h2 className="text-sm font-semibold">Conexiones con otros módulos</h2>
+        <h2 className="text-sm font-semibold">Relaciones con la operación</h2>
         <p className="text-xs text-muted-foreground">Conecte controles validados con personas, equipos y activos existentes. Cada vínculo exige evidencia y revisión.</p>
         {!controls.some(control => control.validation_status === 'verified') && !isLoading && !error && (
         <p className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
@@ -129,7 +144,7 @@ export default function HseControlsPage() {
                 <option value="assets">Activos</option><option value="maintenance">Mantenimiento</option><option value="people">Personas</option>
               </select>
             </label>
-            <label className="text-xs">Identificador del registro existente
+            <label className="text-xs">Registro existente
               <select value={linkTarget} onChange={event=>setLinkTarget(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-2 text-sm">
                 <option value="">Seleccione un registro real</option>
                 {(targetData?.options || []).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
@@ -148,7 +163,7 @@ export default function HseControlsPage() {
       {!isLoading && !error && !controls.length && <p className="rounded-md border p-4 text-sm">No hay controles HSE disponibles para esta organización.</p>}
       {feedback && <p role="alert" className="text-sm">{feedback}</p>}
       <section className="space-y-1">
-        <h2 className="text-sm font-semibold">Bandeja de revisión documental</h2>
+        <h2 className="text-sm font-semibold">Controles por revisar</h2>
         <p className="text-xs text-muted-foreground">Confirme cada obligación contra la evidencia antes de conectarla con la operación.</p>
       </section>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar controles">
@@ -169,12 +184,12 @@ export default function HseControlsPage() {
               <h2 className="font-semibold">{control.rule_code}</h2>
               <span className="rounded-md border px-2 py-1 text-xs">{control.validation_status === 'pending' ? 'Pendiente de revisión' : control.validation_status}</span>
             </div>
-            <p className="text-sm">{control.obligation}</p>
-            <p className="text-xs text-muted-foreground">Responsable propuesto: {control.responsible_role || 'Por determinar'} · Área: {control.domain}</p>
+            <p className="text-sm">{CONTROL_LABELS[control.rule_code] || control.obligation}</p>
+            <p className="text-xs text-muted-foreground">Responsable propuesto: {control.responsible_role || 'Por determinar'} · Área: {DOMAINS[control.domain] || control.domain}</p>
             <div className="rounded-md bg-muted/40 p-3">
               <p className="mb-2 flex items-center gap-2 text-xs font-medium"><FileText className="h-3.5 w-3.5" /> Evidencia documental</p>
               <blockquote className="whitespace-pre-wrap break-words text-xs leading-relaxed">{control.evidence_excerpt}</blockquote>
-              <p className="mt-3 break-all text-[11px] text-muted-foreground">{control.source_file_path.split('/').pop()}</p>
+              <p className="mt-3 break-all text-[11px] text-muted-foreground">{sourceTitle(control.source_file_path)}</p>
             </div>
             {!data?.readOnly && control.validation_status === 'pending' && (
               <div className="space-y-2 border-t pt-3">
