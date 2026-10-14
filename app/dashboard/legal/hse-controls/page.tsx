@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useState } from 'react';
 import { ArrowLeft, ShieldCheck, FileText } from 'lucide-react';
 
+type ModuleLinkSummary = { target_module: string; links: number; pending: number; verified: number };
 type Control = {
   id: string;
   rule_code: string;
@@ -15,7 +16,7 @@ type Control = {
   validation_status: string;
   source_file_path: string;
 };
-const fetcher = async (url: string): Promise<{ controls: Control[]; readOnly: boolean }> => {
+const fetcher = async (url: string): Promise<{ controls: Control[]; moduleLinks: ModuleLinkSummary[]; readOnly: boolean }> => {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) throw new Error('No fue posible consultar los controles HSE');
   return res.json();
@@ -25,6 +26,33 @@ export default function HseControlsPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/legal/hse-controls', fetcher, { revalidateOnFocus: false });
   const controls = data?.controls || [];
   const [notes, setNotes] = useState<Record<string,string>>({});
+  const [linkControl, setLinkControl] = useState<string>('');
+  const [linkModule, setLinkModule] = useState<'assets'|'people'|'maintenance'>('assets');
+  const [linkTarget, setLinkTarget] = useState('');
+  const { data: targetData, error: targetError } = useSWR<{ options: Array<{id:string;label:string}> }>(
+    !data?.readOnly ? '/api/legal/hse-controls/targets?module=' + linkModule : null,
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) throw new Error('No se pudieron cargar registros');
+      return response.json();
+    }
+  );
+  const [linkNote, setLinkNote] = useState('');
+  async function proposeLink() {
+    if (busy) return;
+    setBusy('link'); setFeedback(null);
+    try {
+      const response = await fetch('/api/legal/hse-controls', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ controlId: linkControl, module: linkModule, targetId: linkTarget, note: linkNote }),
+      });
+      if (!response.ok) throw Error('Invalid link');
+      setLinkTarget(''); setLinkNote(''); await mutate();
+      setFeedback('Relación propuesta y pendiente de verificación.');
+    } catch { setFeedback('No se pudo proponer la relación. Revise el control, la organización y el identificador de destino.'); }
+    finally { setBusy(null); }
+  }
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all'|'pending'|'verified'|'rejected'>('pending');
@@ -57,6 +85,45 @@ export default function HseControlsPage() {
         <div className="rounded-md border px-4 py-3"><strong>{controls.filter(c => c.validation_status === 'pending').length}</strong> pendientes</div>
         <div className="rounded-md border px-4 py-3">{data?.readOnly ? 'Consulta de solo lectura' : 'Revisión habilitada'}</div>
       </div>
+      <section className="space-y-3 rounded-lg border p-4">
+        <h2 className="text-sm font-semibold">Conexiones con otros módulos</h2>
+        <p className="text-xs text-muted-foreground">Relaciones explícitas y verificables. Sin coincidencias automáticas por nombre.</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(['assets','maintenance','people'] as const).map(module => {
+            const row = data?.moduleLinks?.find(item => item.target_module === module);
+            return <div key={module} className="rounded-md bg-muted/30 p-3 text-sm">
+              <p className="font-medium">{{assets:'Activos',maintenance:'Mantenimiento',people:'Personas'}[module]}</p>
+              <p className="text-xs text-muted-foreground">{row?.links || 0} vínculos · {row?.pending || 0} pendientes</p>
+            </div>;
+          })}
+        </div>
+        {!data?.readOnly && controls.some(control => control.validation_status === 'verified') && (
+          <div className="grid gap-2 border-t pt-3 sm:grid-cols-2">
+            <label className="text-xs">Control validado
+              <select className="mt-1 w-full rounded-md border bg-background p-2 text-sm" value={linkControl} onChange={event=>setLinkControl(event.target.value)}>
+                <option value="">Seleccione un control</option>
+                {controls.filter(control=>control.validation_status==='verified').map(control=><option key={control.id} value={control.id}>{control.rule_code}</option>)}
+              </select>
+            </label>
+            <label className="text-xs">Módulo
+              <select className="mt-1 w-full rounded-md border bg-background p-2 text-sm" value={linkModule} onChange={event=>{setLinkModule(event.target.value as 'assets'|'people'|'maintenance');setLinkTarget('');}}>
+                <option value="assets">Activos</option><option value="maintenance">Mantenimiento</option><option value="people">Personas</option>
+              </select>
+            </label>
+            <label className="text-xs">Identificador del registro existente
+              <select value={linkTarget} onChange={event=>setLinkTarget(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-2 text-sm">
+                <option value="">Seleccione un registro real</option>
+                {(targetData?.options || []).map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+              {targetError && <span className="text-xs text-destructive">No se pudieron cargar los registros</span>}
+            </label>
+            <label className="text-xs">Justificación y evidencia
+              <input value={linkNote} onChange={event=>setLinkNote(event.target.value)} className="mt-1 w-full rounded-md border bg-background p-2 text-sm" placeholder="Indique por qué se relacionan" />
+            </label>
+            <button type="button" disabled={busy !== null || !linkControl || !linkTarget || linkNote.trim().length < 5} onClick={proposeLink} className="rounded-md border px-3 py-2 text-sm disabled:opacity-50 sm:col-span-2">Proponer conexión para revisión</button>
+          </div>
+        )}
+      </section>
       {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando evidencia HSE…</p>}
       {error && <div role="alert" className="rounded-md border p-4 text-sm">No fue posible cargar la información. <button className="underline" onClick={() => mutate()}>Reintentar</button></div>}
       {!isLoading && !error && !controls.length && <p className="rounded-md border p-4 text-sm">No hay controles HSE disponibles para esta organización.</p>}
