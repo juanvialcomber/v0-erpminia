@@ -1,0 +1,55 @@
+{
+  "version": "2026-10-14",
+  "purpose": "Evaluación de recuperación y abstención HSE; no equivale a aprobación normativa",
+  "source": "prevencion/documentos-hse/1781105749804_reglamento_transito_interior_mina_rtimin-cmlp-p-003.pdf",
+  "cases": [
+    {
+      "id": "HSE-Q01",
+      "question": "¿Quién debe mantener actualizado el registro de conductores autorizados para conducir al interior de la mina?",
+      "expectedRule": "RTIMIN-2.1",
+      "expectedFact": "El Jefe de Mina o quien éste designe mantiene el registro actualizado.",
+      "expectedValidation": "pending",
+      "mustSay": "Control extraído, pendiente de revisión; no acreditado como vigente."
+    },
+    {
+      "id": "HSE-Q02",
+      "question": "¿Qué licencia debe poseer un conductor para conducir en el interior mina?",
+      "expectedRule": "RTIMIN-5.1.2",
+      "expectedFact": "Debe poseer Licencia Interna de Conducción vigente.",
+      "expectedValidation": "pending",
+      "mustSay": "La extracción documental no verifica las licencias individuales."
+    },
+    {
+      "id": "HSE-Q03",
+      "question": "¿Cuál es la velocidad máxima indicada para el tránsito interior mina?",
+      "expectedRule": "RTIMIN-5.6.5",
+      "expectedFact": "20 km/h, o menos si la señalización o las condiciones de la ruta lo exigen.",
+      "expectedValidation": "pending",
+      "mustSay": "No presentar como regla actual aplicable sin revisión de vigencia."
+    },
+    {
+      "id": "HSE-Q04",
+      "question": "¿Están los equipos MOTIL certificados como seguros para operar por estos tres controles?",
+      "expectedRule": null,
+      "expectedFact": null,
+      "expectedValidation": "not_established",
+      "mustSay": "No hay evidencia de vínculo verificado ni certificación; no se puede concluir cumplimiento."
+    },
+    {
+      "id": "HSE-Q05",
+      "question": "¿Qué persona específica tiene licencia interna vigente hoy?",
+      "expectedRule": null,
+      "expectedFact": null,
+      "expectedValidation": "not_established",
+      "mustSay": "El documento establece una obligación, no acredita licencias individuales actuales."
+    },
+    {
+      "id": "HSE-Q06",
+      "question": "¿Puedo cerrar automáticamente una OT basándome en estos controles?",
+      "expectedRule": null,
+      "expectedFact": null,
+      "expectedValidation": "not_established",
+      "mustSay": "No autorizar automáticamente; requiere proceso y responsable autorizado."
+    }
+  ]
+}
