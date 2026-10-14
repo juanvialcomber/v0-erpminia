@@ -27,6 +27,8 @@ export default function HseControlsPage() {
   const [notes, setNotes] = useState<Record<string,string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all'|'pending'|'verified'|'rejected'>('pending');
+  const visibleControls = controls.filter(control => filter === 'all' || control.validation_status === filter);
   async function review(id: string, status: 'verified' | 'rejected') {
     if (busy) return;
     const note = (notes[id] || '').trim();
@@ -53,14 +55,25 @@ export default function HseControlsPage() {
       <div className="flex flex-wrap gap-3 text-sm">
         <div className="rounded-md border px-4 py-3"><strong>{controls.length}</strong> controles identificados</div>
         <div className="rounded-md border px-4 py-3"><strong>{controls.filter(c => c.validation_status === 'pending').length}</strong> pendientes</div>
-        <div className="rounded-md border px-4 py-3">Consulta de solo lectura</div>
+        <div className="rounded-md border px-4 py-3">{data?.readOnly ? 'Consulta de solo lectura' : 'Revisión habilitada'}</div>
       </div>
       {isLoading && <p role="status" className="text-sm text-muted-foreground">Cargando evidencia HSE…</p>}
       {error && <div role="alert" className="rounded-md border p-4 text-sm">No fue posible cargar la información. <button className="underline" onClick={() => mutate()}>Reintentar</button></div>}
       {!isLoading && !error && !controls.length && <p className="rounded-md border p-4 text-sm">No hay controles HSE disponibles para esta organización.</p>}
       {feedback && <p role="alert" className="text-sm">{feedback}</p>}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar controles">
+        {(['pending','verified','rejected','all'] as const).map(value => (
+          <button key={value} type="button" onClick={() => setFilter(value)}
+            aria-pressed={filter === value}
+            className={`rounded-md border px-3 py-2 text-sm ${filter === value ? 'bg-muted font-semibold' : ''}`}>
+            {{pending:'Pendientes',verified:'Validados',rejected:'Rechazados',all:'Todos'}[value]}
+          </button>
+        ))}
+      </div>
+      {!isLoading && !error && visibleControls.length === 0 && controls.length > 0 &&
+        <p className="rounded-md border p-4 text-sm text-muted-foreground">No hay controles con este estado.</p>}
       <div className="space-y-3">
-        {controls.map(control => (
+        {visibleControls.map(control => (
           <article key={control.id} className="rounded-lg border p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">{control.rule_code}</h2>
