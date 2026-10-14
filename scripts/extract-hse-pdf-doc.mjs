@@ -5,7 +5,7 @@
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
  */
 import {createHash} from 'node:crypto';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFile} from 'node:child_process';
@@ -42,13 +42,38 @@ try {
    item.source_sha256=createHash('sha256').update(content).digest('hex');
    let text='';
    if(ext==='pdf'){
-    const output=await exec('pdftotext',['-layout',file,'-'],{maxBuffer:16*1024*1024,timeout:45000});
-    text=output.stdout;
+    try { const output=await exec('pdftotext',['-layout',file,'-'],{maxBuffer:16*1024*1024,timeout:45000}); text=output.stdout; } catch {text='';}
    }else{
-    const output=await exec('antiword',[file],{maxBuffer:16*1024*1024,timeout:45000});
-    text=output.stdout;
+    try { const output=await exec('antiword',[file],{maxBuffer:16*1024*1024,timeout:45000}); text=output.stdout; } catch {text='';}
    }
-   const segments=ext==='pdf'?text.split('\f'): [text];
+   let method='native';
+   if (!text.trim() && ext==='doc') {
+     const converted=join(directory,doc.id+'.txt');
+     try {
+       await exec('libreoffice',['-env:UserInstallation=file:///tmp/hse-lo-'+doc.id,'--headless','--convert-to','txt:Text (encoded):UTF8','--outdir',directory,file],{timeout:45000,maxBuffer:1024*1024});
+       text=await readFile(converted,'utf8');
+       method='libreoffice';
+     } catch { /* Preserve original document and flag if no reader succeeds. */ }
+   }
+   if (!text.trim() && ext==='pdf') {
+     const prefix=join(directory,doc.id+'-scan');
+     const info=await exec('pdfinfo',[file],{timeout:12000,maxBuffer:1024*1024});
+     const count=Number(info.stdout.match(/^Pages:\\s*(\\d+)/m)?.[1]||0);
+     if(count<1||count>120)throw Error('OCR page count outside 1..120');
+     const output=[];
+     for(let page=1;page<=count;page++){
+       const p=prefix+'-'+page;
+       await exec('pdftoppm',['-f',String(page),'-l',String(page),'-r','160','-gray','-singlefile','-png',file,p],{timeout:30000,maxBuffer:1024*1024});
+       const image=p+'.png';
+       const ocr=await exec('tesseract',[image,'stdout','-l','spa+eng','--psm','3'],{timeout:40000,maxBuffer:8*1024*1024});
+       output.push(ocr.stdout);
+       await rm(image,{force:true});
+     }
+     text=output.join('\\f');
+     method='ocr_tesseract_spa_eng';
+   }
+   item.extraction_method=method;
+   const segments=ext==='pdf'?text.split('\\f'): [text];
    for(let page=0;page<segments.length;page++){
     const raw=segments[page].replace(/\r\n/g,'\n').trim();
     if(!raw)continue;
@@ -59,10 +84,10 @@ try {
     }
    }
    item.fragments=item.pages.length;
-   item.status=item.fragments?'extracted_preview':'empty_or_scanned_review';
+   item.status=item.fragments?'extracted_preview':'needs_manual_review';
   }catch(e){item.error=String(e.message||e).slice(0,180);}
   results.push(item);
  }
 }finally{await rm(directory,{recursive:true,force:true});}
 console.log(JSON.stringify({scope:'motil_hse',mode:'dry_run',source_count:selected.length,documents:results},null,2));
-if(results.length!==78 || results.some(x=>x.status==='failed'))process.exitCode=1;
+if(results.length!==78 || results.some(x=>x.status!=='extracted_preview'))process.exitCode=1;

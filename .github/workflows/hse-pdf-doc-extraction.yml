@@ -12,13 +12,13 @@ permissions:
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Install deterministic document readers
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq poppler-utils antiword
+          sudo apt-get install -y -qq poppler-utils antiword libreoffice-writer tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
