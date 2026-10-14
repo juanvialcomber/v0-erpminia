@@ -8,6 +8,8 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  X,
+  ExternalLink,
   History,
   RefreshCw,
   Search,
@@ -16,6 +18,7 @@ import {
   Landmark,
   ShoppingCart,
   Wrench,
+  ImageOff,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
@@ -50,6 +53,7 @@ type OperationalCalendarItem = {
   href: string;
   historical: boolean;
   completed_at: string | null;
+  image_urls?: string[];
 };
 
 type CalendarResponse = {
@@ -89,14 +93,14 @@ function otState(item: OperationalCalendarItem) {
   return OT_STATES[0];
 }
 
-const LABEL_WIDTH = 330;
-const ROW_HEIGHT = 70;
+const LABEL_WIDTH = 390;
+const ROW_HEIGHT = 80;
 const HEADER_HEIGHT = 76;
 const BAR_HEIGHT = 42;
 
 const PERIOD_CONFIG: Record<CalendarPeriod, { label: string; days: number; dayWidth: number }> = {
   '7': { label: '7 días', days: 7, dayWidth: 112 },
-  '14': { label: '14 días', days: 14, dayWidth: 76 },
+  '14': { label: '14 días', days: 14, dayWidth: 86 },
   month: { label: 'Mes', days: 31, dayWidth: 48 },
 };
 
@@ -182,6 +186,8 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   const [period, setPeriod] = useState<CalendarPeriod>('14');
   const [anchorDate, setAnchorDate] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [selectedItem, setSelectedItem] = useState<OperationalCalendarItem | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
 
   const { data, error, isLoading, isValidating, mutate } = useSWR<CalendarResponse>(
@@ -212,11 +218,14 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
     by_source: { maintenance: 0, hse: 0, legal: 0, procurement: 0, finance: 0, people: 0 },
   };
 
+  const owners = useMemo(() => [...new Set(items.map(item => item.owner?.trim()).filter((name): name is string => Boolean(name)))].sort((a,b) => a.localeCompare(b, 'es')), [items]);
+
   const filteredItems = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('es-CL');
 
     return items.filter((item) => {
       if (perspective === 'area' && source !== 'all' && item.source !== source) return false;
+      if (ownerFilter !== 'all' && item.owner?.trim() !== ownerFilter) return false;
       if (perspective === 'mine') {
         const viewer = data?.viewerName?.trim().toLocaleLowerCase('es-CL');
         if (!viewer || item.owner?.trim().toLocaleLowerCase('es-CL') !== viewer) return false;
@@ -230,7 +239,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
 
       return item.date <= rangeEnd && itemEnd >= currentAnchor;
     });
-  }, [currentAnchor, items, rangeEnd, search, source, perspective, data?.viewerName]);
+  }, [currentAnchor, items, rangeEnd, search, source, perspective, data?.viewerName, ownerFilter]);
 
   const goToToday = () => {
     setAnchorDate(null);
@@ -320,6 +329,19 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
         </Select>
       </div>
 
+      {perspective !== 'mine' ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Responsable</span>
+          <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+            <SelectTrigger className="w-[240px]" aria-label="Filtrar por responsable"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los responsables</SelectItem>
+              {owners.map(owner => <SelectItem key={owner} value={owner}>{owner}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {ownerFilter !== 'all' ? <Button variant="ghost" size="sm" onClick={() => setOwnerFilter('all')}>Limpiar filtro</Button> : null}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge variant="outline">{filteredItems.length} visibles</Badge>
         <Badge variant="outline">{periodConfig.label}</Badge>
@@ -417,7 +439,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
               const duration = Math.max(1, diffDays(clippedStart, clippedEnd) + 1);
               const width = Math.max(dayWidth - 12, duration * dayWidth - 12);
               const left = LABEL_WIDTH + startIndex * dayWidth + 6;
-              const barPrimary = period === 'month' ? item.reference || item.kind : item.title;
+              const barPrimary = duration === 1 ? (item.reference?.replace(/^OT-\d{4}-/, 'OT ') || item.kind) : item.title;
               const barSecondary = item.historical && item.completed_at
                 ? `Completada ${formatShortDate(item.completed_at)}`
                 : `${item.reference || item.kind} · ${item.status_label}`;
@@ -441,14 +463,14 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
 
                   <div className="sticky left-0 z-20 flex h-full items-center gap-3 border-r bg-card px-3" style={{ width: LABEL_WIDTH }}>
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40">
-                      <SourceIcon className="h-4 w-4 text-muted-foreground" />
+                      {item.image_urls?.[0] ? <img src={item.image_urls[0]} alt={`Evidencia de ${item.reference || item.title}`} loading="lazy" className="h-full w-full rounded object-cover" /> : <SourceIcon className="h-4 w-4 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
-                        <p className="truncate text-sm font-semibold leading-5 text-foreground">{item.title}</p>
+                        <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">{item.title}</p>
                         {item.historical ? <History className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : null}
                       </div>
-                      <p className="mt-0.5 truncate text-xs leading-4 text-muted-foreground">
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-muted-foreground">
                         {item.reference || item.kind}
                         {item.owner ? ` · ${item.owner}` : ''}
                         {item.location ? ` · ${item.location}` : ''}
@@ -456,17 +478,19 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                     </div>
                   </div>
 
-                  <Link
-                    href={item.href}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItem(item)}
+                    aria-label={`Ver detalle de ${item.title}`}
                     title={`${item.title} · ${item.status_label}`}
                     className={`absolute z-10 flex items-center overflow-hidden rounded-md border px-2 shadow-none transition-colors hover:z-20 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 ${item.source === 'maintenance' ? otState(item).bar : SOURCE_META[item.source].bar} ${item.historical ? 'opacity-85' : ''}`}
                     style={{ left, width, height: BAR_HEIGHT, top: (ROW_HEIGHT - BAR_HEIGHT) / 2 }}
                   >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold leading-4">{barPrimary}</p>
-                      <p className="mt-0.5 truncate text-[10px] opacity-85">{barSecondary}</p>
+                      {duration > 1 ? <p className="mt-0.5 truncate text-[10px] opacity-85">{barSecondary}</p> : null}
                     </div>
-                  </Link>
+                  </button>
                 </div>
               );
             }) : null}
@@ -481,6 +505,51 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
           </div>
         </div>
       </Card>
+
+      {selectedItem ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/45" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedItem(null); }}>
+          <aside role="dialog" aria-modal="true" aria-label="Detalle de actividad" className="flex h-full w-full max-w-md flex-col border-l bg-background p-6 shadow-2xl" onKeyDown={(event) => { if (event.key === 'Escape') setSelectedItem(null); }}>
+            <div className="flex items-start justify-between gap-4">
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{SOURCE_META[selectedItem.source].label} · {selectedItem.kind}</span>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedItem(null)} aria-label="Cerrar detalle"><X className="h-4 w-4" /></Button>
+            </div>
+            <Link href={selectedItem.href} aria-label={`Abrir orden o actividad completa: ${selectedItem.title}`} className="group mt-6 block rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/60 hover:bg-muted/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold tracking-wide text-muted-foreground">{selectedItem.reference || selectedItem.kind}</span>
+                <ExternalLink className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
+              </div>
+              <h2 className="mt-3 text-lg font-semibold leading-snug text-foreground">{selectedItem.title}</h2>
+              {selectedItem.source === 'maintenance' ? (
+                <div className="mt-4 overflow-hidden rounded-md border bg-muted/30">
+                  {selectedItem.image_urls?.length ? (
+                    <div className="grid grid-cols-3 gap-1 p-1">
+                      {selectedItem.image_urls.map((url, index) => (
+                        <img key={url} src={url} alt={`Evidencia ${index + 1} de ${selectedItem.reference || selectedItem.title}`} loading="lazy" className={`w-full rounded object-cover ${index === 0 ? 'col-span-3 h-44' : 'h-20'}`} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-28 flex-col items-center justify-center gap-2 text-xs text-muted-foreground"><ImageOff className="h-5 w-5" />Sin fotografías registradas</div>
+                  )}
+                </div>
+              ) : null}
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className={`rounded-md border px-2 py-1 font-semibold ${selectedItem.source === 'maintenance' ? otState(selectedItem).bar : SOURCE_META[selectedItem.source].bar}`}>{selectedItem.status_label}</span>
+                <span className="text-muted-foreground">{formatShortDate(selectedItem.date)}</span>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-4 border-t pt-4 text-sm">
+                <p><span className="text-xs text-muted-foreground">Responsable</span><span className="mt-1 block font-medium">{selectedItem.owner || 'Sin asignar'}</span></p>
+                <p><span className="text-xs text-muted-foreground">Programada</span><span className="mt-1 block font-medium">{formatShortDate(selectedItem.date)}</span></p>
+                {selectedItem.completed_at ? <p><span className="text-xs text-muted-foreground">Finalizada</span><span className="mt-1 block font-medium">{formatShortDate(selectedItem.completed_at)}</span></p> : null}
+                {selectedItem.location ? <p><span className="text-xs text-muted-foreground">Ubicación</span><span className="mt-1 block font-medium">{selectedItem.location}</span></p> : null}
+              </div>
+              <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm font-medium text-foreground">
+                Ver OT completa <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </div>
+            </Link>
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">Vista previa de solo lectura. Selecciona la ficha para abrir el registro y sus evidencias.</p>
+          </aside>
+        </div>
+      ) : null}
 
       <p className="text-xs leading-5 text-muted-foreground">
         Vista continua de solo lectura. Abre un registro para ver su detalle; usa Anterior para revisar días pasados. Las modificaciones se realizan en el módulo responsable.

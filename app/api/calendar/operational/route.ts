@@ -26,6 +26,7 @@ type OperationalCalendarItem = {
   href: string;
   historical: boolean;
   completed_at: string | null;
+  image_urls?: string[];
   overdue: boolean;
   days_until: number;
 };
@@ -301,6 +302,38 @@ export async function GET(request: NextRequest) {
     if (credentialsResult.error) warnings.push('No se pudieron cargar los vencimientos de credenciales de Personas.');
     if (legalCasesResult.error) warnings.push('No se pudieron cargar los casos legales con plazo.');
 
+    // Resolve evidence only for orders already scoped to the viewer's organization.
+    const orderIds = (workOrdersResult.data || []).map((order) => order.id);
+    const evidenceImages = new Map<string, string[]>();
+    if (orderIds.length) {
+      const { data: evidenceRows, error: evidenceError } = await context.supabase
+        .from('work_order_evidence_files')
+        .select('work_order_id,storage_bucket,storage_path,mime_type,captured_at')
+        .eq('organization_id', context.organizationId)
+        .in('work_order_id', orderIds)
+        .like('mime_type', 'image/%')
+        .order('captured_at', { ascending: false })
+        .limit(2000);
+      if (evidenceError) {
+        warnings.push('No se pudieron cargar las fotografías de las OT.');
+      } else {
+        const candidates = new Map<string, Array<{ bucket: string; path: string }>>();
+        for (const row of evidenceRows || []) {
+          if (!row.storage_bucket || !row.storage_path) continue;
+          const existing = candidates.get(row.work_order_id) || [];
+          if (existing.length < 3) existing.push({ bucket: row.storage_bucket, path: row.storage_path });
+          candidates.set(row.work_order_id, existing);
+        }
+        await Promise.all(Array.from(candidates, async ([orderId, images]) => {
+          const signed = await Promise.all(images.map(({ bucket, path }) =>
+            context.supabase.storage.from(bucket).createSignedUrl(path, 3600)
+          ));
+          const urls = signed.map(({ data }) => data?.signedUrl).filter((url): url is string => Boolean(url));
+          if (urls.length) evidenceImages.set(orderId, urls);
+        }));
+      }
+    }
+
     const items: OperationalCalendarItem[] = [];
 
     for (const row of workOrdersResult.data || []) {
@@ -324,6 +357,7 @@ export async function GET(request: NextRequest) {
         href: `/dashboard/mantenimiento/ordenes-trabajo/${row.id}`,
         historical,
         completed_at: normalizeDate(row.completion_date || row.closed_at),
+        image_urls: evidenceImages.get(row.id) || [],
       }, today));
     }
 
