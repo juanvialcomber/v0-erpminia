@@ -170,6 +170,11 @@ export default function MaintenanceLayout({ children }: { children: ReactNode })
               </nav>
             </div>
           </> : null}
+          <nav className="ml-2 flex items-stretch" aria-label="Seguridad documental">
+            <Link href="/dashboard/legal/hse-controls" className="inline-flex min-h-12 items-center px-2.5 text-xs text-muted-foreground hover:text-foreground">
+              Consultar HSE
+            </Link>
+          </nav>
         </div>
       </section>
       {children}

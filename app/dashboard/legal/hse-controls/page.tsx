@@ -85,6 +85,20 @@ export default function HseControlsPage() {
         <div className="rounded-md border px-4 py-3"><strong>{controls.filter(c => c.validation_status === 'pending').length}</strong> pendientes</div>
         <div className="rounded-md border px-4 py-3">{data?.readOnly ? 'Consulta de solo lectura' : 'Revisión habilitada'}</div>
       </div>
+      <nav aria-label="Módulos relacionados" className="grid gap-2 sm:grid-cols-3">
+        <Link href="/dashboard/mantenimiento/equipos" className="rounded-md border p-3 text-sm hover:bg-muted/30">
+          <span className="font-medium">Activos de mantenimiento</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Consultar equipos y sus expedientes</span>
+        </Link>
+        <Link href="/dashboard/mantenimiento/ordenes-trabajo" className="rounded-md border p-3 text-sm hover:bg-muted/30">
+          <span className="font-medium">Órdenes de trabajo</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Consultar ejecución y responsables</span>
+        </Link>
+        <Link href="/dashboard/mantenimiento/personal" className="rounded-md border p-3 text-sm hover:bg-muted/30">
+          <span className="font-medium">Personal</span>
+          <span className="mt-1 block text-xs text-muted-foreground">Consultar personas del módulo</span>
+        </Link>
+      </nav>
       <section className="space-y-3 rounded-lg border p-4">
         <h2 className="text-sm font-semibold">Conexiones con otros módulos</h2>
         <p className="text-xs text-muted-foreground">Conecte controles validados con personas, equipos y activos existentes. Cada vínculo exige evidencia y revisión.</p>
