@@ -1,0 +1,33 @@
+name: HSE PDF and DOC extraction audit
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deterministic document readers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils antiword
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read-only extraction diagnostics
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/extract-hse-pdf-doc.mjs > hse-extraction-diagnostics.json
+          node -e "const x=require('./hse-extraction-diagnostics.json'); const counts={};for(const d of x.documents)counts[d.status]=(counts[d.status]||0)+1;console.log(JSON.stringify({source_count:x.source_count,statuses:counts}))"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hse-pdf-doc-diagnostics
+          path: hse-extraction-diagnostics.json
+          retention-days: 7
