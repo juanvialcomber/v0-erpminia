@@ -12,9 +12,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Solo administración puede verificar archivos HSE' }, { status: 403 });
   }
   const prefix = 'prevencion/documentos-hse/';
+  const body = await request.json().catch(() => ({}));
+  const offset = Number(body?.offset ?? 0);
+  const limit = Number(body?.limit ?? 10);
+  if (!Number.isInteger(offset) || offset < 0 || offset > 1000 || !Number.isInteger(limit) || limit < 1 || limit > 10) {
+    return NextResponse.json({ error: 'Lote inválido' }, { status: 400 });
+  }
   const { data: records, error: listError } = await ctx.supabase.from('module_documents')
     .select('id,file_path').eq('organization_id', ctx.organizationId)
-    .like('file_path', prefix + '%').order('file_path').limit(10);
+    .like('file_path', prefix + '%').order('file_path').range(offset, offset + limit - 1);
   if (listError) return NextResponse.json({ error: 'No se pudo consultar el inventario HSE' }, { status: 502 });
   const items = [];
   for (const record of records || []) {
@@ -28,6 +34,6 @@ export async function POST(request: NextRequest) {
       sha256: createHash('sha256').update(buffer).digest('hex'), status: 'verified_bytes' });
   }
   return NextResponse.json({ scope: 'motil_hse', returned: items.length, items,
-    has_more: (records || []).length === 10, mutates_data: false },
+    offset, has_more: (records || []).length === limit, mutates_data: false },
     { headers: { 'Cache-Control': 'no-store' } });
 }
