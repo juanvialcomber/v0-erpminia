@@ -58,7 +58,7 @@ try {
    if (!text.trim() && ext==='pdf') {
      const prefix=join(directory,doc.id+'-scan');
      const info=await exec('pdfinfo',[file],{timeout:12000,maxBuffer:1024*1024});
-     const count=Number(info.stdout.match(/^Pages:\\s*(\\d+)/m)?.[1]||0);
+     const count=Number(info.stdout.match(/^Pages:\s*(\d+)/m)?.[1]||0);
      if(count<1||count>120)throw Error('OCR page count outside 1..120');
      const output=[];
      for(let page=1;page<=count;page++){
