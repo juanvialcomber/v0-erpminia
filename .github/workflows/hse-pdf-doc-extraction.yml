@@ -1,6 +1,10 @@
 name: HSE PDF and DOC extraction audit
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hse-pdf-doc-extraction.yml'
 
 permissions:
   contents: read
