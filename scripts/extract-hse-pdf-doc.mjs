@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Read-only MOTIL HSE extraction. Run on a trusted worker with poppler-utils
- * (pdfinfo, pdftotext) and antiword installed. No writes to Supabase.
+ * (pdfinfo, pdftotext) and antiword installed. Stages pending fragments only when HSE_STAGE_FRAGMENTS=1.
  * Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
  */
 import {createHash} from 'node:crypto';
@@ -29,6 +29,8 @@ for(let offset=0;offset<1000;offset+=100){
 const selected=docs.filter(d=>d.organization_id && /\.(pdf|doc)$/i.test(d.file_path));
 const directory=await mkdtemp(join(tmpdir(),'motil-hse-'));
 const results=[];
+const staged=[];
+const stageEnabled=process.env.HSE_STAGE_FRAGMENTS==='1';
 try {
  for(const doc of selected){
   const ext=doc.file_path.toLowerCase().endsWith('.pdf')?'pdf':'doc';
@@ -85,7 +87,13 @@ try {
     const chunks=raw.match(/[\s\S]{1,3000}/g)||[];
     for(let i=0;i<chunks.length;i++){
      const fragment=chunks[i];
-     item.pages.push({page:ext==='pdf'?page+1:null,section:i+1,sha256:createHash('sha256').update(fragment).digest('hex'),characters:fragment.length});
+     const fragment_sha256=createHash('sha256').update(fragment).digest('hex');
+     item.pages.push({page:ext==='pdf'?page+1:null,section:i+1,sha256:fragment_sha256,characters:fragment.length});
+     if(stageEnabled)staged.push({
+       source_document_id:doc.id,source_sha256:item.source_sha256,
+       page_number:ext==='pdf'?page+1:null,section_number:i+1,
+       extraction_method:method,fragment_text:fragment,fragment_sha256
+     });
     }
    }
    item.fragments=item.pages.length;
@@ -94,5 +102,15 @@ try {
   results.push(item);
  }
 }finally{await rm(directory,{recursive:true,force:true});}
-console.log(JSON.stringify({scope:'motil_hse',mode:'dry_run',source_count:selected.length,documents:results},null,2));
-if(results.length!==78 || results.some(x=>x.status!=='extracted_preview'))process.exitCode=1;
+const complete=results.length===78 && results.every(x=>x.status==='extracted_preview');
+if(stageEnabled && complete){
+ for(let start=0;start<staged.length;start+=100){
+   const res=await fetch(URL_ROOT+'/rest/v1/rpc/stage_hse_document_fragments',{
+     method:'POST',headers:{...headers,'Content-Type':'application/json'},
+     body:JSON.stringify({p_rows:staged.slice(start,start+100)})
+   });
+   if(!res.ok)throw Error('HSE staging RPC failed HTTP '+res.status);
+ }
+}
+console.log(JSON.stringify({scope:'motil_hse',mode:stageEnabled?'staging':'dry_run',source_count:selected.length,documents:results},null,2));
+if(!complete)process.exitCode=1;

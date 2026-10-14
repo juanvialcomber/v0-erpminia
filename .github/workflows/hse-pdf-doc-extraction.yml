@@ -1,6 +1,11 @@
 name: HSE PDF and DOC extraction audit
 on:
   workflow_dispatch:
+    inputs:
+      stage_fragments:
+        description: 'Stage pending HSE text in canonical database (requires migration)'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -25,6 +30,7 @@ jobs:
           node-version: '22'
       - name: Read-only extraction diagnostics
         env:
+          HSE_STAGE_FRAGMENTS: ${{ inputs.stage_fragments == true && '1' || '0' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
