@@ -14,6 +14,11 @@ const requiredTerms = {
   'HSE-Q02': ['licencia interna', 'vigente'],
   'HSE-Q03': ['20', 'km'],
 };
+const criticalQualifiers = {
+  'HSE-Q01': /jefe de mina|designad[oa]/,
+  'HSE-Q02': /vigente/,
+  'HSE-Q03': /menor(?:es)?|señalizaci[oó]n|condiciones de la ruta/,
+};
 const results = dataset.cases.map(testCase => {
   const answer = byId.get(testCase.id);
   const text = String(answer?.answer || '').toLowerCase();
@@ -25,9 +30,10 @@ const results = dataset.cases.map(testCase => {
     ? true
     : answer?.abstained === true;
   const factualOk = !testCase.expectedRule || (requiredTerms[testCase.id] || []).every(term => text.includes(term));
+  const qualifierOk = !testCase.expectedRule || criticalQualifiers[testCase.id]?.test(text) === true;
   const noApprovalClaim = !/cumplimiento (certificado|confirmado)|autorizad[oa] automáticamente|aprobado automáticamente/i.test(text);
-  const pass = Boolean(answer && sourceOk && factualOk && abstentionOk && noApprovalClaim && text.trim().length);
-  return { id: testCase.id, pass, sourceOk, factualOk, abstentionOk, noApprovalClaim, answered: Boolean(text.trim()) };
+  const pass = Boolean(answer && sourceOk && factualOk && qualifierOk && abstentionOk && noApprovalClaim && text.trim().length);
+  return { id: testCase.id, pass, sourceOk, factualOk, qualifierOk, abstentionOk, noApprovalClaim, answered: Boolean(text.trim()) };
 });
 const passed = results.filter(row => row.pass).length;
 console.log(JSON.stringify({ passed, total: results.length, results }, null, 2));

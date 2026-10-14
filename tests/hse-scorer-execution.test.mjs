@@ -43,3 +43,11 @@ test('scorer rejects answers that do not abstain on unsupported cases', () => {
   assert.equal(result.status, 1);
   assert.equal(result.output.results[3].abstentionOk, false);
 });
+
+test('scorer rejects speed limit without stricter posted-condition qualifier', () => {
+  const answers = structuredClone(good);
+  answers[2].answer = 'La velocidad máxima es 20 km/h.';
+  const result = run(answers);
+  assert.equal(result.status, 1);
+  assert.equal(result.output.results[2].qualifierOk, false);
+});

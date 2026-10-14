@@ -9,7 +9,7 @@ test('HSE answer scorer checks factual content in addition to citations', () => 
   assert.match(source, /HSE-Q01/);
   assert.match(source, /HSE-Q02/);
   assert.match(source, /HSE-Q03/);
-  assert.match(source, /sourceOk && factualOk && abstentionOk/);
+  assert.match(source, /sourceOk && factualOk && qualifierOk && abstentionOk/);
 });
 
 test('HSE answer scorer demands abstention for unsupported facts', () => {
