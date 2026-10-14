@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/hse-pdf-doc-extraction.yml'
+      - 'scripts/extract-hse-pdf-doc.mjs'
 
 permissions:
   contents: read
