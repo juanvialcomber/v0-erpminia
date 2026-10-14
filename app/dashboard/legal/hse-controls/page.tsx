@@ -181,7 +181,7 @@ export default function HseControlsPage() {
         <p className="rounded-md border p-4 text-sm text-muted-foreground">No hay controles con este estado.</p>}
       <div className="space-y-3">
         {visibleControls.map(control => (
-          <article key={control.id} className="rounded-lg border p-4 space-y-3">
+          <article id={'hse-control-' + control.id} key={control.id} className="scroll-mt-24 rounded-lg border p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-semibold">{control.rule_code}</h2>
               <span className="rounded-md border px-2 py-1 text-xs">{control.validation_status === 'pending' ? 'Pendiente de revisión' : control.validation_status}</span>

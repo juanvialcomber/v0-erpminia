@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import Link from 'next/link';
 
 type Edge = { source_type: string; source_id: string; relationship: string; target_type: string; target_id: string; review_state: string };
 async function fetchGraph(url: string): Promise<{ edges: Edge[] }> {
@@ -30,6 +31,19 @@ export function HseEvidenceGraphSummary() {
             <p className="text-lg font-semibold">{verified.length}</p>
             <p className="text-xs text-muted-foreground">Conexiones operacionales verificadas</p>
           </div>
+          {candidates.length > 0 && (
+            <div className="sm:col-span-2 rounded-md border p-3">
+              <p className="mb-2 text-xs font-semibold">Controles documentales con fuente identificada</p>
+              <ul className="space-y-2">
+                {candidates.slice(0, 20).map(edge => (
+                  <li key={edge.source_id + ':' + edge.target_id} className="flex items-center justify-between gap-3 text-xs">
+                    <span>Control candidato · {edge.review_state === 'pending' ? 'Pendiente de revisión' : edge.review_state}</span>
+                    <Link href={'#hse-control-' + encodeURIComponent(edge.target_id)} className="underline underline-offset-4">Ver evidencia del control</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {edges.length === 0 && <p className="text-sm text-muted-foreground sm:col-span-2">Sin relaciones documentales registradas.</p>}
         </div>
       )}
