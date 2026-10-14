@@ -4,6 +4,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { useState } from 'react';
 import { ArrowLeft, ShieldCheck, FileText } from 'lucide-react';
+import { HseEvidenceGraphSummary } from '@/components/legal/hse-evidence-graph-summary';
 
 type ModuleLinkSummary = { target_module: string; links: number; pending: number; verified: number };
 type Control = {
@@ -100,6 +101,7 @@ export default function HseControlsPage() {
         <div className="rounded-md border px-4 py-3"><strong>{controls.filter(c => c.validation_status === 'pending').length}</strong> pendientes</div>
         <div className="rounded-md border px-4 py-3">{data?.readOnly ? 'Consulta de solo lectura' : 'Revisión habilitada'}</div>
       </div>
+      <HseEvidenceGraphSummary />
       <nav aria-label="Módulos relacionados" className="grid gap-2 sm:grid-cols-3">
         <Link href="/dashboard/mantenimiento/equipos" className="rounded-md border p-3 text-sm hover:bg-muted/30">
           <span className="font-medium">Activos de mantenimiento</span>
