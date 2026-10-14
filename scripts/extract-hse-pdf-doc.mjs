@@ -63,10 +63,15 @@ try {
      const output=[];
      for(let page=1;page<=count;page++){
        const p=prefix+'-'+page;
-       await exec('pdftoppm',['-f',String(page),'-l',String(page),'-r','160','-gray','-singlefile','-png',file,p],{timeout:30000,maxBuffer:1024*1024});
+       await exec('pdftoppm',['-f',String(page),'-l',String(page),'-r','300','-gray','-singlefile','-png',file,p],{timeout:30000,maxBuffer:1024*1024});
        const image=p+'.png';
        const ocr=await exec('tesseract',[image,'stdout','-l','spa+eng','--psm','3'],{timeout:40000,maxBuffer:8*1024*1024});
-       output.push(ocr.stdout);
+       let extracted=ocr.stdout;
+       if(!extracted.trim()){
+         const alt=await exec('tesseract',[image,'stdout','-l','spa+eng','--psm','11'],{timeout:40000,maxBuffer:8*1024*1024});
+         extracted=alt.stdout;
+       }
+       output.push(extracted);
        await rm(image,{force:true});
      }
      text=output.join('\\f');
