@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
 
 type WorkOrderPatchPayload = {
@@ -193,6 +194,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           { error: 'El ejecutor asignado sólo puede iniciar su OT y registrar evidencia de su propia ejecución.' },
           { status: 403 },
         );
+      }
+    }
+    if (body.status === 'in_progress') {
+      const other = await findOtherRunningWorkOrder(context, id);
+      if (other) {
+        return NextResponse.json({
+          error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
+          concurrentWorkOrderId: other.id,
+        }, { status: 409 });
       }
     }
     if (body.status === 'completed') {

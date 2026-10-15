@@ -116,6 +116,14 @@ function domainLabel(domain: string | null) {
 }
 
 export default function PlanificacionPage() {
+  const { data: maintenanceViewer } = useSWR<{ canCreateWorkOrder?: boolean }>(
+    '/api/maintenance/viewer-context',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include' });
+      return response.ok ? (await response.json()) as { canCreateWorkOrder?: boolean } : { canCreateWorkOrder: false };
+    },
+    { revalidateOnFocus: false },
+  );
   const { data, error, isLoading, isValidating, mutate } = useSWR<PlanningResponse>('/api/planificacion', fetcher, { revalidateOnFocus: false });
   const attention = data?.attention ?? [];
   const preventive = data?.preventive ?? [];
@@ -136,6 +144,9 @@ export default function PlanificacionPage() {
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
+          {maintenanceViewer?.canCreateWorkOrder ? (
+            <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo/create"><Wrench className="h-4 w-4" />Programar OT</Link></Button>
+          ) : null}
           <Button variant="outline" onClick={() => void mutate()} disabled={isValidating}>
             <RefreshCw className={`h-4 w-4 ${isValidating ? 'animate-spin' : ''}`} />
             Actualizar

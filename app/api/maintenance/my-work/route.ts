@@ -4,9 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
-
-const terminalStatuses = new Set(['completed', 'closed', 'cancelled']);
-const activeTimerStatuses = new Set(['running', 'paused']);
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
+import { buildAssignedWorkActions } from '@/lib/maintenance/my-work-priority.mjs';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
@@ -60,39 +59,20 @@ export async function GET(request: NextRequest) {
       .from('maintenance_work_orders')
       .select('id,work_order_number,title,status,priority,scheduled_date,start_date,created_at,timer_status,total_timer_minutes,canonical_asset_id')
       .eq('organization_id', context.organizationId)
-      .eq('assigned_person_id', person.id);
+      .eq('assigned_person_id', person.id)
+      .not('created_by', 'is', null)
+      .in('status', ['open', 'assigned', 'pending', 'planned', 'in_progress'])
+      .order('scheduled_date', { ascending: true, nullsFirst: false })
+      .limit(200);
     if (workOrdersError) throw workOrdersError;
 
-    const actions = (rows || [])
-      .filter((row: any) => !terminalStatuses.has(String(row.status || '').toLowerCase()))
-      .sort((a: any, b: any) => {
-        const aActive = activeTimerStatuses.has(String(a.timer_status || '').toLowerCase()) || String(a.status || '').toLowerCase() === 'in_progress';
-        const bActive = activeTimerStatuses.has(String(b.timer_status || '').toLowerCase()) || String(b.status || '').toLowerCase() === 'in_progress';
-        if (aActive !== bActive) return aActive ? -1 : 1;
-        const aDate = a.scheduled_date ? Date.parse(String(a.scheduled_date)) : Number.POSITIVE_INFINITY;
-        const bDate = b.scheduled_date ? Date.parse(String(b.scheduled_date)) : Number.POSITIVE_INFINITY;
-        if (aDate !== bDate) return aDate - bDate;
-        return Date.parse(String(a.created_at || '')) - Date.parse(String(b.created_at || ''));
-      })
-      .map((row: any) => {
-        const number = row.work_order_number || 'OT';
-        const timerState = String(row.timer_status || '').toLowerCase();
-        const isActive = activeTimerStatuses.has(timerState) || String(row.status || '').toLowerCase() === 'in_progress';
-        const scheduledEvidence = row.scheduled_date ? `Programada ${row.scheduled_date}` : 'Sin fecha programada';
-        const priorityEvidence = row.priority ? ` · Prioridad ${row.priority}` : '';
-        return {
-          id: String(row.id),
-          title: `${isActive ? 'Continuar' : 'Iniciar'} · ${number}`,
-          description: row.title || 'Orden de trabajo asignada',
-          evidence: `${scheduledEvidence}${priorityEvidence}`,
-          href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
-        };
-      });
+    const actions = buildAssignedWorkActions(rows || [], chileTodayDateKey());
 
     return NextResponse.json({
       identityLinked: true,
       actions,
       canEdit: access.canWrite,
+      generatedAt: new Date().toISOString(),
       sources: ['profiles', 'cargos', 'people', 'maintenance_work_orders'],
     });
   } catch (error) {

@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import useSWR from 'swr';
-import { Camera, CirclePause, CirclePlay, Clock3, ShieldCheck, SquareStop, Wrench } from 'lucide-react';
+import { AlertTriangle, Camera, CirclePause, CirclePlay, Clock3, ShieldCheck, SquareStop, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +33,23 @@ type TimerResponse = {
     event_type?: string;
     payload?: { notes?: string | null } | null;
   }>;
+};
+
+type AssignedWorkAction = {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  isCritical: boolean;
+  isRunning: boolean;
+};
+type AssignedWorkResponse = { actions?: AssignedWorkAction[] };
+
+const assignedWorkFetcher = async (url: string): Promise<AssignedWorkResponse> => {
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo verificar tu trabajo asignado.');
+  return payload as AssignedWorkResponse;
 };
 
 const PAUSE_REASONS = [
@@ -88,6 +107,33 @@ export function MobileWorkOrderFlow({
 }) {
   const router = useRouter();
   const hasCanonicalAssignee = Boolean(assignedPersonId);
+  const { data: assignedWork, error: assignedWorkError, mutate: refreshAssignedWork } = useSWR<AssignedWorkResponse>(
+    canEdit && hasCanonicalAssignee && status !== 'completed' ? '/api/maintenance/my-work' : null,
+    assignedWorkFetcher,
+    { refreshInterval: 30_000, revalidateOnFocus: true },
+  );
+  const assignedActions = assignedWork?.actions || [];
+  const runningElsewhere = assignedActions.find((order) => order.isRunning && order.id !== workOrderId) || null;
+  const isThisCritical = assignedActions.some((order) => order.id === workOrderId && order.isCritical);
+  const higherPriority = !isThisCritical
+    ? assignedActions.find((order) => order.isCritical && order.id !== workOrderId) || null
+    : null;
+  const previousCritical = useRef(new Set<string>());
+  const hasLoadedAssignments = useRef(false);
+  const [switchComment, setSwitchComment] = useState('');
+  const [switchBusy, setSwitchBusy] = useState(false);
+
+  useEffect(() => {
+    if (!assignedWork) return;
+    const newIds = new Set((assignedWork.actions || []).filter((order) => order.isCritical).map((order) => order.id));
+    if (hasLoadedAssignments.current) {
+      const arrived = (assignedWork.actions || []).find((order) => order.isCritical && order.id !== workOrderId && !previousCritical.current.has(order.id));
+      if (arrived) toast.warning('Nueva OT crítica asignada', { description: arrived.title + ' · Revisa si debes cambiar de prioridad.' });
+    }
+    previousCritical.current = newIds;
+    hasLoadedAssignments.current = true;
+  }, [assignedWork, workOrderId]);
+
   const { data, error, isLoading, mutate } = useSWR<TimerResponse>(
     canEdit && hasCanonicalAssignee && status !== 'completed' ? `/api/maintenance/work-orders/${workOrderId}/timer` : null,
     fetcher,
@@ -191,6 +237,14 @@ export function MobileWorkOrderFlow({
 
   async function startWork() {
     if (!hasCanonicalAssignee) return;
+    if (!assignedWork || assignedWorkError) {
+      setMessage('No se pudo verificar tu asignación. Actualiza la página antes de iniciar.');
+      return;
+    }
+    if (runningElsewhere) {
+      setMessage('Primero registra la pausa de ' + runningElsewhere.title + ' para cambiar de OT.');
+      return;
+    }
     setBusy(true);
     setMessage(null);
     try {
@@ -215,6 +269,10 @@ export function MobileWorkOrderFlow({
   }
 
   async function timerAction(action: 'play' | 'pause' | 'resume', notes?: string) {
+    if ((action === 'play' || action === 'resume') && (!assignedWork || assignedWorkError || runningElsewhere)) {
+      setMessage(runningElsewhere ? 'Primero registra la pausa de ' + runningElsewhere.title + '.' : 'No se pudo verificar tu trabajo asignado.');
+      return;
+    }
     setBusy(true);
     setMessage(null);
     try {
@@ -241,12 +299,40 @@ export function MobileWorkOrderFlow({
       setMessage('Selecciona el motivo de la pausa.');
       return;
     }
-    if (pauseReason === 'Otro' && !pauseDetail.trim()) {
+    if ((pauseReason === 'Otro' || pauseReason === 'Entró una OT más crítica') && !pauseDetail.trim()) {
       setMessage('Describe el motivo de la pausa.');
       return;
     }
     const notes = pauseDetail.trim() ? `${pauseReason} — ${pauseDetail.trim()}` : pauseReason;
     await timerAction('pause', notes);
+  }
+
+  async function pauseOtherBeforeSwitch() {
+    if (!runningElsewhere) return;
+    const comment = switchComment.trim();
+    if (comment.length < 5) {
+      setMessage('Describe por qué interrumpes la otra OT (mínimo 5 caracteres).');
+      return;
+    }
+    setSwitchBusy(true);
+    setMessage(null);
+    try {
+      const reason = isThisCritical ? 'Entró una OT más crítica' : 'Cambio de prioridad operacional';
+      await request('/api/maintenance/work-orders/' + encodeURIComponent(runningElsewhere.id) + '/timer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pause',
+          notes: reason + ' · Para atender ' + (workOrderNumber || 'otra OT') + ' — ' + comment,
+        }),
+      });
+      setSwitchComment('');
+      await refreshAssignedWork();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo registrar la pausa de la OT anterior.');
+    } finally {
+      setSwitchBusy(false);
+    }
   }
 
   async function finishWork() {
@@ -275,6 +361,43 @@ export function MobileWorkOrderFlow({
 
   return (
     <section className="mx-auto w-full max-w-xl space-y-4" aria-label="Ejecución en terreno">
+      {higherPriority ? (
+        <div role="alert" className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+            <div className="space-y-1">
+              <p className="font-semibold">OT crítica asignada · {higherPriority.title}</p>
+              <p className="text-sm text-muted-foreground">{higherPriority.description}</p>
+              <p className="text-sm">Recomendación: considera priorizarla. Tú decides; registra una pausa comentada si interrumpes el trabajo actual.</p>
+            </div>
+          </div>
+          <Button variant="outline" asChild className="w-full">
+            <Link href={higherPriority.href}>Revisar OT crítica</Link>
+          </Button>
+        </div>
+      ) : null}
+      {assignedWorkError ? <StatePanel tone="error" title="No se pudo verificar tu bandeja de OT" description={assignedWorkError.message} /> : null}
+      {runningElsewhere ? (
+        <div className="space-y-3 rounded-lg border p-4" aria-label="Cambio de orden de trabajo">
+          <p className="font-semibold">Primero pausa la OT actual</p>
+          <p className="text-sm text-muted-foreground">
+            {runningElsewhere.title} sigue registrando tiempo. Para elegir esta OT, deja un comentario de interrupción; no se cambiará la prioridad automáticamente.
+          </p>
+          <div className="space-y-2">
+            <label htmlFor="ot-switch-comment" className="text-sm font-medium">Comentario obligatorio de la pausa</label>
+            <textarea id="ot-switch-comment" value={switchComment} onChange={(event) => setSwitchComment(event.target.value)}
+              minLength={5} maxLength={500} required rows={3} placeholder="Explica el cambio de prioridad y el estado del trabajo que dejas pendiente"
+              className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          </div>
+          <Button className="h-12 w-full" disabled={switchBusy || switchComment.trim().length < 5 || Boolean(assignedWorkError)}
+            onClick={() => void pauseOtherBeforeSwitch()}>
+            <CirclePause className="mr-2 h-4 w-4" />{switchBusy ? 'Guardando pausa...' : 'Registrar pausa y continuar'}
+          </Button>
+          <Button variant="outline" asChild className="h-11 w-full">
+            <Link href={runningElsewhere.href}>Volver a la OT en ejecución</Link>
+          </Button>
+        </div>
+      ) : null}
       <Card className="border-2 shadow-none">
         <CardContent className="space-y-5 p-5 sm:p-6">
           <div>
@@ -355,12 +478,12 @@ export function MobileWorkOrderFlow({
           </div>
 
           {status !== 'in_progress' ? (
-            <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => void startWork()}>
+            <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void startWork()}>
               <CirclePlay className="mr-2 h-5 w-5" />
               {busy ? 'Iniciando...' : 'Iniciar trabajo'}
             </Button>
           ) : timerStatus === 'idle' ? (
-            <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => void timerAction('play')}>
+            <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('play')}>
               <CirclePlay className="mr-2 h-5 w-5" />
               {busy ? 'Iniciando...' : 'Reanudar trabajo'}
             </Button>
@@ -388,14 +511,14 @@ export function MobileWorkOrderFlow({
                 onChange={(event) => setPauseDetail(event.target.value)}
                 rows={2}
                 maxLength={500}
-                placeholder={pauseReason === 'Otro' ? 'Describe el motivo' : 'Comentario opcional'}
+                placeholder={pauseReason === 'Otro' || pauseReason === 'Entró una OT más crítica' ? 'Describe el motivo (obligatorio)' : 'Comentario opcional'}
                 className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Button variant="ghost" className="h-11" disabled={busy} onClick={() => { setShowPauseForm(false); setMessage(null); }}>
                   Cancelar
                 </Button>
-                <Button className="h-11" disabled={busy || !pauseReason} onClick={() => void pauseWork()}>
+                <Button className="h-11" disabled={busy || !pauseReason || ((pauseReason === 'Otro' || pauseReason === 'Entró una OT más crítica') && !pauseDetail.trim())} onClick={() => void pauseWork()}>
                   <CirclePause className="mr-2 h-4 w-4" />
                   {busy ? 'Pausando...' : 'Confirmar pausa'}
                 </Button>
@@ -409,7 +532,7 @@ export function MobileWorkOrderFlow({
                   <p className="mt-1 text-sm font-medium">{lastPauseReason}</p>
                 </div>
               ) : null}
-              <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => void timerAction('resume')}>
+              <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('resume')}>
                 <CirclePlay className="mr-2 h-5 w-5" />
                 {busy ? 'Guardando...' : 'Reanudar trabajo'}
               </Button>

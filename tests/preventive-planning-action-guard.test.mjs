@@ -5,7 +5,7 @@ const source = readFileSync(new URL('../components/maintenance/preventive-plan-b
 test('preventive plan actions are guarded against rapid duplicate requests', () => {
   assert.match(source, /if \(actionInFlight\.current\) return/);
   assert.match(source, /actionInFlight\.current = true/);
-  assert.match(source, /finally \{ actionInFlight\.current = false; setPendingAction\(null\)/);
+  assert.match(source, /finally\s*\{\s*actionInFlight\.current = false;\s*setPendingAction\(null\)/);
   assert.match(source, /disabled=\{pendingAction !== null \|\| !schedule\.enabled \|\| Boolean\(schedule\.generated_work_order_id\)\}/);
   assert.match(source, /disabled=\{pendingAction !== null\} onClick=\{\(\) => void act\(schedule\.id, 'toggle'\)\}/);
 });

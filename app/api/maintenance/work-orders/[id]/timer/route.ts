@@ -3,6 +3,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
 
 const TIMER_ACTIONS = new Set(['play', 'pause', 'resume', 'terminate']);
 
@@ -31,6 +32,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!TIMER_ACTIONS.has(action)) return NextResponse.json({ ok: false, error: 'Invalid action' }, { status: 400 });
   if (action === 'pause' && !notes) {
     return NextResponse.json({ ok: false, error: 'Debes indicar por qué pausas la orden de trabajo.' }, { status: 400 });
+  }
+
+  if (action === 'play' || action === 'resume') {
+    try {
+      const other = await findOtherRunningWorkOrder(context, workOrderId);
+      if (other) {
+        return NextResponse.json({
+          ok: false,
+          error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
+          concurrentWorkOrderId: other.id,
+        }, { status: 409 });
+      }
+    } catch (cause) {
+      console.error('[maintenance/work-order-timer:conflict]', cause);
+      return NextResponse.json({ ok: false, error: 'No se pudo verificar si tienes otra OT en ejecución.' }, { status: 503 });
+    }
   }
 
   const { data, error } = await context.supabase.rpc('update_work_order_timer', {

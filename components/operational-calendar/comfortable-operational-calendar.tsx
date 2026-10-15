@@ -170,6 +170,11 @@ function addDays(dateKey: string, amount: number) {
   return toDateKey(date);
 }
 
+function startOfChileanWorkWeek(today: string) {
+  const weekday = new Date(today + 'T12:00:00Z').getUTCDay();
+  return addDays(today, -((weekday + 6) % 7));
+}
+
 function diffDays(from: string, to: string) {
   const a = new Date(`${from}T12:00:00Z`).getTime();
   const b = new Date(`${to}T12:00:00Z`).getTime();
@@ -214,8 +219,8 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   );
 
   const today = data?.range.today || toDateKey(new Date());
-  // Show ten previous days and the coming days; navigate by week without hiding closed work.
-  const currentAnchor = anchorDate || addDays(today, -10);
+  // Open on Monday: the two-week view shows this week AND the coming work week.
+  const currentAnchor = anchorDate || startOfChileanWorkWeek(today);
   const periodConfig = PERIOD_CONFIG[period];
   const dates = useMemo(
     () => buildDates(currentAnchor, periodConfig.days),

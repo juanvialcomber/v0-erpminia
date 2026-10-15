@@ -13,7 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { StatePanel } from '@/components/ui/state-panel';
 
 type Asset = { id: string; asset_code: string; asset_name: string; asset_type?: string | null; location?: string | null };
-type Schedule = { id: string; asset_id: string; task_name: string; description?: string | null; frequency_days?: number | null; frequency_hours?: number | null; next_scheduled_date?: string | null; estimated_duration_hours?: number | null; priority?: string | null; enabled: boolean; generated_work_order_id?: string | null; asset?: Asset | null };
+type Schedule = { id: string; asset_id: string; canonical_asset_id?: string | null; task_name: string; description?: string | null; frequency_days?: number | null; frequency_hours?: number | null; next_scheduled_date?: string | null; estimated_duration_hours?: number | null; priority?: string | null; enabled: boolean; generated_work_order_id?: string | null; asset?: Asset | null };
+type Assignee = { id: string; full_name: string; role_title: string | null };
+type AssigneeResponse = { assignees: Assignee[] };
 type OpenWorkOrder = { id: string; work_order_number: string; title: string; status: string };
 type OperationCandidate = { canonical_asset_id: string; rig_name: string; suggested_task: string; observation_count: number; out_of_service_count: number; first_observed_at: string; last_observed_at: string; latest_observation?: string | null; signal_status: string; latest_source_file?: string | null; latest_source_sheet?: string | null; latest_source_row?: number | null; open_work_orders: OpenWorkOrder[]; promotion_state: string };
 type HourSignal = { schedule_id: string; canonical_asset_id: string; asset_code: string; asset_name: string; task_name: string; frequency_hours?: number | null; last_executed_meter?: number | null; due_meter?: number | null; effective_current_meter?: number | null; remaining_hours?: number | null; hour_status: string; alert_due: boolean; meter_evidence_source?: string | null; meter_basis_warning: boolean; evidence_quality: 'observed_runtime' | 'needs_reconciliation' | 'source_snapshot'; source_reference?: string | null; generated_work_order_id?: string | null };
@@ -27,6 +29,18 @@ export function PreventivePlanBoard() {
   const { data, error, isLoading, mutate } = useSWR<Response>('/api/maintenance/preventive', fetcher, { revalidateOnFocus: false });
   const [showForm, setShowForm] = useState(false); const [saving, setSaving] = useState(false); const [message, setMessage] = useState('');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [generationScheduleId, setGenerationScheduleId] = useState<string | null>(null);
+  const [generationAssigneeId, setGenerationAssigneeId] = useState('');
+  const { data: assigneeData, error: assigneeError, isLoading: assigneesLoading } = useSWR<AssigneeResponse>(
+    generationScheduleId ? '/api/maintenance/assignees' : null,
+    async (url: string) => {
+      const response = await apiFetch(url);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar los responsables.');
+      return payload as AssigneeResponse;
+    },
+    { revalidateOnFocus: false },
+  );
   const actionInFlight = useRef(false);
   const [form, setForm] = useState({ assetId: '', taskName: '', description: '', frequencyDays: '', frequencyHours: '', nextScheduledDate: '', estimatedDurationHours: '', priority: 'medium' });
   const schedules = data?.schedules || []; const summary = data?.summary || null;
@@ -38,7 +52,38 @@ export function PreventivePlanBoard() {
 
   function promoteCandidate(candidate: OperationCandidate) { setForm({ assetId: candidate.canonical_asset_id, taskName: candidate.suggested_task, description: `Candidato derivado de ${candidate.observation_count} observaciones operacionales entre ${candidate.first_observed_at} y ${candidate.last_observed_at}. Requiere validación del supervisor antes de generar trabajo.`, frequencyDays: '', frequencyHours: '', nextScheduledDate: '', estimatedDurationHours: '', priority: candidate.signal_status === 'attention' ? 'high' : 'medium' }); setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   async function submit() { setSaving(true); setMessage(''); try { const response = await apiFetch('/api/maintenance/preventive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo crear el plan.'); setForm({ assetId: '', taskName: '', description: '', frequencyDays: '', frequencyHours: '', nextScheduledDate: '', estimatedDurationHours: '', priority: 'medium' }); setShowForm(false); setMessage('Plan preventivo creado.'); await mutate(); } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'No se pudo crear el plan.'); } finally { setSaving(false); } }
-  async function act(scheduleId: string, action: 'toggle' | 'generate') { if (actionInFlight.current) return; actionInFlight.current = true; setPendingAction(scheduleId); setMessage(''); try { const response = await apiFetch('/api/maintenance/preventive', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scheduleId, action }) }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo actualizar el plan.'); setMessage(action === 'generate' ? 'Orden de trabajo creada desde el plan.' : 'Estado actualizado.'); await mutate(); } catch (cause) { setMessage(cause instanceof Error ? cause.message : 'No se pudo actualizar el plan.'); } finally { actionInFlight.current = false; setPendingAction(null); } }
+  async function act(scheduleId: string, action: 'toggle' | 'generate') {
+    if (actionInFlight.current) return;
+    if (action === 'generate' && (!generationAssigneeId || generationScheduleId !== scheduleId)) {
+      setMessage('Selecciona el responsable antes de generar la OT.');
+      return;
+    }
+    actionInFlight.current = true;
+    setPendingAction(scheduleId);
+    setMessage('');
+    try {
+      const response = await apiFetch('/api/maintenance/preventive', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId, action, assignedPersonId: action === 'generate' ? generationAssigneeId : undefined }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo actualizar el plan.');
+      setMessage(action === 'generate'
+        ? 'OT generada y asignada a ' + (payload.assignedPersonName || 'la persona seleccionada') + '.'
+        : 'Estado actualizado.');
+      if (action === 'generate') {
+        setGenerationScheduleId(null);
+        setGenerationAssigneeId('');
+      }
+      await mutate();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo actualizar el plan.');
+    } finally {
+      actionInFlight.current = false;
+      setPendingAction(null);
+    }
+  }
 
   return <main className="space-y-6">
     <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-5"><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mantenimiento</p><h1 className="mt-1 text-2xl font-semibold">Planificación preventiva</h1><p className="mt-1 text-sm text-muted-foreground">Planes canónicos, señales operacionales y vencimientos por horas. La evidencia derivada requiere revisión humana.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="h-4 w-4"/>Actualizar</Button><Button onClick={() => setShowForm((value) => !value)} disabled={isLoading || Boolean(error)}><Plus className="h-4 w-4"/>Nuevo plan</Button></div></header>
@@ -55,6 +100,43 @@ export function PreventivePlanBoard() {
       {hourSignals.length > 0 && <Card className="shadow-none"><CardHeader><CardTitle className="text-base">Control por horómetro</CardTitle></CardHeader><CardContent className="space-y-3">{hourSignals.map((signal) => { const observed = signal.evidence_quality === 'observed_runtime'; const snapshotOnly = signal.evidence_quality === 'source_snapshot'; return <div key={signal.schedule_id} className="border-b pb-3 last:border-0 last:pb-0"><div className="flex flex-wrap items-start justify-between gap-2"><div><div className="flex flex-wrap gap-2">{signal.meter_basis_warning ? <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3"/>Reconciliar contador</Badge> : signal.alert_due && observed ? <Badge variant="destructive">Vencido por horas</Badge> : signal.alert_due && snapshotOnly ? <Badge variant="secondary">Revisar referencia del plan</Badge> : <Badge variant="secondary">Por revisar</Badge>}<Badge variant="outline">{observed ? 'Lectura operacional' : signal.meter_basis_warning ? 'Evidencia en conflicto' : 'Sin lectura operacional'}</Badge></div><p className="mt-2 font-medium">{signal.task_name}</p><p className="text-sm text-muted-foreground">{signal.asset_code} · {signal.asset_name}</p></div>{signal.meter_basis_warning ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(signal.canonical_asset_id)}`}>Reconciliar evidencia</Link></Button> : null}</div><div className="mt-2 grid grid-cols-3 gap-2 text-sm"><div><p className="text-xs text-muted-foreground">Actual</p><p>{numberOrDash(signal.effective_current_meter)} h</p></div><div><p className="text-xs text-muted-foreground">Objetivo</p><p>{numberOrDash(signal.due_meter)} h</p></div><div><p className="text-xs text-muted-foreground">Restante</p><p>{numberOrDash(signal.remaining_hours)} h</p></div></div>{signal.meter_basis_warning ? <p className="mt-2 text-xs text-muted-foreground">El contador observado entra en conflicto con la base del plan. No se usa como vencimiento confiable hasta reconciliar reset, cambio de contador o error de fuente.</p> : snapshotOnly ? <p className="mt-2 text-xs text-muted-foreground">El valor actual proviene del snapshot guardado en el plan, no de una lectura operacional vigente. {signal.source_reference ? `Base del plan: ${signal.source_reference}.` : ''}</p> : <p className="mt-2 text-xs text-muted-foreground">Vencimiento calculado con la última lectura operacional disponible.</p>}</div>; })}</CardContent></Card>}
     </div></section>}
 
-    <section className="space-y-3"><div><h2 className="text-lg font-semibold">Planes preventivos</h2><p className="text-sm text-muted-foreground">Programación aprobada y generación controlada de órdenes.</p></div>{isLoading ? <div className="h-40 animate-pulse rounded-lg bg-muted"/> : error ? null : ordered.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No existen planes preventivos registrados. Crea el primero desde “Nuevo plan”.</CardContent></Card> : <div className="space-y-3">{ordered.map((schedule) => { const state = dueState(schedule.next_scheduled_date); return <Card key={schedule.id} className="shadow-none"><CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_180px_170px_auto] lg:items-center"><div><div className="flex flex-wrap gap-2"><Badge variant={state.tone}>{state.label}</Badge><Badge variant="outline">{schedule.priority || 'Sin prioridad'}</Badge>{!schedule.enabled && <Badge variant="secondary">Pausado</Badge>}</div><p className="mt-2 font-medium">{schedule.task_name}</p><p className="text-sm text-muted-foreground">{schedule.asset?.asset_code || 'Sin código'} · {schedule.asset?.asset_name || 'Equipo no disponible'}</p>{schedule.description && <p className="mt-1 text-sm text-muted-foreground">{schedule.description}</p>}</div><div><p className="text-xs text-muted-foreground">Frecuencia</p><p className="text-sm">{schedule.frequency_days ? `Cada ${schedule.frequency_days} días` : schedule.frequency_hours ? `Cada ${schedule.frequency_hours} horas` : 'No definida'}</p></div><div><p className="text-xs text-muted-foreground">Orden relacionada</p>{schedule.generated_work_order_id ? <Button asChild variant="link" className="h-auto p-0"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${schedule.generated_work_order_id}`}><CheckCircle2 className="h-4 w-4"/>Abrir OT</Link></Button> : <p className="text-sm text-muted-foreground">Aún no generada</p>}</div><div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" disabled={pendingAction !== null} onClick={() => void act(schedule.id, 'toggle')}>{schedule.enabled ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}{schedule.enabled ? 'Pausar' : 'Activar'}</Button><Button size="sm" disabled={pendingAction !== null || !schedule.enabled || Boolean(schedule.generated_work_order_id)} onClick={() => void act(schedule.id, 'generate')}><Wrench className="h-4 w-4"/>Crear OT</Button></div></CardContent></Card>; })}</div>}</section>
+    <section className="space-y-3"><div><h2 className="text-lg font-semibold">Planes preventivos</h2><p className="text-sm text-muted-foreground">Programación aprobada y generación controlada de órdenes.</p></div>{isLoading ? <div className="h-40 animate-pulse rounded-lg bg-muted"/> : error ? null : ordered.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No existen planes preventivos registrados. Crea el primero desde “Nuevo plan”.</CardContent></Card> : <div className="space-y-3">{ordered.map((schedule) => { const state = dueState(schedule.next_scheduled_date); return <Card key={schedule.id} className="shadow-none"><CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_180px_170px_auto] lg:items-center"><div><div className="flex flex-wrap gap-2"><Badge variant={state.tone}>{state.label}</Badge><Badge variant="outline">{schedule.priority || 'Sin prioridad'}</Badge>{!schedule.enabled && <Badge variant="secondary">Pausado</Badge>}</div><p className="mt-2 font-medium">{schedule.task_name}</p><p className="text-sm text-muted-foreground">{schedule.asset?.asset_code || 'Sin código'} · {schedule.asset?.asset_name || 'Equipo no disponible'}</p>{schedule.description && <p className="mt-1 text-sm text-muted-foreground">{schedule.description}</p>}
+{!schedule.next_scheduled_date && !schedule.generated_work_order_id ? <p className="mt-1 text-xs text-muted-foreground">Plan sin fecha. Programa una OT manual para asignar responsable y día de ejecución.</p> : null}</div><div><p className="text-xs text-muted-foreground">Frecuencia</p><p className="text-sm">{schedule.frequency_days ? `Cada ${schedule.frequency_days} días` : schedule.frequency_hours ? `Cada ${schedule.frequency_hours} horas` : 'No definida'}</p></div><div><p className="text-xs text-muted-foreground">Orden relacionada</p>{schedule.generated_work_order_id ? <Button asChild variant="link" className="h-auto p-0"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${schedule.generated_work_order_id}`}><CheckCircle2 className="h-4 w-4"/>Abrir OT</Link></Button> : <p className="text-sm text-muted-foreground">Aún no generada</p>}</div><div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" disabled={pendingAction !== null} onClick={() => void act(schedule.id, 'toggle')}>{schedule.enabled ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}{schedule.enabled ? 'Pausar' : 'Activar'}</Button>{!schedule.generated_work_order_id && !schedule.next_scheduled_date ? (
+  <Button size="sm" variant="outline" asChild>
+    <Link href={{
+      pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
+      query: { assetId: schedule.canonical_asset_id || schedule.asset_id, title: schedule.task_name, workType: 'preventive', priority: schedule.priority || 'medium' },
+    }}><Wrench className="h-4 w-4"/>Programar OT</Link>
+  </Button>
+) : (
+  <Button size="sm" disabled={pendingAction !== null || !schedule.enabled || Boolean(schedule.generated_work_order_id)}
+    onClick={() => { setGenerationScheduleId(schedule.id); setGenerationAssigneeId(''); setMessage(''); }}>
+    <Wrench className="h-4 w-4"/>Asignar OT
+  </Button>
+)}</div>
+      {generationScheduleId === schedule.id && !schedule.generated_work_order_id ? (
+        <div className="col-span-full space-y-3 border-t pt-4" data-testid="preventive-ot-assignment">
+          <p className="text-sm font-medium">Generar OT con responsable</p>
+          <p className="text-xs text-muted-foreground">
+            La fecha programada se mantiene en la OT. El responsable verá la orden desde que quede asignada, aunque sea para la próxima semana.
+          </p>
+          {assigneeError ? <p className="text-sm text-destructive">{assigneeError.message}</p> : null}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[220px] flex-1 space-y-1">
+              <label htmlFor={'generation-assignee-' + schedule.id} className="text-sm font-medium">Ejecutor responsable</label>
+              <Select value={generationAssigneeId} onValueChange={setGenerationAssigneeId} disabled={assigneesLoading || Boolean(assigneeError)}>
+                <SelectTrigger id={'generation-assignee-' + schedule.id}><SelectValue placeholder={assigneesLoading ? 'Cargando responsables…' : 'Seleccionar responsable'} /></SelectTrigger>
+                <SelectContent>{(assigneeData?.assignees || []).map((person) => (
+                  <SelectItem key={person.id} value={person.id}>{person.full_name}{person.role_title ? ' · ' + person.role_title : ''}</SelectItem>
+                ))}</SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" disabled={pendingAction !== null} onClick={() => { setGenerationScheduleId(null); setGenerationAssigneeId(''); }}>Cancelar</Button>
+            <Button disabled={pendingAction !== null || !generationAssigneeId || assigneesLoading || Boolean(assigneeError)}
+              onClick={() => void act(schedule.id, 'generate')}>{pendingAction === schedule.id ? 'Generando…' : 'Generar y asignar OT'}</Button>
+          </div>
+        </div>
+      ) : null}
+      </CardContent></Card>; })}</div>}</section>
   </main>;
 }

@@ -23,9 +23,10 @@ test('server filters timeline records by assigned module permissions', () => {
   assert.match(route, /data: visibleItems/);
 });
 
-test('timeline defaults to a rolling window with recent history and subtle today cue', () => {
+test('timeline defaults to current and next work week with subtle today cue', () => {
   const calendar = readFileSync('components/operational-calendar/comfortable-operational-calendar.tsx', 'utf8');
-  assert.match(calendar, /anchorDate \|\| addDays\(today, -10\)/);
+  assert.match(calendar, /anchorDate \|\| startOfChileanWorkWeek\(today\)/);
+  assert.match(calendar, /getUTCDay\(\)/);
   assert.match(calendar, /setAnchorDate\(null\)/);
   assert.match(calendar, /border-orange-500\/25/);
   assert.doesNotMatch(calendar, /border-l-2 border-orange-500\/80/);

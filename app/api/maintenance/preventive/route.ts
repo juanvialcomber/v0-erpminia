@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle, workshopSiteFromKnownLocation } from '@/lib/maintenance/workshop-site-scope';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
@@ -109,7 +110,112 @@ export async function PATCH(request: NextRequest) {
       const { error } = await context.supabase.from('preventive_maintenance_schedules').update({ enabled: !schedule.enabled, updated_at: new Date().toISOString() }).eq('organization_id', context.organizationId).eq('id', scheduleId);
       if (error) throw error; return NextResponse.json({ ok: true });
     }
-    if (action === 'generate') { const { data, error } = await context.supabase.rpc('create_work_order_from_schedule', { p_schedule_id: scheduleId, p_created_by: context.userId }); if (error) throw error; return NextResponse.json({ workOrderId: data }); }
+    if (action === 'generate') {
+      const assignedPersonId = String(body.assignedPersonId || '').trim();
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuid.test(scheduleId)) return NextResponse.json({ error: 'Plan no identificado.' }, { status: 400 });
+      if (!uuid.test(assignedPersonId)) {
+        return NextResponse.json({ error: 'Selecciona a la persona que ejecutará la OT.' }, { status: 400 });
+      }
+
+      // Validate schedule and assignee in the signed-in organization BEFORE the
+      // existing security-definer RPC; never invoke the RPC with a foreign ID.
+      const [{ data: schedule, error: scheduleError }, { data: person, error: personError }] = await Promise.all([
+        context.supabase.from('preventive_maintenance_schedules')
+          .select('id,organization_id,enabled,canonical_asset_id,asset_id,next_scheduled_date')
+          .eq('organization_id', context.organizationId).eq('id', scheduleId).maybeSingle(),
+        context.supabase.from('people')
+          .select('id,full_name,role_title,profile_id')
+          .eq('organization_id', context.organizationId).eq('id', assignedPersonId)
+          .eq('employment_status', 'active').not('profile_id', 'is', null).maybeSingle(),
+      ]);
+      if (scheduleError) throw scheduleError;
+      if (personError) throw personError;
+      if (!schedule) return NextResponse.json({ error: 'El plan no pertenece a tu organización.' }, { status: 404 });
+      if (!schedule.enabled) return NextResponse.json({ error: 'Activa el plan antes de generar una OT.' }, { status: 409 });
+      if (!schedule.next_scheduled_date) {
+        return NextResponse.json({ error: 'Este plan no tiene fecha de próxima intervención. Programa una OT con fecha desde Nueva OT.' }, { status: 409 });
+      }
+      if (!person) return NextResponse.json({ error: 'El responsable no está disponible como persona operativa activa.' }, { status: 400 });
+
+      const workshop = await resolveWorkshopHeadScope(context);
+      if (workshop.isWorkshopHead) {
+        if (!workshop.personId) return NextResponse.json({ error: 'Jefatura sin identidad operativa activa.' }, { status: 403 });
+        const personSite = workshopSiteFromRoleTitle(person.role_title);
+        if (personSite && personSite !== workshop.site) {
+          return NextResponse.json({ error: 'El ejecutor pertenece a otra mina.' }, { status: 403 });
+        }
+        const { data: asset, error: assetError } = await context.supabase.schema('canonical').from('assets')
+          .select('location').eq('organization_id', context.organizationId)
+          .eq('id', schedule.canonical_asset_id || schedule.asset_id).maybeSingle();
+        if (assetError) throw assetError;
+        const assetSite = workshopSiteFromKnownLocation(asset?.location);
+        if (assetSite && assetSite !== workshop.site) {
+          return NextResponse.json({ error: 'El equipo pertenece a otra mina.' }, { status: 403 });
+        }
+      }
+
+      const { data: workOrderId, error: generateError } = await context.supabase.rpc(
+        'create_work_order_from_schedule', { p_schedule_id: scheduleId, p_created_by: context.userId },
+      );
+      if (generateError) throw generateError;
+      if (!workOrderId) throw new Error('El plan no devolvió una OT válida.');
+
+      const { data: order, error: orderError } = await context.supabase.from('maintenance_work_orders')
+        .select('id,created_by,assigned_person_id,status')
+        .eq('organization_id', context.organizationId).eq('id', workOrderId).maybeSingle();
+      if (orderError) throw orderError;
+      if (!order) throw new Error('No se encontró la OT generada.');
+      if (!order.created_by) {
+        return NextResponse.json({ error: 'La OT generada no tiene creador operacional y requiere revisión de identidad.' }, { status: 409 });
+      }
+      if (['completed', 'closed', 'cancelled', 'canceled'].includes(String(order.status).toLowerCase())) {
+        return NextResponse.json({ error: 'No se puede asignar una OT finalizada.' }, { status: 409 });
+      }
+      if (order.assigned_person_id && order.assigned_person_id !== person.id) {
+        return NextResponse.json({ error: 'Esta OT ya está asignada a otra persona. Revísala antes de continuar.' }, { status: 409 });
+      }
+
+      // Compare-and-set: never overwrite a concurrent planner's assignment.
+      if (!order.assigned_person_id) {
+        const { data: updated, error: updateError } = await context.supabase.from('maintenance_work_orders')
+          .update({ assigned_person_id: person.id, assigned_to_name: person.full_name, updated_at: new Date().toISOString() })
+          .eq('organization_id', context.organizationId).eq('id', workOrderId)
+          .is('assigned_person_id', null).select('id').maybeSingle();
+        if (updateError) throw updateError;
+        if (!updated) {
+          const { data: current, error: currentError } = await context.supabase.from('maintenance_work_orders')
+            .select('assigned_person_id').eq('organization_id', context.organizationId).eq('id', workOrderId).maybeSingle();
+          if (currentError) throw currentError;
+          if (current?.assigned_person_id !== person.id) {
+            return NextResponse.json({ error: 'La asignación cambió mientras se generaba la OT. Actualiza el plan.' }, { status: 409 });
+          }
+        }
+      }
+
+      // Reuse the canonical event stream and prevent duplicate confirmation
+      // events on retries after an already-created schedule-generated OT.
+      const { data: existingEvent, error: eventLookupError } = await context.supabase.from('work_order_events')
+        .select('id').eq('organization_id', context.organizationId).eq('work_order_id', workOrderId)
+        .eq('event_type', 'schedule_executor_assigned').limit(1).maybeSingle();
+      if (eventLookupError) throw eventLookupError;
+      if (!existingEvent) {
+        const { error: eventError } = await context.supabase.from('work_order_events').insert({
+          organization_id: context.organizationId,
+          work_order_id: workOrderId,
+          canonical_asset_id: schedule.canonical_asset_id || schedule.asset_id,
+          event_type: 'schedule_executor_assigned',
+          actor_id: context.userId,
+          actor_name: context.userName || null,
+          source_table: 'preventive_maintenance_schedules',
+          source_record_id: scheduleId,
+          summary: 'Responsable asignado al generar OT desde plan preventivo',
+          payload: { assigned_person_id: person.id, assigned_person_name: person.full_name },
+        });
+        if (eventError) throw eventError;
+      }
+      return NextResponse.json({ workOrderId, assignedPersonId: person.id, assignedPersonName: person.full_name });
+    }
     return NextResponse.json({ error: 'Acción no reconocida.' }, { status: 400 });
   } catch (error) { const message = error instanceof Error ? error.message : 'No se pudo actualizar el plan preventivo'; return NextResponse.json({ error: message }, { status: 500 }); }
 }
