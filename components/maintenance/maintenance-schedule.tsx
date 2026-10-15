@@ -1,4 +1,5 @@
 'use client';
+import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,8 +37,9 @@ const getUrgency = (daysUntil: number | undefined) => {
   if (daysUntil === undefined || daysUntil === null) {
     return { color: 'text-muted-foreground', label: 'Pendiente de programación' };
   }
-  if (daysUntil <= 0) return { color: 'text-destructive', label: 'Vencido' };
-  if (daysUntil <= 1) return { color: 'text-yellow-700', label: 'Hoy' };
+  if (daysUntil < 0) return { color: 'text-destructive', label: 'Vencido' };
+  if (daysUntil === 0) return { color: 'text-amber-700', label: 'Hoy' };
+  if (daysUntil === 1) return { color: 'text-amber-700', label: 'Mañana' };
   if (daysUntil <= 3) return { color: 'text-yellow-600', label: 'Pronto' };
   return { color: 'text-foreground', label: `En ${daysUntil} días` };
 };
@@ -61,6 +63,7 @@ export function MaintenanceSchedule({ schedules }: MaintenanceScheduleProps) {
                   <div className="flex-1">
                     <h4 className="font-semibold">{schedule.taskName}</h4>
                     <p className="text-sm text-muted-foreground">{schedule.assetName}</p>
+                    <p className="text-xs text-muted-foreground">Programada: {formatWorkOrderDate(schedule.nextScheduledDate)}</p>
                     <div className="mt-2 flex gap-2">
                       <Badge className={priorityColors[schedule.priority]}>{priorityLabels[schedule.priority]}</Badge>
                       <span className={`text-sm ${urgency.color}`}>

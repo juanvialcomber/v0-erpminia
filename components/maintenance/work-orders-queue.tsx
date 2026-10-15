@@ -1,4 +1,5 @@
 'use client';
+import { daysUntilWorkOrderDate, isWorkOrderScheduledOverdue } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -73,12 +74,7 @@ function getPriorityLabel(priority: string | null | undefined, t: WorkOrdersT) {
 
 function isOverdue(order: WorkOrderItem) {
   if (!order.scheduled_date || ['completed', 'completado'].includes(normalizeText(order.status))) return false;
-  const scheduled = new Date(order.scheduled_date);
-  if (Number.isNaN(scheduled.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  scheduled.setHours(0, 0, 0, 0);
-  return scheduled < today;
+  return isWorkOrderScheduledOverdue(order.scheduled_date);
 }
 
 function fill(template: string, vars: Record<string, string | number>) {
@@ -93,7 +89,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [viewFilter, setViewFilter] = useState<'active' | 'approval' | 'completed' | 'historical'>('active');
+  const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'approval' | 'completed' | 'historical'>('active');
 
   const { data, error, isLoading, mutate } = useSWR('/api/maintenance/work-orders', async (url: string) => {
     const response = await fetch(url, { credentials: 'include' });
@@ -120,8 +116,10 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
       const operational = order.record_scope !== 'historical';
       const matchesView = missingAssetOnly
         ? operational
-        : viewFilter === 'historical'
-          ? order.record_scope === 'historical'
+        : viewFilter === 'all'
+          ? operational
+          : viewFilter === 'historical'
+            ? order.record_scope === 'historical'
           : viewFilter === 'approval'
             ? operational && completed && normalizeText(order.approval_status) !== 'approved'
             : viewFilter === 'completed'
@@ -138,10 +136,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
   const scheduleItems = useMemo(() => operationalWorkOrders
     .filter((order) => order.scheduled_date && !['completed', 'completado'].includes(normalizeText(order.status)))
     .map((order): ScheduleItem => {
-      const scheduledDate = new Date(order.scheduled_date as string);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      scheduledDate.setHours(0, 0, 0, 0);
+      const daysUntil = daysUntilWorkOrderDate(order.scheduled_date);
       const priority = normalizeText(order.priority);
       return {
         id: order.id,
@@ -149,7 +144,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
         taskName: `${formatWorkOrderNumber(order.work_order_number, locale)} · ${order.title || t.untitled}`,
         nextScheduledDate: order.scheduled_date || '',
         priority: priority === 'critical' || priority === 'high' ? 'high' : priority === 'low' ? 'low' : 'medium',
-        daysUntil: Math.ceil((scheduledDate.getTime() - today.getTime()) / 86400000),
+        daysUntil: daysUntil ?? 9999,
       };
     })
     .sort((a, b) => a.daysUntil - b.daysUntil)
@@ -188,6 +183,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
               {!missingAssetOnly ? (
                 <div className="mt-3 flex flex-wrap gap-1 rounded-md border bg-background p-1">
                   <Button size="sm" variant={viewFilter === 'active' ? 'secondary' : 'ghost'} onClick={() => setViewFilter('active')}>{t.inboxViews.active}</Button>
+                  <Button size="sm" variant={viewFilter === 'all' ? 'secondary' : 'ghost'} onClick={() => setViewFilter('all')}>Todas · {operationalWorkOrders.length}</Button>
                   <Button size="sm" variant={viewFilter === 'approval' ? 'secondary' : 'ghost'} onClick={() => setViewFilter('approval')}>{t.inboxViews.approval}{pendingApproval ? ` · ${pendingApproval}` : ''}</Button>
                   <Button size="sm" variant={viewFilter === 'completed' ? 'secondary' : 'ghost'} onClick={() => setViewFilter('completed')}>{t.inboxViews.completed}{completedOrders.length ? ` · ${completedOrders.length}` : ''}</Button>
                 </div>

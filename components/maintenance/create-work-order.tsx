@@ -1,4 +1,5 @@
 'use client';
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -135,7 +136,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [plannedMaterials, setPlannedMaterials] = useState<PlannedMaterial[]>([]);
   const [workType, setWorkType] = useState(searchParams.get('workType') || 'corrective');
   const [priority, setPriority] = useState(searchParams.get('priority') || 'medium');
-  const [scheduledDate, setScheduledDate] = useState(searchParams.get('scheduledDate') || new Date().toISOString().slice(0, 10));
+  const [scheduledDate, setScheduledDate] = useState(searchParams.get('scheduledDate') || chileTodayDateKey());
   const [plannedHours, setPlannedHours] = useState(searchParams.get('plannedDurationHours') || '');
   const [meterReading, setMeterReading] = useState('');
   const [meterUnit, setMeterUnit] = useState('hours');

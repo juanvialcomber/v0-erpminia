@@ -25,7 +25,8 @@ test('maintenance action center excludes imported historical work orders from da
 });
 
 test('daily work order workspace defaults to Motil operations and keeps history queryable', () => {
-  assert.match(workOrdersPage, /useState<'active' \| 'approval' \| 'completed' \| 'historical'>\('active'\)/);
+  assert.match(workOrdersPage, /useState<'all' \| 'active' \| 'approval' \| 'completed' \| 'historical'>\('active'\)/);
+  assert.match(workOrdersPage, /viewFilter === 'all'\s*\? operational/);
   assert.match(workOrdersPage, /operationalWorkOrders/);
   assert.match(workOrdersPage, /historicalWorkOrders/);
   assert.match(workOrdersPage, /record_scope !== 'historical'/);

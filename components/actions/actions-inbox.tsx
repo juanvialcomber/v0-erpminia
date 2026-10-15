@@ -242,7 +242,7 @@ export function ActionsInbox({ locale, dictionary }: { locale: Locale; dictionar
               const criticalCount = familyTasks.filter((task) => task.severity === 'critical').length;
               const overdueCount = familyTasks.filter((task) => task.urgency_state === 'overdue' || task.urgency_state === 'escalated').length;
               const preferenceKey = `${lane}:${key}`;
-              const defaultOpen = hasSearch || criticalCount > 0;
+              const defaultOpen = hasSearch || criticalCount > 0 || key === 'workOrder';
               const isOpen = hasSearch ? true : preferencesLoaded && Object.hasOwn(familyPreferences, preferenceKey) ? familyPreferences[preferenceKey] : defaultOpen;
               return <details key={key} open={isOpen} onToggle={(event) => {
                 if (!preferencesLoaded || hasSearch) return;

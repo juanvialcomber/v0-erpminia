@@ -1,4 +1,5 @@
 'use client';
+import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -258,7 +259,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div><p className="text-xs text-muted-foreground">{t.summary.type}</p><p className="mt-1 font-medium">{typeLabel(workOrder.work_type, t)}</p></div>
             <div><p className="text-xs text-muted-foreground">{t.summary.priority}</p><p className="mt-1 font-medium">{priorityLabel(workOrder.priority, t)}</p></div>
-            <div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{workOrder.scheduled_date ? new Date(workOrder.scheduled_date).toLocaleDateString(dateLocale) : t.summary.noDate}</p></div>
+            <div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{workOrder.scheduled_date ? formatWorkOrderDate(workOrder.scheduled_date, dateLocale) : t.summary.noDate}</p></div>
           </div>
         </CardContent>
       </Card>
@@ -307,7 +308,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <div className="space-y-5 border-t p-5">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {workOrder.assigned_to_name ? <div><p className="text-xs text-muted-foreground">{t.summary.assignee}</p><p className="mt-1 font-medium">{workOrder.assigned_to_name}</p></div> : null}
-              {workOrder.scheduled_date ? <div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{new Date(workOrder.scheduled_date).toLocaleDateString(dateLocale)}</p></div> : null}
+              {workOrder.scheduled_date ? <div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{formatWorkOrderDate(workOrder.scheduled_date, dateLocale)}</p></div> : null}
               {workOrder.priority ? <div><p className="text-xs text-muted-foreground">{t.summary.priority}</p><p className="mt-1 font-medium">{priorityLabel(workOrder.priority, t)}</p></div> : null}
               {workOrder.work_type ? <div><p className="text-xs text-muted-foreground">{t.summary.type}</p><p className="mt-1 font-medium">{typeLabel(workOrder.work_type, t)}</p></div> : null}
             </div>
@@ -350,7 +351,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
     <details data-testid="ot-detail-more-summary" className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver más · Datos de la OT</summary>
       <div className="border-t p-3">
-    <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.summary.title} {isHistorical ? t.summary.historicalSuffix : t.summary.operationalSuffix}</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6"><div><p className="text-xs text-muted-foreground">{t.summary.status}</p><p className="mt-1 font-medium">{statusLabel(workOrder.status, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.priority}</p><p className="mt-1 font-medium">{priorityLabel(workOrder.priority, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.type}</p><p className="mt-1 font-medium">{typeLabel(workOrder.work_type, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.assignee}</p><p className="mt-1 font-medium">{workOrder.assigned_to_name || t.summary.unassigned}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{workOrder.scheduled_date ? new Date(workOrder.scheduled_date).toLocaleDateString(dateLocale) : t.summary.noDate}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.initialReading}</p><p className="mt-1 font-medium">{workOrder.meter_reading ? `${workOrder.meter_reading} ${workOrder.meter_unit || ''}` : t.summary.noReading}</p></div></CardContent></Card>
+    <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.summary.title} {isHistorical ? t.summary.historicalSuffix : t.summary.operationalSuffix}</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6"><div><p className="text-xs text-muted-foreground">{t.summary.status}</p><p className="mt-1 font-medium">{statusLabel(workOrder.status, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.priority}</p><p className="mt-1 font-medium">{priorityLabel(workOrder.priority, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.type}</p><p className="mt-1 font-medium">{typeLabel(workOrder.work_type, t)}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.assignee}</p><p className="mt-1 font-medium">{workOrder.assigned_to_name || t.summary.unassigned}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.scheduled}</p><p className="mt-1 font-medium">{workOrder.scheduled_date ? formatWorkOrderDate(workOrder.scheduled_date, dateLocale) : t.summary.noDate}</p></div><div><p className="text-xs text-muted-foreground">{t.summary.initialReading}</p><p className="mt-1 font-medium">{workOrder.meter_reading ? `${workOrder.meter_reading} ${workOrder.meter_unit || ''}` : t.summary.noReading}</p></div></CardContent></Card>
       </div>
     </details>
 

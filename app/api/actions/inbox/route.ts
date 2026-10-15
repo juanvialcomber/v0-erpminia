@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { loadPersonalMaintenanceTasks } from '@/lib/maintenance/personal-work-order-inbox';
 
 type RoleTask = {
   organization_id: string;
@@ -289,9 +290,16 @@ export async function GET(request: NextRequest) {
   }
 
   const cargoName = cargo?.name || null;
+  let personalWorkOrderTasks;
+  try {
+    personalWorkOrderTasks = await loadPersonalMaintenanceTasks(context, profile.cargo_id, cargoName || 'Mantenimiento');
+  } catch (error) {
+    console.error('[role-task-inbox] personal OT lookup failed', error);
+    return NextResponse.json({ error: 'No se pudieron consultar tus órdenes de trabajo asignadas' }, { status: 503 });
+  }
   const hasPrivateFinanceInbox = cargoName?.toUpperCase() === 'JEFE ADM.';
 
-  if (!coverageError && !coverage && !hasPrivateFinanceInbox) {
+  if (!coverageError && !coverage && !hasPrivateFinanceInbox && personalWorkOrderTasks.length === 0) {
     return emptyRoleInbox(profile.full_name || null, profile.cargo_id, cargoName);
   }
 
@@ -299,22 +307,23 @@ export async function GET(request: NextRequest) {
     console.warn('[role-task-inbox] coverage lookup failed; continuing with scoped task queries', coverageError);
   }
 
-  const escalationLookup = !coverageError && coverage && Number(coverage.escalations || 0) === 0
+  // A missing cargo coverage row must never hide assigned work orders.
+  const coverageMissing = !coverageError && !coverage && !hasPrivateFinanceInbox;
+  const escalationLookup = coverageMissing || (!coverageError && coverage && Number(coverage.escalations || 0) === 0)
     ? Promise.resolve({ data: [], error: null })
     : context.supabase
         .from('role_task_escalations_v1')
         .select(TASK_COLUMNS)
         .eq('organization_id', context.organizationId)
         .eq('cargo_id', profile.cargo_id);
-
-  const [actionableResult, escalationResult] = await Promise.all([
-    context.supabase
-      .from('role_tasks_actionable_v1')
-      .select(TASK_COLUMNS)
-      .eq('organization_id', context.organizationId)
-      .eq('cargo_id', profile.cargo_id),
-    escalationLookup,
-  ]);
+  const actionableLookup = coverageMissing
+    ? Promise.resolve({ data: [], error: null })
+    : context.supabase
+        .from('role_tasks_actionable_v1')
+        .select(TASK_COLUMNS)
+        .eq('organization_id', context.organizationId)
+        .eq('cargo_id', profile.cargo_id);
+  const [actionableResult, escalationResult] = await Promise.all([actionableLookup, escalationLookup]);
 
   const taskError = actionableResult.error || escalationResult.error;
   if (taskError) {
@@ -325,7 +334,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No se pudo cargar tu bandeja operacional' }, { status: 500 });
   }
 
-  const baseRows = [...(actionableResult.data || []), ...(escalationResult.data || [])] as unknown as Array<
+  const baseRows = [...(actionableResult.data || []), ...(escalationResult.data || []), ...personalWorkOrderTasks] as unknown as Array<
     Omit<RoleTask, 'personal_status' | 'snoozed_until' | 'visible_now' | 'actions' | 'module_route' | 'urgency_label' | 'responsibility_label'>
   >;
 
@@ -436,7 +445,7 @@ export async function GET(request: NextRequest) {
       backlog: tasks.filter(isBacklog).length,
     },
     generatedAt: new Date().toISOString(),
-    source: 'scoped_role_task_queries_v1',
+    source: 'scoped_role_tasks_and_personal_work_orders_v1',
     rawTaskCount: rawTasks.length,
     deduplicatedTaskCount: tasks.length,
   });

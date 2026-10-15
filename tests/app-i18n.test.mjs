@@ -223,7 +223,7 @@ test('work order detail is a server wrapper over a locale-aware client', () => {
   assert.match(detail, /const t = dictionary\.app\.workOrderDetail;/);
   assert.match(detail, /statusLabel\(workOrder\.status, t\)/);
   assert.match(detail, /typeLabel\(workOrder\.work_type, t\)/);
-  assert.match(detail, /toLocaleDateString\(dateLocale\)/);
+  assert.match(detail, /formatWorkOrderDate\(workOrder.scheduled_date, dateLocale\)/);
   assert.match(detail, /fill\(t\.financial\.readyTemplate, \{ code: selectedCostCenter\?\.code \|\| t\.financial\.readyDefault \}\)/);
   // No hardcoded detail copy may remain in the component.
   for (const literal of ['Histórico importado · solo lectura', 'Imputación financiera', 'Continuar cierre', 'Responsable operativo', 'Intervención']) {
