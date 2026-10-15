@@ -97,6 +97,9 @@ test('only specific trusted media domains can be downloaded',()=>{
  assert.equal(check('https://sw-media.storage.greenapi.net/media.png'),true);
  assert.equal(check('https://sw-media.storage.yandexcloud.net/media.png'),true);
  assert.equal(check('https://7107.api.greenapi.com/media.png'),true);
+ assert.equal(check('https://do-media-7107.fra1.digitaloceanspaces.com/710722691570/photo.jpeg'),true);
+ assert.equal(check('https://attacker.fra1.digitaloceanspaces.com/710722691570/photo.jpeg'),false);
+ assert.equal(check('https://do-media-7107.fra1.digitaloceanspaces.com.attacker.invalid/photo.jpeg'),false);
  assert.equal(check('http://7107.api.greenapi.com/media.png'),false);
  assert.equal(check('https://evil.example/media.png'),false);
  assert.equal(check('https://7107.api.greenapi.com.attacker.invalid/payload'),false);

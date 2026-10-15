@@ -22,6 +22,8 @@ export function isTrustedGreenMediaUrl(raw: unknown) {
     const u = new URL(raw);
     const providerHost = greenApiOrigin(process.env.GREENAPI_API_URL || '').replace('https://', '');
     const hosts = ['sw-media.storage.greenapi.net', 'sw-media.storage.yandexcloud.net',
+      // Exact Green API storage hostname observed from authenticated DownloadFile; no wildcard.
+      'do-media-7107.fra1.digitaloceanspaces.com',
       'api.green-api.com', 'api.greenapi.com', providerHost];
     return u.protocol === 'https:' && !u.username && !u.password && !u.port
       && hosts.includes(u.hostname) && u.pathname.length > 1;
