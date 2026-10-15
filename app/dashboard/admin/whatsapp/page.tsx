@@ -1,11 +1,14 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { RefreshCw, MessageSquare, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 type Group={id?:string;chatId?:string;chat_id?:string;name?:string;display_name?:string;enabled?:boolean;last_received_at?:string|null};
 type Report={report_date:string;status:string;message_count:number;summary:string;truncated:boolean;findings:any[]};
 type Evidence={id:string;group_id:string;message_id:number;download_status:string;scan_status:string;download_error_code?:string|null;scan_error_code?:string|null;mime_type?:string|null;original_file_name?:string|null;size_bytes?:number|null;created_at:string;downloaded_at?:string|null};
-type EvidenceDetail={id:string;extraction_json?:{document_kind?:string;handwritten?:boolean;transcription?:string;tables?:Array<{headers?:string[];rows?:Array<Array<string|null>>}>;fields?:Array<{label?:string;value?:string|null;unit?:string;confidence?:string}>;uncertainties?:string[]};scan_status:string};
+type EvidenceSource={sender_name?:string|null;body?:string|null;occurred_at?:string|null;received_at?:string|null};
+type EvidenceDetail={id:string;download_status:string;mime_type?:string|null;original_file_name?:string|null;size_bytes?:number|null;sha256?:string|null;downloaded_at?:string|null;extraction_json?:{document_kind?:string;handwritten?:boolean;transcription?:string;tables?:Array<{headers?:string[];rows?:Array<Array<string|null>>}>;fields?:Array<{label?:string;value?:string|null;unit?:string;confidence?:string}>;uncertainties?:string[]};scan_status:string};
 export default function WhatsappAdminPage() {
   const [configured,setConfigured]=useState(false);
   const [groups,setGroups]=useState<Group[]>([]);
@@ -14,6 +17,11 @@ export default function WhatsappAdminPage() {
   const [evidence,setEvidence]=useState<Evidence[]>([]);
   const [evidenceConfigured,setEvidenceConfigured]=useState(false);
   const [selectedEvidence,setSelectedEvidence]=useState<EvidenceDetail|null>(null);
+  const [activeEvidence,setActiveEvidence]=useState<Evidence|null>(null);
+  const [evidenceSource,setEvidenceSource]=useState<EvidenceSource|null>(null);
+  const [detailLoading,setDetailLoading]=useState(false);
+  const [detailError,setDetailError]=useState('');
+  const detailSequence=useRef(0);
   const [error,setError]=useState('');
   const [historyResults,setHistoryResults]=useState<string[]>([]);
   const [loading,setLoading]=useState(true);
@@ -47,15 +55,28 @@ export default function WhatsappAdminPage() {
       }
     }finally{setBusy('')}
   }
-  async function inspectEvidence(id:string){
-    setBusy('evidence-'+id);setError('');
+  function closeEvidence(){
+    detailSequence.current+=1;
+    setActiveEvidence(null);setSelectedEvidence(null);setEvidenceSource(null);
+    setDetailLoading(false);setDetailError('');
+  }
+  async function inspectEvidence(item:Evidence){
+    const sequence=++detailSequence.current;
+    // Open immediately: the detail must be visible even before the network request finishes.
+    setActiveEvidence(item);setSelectedEvidence(null);setEvidenceSource(null);
+    setDetailError('');setDetailLoading(true);
     try {
-      const response=await fetch('/api/admin/whatsapp/evidence/'+id,{credentials:'include',cache:'no-store'});
+      const response=await fetch('/api/admin/whatsapp/evidence/'+encodeURIComponent(item.id),
+        {credentials:'include',cache:'no-store'});
       const data=await response.json().catch(()=>null);
-      if(!response.ok||!data?.evidence)throw new Error(data?.error||'No se pudo leer evidencia');
-      setSelectedEvidence(data.evidence);
-    } catch(err){setError(err instanceof Error?err.message:'No se pudo leer evidencia');}
-    finally {setBusy('');}
+      if(!response.ok||!data?.evidence)throw new Error(data?.error||'No se pudo leer la evidencia');
+      if(sequence!==detailSequence.current)return;
+      setSelectedEvidence(data.evidence);setEvidenceSource(data.source||null);
+    } catch(err){
+      if(sequence===detailSequence.current)setDetailError(err instanceof Error?err.message:'No se pudo consultar el detalle');
+    } finally {
+      if(sequence===detailSequence.current)setDetailLoading(false);
+    }
   }
   async function toggle(g:Group,enabled:boolean){
     const chatId=g.chatId||g.chat_id||'',name=g.name||g.display_name||'';
@@ -123,23 +144,82 @@ export default function WhatsappAdminPage() {
               <td className="px-3 py-2">{e.scan_status==='review_ready'?'Para revisar':e.scan_status==='processing'?'Leyendo':e.scan_status==='pending'?'Pendiente':e.scan_status==='manual'?'Revisión manual':e.scan_status==='retry'?'Reintentando':'Sin lectura'}</td>
               <td className="px-3 py-2"><div className="flex flex-wrap items-center gap-3">
                 {e.download_status==='stored'&&<a className="font-medium underline underline-offset-2" href={`/api/admin/whatsapp/evidence/${e.id}?file=1`} target="_blank" rel="noopener noreferrer">Ver original</a>}
-                <button type="button" className="font-medium underline underline-offset-2" onClick={()=>void inspectEvidence(e.id)} disabled={Boolean(busy)}>Detalle</button>
+                <button type="button" className="font-medium underline underline-offset-2" onClick={()=>void inspectEvidence(e)} aria-label={"Detalle de "+(e.original_file_name||e.mime_type||"archivo multimedia")}>Detalle</button>
               </div></td>
             </tr>)}</tbody></table>
         </div>}
-        {selectedEvidence&&<div className="space-y-3 rounded-lg border p-4">
-          <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Lectura de evidencia · Pendiente de aprobación</h3><Button variant="outline" size="sm" onClick={()=>setSelectedEvidence(null)}>Cerrar</Button></div>
-          {selectedEvidence.scan_status!=='review_ready'?<p className="text-sm text-muted-foreground">El archivo aún no tiene una interpretación visual disponible.</p>:<>
-            <p className="text-sm text-muted-foreground">{selectedEvidence.extraction_json?.document_kind||'Tipo sin determinar'}{selectedEvidence.extraction_json?.handwritten?' · Contiene escritura manual':''}</p>
-            {selectedEvidence.extraction_json?.transcription&&<p className="whitespace-pre-wrap text-sm">{selectedEvidence.extraction_json.transcription}</p>}
-            {(selectedEvidence.extraction_json?.tables||[]).map((table,i)=><div key={i} className="overflow-x-auto rounded border">
-              <table className="w-full text-xs"><thead><tr>{(table.headers||[]).map((h,j)=><th key={j} className="border-b px-2 py-2 text-left">{h}</th>)}</tr></thead>
-              <tbody>{(table.rows||[]).map((row,k)=><tr key={k} className="border-b last:border-0">{row.map((cell,j)=><td key={j} className="px-2 py-2">{cell===null?'Ilegible':cell}</td>)}</tr>)}</tbody></table>
-            </div>)}
-            {(selectedEvidence.extraction_json?.uncertainties||[]).length>0&&<p className="text-sm text-muted-foreground">Lecturas inciertas: {selectedEvidence.extraction_json?.uncertainties?.join(' · ')}</p>}
-          </>}
-        </div>}
+
       </section>
     </>}
+    <Dialog open={Boolean(activeEvidence)} onOpenChange={(open)=>{if(!open)closeEvidence();}}>
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Detalle de evidencia</DialogTitle>
+          <DialogDescription>
+            {groups.find(g=>g.id===activeEvidence?.group_id)?.display_name||'Grupo autorizado'} · Original de WhatsApp
+          </DialogDescription>
+        </DialogHeader>
+        {activeEvidence&&<div className="space-y-4 text-sm">
+          <div className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+            <div><p className="text-xs text-muted-foreground">Archivo</p>
+              <p className="break-all font-medium">{selectedEvidence?.original_file_name||activeEvidence.original_file_name||activeEvidence.mime_type||'Archivo multimedia'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Descarga</p>
+              <p className="font-medium">{activeEvidence.download_status==='stored'?'Original guardado en MOTIL':
+                activeEvidence.download_status==='pending'?'En cola de descarga':
+                activeEvidence.download_status==='processing'?'Descargando':
+                activeEvidence.download_status==='retry'?'Reintentando descarga':'Archivo no disponible todavía'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Lectura</p>
+              <p>{activeEvidence.scan_status==='review_ready'?'Extraído · Pendiente de revisión':
+                activeEvidence.scan_status==='pending'?'Pendiente de análisis':
+                activeEvidence.scan_status==='processing'?'Analizando':
+                activeEvidence.scan_status==='manual'?'Requiere revisión manual':'Sin lectura todavía'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Fecha del archivo</p>
+              <p>{evidenceSource?.occurred_at?new Date(evidenceSource.occurred_at).toLocaleString('es-CL'):
+                new Date(activeEvidence.created_at).toLocaleString('es-CL')+
+                (evidenceSource?' (registro en MOTIL)':' (registro; consultando origen)')}</p></div>
+          </div>
+          {detailLoading&&<p role="status" className="text-muted-foreground">Cargando mensaje original y trazabilidad…</p>}
+          {detailError&&<p role="alert" className="rounded-md border border-destructive/40 p-3 text-destructive">
+            {detailError}. El archivo conserva su estado en la lista.</p>}
+          {evidenceSource&&<div className="space-y-1 rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground">Mensaje de origen{evidenceSource.sender_name?' · '+evidenceSource.sender_name:''}</p>
+            <p className="whitespace-pre-wrap break-words">{evidenceSource.body||'Mensaje con archivo adjunto, sin texto adicional.'}</p>
+          </div>}
+          {activeEvidence.download_status==='stored'&&<>
+            {activeEvidence.mime_type?.startsWith('image/')&&
+              <div className="overflow-hidden rounded-lg border bg-muted/20 p-2">
+                <Image unoptimized width={960} height={640} alt="Fotografía original de la evidencia de WhatsApp"
+                  src={'/api/admin/whatsapp/evidence/'+activeEvidence.id+'?file=1'}
+                  className="max-h-[50vh] w-full object-contain"/>
+              </div>}
+            <a className="inline-flex items-center rounded-md border px-3 py-2 font-medium underline underline-offset-2"
+              href={'/api/admin/whatsapp/evidence/'+activeEvidence.id+'?file=1'}
+              target="_blank" rel="noopener noreferrer">Ver archivo original</a>
+          </>}
+          {selectedEvidence?.sha256&&<div>
+            <p className="text-xs text-muted-foreground">Integridad del original (SHA-256)</p>
+            <p className="break-all font-mono text-xs">{selectedEvidence.sha256}</p>
+          </div>}
+          {selectedEvidence?.scan_status!=='review_ready'&&
+            <p className="rounded-md border p-3 text-muted-foreground">
+              {activeEvidence.download_status==='stored'
+                ?'El original está guardado. La transcripción y las tablas aún no están disponibles; no se han generado datos canónicos.'
+                :'El archivo está identificado en el mensaje, pero aún no se descarga. Podrás ver el original aquí cuando esté guardado.'}
+            </p>}
+          {selectedEvidence?.scan_status==='review_ready'&&<div className="space-y-3">
+            <p className="font-medium">Lectura automática · Pendiente de validación humana</p>
+            <p className="text-muted-foreground">{selectedEvidence.extraction_json?.document_kind||'Documento sin clasificar'}{selectedEvidence.extraction_json?.handwritten?' · Contiene escritura manual':''}</p>
+            {selectedEvidence.extraction_json?.transcription&&<p className="whitespace-pre-wrap break-words">{selectedEvidence.extraction_json.transcription}</p>}
+            {(selectedEvidence.extraction_json?.tables||[]).map((table,i)=><div key={i} className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs"><thead><tr>{(table.headers||[]).map((h,j)=><th key={j} className="border-b p-2 text-left">{h}</th>)}</tr></thead>
+                <tbody>{(table.rows||[]).map((row,k)=><tr key={k} className="border-b last:border-0">{row.map((cell,j)=><td key={j} className="p-2">{cell===null?'Ilegible':cell}</td>)}</tr>)}</tbody></table>
+            </div>)}
+            {(selectedEvidence.extraction_json?.uncertainties||[]).length>0&&
+              <p className="text-muted-foreground">Valores inciertos: {selectedEvidence.extraction_json?.uncertainties?.join(' · ')}</p>}
+          </div>}
+        </div>}
+        <DialogFooter><Button variant="outline" onClick={closeEvidence}>Cerrar</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </main>;
 }

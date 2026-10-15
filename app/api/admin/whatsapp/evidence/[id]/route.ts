@@ -29,6 +29,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     response.headers.set('Referrer-Policy','no-referrer');
     return response;
   }
+  // Include original message context, always filtered by the authenticated tenant and group.
+  const {data:source,error:sourceError}=await db.from('motil_whatsapp_messages')
+    .select('sender_name,body,occurred_at,received_at')
+    .eq('organization_id',auth.organizationId).eq('group_id',data.group_id)
+    .eq('id',data.message_id).maybeSingle();
+  if(sourceError) return NextResponse.json({error:'No se pudo consultar el mensaje original'},
+    {status:503,headers:GREEN_NO_STORE});
   const {storage_path,organization_id,...safe}=data;
-  return NextResponse.json({evidence:safe},{headers:GREEN_NO_STORE});
+  return NextResponse.json({evidence:safe,source:source?{
+    sender_name:source.sender_name,
+    body:typeof source.body==='string'?source.body.slice(0,4000):null,
+    occurred_at:source.occurred_at,
+    received_at:source.received_at,
+  }:null},{headers:GREEN_NO_STORE});
 }
