@@ -1,13 +1,14 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { isAllowedGreenApiHost } from './greenapi-host';
+import { greenApiOrigin } from './greenapi-host';
 
 export const GREEN_NO_STORE = { 'Cache-Control': 'no-store' };
 export function greenInstance() { return process.env.GREENAPI_ID_INSTANCE?.trim() || ''; }
 export function greenConfigured() {
   return /^\d{1,20}$/.test(greenInstance()) &&
     Boolean(process.env.GREENAPI_API_TOKEN_INSTANCE) &&
-    Boolean(process.env.GREENAPI_WEBHOOK_TOKEN && process.env.GREENAPI_WEBHOOK_TOKEN.length >= 32);
+    Boolean(process.env.GREENAPI_WEBHOOK_TOKEN && process.env.GREENAPI_WEBHOOK_TOKEN.length >= 32) &&
+    Boolean(process.env.GREENAPI_API_URL?.trim());
 }
 export function validWebhookToken(candidate: string | null): boolean {
   const expected = process.env.GREENAPI_WEBHOOK_TOKEN;
@@ -16,18 +17,16 @@ export function validWebhookToken(candidate: string | null): boolean {
   const b = createHash('sha256').update(expected).digest();
   return timingSafeEqual(a, b);
 }
-export async function greenRequest(method: string) {
+export async function greenRequest(method: string, payload: Record<string, unknown> = {}) {
   if (!greenConfigured()) throw new Error('Green API no configurada');
-  const apiBase = (process.env.GREENAPI_API_URL || 'https://api.green-api.com').replace(/\/$/, '');
-  const url = new URL(apiBase);
-  if (url.protocol !== 'https:' || !isAllowedGreenApiHost(url.hostname)) {
-    throw new Error('GREENAPI_API_URL inválida');
-  }
+  const apiOrigin = greenApiOrigin(process.env.GREENAPI_API_URL);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const result = await fetch(`${url.origin}/waInstance${greenInstance()}/${method}/${process.env.GREENAPI_API_TOKEN_INSTANCE}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    const result = await fetch(`${apiOrigin}/waInstance${greenInstance()}/${method}/${process.env.GREENAPI_API_TOKEN_INSTANCE}`, {
+      method: method === 'getChats' || method === 'getStateInstance' ? 'GET' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      ...(method === 'getChats' || method === 'getStateInstance' ? {} : { body: JSON.stringify(payload) }),
       signal: controller.signal, cache: 'no-store',
     });
     if (!result.ok) throw new Error(`Proveedor HTTP ${result.status}`);

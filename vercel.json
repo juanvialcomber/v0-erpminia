@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/messages-push",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp-history",
+      "schedule": "7,37 * * * *"
     }
   ]
 }

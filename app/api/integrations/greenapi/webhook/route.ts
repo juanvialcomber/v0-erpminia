@@ -53,6 +53,6 @@ export async function POST(request: NextRequest) {
     console.error('[greenapi] insert failed', error.code);
     return NextResponse.json({ error: 'No se pudo registrar el evento' }, { status: 503 });
   }
-  // Fail-closed: no asset, person, OT or HSE record is ever mutated by this intake.
+  // Track last successful ingestion for operator visibility.\n  const { error: heartbeatError } = await db.from('motil_whatsapp_groups')\n    .update({ last_received_at: new Date().toISOString() })\n    .eq('id', group.id).eq('organization_id', group.organization_id);\n  if (heartbeatError) console.error('[greenapi] heartbeat update failed', heartbeatError.code);\n  // Fail-closed: no asset, person, OT or HSE record is ever mutated by this intake.
   return NextResponse.json({ ok: true }, { headers: GREEN_NO_STORE });
 }

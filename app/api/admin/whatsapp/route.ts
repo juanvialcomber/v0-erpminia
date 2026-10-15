@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import { historyMessage } from '@/lib/messages/greenapi-history';
 import { requireAdmin } from '@/lib/api/guard';
 import { GREEN_NO_STORE, greenConfigured, greenDb, greenInstance, greenRequest } from '@/lib/messages/greenapi';
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   if (!ctx.organizationId) return ctx.error;
   const db = greenDb();
   const { data: groups, error } = await db.from('motil_whatsapp_groups')
-    .select('id,chat_id,display_name,enabled,created_at').eq('organization_id',ctx.organizationId)
+    .select('id,chat_id,display_name,enabled,created_at,last_received_at').eq('organization_id',ctx.organizationId)
     .order('display_name').limit(100);
   if (error) return NextResponse.json({ error: 'No se pudieron consultar grupos. Comprueba la migración.' }, { status: 503 });
   const { data: recent, error: reportError } = await db.from('motil_whatsapp_daily_reports')
@@ -26,6 +27,42 @@ export async function POST(request: NextRequest) {
   const ctx = await context(request);
   if (!ctx.organizationId) return ctx.error;
   const body = await request.json().catch(()=>null);
+  if (body?.action === 'history') {
+    const db = greenDb();
+    const { data: group, error: groupError } = await db.from('motil_whatsapp_groups')
+      .select('id,organization_id,chat_id,enabled').eq('organization_id', ctx.organizationId)
+      .eq('instance_id', greenInstance()).eq('chat_id', String(body.chatId || ''))
+      .eq('enabled', true).maybeSingle();
+    if (groupError) return NextResponse.json({ error: 'No se pudo consultar el grupo' }, { status: 503 });
+    if (!group) return NextResponse.json({ error: 'Grupo no habilitado para esta organización' }, { status: 403 });
+    if (!greenConfigured()) return NextResponse.json({ error: 'Configuración incompleta' }, { status: 503 });
+    try {
+      const history = await greenRequest('getChatHistory', { chatId: group.chat_id, count: 100 });
+      if (!Array.isArray(history)) throw new Error('Respuesta inesperada');
+      const candidates = history.slice(0, 100).map(row => historyMessage(row, group)).filter(row => row !== null);
+      const rows = [...new Map(candidates.map(row => [row.provider_message_id, row])).values()];
+      // Recheck permission after the external request so disabling a group takes effect.
+      const { data: current, error: currentError } = await db.from('motil_whatsapp_groups')
+        .select('id').eq('id', group.id).eq('organization_id', ctx.organizationId)
+        .eq('instance_id', greenInstance()).eq('enabled', true).maybeSingle();
+      if (currentError) return NextResponse.json({ error: 'No se pudo verificar el grupo' }, { status: 503 });
+      if (!current) return NextResponse.json({ error: 'El grupo fue desactivado' }, { status: 409 });
+      let inserted = 0;
+      if (rows.length) {
+        const { data: saved, error: saveError } = await db.from('motil_whatsapp_messages')
+          .upsert(rows, { onConflict: 'group_id,provider_message_id', ignoreDuplicates: true }).select('id');
+        if (saveError) return NextResponse.json({ error: 'No se pudo guardar el historial; puedes reintentar sin duplicar' }, { status: 503 });
+        inserted = saved?.length || 0;
+      }
+      return NextResponse.json({ inserted, existing: rows.length - inserted,
+        skipped: Math.min(history.length, 100) - rows.length, fetched: Math.min(history.length, 100),
+        limited: history.length >= 100 }, { headers: GREEN_NO_STORE });
+    } catch (err) {
+      const message = err instanceof Error && /^Proveedor HTTP \d{3}$/.test(err.message)
+        ? err.message : 'No se pudo recuperar el historial de Green API';
+      return NextResponse.json({ error: message }, { status: 502 });
+    }
+  }
   if (body?.action === 'discover') {
     if (!greenConfigured()) return NextResponse.json({ error: 'Configura primero GREENAPI_ID_INSTANCE, GREENAPI_API_TOKEN_INSTANCE y GREENAPI_WEBHOOK_TOKEN en Vercel.' }, { status: 503 });
     try {
