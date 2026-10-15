@@ -46,3 +46,12 @@ test('daily message report remains read-only evidence and not a write to operati
   assert.match(daily, /review_status:'pending'/);
   assert.doesNotMatch(daily, /maintenance_work_orders/);
 });
+
+test('history respects provider one-request-per-second and handles a single 429 backoff', () => {
+  const source=file('lib/messages/greenapi-history-sync.ts');
+  assert.match(source, /setTimeout\(resolve, 1350\)/);
+  assert.match(source, /error\.message !== 'Proveedor HTTP 429'/);
+  assert.match(source, /setTimeout\(resolve, 2200\)/);
+  assert.match(source, /greenRequest\('getChatHistory'/);
+  assert.doesNotMatch(source, /sendMessage|sendFileByUrl/);
+});

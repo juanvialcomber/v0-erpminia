@@ -31,8 +31,10 @@ export async function POST(request: NextRequest) {
   if (!group?.enabled) return NextResponse.json({ ok: true, skipped: 'not_enabled' }, { headers: GREEN_NO_STORE });
   const type = String(payload.messageData?.typeMessage || 'unknown').slice(0, 64);
   const data = payload.messageData || {};
+  const media = data.fileMessageData || data.imageMessageData || data.documentMessageData || data.videoMessageData || data.audioMessageData || {};
   const text = typeof data.textMessageData?.textMessage === 'string' ? data.textMessageData.textMessage
     : typeof data.extendedTextMessageData?.text === 'string' ? data.extendedTextMessageData.text
+    : typeof media.caption === 'string' ? media.caption
     : typeof data.imageMessageData?.caption === 'string' ? data.imageMessageData.caption
     : typeof data.videoMessageData?.caption === 'string' ? data.videoMessageData.caption
     : typeof data.documentMessageData?.caption === 'string' ? data.documentMessageData.caption : null;
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     sender_chat_id: String(payload.senderData?.sender || '').slice(0,128),
     sender_name: String(payload.senderData?.senderName || '').slice(0,160),
     body: text?.slice(0,10000) || null, message_type: type,
-    file_name: String(data.documentMessageData?.fileName || '').slice(0,255) || null,
+    file_name: String(media.fileName || '').slice(0,255) || null,
     quoted_message_id: String(data.extendedTextMessageData?.stanzaId || '').slice(0,255) || null,
     occurred_at: new Date(seconds * 1000).toISOString(),
   }, { onConflict: 'group_id,provider_message_id', ignoreDuplicates: true });
@@ -53,6 +55,11 @@ export async function POST(request: NextRequest) {
     console.error('[greenapi] insert failed', error.code);
     return NextResponse.json({ error: 'No se pudo registrar el evento' }, { status: 503 });
   }
-  // Track last successful ingestion for operator visibility.\n  const { error: heartbeatError } = await db.from('motil_whatsapp_groups')\n    .update({ last_received_at: new Date().toISOString() })\n    .eq('id', group.id).eq('organization_id', group.organization_id);\n  if (heartbeatError) console.error('[greenapi] heartbeat update failed', heartbeatError.code);\n  // Fail-closed: no asset, person, OT or HSE record is ever mutated by this intake.
+  // Track last successful ingestion for operator visibility.
+  const { error: heartbeatError } = await db.from('motil_whatsapp_groups')
+    .update({ last_received_at: new Date().toISOString() })
+    .eq('id', group.id).eq('organization_id', group.organization_id);
+  if (heartbeatError) console.error('[greenapi] heartbeat update failed', heartbeatError.code);
+  // Fail-closed: no asset, person, OT or HSE record is ever mutated by this intake.
   return NextResponse.json({ ok: true }, { headers: GREEN_NO_STORE });
 }

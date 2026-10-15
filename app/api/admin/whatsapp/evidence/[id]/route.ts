@@ -1,0 +1,34 @@
+export const dynamic = 'force-dynamic';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/api/guard';
+import { greenDb, GREEN_NO_STORE } from '@/lib/messages/greenapi';
+
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const auth = await requireAdmin(request);
+  if (!auth.authorized || !auth.organizationId) return auth.response ||
+    NextResponse.json({error:'Sin permisos'},{status:403,headers:GREEN_NO_STORE});
+  const {id} = await context.params;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+    return NextResponse.json({error:'ID inválido'},{status:400,headers:GREEN_NO_STORE});
+  const db=greenDb();
+  const {data,error}=await db.from('motil_whatsapp_attachments')
+    .select('id,organization_id,group_id,message_id,download_status,scan_status,download_error_code,scan_error_code,mime_type,original_file_name,size_bytes,sha256,storage_path,extraction_json,scan_model,scan_schema_version,created_at,downloaded_at,scanned_at')
+    .eq('organization_id',auth.organizationId).eq('id',id).maybeSingle();
+  if(error) return NextResponse.json({error:'Error al consultar evidencia'},{status:503,headers:GREEN_NO_STORE});
+  if(!data) return NextResponse.json({error:'Evidencia no encontrada'},{status:404,headers:GREEN_NO_STORE});
+  if(request.nextUrl.searchParams.get('file')==='1') {
+    if(data.download_status!=='stored' || !data.storage_path ||
+       !data.storage_path.startsWith(auth.organizationId+'/'))
+      return NextResponse.json({error:'Archivo no disponible'},{status:404,headers:GREEN_NO_STORE});
+    const {data:signed,error:signedError}=await db.storage.from('motil-whatsapp-evidence')
+      .createSignedUrl(data.storage_path,120);
+    if(signedError || !signed?.signedUrl)
+      return NextResponse.json({error:'No se pudo autorizar el archivo'},{status:503,headers:GREEN_NO_STORE});
+    const response=NextResponse.redirect(signed.signedUrl);
+    response.headers.set('Cache-Control','no-store');
+    response.headers.set('Referrer-Policy','no-referrer');
+    return response;
+  }
+  const {storage_path,organization_id,...safe}=data;
+  return NextResponse.json({evidence:safe},{headers:GREEN_NO_STORE});
+}

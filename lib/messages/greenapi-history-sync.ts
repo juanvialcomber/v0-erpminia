@@ -32,11 +32,25 @@ export async function syncGreenApiGroupHistory() {
   if ((groups?.length || 0) > MAX_GROUPS_PER_RUN) throw new Error('group_budget_exceeded');
 
   const results: SyncResult[] = [];
+  // Green API limits getChatHistory to 1 request/second per instance.
+  // The webhook remains the fast path; never hammer history endpoints.
+  let requested = 0;
   for (const group of groups || []) {
     try {
-      const history = await greenRequest('getChatHistory', {
-        chatId: group.chat_id, count: HISTORY_LIMIT,
-      });
+      if (requested++ > 0) await new Promise<void>(resolve => setTimeout(resolve, 1350));
+      let history: unknown;
+      try {
+        history = await greenRequest('getChatHistory', {
+          chatId: group.chat_id, count: HISTORY_LIMIT,
+        });
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== 'Proveedor HTTP 429') throw error;
+        // One bounded backoff; do not retry auth, validation, or provider 5xx blindly.
+        await new Promise<void>(resolve => setTimeout(resolve, 2200));
+        history = await greenRequest('getChatHistory', {
+          chatId: group.chat_id, count: HISTORY_LIMIT,
+        });
+      }
       if (!Array.isArray(history)) throw new Error('invalid_history_response');
       const rows = history.slice(0, HISTORY_LIMIT)
         .map((entry: unknown) => historyMessage(entry, group))

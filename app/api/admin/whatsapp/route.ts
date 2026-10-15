@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
     .select('report_date,status,message_count,summary,findings,truncated,generated_at')
     .eq('organization_id',ctx.organizationId).order('report_date',{ascending:false}).limit(7);
   if (reportError) return NextResponse.json({ error: 'No se pudieron consultar los resúmenes.' }, { status: 503 });
-  return NextResponse.json({ configured: greenConfigured(), groups: groups || [], reports: recent || [] }, { headers: GREEN_NO_STORE });
+  const { data: evidence, error: evidenceError } = await db.from('motil_whatsapp_attachments')
+    .select('id,group_id,message_id,download_status,scan_status,download_error_code,scan_error_code,mime_type,original_file_name,size_bytes,created_at,downloaded_at')
+    .eq('organization_id',ctx.organizationId).order('created_at',{ascending:false}).limit(60);
+  const evidenceConfigured = !evidenceError;
+  return NextResponse.json({ configured: greenConfigured(), groups: groups || [],
+    reports: recent || [], evidence: evidence || [], evidenceConfigured },
+    { headers: GREEN_NO_STORE });
 }
 export async function POST(request: NextRequest) {
   const ctx = await context(request);
