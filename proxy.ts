@@ -21,6 +21,9 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/health',
   '/api/auth/login',
   '/api/auth/logout',
+  '/api/integrations/greenapi/webhook',
+  // The cron handler validates CRON_SECRET before doing any work.
+  '/api/cron/whatsapp-daily',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [

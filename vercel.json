@@ -10,6 +10,10 @@
       "schedule": "30 6 * * *"
     },
     {
+      "path": "/api/cron/whatsapp-daily",
+      "schedule": "30 9 * * *"
+    },
+    {
       "path": "/api/cron/messages-push",
       "schedule": "* * * * *"
     }

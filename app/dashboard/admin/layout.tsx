@@ -3,12 +3,13 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShieldCheck, Users } from 'lucide-react';
+import { ShieldCheck, Users, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const items = [
   { href: '/dashboard/admin/users', label: 'Usuarios', icon: Users },
   { href: '/dashboard/admin/roles', label: 'Roles y cargos', icon: ShieldCheck },
+  { href: '/dashboard/admin/whatsapp', label: 'WhatsApp', icon: MessageSquare },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
