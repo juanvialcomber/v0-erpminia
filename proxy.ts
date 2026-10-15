@@ -97,6 +97,37 @@ async function isActiveCustomSessionProfile(profileId: string) {
   return profile?.status === 'active';
 }
 
+// Financial manager: explicit least-privilege boundary, including direct URL/API requests.
+const FINANCE_MANAGER_CARGO_ID = '8fbc8010-7824-4c7e-b0f5-587a2c23032c';
+async function isFinanceManager(profileId: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Missing permission lookup configuration');
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data, error } = await admin.from('profiles').select('cargo_id,status').eq('id', profileId).single();
+  if (error && error.code !== 'PGRST116') throw error;
+  if (data) return data.status === 'active' && data.cargo_id === FINANCE_MANAGER_CARGO_ID;
+  const { data: link, error: linkError } = await admin.from('auth_profile_identity_links').select('profile_id').eq('auth_user_id',profileId).maybeSingle();
+  if (linkError) throw linkError;
+  if (!link) return false;
+  const { data: linked, error: linkedError } = await admin.from('profiles').select('cargo_id,status').eq('id',link.profile_id).single();
+  if (linkedError) throw linkedError;
+  return linked.status === 'active' && linked.cargo_id === FINANCE_MANAGER_CARGO_ID;
+}
+function financeManagerAllowed(path: string, method: string): boolean {
+  const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
+  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas')) return true;
+  if (path === '/dashboard/compras') return true;
+  if (path.startsWith('/dashboard/compras/')) return true;
+  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
+  const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
+  if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
+  if (path.startsWith('/api/finance/')) return false;
+  if (path.startsWith('/api/compras/')) return readOnly;
+  if (path === '/api/cost-centers' || path.startsWith('/api/cost-centers/')) return true;
+  return false;
+}
+
 function isPublicApiRoute(pathname: string) {
   return (
     PUBLIC_API_ROUTES.has(pathname) ||
@@ -239,6 +270,22 @@ async function proxyRequest(request: NextRequest) {
   }
 
   const isAuthenticated = Boolean(user || customSession);
+  // Apply the cargo-specific guard before the general API authorization shortcut.
+  // This also rejects non-finance dashboard URLs rather than relying on hidden navigation.
+  const accessIdentityId = customSession?.user.id || user?.id;
+  if (accessIdentityId && (pathname.startsWith('/api/') || pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+    try {
+      if (await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method)) {
+        if (pathname.startsWith('/api/')) {
+          return withSecurityHeaders(NextResponse.json({ error: 'Acceso restringido al área de Finanzas' }, { status: 403 }));
+        }
+        return withSecurityHeaders(NextResponse.redirect(new URL('/dashboard/finanzas?error=module_access_denied', request.url)));
+      }
+    } catch {
+      return withSecurityHeaders(NextResponse.json({ error: 'No fue posible verificar permisos del cargo' }, { status: 503 }));
+    }
+  }
+
 
   if (authToken && !customSession) {
     response = clearCustomSession(response);
