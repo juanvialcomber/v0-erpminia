@@ -108,3 +108,15 @@ test('admin cannot launch a globally scoped media batch',()=>{
  assert.doesNotMatch(admin,/body\?\.action === 'download-one'/);
  assert.doesNotMatch(admin,/downloadGreenApiEvidenceBatch/);
 });
+
+test('provider diagnostics never print signed media URL or source message ID', () => {
+ const src=read('lib/messages/greenapi-media.ts');
+ assert.match(src,/provider missing downloadUrl/);
+ assert.match(src,/provider media host rejected/);
+ assert.match(src,/Object\.keys\(result\)\.slice\(0, 8\)/);
+ assert.match(src,/new URL\(downloadUrl\)\.hostname/);
+ assert.doesNotMatch(src,/console\.(?:log|warn|error)\(\s*(?:result|downloadUrl)\s*[,)]/);
+ const schedule=JSON.parse(read('vercel.json')).crons;
+ const job=schedule.find(x=>x.path==='/api/cron/whatsapp-media');
+ assert.equal(job.schedule,'1,6,11,16,21,26,31,36,41,46,51,56 * * * *');
+});

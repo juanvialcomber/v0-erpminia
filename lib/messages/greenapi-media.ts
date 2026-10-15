@@ -141,9 +141,24 @@ export async function downloadGreenApiEvidenceBatch(limit = 2) {
       const result = await greenRequest('downloadFile', {
         chatId: job.source_chat_id, idMessage: job.source_provider_id,
       });
-      if (!result || !isTrustedGreenMediaUrl(result.downloadUrl))
+      const downloadUrl = typeof result?.downloadUrl === 'string' ? result.downloadUrl : '';
+      if (!downloadUrl) {
+        // Log only response field names; never log the payload, message ID or signed URL.
+        console.warn('[whatsapp-evidence] provider missing downloadUrl', {
+          response_type: Array.isArray(result) ? 'array' : typeof result,
+          response_fields: result && typeof result === 'object'
+            ? Object.keys(result).slice(0, 8) : [],
+        });
         throw new Error('invalid_download_response');
-      const bytes = await fetchMedia(result.downloadUrl);
+      }
+      if (!isTrustedGreenMediaUrl(downloadUrl)) {
+        // Hostname-only telemetry is safe; media URLs often contain signed secrets.
+        let hostname = 'invalid';
+        try { hostname = new URL(downloadUrl).hostname; } catch { /* invalid URL */ }
+        console.warn('[whatsapp-evidence] provider media host rejected', { hostname });
+        throw new Error('untrusted_media_host');
+      }
+      const bytes = await fetchMedia(downloadUrl);
       const file = sniff(bytes, job.source_type, job.source_name);
       if (!file) throw new Error('unsupported_media_signature');
       // A group may be disabled while the provider downloads the binary.
