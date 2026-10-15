@@ -61,6 +61,17 @@ test('date-only UI avoids UTC midnight and shows exact planned date', () => {
   assert.match(schedule, /daysUntil === 1.*Mañana/);
 });
 
+test('execution/print registry and executive maintenance summary keep exact OT calendar days', () => {
+ const registry=read('components/maintenance/work-order-execution-panel.tsx');
+ const dashboard=read('components/maintenance/maintenance-executive-dashboard.tsx');
+ assert.match(registry,/formatWorkOrderDate\(value\) \|\| 'Sin fecha'/);
+ assert.match(registry,/dateLabel\(workOrder.scheduled_date\)/);
+ assert.doesNotMatch(registry,/new Date\(value\).toLocaleDateString/);
+ assert.match(dashboard,/isWorkOrderScheduledOverdue\(order.scheduled_date\)/);
+ assert.match(dashboard,/formatWorkOrderDate\(order.scheduled_date\)/);
+ assert.doesNotMatch(dashboard,/new Date\(order.scheduled_date\)/);
+});
+
 test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas', () => {
   const api = read('app/api/actions/inbox/route.ts');
   const source = read('lib/maintenance/personal-work-order-inbox.ts');

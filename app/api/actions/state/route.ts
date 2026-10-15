@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { loadPersonalMaintenanceTasks } from '@/lib/maintenance/personal-work-order-inbox';
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
@@ -76,6 +77,29 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'No se pudo validar la acción contra tu bandeja actual' }, { status: 500 });
       }
       task = escalationResult.data;
+    }
+
+    // Personal OT tasks are read-only projections from canonical orders. Validate
+    // exact ownership/creator/reviewer scope before changing a user's UI state.
+    if (!task && /^work_order:[0-9a-f-]{36}$/i.test(sourceKey)) {
+      const { data: cargo, error: cargoError } = await context.supabase
+        .from('cargos')
+        .select('name')
+        .eq('id', profile.cargo_id)
+        .maybeSingle();
+      if (cargoError) {
+        return NextResponse.json({ error: 'No se pudo validar tu cargo' }, { status: 500 });
+      }
+      try {
+        const personal = await loadPersonalMaintenanceTasks(
+          context, profile.cargo_id, cargo?.name || 'Mantenimiento',
+        );
+        const authorized = personal.find((item) => item.task_key === sourceKey);
+        if (authorized) task = { task_key: authorized.task_key, severity: authorized.severity };
+      } catch (error) {
+        console.error('[role-task-state] personal OT authorization failed', error);
+        return NextResponse.json({ error: 'No se pudo validar tu asignación de OT' }, { status: 503 });
+      }
     }
 
     if (!task) {

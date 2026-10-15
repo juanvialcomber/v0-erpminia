@@ -1,4 +1,5 @@
 'use client';
+import { formatWorkOrderDate, isWorkOrderScheduledOverdue } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import Link from 'next/link';
 import useSWR from 'swr';
@@ -146,11 +147,8 @@ export function MaintenanceExecutiveDashboard() {
   const criticalAssets = assets.filter((asset) => ['critical', 'critico', 'high', 'alto'].includes(normalizeStatus(asset.criticality))).length;
   const overdueOrders = workOrders.filter((order) => {
     if (!order.scheduled_date) return false;
-    const due = new Date(order.scheduled_date);
-    due.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return due < today && !['completed', 'completado', 'closed'].includes(String(order.status || '').toLowerCase());
+    return isWorkOrderScheduledOverdue(order.scheduled_date)
+      && !['completed', 'completado', 'closed'].includes(String(order.status || '').toLowerCase());
   }).length;
   const openOrders = workOrders.filter((order) => ['open', 'pending', 'pendiente'].includes(String(order.status || '').toLowerCase())).length;
   const inProgressOrders = workOrders.filter((order) => ['in_progress', 'en_progreso'].includes(String(order.status || '').toLowerCase())).length;
@@ -452,7 +450,7 @@ export function MaintenanceExecutiveDashboard() {
                       <Badge variant="destructive">{order.priority || 'critica'}</Badge>
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {order.asset_name || 'Sin equipo'} {order.scheduled_date ? `- ${new Date(order.scheduled_date).toLocaleDateString('es-CL')}` : ''}
+                      {order.asset_name || 'Sin equipo'} {order.scheduled_date ? `- ${formatWorkOrderDate(order.scheduled_date)}` : ''}
                     </p>
                   </div>
                 ))}

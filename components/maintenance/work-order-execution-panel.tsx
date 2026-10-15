@@ -1,4 +1,5 @@
 'use client';
+import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 import { useState } from 'react';
 import useSWR from 'swr';
@@ -22,7 +23,7 @@ const money = (value: number | string | null | undefined) =>
   `$${Number(value || 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}`;
 
 const dateLabel = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString('es-CL') : 'Sin fecha';
+  formatWorkOrderDate(value) || 'Sin fecha';
 
 const durationLabel = (hours?: number | null) => {
   if (hours == null || !Number.isFinite(Number(hours)) || Number(hours) < 0) return 'Sin registrar';
