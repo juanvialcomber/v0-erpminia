@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { historyMessage } from '@/lib/messages/greenapi-history';
 import { requireAdmin } from '@/lib/api/guard';
 import { GREEN_NO_STORE, greenConfigured, greenDb, greenInstance, greenRequest } from '@/lib/messages/greenapi';
+import { isGreenApiGroupId, normalizeGreenApiGroupDiscovery } from '@/lib/messages/greenapi-group-discovery.mjs';
 
 async function context(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -70,17 +71,33 @@ export async function POST(request: NextRequest) {
     }
   }
   if (body?.action === 'discover') {
-    if (!greenConfigured()) return NextResponse.json({ error: 'Configura primero GREENAPI_ID_INSTANCE, GREENAPI_API_TOKEN_INSTANCE y GREENAPI_WEBHOOK_TOKEN en Vercel.' }, { status: 503 });
-    try {
-      const result = await greenRequest('getChats');
-      if (!Array.isArray(result)) throw new Error('Respuesta inesperada');
-      return NextResponse.json({ groups: result.filter((g: any)=>/^\d{5,30}@g\.us$/.test(String(g.id||'')))
-        .slice(0,100).map((g:any)=>({ chatId:String(g.id),name:String(g.name||g.id).slice(0,120) })) }, { headers:GREEN_NO_STORE });
-    } catch (err) { return NextResponse.json({ error: err instanceof Error ? err.message : 'No se pudo consultar Green API' },{ status: 502 }); }
+    if (!greenConfigured()) return NextResponse.json({ error: 'Configuración de GREEN-API incompleta.' }, { status: 503 });
+    // GetChats follows recent chat activity. GetContacts?group=true is the
+    // independent group-directory source; both may be temporarily incomplete.
+    const [chatResult, contactResult] = await Promise.allSettled([
+      greenRequest('getChats'),
+      greenRequest('getContacts', { group: true }),
+    ]);
+    const chats = chatResult.status === 'fulfilled' && Array.isArray(chatResult.value) ? chatResult.value : null;
+    const contacts = contactResult.status === 'fulfilled' && Array.isArray(contactResult.value) ? contactResult.value : null;
+    if (!chats && !contacts) {
+      console.error('[greenapi-discover] group sources unavailable', {
+        chats: chatResult.status === 'rejected' ? 'request_failed' : 'invalid_response',
+        contacts: contactResult.status === 'rejected' ? 'request_failed' : 'invalid_response',
+      });
+      return NextResponse.json({ error: 'GREEN-API no devolvió la lista de grupos. Intenta nuevamente.' }, { status: 502 });
+    }
+    const discovered = normalizeGreenApiGroupDiscovery(chats, contacts, 500);
+    return NextResponse.json({
+      ...discovered,
+      sources: { chats: Boolean(chats), contacts: Boolean(contacts) },
+    }, { headers: GREEN_NO_STORE });
   }
   if (body?.action !== 'save') return NextResponse.json({ error: 'Acción inválida' }, { status: 400 });
   const chatId=String(body.chatId||''), name=String(body.name||'').trim();
-  if (!/^\d{5,30}@g\.us$/.test(chatId) || !name || name.length>120 || typeof body.enabled!=='boolean') return NextResponse.json({ error:'Grupo inválido' },{status:400});
+  if (!isGreenApiGroupId(chatId) || !name || name.length > 120 || typeof body.enabled !== 'boolean') {
+    return NextResponse.json({ error: 'Grupo inválido' }, { status: 400 });
+  }
   const instanceId=greenInstance();
   if (!/^\d{1,20}$/.test(instanceId)) return NextResponse.json({ error:'Configuración de instancia incompleta' },{status:503});
   const db=greenDb();
@@ -100,13 +117,22 @@ export async function POST(request: NextRequest) {
   }
 
   if (!greenConfigured()) return NextResponse.json({ error: 'Configuración incompleta' }, { status: 503 });
-  // Verify provider membership before any group can be enabled.
+  // GetChats can omit inactive/older groups. Verify membership by exact ID
+  // directly with Green API before permitting ingestion for this tenant.
+  let verifiedName = name;
   try {
-    const chats = await greenRequest('getChats');
-    if (!Array.isArray(chats) || !chats.some((c:any)=>c.id===chatId)) return NextResponse.json({ error:'El grupo no existe en esta instancia' },{status:400});
-  } catch { return NextResponse.json({ error:'No se pudo comprobar el grupo en Green API' },{status:502}); }
+    const details = await greenRequest('getGroupData', { groupId: chatId });
+    if (!details || typeof details !== 'object' || details.groupId !== chatId) {
+      return NextResponse.json({ error: 'GREEN-API no confirmó la identidad del grupo.' }, { status: 409 });
+    }
+    verifiedName = String(details.subject || name).trim().slice(0, 120) || name;
+  } catch {
+    return NextResponse.json({
+      error: 'GREEN-API no confirmó acceso a este grupo. Comprueba que el número conectado también sea participante.',
+    }, { status: 502 });
+  }
   const {error} = await db.from('motil_whatsapp_groups').upsert({
-    organization_id:ctx.organizationId, instance_id:instanceId,chat_id:chatId,display_name:name,
+    organization_id:ctx.organizationId, instance_id:instanceId,chat_id:chatId,display_name:verifiedName,
     enabled:true,updated_at:new Date().toISOString(),
   },{onConflict:'instance_id,chat_id'});
   if (error) return NextResponse.json({error:error.code==='23505'?'Grupo asignado a otra organización':'No se pudo guardar el grupo'},{status:error.code==='23505'?409:503});

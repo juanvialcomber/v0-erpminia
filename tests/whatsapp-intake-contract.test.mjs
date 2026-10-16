@@ -17,7 +17,9 @@ test('Group controls are admin-only and provider membership verified before enab
   const route=read('app/api/admin/whatsapp/route.ts');
   assert.match(route,/requireAdmin/);
   assert.match(route,/getChats/);
-  assert.match(route,/c\.id===chatId/);
+  assert.match(route,/greenRequest\('getContacts', \{ group: true \}\)/);
+  assert.match(route,/greenRequest\('getGroupData', \{ groupId: chatId \}\)/);
+  assert.match(route,/details\.groupId !== chatId/);
   assert.match(route,/organization_id!==ctx.organizationId/);
   assert.match(route,/if \(!body\.enabled\)/);
   assert.match(route,/\.eq\('organization_id',ctx\.organizationId\)/);

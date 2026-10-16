@@ -23,10 +23,15 @@ export async function greenRequest(method: string, payload: Record<string, unkno
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    const result = await fetch(`${apiOrigin}/waInstance${greenInstance()}/${method}/${process.env.GREENAPI_API_TOKEN_INSTANCE}`, {
-      method: method === 'getChats' || method === 'getStateInstance' ? 'GET' : 'POST',
+    const isGet = method === 'getChats' || method === 'getContacts' || method === 'getStateInstance';
+    // GREEN API supports a server-side group filter on GetContacts. Never
+    // download every personal contact to discover operational WhatsApp groups.
+    const endpoint = `${apiOrigin}/waInstance${greenInstance()}/${method}/${process.env.GREENAPI_API_TOKEN_INSTANCE}`;
+    const url = method === 'getContacts' && payload.group === true ? endpoint + '?group=true' : endpoint;
+    const result = await fetch(url, {
+      method: isGet ? 'GET' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      ...(method === 'getChats' || method === 'getStateInstance' ? {} : { body: JSON.stringify(payload) }),
+      ...(isGet ? {} : { body: JSON.stringify(payload) }),
       signal: controller.signal, cache: 'no-store',
     });
     if (!result.ok) throw new Error(`Proveedor HTTP ${result.status}`);
