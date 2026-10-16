@@ -4,6 +4,7 @@ import { historyMessage } from '@/lib/messages/greenapi-history';
 import { requireAdmin } from '@/lib/api/guard';
 import { GREEN_NO_STORE, greenConfigured, greenDb, greenInstance, greenRequest } from '@/lib/messages/greenapi';
 import { redactDisallowedWhatsappReports, isExcludedMotilWhatsappGroup } from '@/lib/messages/greenapi-group-scope';
+import { whatsappOperationalReviewEnabled } from '@/lib/messages/whatsapp-operational-feature.mjs';
 import { isGreenApiGroupId, normalizeGreenApiGroupDiscovery } from '@/lib/messages/greenapi-group-discovery.mjs';
 
 async function context(request: NextRequest) {
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
   const evidenceConfigured = !evidenceError;
   const reports = redactDisallowedWhatsappReports(recent || [], groups || []);
   return NextResponse.json({ configured: greenConfigured(), groups: (groups || []).filter(group => !isExcludedMotilWhatsappGroup(group.chat_id)),
-    reports, evidence: evidence || [], evidenceConfigured },
+    reports, evidence: evidence || [], evidenceConfigured,
+    whatsappReviewEnabled: whatsappOperationalReviewEnabled() },
     { headers: GREEN_NO_STORE });
 }
 export async function POST(request: NextRequest) {

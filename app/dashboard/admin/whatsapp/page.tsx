@@ -5,6 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { RefreshCw, MessageSquare, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WhatsappFindingReview } from '@/components/whatsapp/whatsapp-finding-review';
+import { WhatsappOperationalLog } from '@/components/whatsapp/whatsapp-operational-log';
+import { WhatsappTriageInbox } from '@/components/whatsapp/whatsapp-triage-inbox';
 type Group={id?:string;chatId?:string;chat_id?:string;name?:string;display_name?:string;enabled?:boolean;last_received_at?:string|null};
 type GroupDiscovery={total:number;truncated:boolean;sources:{chats:boolean;contacts:boolean}};
 type Report={report_date:string;status:string;message_count:number;summary:string;truncated:boolean;findings:any[];source_scope_stale?:boolean};
@@ -13,6 +16,7 @@ type EvidenceSource={sender_name?:string|null;body?:string|null;occurred_at?:str
 type EvidenceDetail={id:string;download_status:string;mime_type?:string|null;original_file_name?:string|null;size_bytes?:number|null;sha256?:string|null;downloaded_at?:string|null;extraction_json?:{document_kind?:string;handwritten?:boolean;transcription?:string;tables?:Array<{headers?:string[];rows?:Array<Array<string|null>>}>;fields?:Array<{label?:string;value?:string|null;unit?:string;confidence?:string}>;uncertainties?:string[]};scan_status:string};
 export default function WhatsappAdminPage() {
   const [configured,setConfigured]=useState(false);
+  const [whatsappReviewEnabled,setWhatsappReviewEnabled]=useState(false);
   const [groups,setGroups]=useState<Group[]>([]);
   const [discovered,setDiscovered]=useState<Group[]>([]);
   const [discovery,setDiscovery]=useState<GroupDiscovery|null>(null);
@@ -39,7 +43,7 @@ export default function WhatsappAdminPage() {
   }
   async function reload(){
     setLoading(true);setError('');
-    try{const j=await call();setConfigured(j.configured);setGroups(j.groups);setReports(j.reports);setEvidence(j.evidence||[]);setEvidenceConfigured(Boolean(j.evidenceConfigured))}
+    try{const j=await call();setConfigured(j.configured);setWhatsappReviewEnabled(Boolean(j.whatsappReviewEnabled));setGroups(j.groups);setReports(j.reports);setEvidence(j.evidence||[]);setEvidenceConfigured(Boolean(j.evidenceConfigured))}
     catch(e){setError(e instanceof Error?e.message:'No se pudo cargar');}finally{setLoading(false);}
   }
   useEffect(()=>{void reload()},[]);
@@ -143,16 +147,27 @@ export default function WhatsappAdminPage() {
         </div>
         <p className="text-xs text-muted-foreground">Los participantes deben conocer el uso operacional de estos mensajes. La recepción requiere configurar también el webhook seguro de esta instancia en Green API.</p>
       </section>
+      {whatsappReviewEnabled ? <WhatsappTriageInbox dates={reports.map(report=>report.report_date)} /> : null}
       <section className="space-y-3 border-t pt-5">
-        <h2 className="text-lg font-semibold">Resúmenes diarios</h2>
+        <h2 className="text-lg font-semibold">{whatsappReviewEnabled?'Novedades diarias':'Resúmenes diarios'}</h2>
         {!reports.length?<p className="rounded-lg border p-5 text-sm text-muted-foreground">Sin resúmenes todavía. Se generan después de que lleguen mensajes y se ejecute la tarea diaria.</p>:
         reports.map(r=><article key={r.report_date} className="space-y-2 rounded-lg border p-4">
-          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-medium">{r.report_date}</h3><span className="text-xs text-muted-foreground">{r.source_scope_stale?'Fuentes deshabilitadas · Resumen oculto':`${r.message_count} mensajes · ${r.status==='partial'?'Datos parciales':r.status==='ready'?'Actualizado':r.status==='empty'?'Sin mensajes':r.status==='processing'?'Procesando':r.status}`}</span></div>
+          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-medium">{r.report_date}</h3><span className="text-xs text-muted-foreground">{r.source_scope_stale?'Fuentes deshabilitadas · Resumen oculto':r.message_count+' mensajes · '+(r.status==='partial'?'Datos parciales':r.status==='ready'?'Actualizado':r.status==='empty'?'Sin mensajes':r.status==='processing'?'Procesando':r.status)}</span></div>
           <p className="text-sm text-muted-foreground">{r.summary||'Procesamiento pendiente.'}</p>
-          {(r.findings||[]).map((f,i)=><p key={i} className="border-l-2 border-border pl-3 text-sm"><span className="font-medium">{f.domain}: </span>{f.detail}<span className="block text-xs text-muted-foreground">Evidencias: {Array.isArray(f.source_ids)?f.source_ids.length:0} · Pendiente de revisión</span></p>)}
+          {!r.source_scope_stale && whatsappReviewEnabled && r.status === 'ready' &&
+             Array.isArray(r.findings) && r.findings.length > 0
+            ? <WhatsappFindingReview report={r} onReviewed={reload} /> : null}
+          {!r.source_scope_stale && !whatsappReviewEnabled ? (r.findings||[]).map((f:any,i:number)=>
+            <p key={i} className="border-l-2 border-border pl-3 text-sm">
+              <span className="font-medium">{f.domain}: </span>{f.detail}
+              <span className="block text-xs text-muted-foreground">
+                Evidencias: {Array.isArray(f.source_ids)?f.source_ids.length:0} · Pendiente de revisión
+              </span>
+            </p>) : null}
           {r.truncated&&<p className="text-xs text-destructive">Resumen parcial: se alcanzó el límite de procesamiento.</p>}
         </article>)}
       </section>
+      {whatsappReviewEnabled ? <WhatsappOperationalLog /> : null}
       <section className="space-y-3 border-t pt-5">
         <div><h2 className="text-lg font-semibold">Evidencias de WhatsApp</h2>
           <p className="text-sm text-muted-foreground">Fotos, documentos y archivos originales protegidos. Las tablas leídas por IA quedan pendientes de revisión humana.</p>

@@ -1,0 +1,21 @@
+export type WhatsappFinding = {
+  detail?: string;
+  domain?: string;
+  confidence?: string;
+  source_ids?: number[];
+  review_status?: string;
+  review_history?: unknown[];
+  review_note?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  [key:string]: unknown;
+};
+export const FINDING_DECISIONS: string[];
+export function sourceIdsOfFinding(finding: WhatsappFinding | null, limit?: number): number[];
+export function canReviewFinding(finding: WhatsappFinding | null, decision: string): boolean;
+export function reviewedFinding(finding: WhatsappFinding, decision: string, note: string, actor: string, reviewedAt: string): WhatsappFinding;
+export const OPERATIONAL_SCOPES: string[];
+export const OPERATIONAL_CATEGORIES: string[];
+export const REPORTED_STATES: string[];
+export function canRecordOperationalFinding(finding: WhatsappFinding | null): boolean;
+export function validOperationalClassification(scope: string, category: string, reportedState: string): boolean;
