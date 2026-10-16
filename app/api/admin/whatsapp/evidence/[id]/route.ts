@@ -16,6 +16,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     .eq('organization_id',auth.organizationId).eq('id',id).maybeSingle();
   if(error) return NextResponse.json({error:'Error al consultar evidencia'},{status:503,headers:GREEN_NO_STORE});
   if(!data) return NextResponse.json({error:'Evidencia no encontrada'},{status:404,headers:GREEN_NO_STORE});
+  // Archived groups must not contribute either detail/transcription or a new
+  // signed file URL, even when an administrator knows the historical file ID.
+  const {data:approvedGroup,error:groupError}=await db.from('motil_whatsapp_groups')
+    .select('id').eq('id',data.group_id).eq('organization_id',auth.organizationId)
+    .eq('enabled',true).maybeSingle();
+  if(groupError) return NextResponse.json({error:'No se pudo verificar el grupo'},
+    {status:503,headers:GREEN_NO_STORE});
+  if(!approvedGroup) return NextResponse.json({error:'Evidencia de grupo no habilitado'},
+    {status:404,headers:GREEN_NO_STORE});
+
   if(request.nextUrl.searchParams.get('file')==='1') {
     if(data.download_status!=='stored' || !data.storage_path ||
        !data.storage_path.startsWith(auth.organizationId+'/'))

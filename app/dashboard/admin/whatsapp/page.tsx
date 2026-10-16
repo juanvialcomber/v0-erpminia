@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 type Group={id?:string;chatId?:string;chat_id?:string;name?:string;display_name?:string;enabled?:boolean;last_received_at?:string|null};
 type GroupDiscovery={total:number;truncated:boolean;sources:{chats:boolean;contacts:boolean}};
-type Report={report_date:string;status:string;message_count:number;summary:string;truncated:boolean;findings:any[]};
+type Report={report_date:string;status:string;message_count:number;summary:string;truncated:boolean;findings:any[];source_scope_stale?:boolean};
 type Evidence={id:string;group_id:string;message_id:number;download_status:string;scan_status:string;download_error_code?:string|null;scan_error_code?:string|null;mime_type?:string|null;original_file_name?:string|null;size_bytes?:number|null;created_at:string;downloaded_at?:string|null};
 type EvidenceSource={sender_name?:string|null;body?:string|null;occurred_at?:string|null;received_at?:string|null};
 type EvidenceDetail={id:string;download_status:string;mime_type?:string|null;original_file_name?:string|null;size_bytes?:number|null;sha256?:string|null;downloaded_at?:string|null;extraction_json?:{document_kind?:string;handwritten?:boolean;transcription?:string;tables?:Array<{headers?:string[];rows?:Array<Array<string|null>>}>;fields?:Array<{label?:string;value?:string|null;unit?:string;confidence?:string}>;uncertainties?:string[]};scan_status:string};
@@ -147,7 +147,7 @@ export default function WhatsappAdminPage() {
         <h2 className="text-lg font-semibold">Resúmenes diarios</h2>
         {!reports.length?<p className="rounded-lg border p-5 text-sm text-muted-foreground">Sin resúmenes todavía. Se generan después de que lleguen mensajes y se ejecute la tarea diaria.</p>:
         reports.map(r=><article key={r.report_date} className="space-y-2 rounded-lg border p-4">
-          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-medium">{r.report_date}</h3><span className="text-xs text-muted-foreground">{r.message_count} mensajes · {r.status==='partial'?'Datos parciales':r.status==='ready'?'Actualizado':r.status==='empty'?'Sin mensajes':r.status==='processing'?'Procesando':r.status}</span></div>
+          <div className="flex flex-wrap justify-between gap-2"><h3 className="font-medium">{r.report_date}</h3><span className="text-xs text-muted-foreground">{r.source_scope_stale?'Fuentes deshabilitadas · Resumen oculto':`${r.message_count} mensajes · ${r.status==='partial'?'Datos parciales':r.status==='ready'?'Actualizado':r.status==='empty'?'Sin mensajes':r.status==='processing'?'Procesando':r.status}`}</span></div>
           <p className="text-sm text-muted-foreground">{r.summary||'Procesamiento pendiente.'}</p>
           {(r.findings||[]).map((f,i)=><p key={i} className="border-l-2 border-border pl-3 text-sm"><span className="font-medium">{f.domain}: </span>{f.detail}<span className="block text-xs text-muted-foreground">Evidencias: {Array.isArray(f.source_ids)?f.source_ids.length:0} · Pendiente de revisión</span></p>)}
           {r.truncated&&<p className="text-xs text-destructive">Resumen parcial: se alcanzó el límite de procesamiento.</p>}

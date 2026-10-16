@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { historyMessage } from '@/lib/messages/greenapi-history';
 import { requireAdmin } from '@/lib/api/guard';
 import { GREEN_NO_STORE, greenConfigured, greenDb, greenInstance, greenRequest } from '@/lib/messages/greenapi';
+import { redactDisallowedWhatsappReports, isExcludedMotilWhatsappGroup } from '@/lib/messages/greenapi-group-scope';
 import { isGreenApiGroupId, normalizeGreenApiGroupDiscovery } from '@/lib/messages/greenapi-group-discovery.mjs';
 
 async function context(request: NextRequest) {
@@ -15,19 +16,31 @@ export async function GET(request: NextRequest) {
   if (!ctx.organizationId) return ctx.error;
   const db = greenDb();
   const { data: groups, error } = await db.from('motil_whatsapp_groups')
-    .select('id,chat_id,display_name,enabled,created_at,last_received_at').eq('organization_id',ctx.organizationId)
+    .select('id,chat_id,display_name,enabled,updated_at,created_at,last_received_at').eq('organization_id',ctx.organizationId)
     .order('display_name').limit(100);
   if (error) return NextResponse.json({ error: 'No se pudieron consultar grupos. Comprueba la migración.' }, { status: 503 });
   const { data: recent, error: reportError } = await db.from('motil_whatsapp_daily_reports')
     .select('report_date,status,message_count,summary,findings,truncated,generated_at')
     .eq('organization_id',ctx.organizationId).order('report_date',{ascending:false}).limit(7);
   if (reportError) return NextResponse.json({ error: 'No se pudieron consultar los resúmenes.' }, { status: 503 });
-  const { data: evidence, error: evidenceError } = await db.from('motil_whatsapp_attachments')
-    .select('id,group_id,message_id,download_status,scan_status,download_error_code,scan_error_code,mime_type,original_file_name,size_bytes,created_at,downloaded_at')
-    .eq('organization_id',ctx.organizationId).order('created_at',{ascending:false}).limit(60);
+  // Archived attachments remain stored, but never appear in an operational
+  // evidence inbox once their group has been disabled. Resolve the allowlist
+  // *before* limiting rows so disabled history cannot crowd out active sources.
+  const activeGroupIds = (groups || []).filter(group => group.enabled && !isExcludedMotilWhatsappGroup(group.chat_id)).map(group => group.id);
+  if (activeGroupIds.length > 50) {
+    return NextResponse.json({ error: 'Demasiados grupos activos para esta consulta' },
+      { status: 503, headers: GREEN_NO_STORE });
+  }
+  const { data: evidence, error: evidenceError } = activeGroupIds.length
+    ? await db.from('motil_whatsapp_attachments')
+        .select('id,group_id,message_id,download_status,scan_status,download_error_code,scan_error_code,mime_type,original_file_name,size_bytes,created_at,downloaded_at')
+        .eq('organization_id',ctx.organizationId).in('group_id',activeGroupIds)
+        .order('created_at',{ascending:false}).limit(60)
+    : { data: [], error: null };
   const evidenceConfigured = !evidenceError;
-  return NextResponse.json({ configured: greenConfigured(), groups: groups || [],
-    reports: recent || [], evidence: evidence || [], evidenceConfigured },
+  const reports = redactDisallowedWhatsappReports(recent || [], groups || []);
+  return NextResponse.json({ configured: greenConfigured(), groups: (groups || []).filter(group => !isExcludedMotilWhatsappGroup(group.chat_id)),
+    reports, evidence: evidence || [], evidenceConfigured },
     { headers: GREEN_NO_STORE });
 }
 export async function POST(request: NextRequest) {
@@ -88,13 +101,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'GREEN-API no devolvió la lista de grupos. Intenta nuevamente.' }, { status: 502 });
     }
     const discovered = normalizeGreenApiGroupDiscovery(chats, contacts, 500);
+    const allowedDiscovered = discovered.groups.filter(group => !isExcludedMotilWhatsappGroup(group.chatId));
     return NextResponse.json({
-      ...discovered,
+      ...discovered, groups: allowedDiscovered, total: allowedDiscovered.length,
       sources: { chats: Boolean(chats), contacts: Boolean(contacts) },
     }, { headers: GREEN_NO_STORE });
   }
   if (body?.action !== 'save') return NextResponse.json({ error: 'Acción inválida' }, { status: 400 });
   const chatId=String(body.chatId||''), name=String(body.name||'').trim();
+  if (isExcludedMotilWhatsappGroup(chatId)) return NextResponse.json({error:'Grupo excluido de MOTIL'},{status:403});
   if (!isGreenApiGroupId(chatId) || !name || name.length > 120 || typeof body.enabled !== 'boolean') {
     return NextResponse.json({ error: 'Grupo inválido' }, { status: 400 });
   }
@@ -135,6 +150,21 @@ export async function POST(request: NextRequest) {
     organization_id:ctx.organizationId, instance_id:instanceId,chat_id:chatId,display_name:verifiedName,
     enabled:true,updated_at:new Date().toISOString(),
   },{onConflict:'instance_id,chat_id'});
-  if (error) return NextResponse.json({error:error.code==='23505'?'Grupo asignado a otra organización':'No se pudo guardar el grupo'},{status:error.code==='23505'?409:503});
+  if (error) {
+    // The original production constraint only accepts numeric@g.us while
+    // Green API also returns numeric-numeric@g.us. Never remap the provider ID.
+    if (error.code === '23514' && chatId.includes('-')) {
+      console.warn('[greenapi-group-save] legacy group ID rejected by database schema');
+      return NextResponse.json({
+        error: 'No se pudo activar: la base de datos aún no admite el identificador de este grupo. Falta desplegar la migración de compatibilidad de WhatsApp.',
+        code: 'WHATSAPP_SCHEMA_OUTDATED',
+      }, { status: 503, headers: GREEN_NO_STORE });
+    }
+    console.warn('[greenapi-group-save] database rejected request', { code: error.code || 'unknown' });
+    return NextResponse.json({
+      error: error.code === '23505' ? 'Grupo asignado a otra organización' : 'No se pudo guardar el grupo. Revisa la configuración del servidor.',
+      code: error.code === '23505' ? 'GROUP_TENANT_CONFLICT' : 'GROUP_SAVE_FAILED',
+    }, { status: error.code === '23505' ? 409 : 503, headers: GREEN_NO_STORE });
+  }
   return NextResponse.json({ok:true,enabled:true},{headers:GREEN_NO_STORE});
 }

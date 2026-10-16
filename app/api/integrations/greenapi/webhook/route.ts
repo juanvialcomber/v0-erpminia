@@ -1,6 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { greenDb, greenInstance, validWebhookToken, GREEN_NO_STORE } from '@/lib/messages/greenapi';
+import { isGreenApiGroupId } from '@/lib/messages/greenapi-group-discovery.mjs';
+import { isExcludedMotilWhatsappGroup } from '@/lib/messages/greenapi-group-scope';
 
 // Always acknowledge irrelevant notification types to avoid retry storms.
 // The webhook is intentionally distinct from MOTIL's internal messaging inbox.
@@ -20,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (String(payload.instanceData?.idInstance || '') !== greenInstance()) return NextResponse.json({ error: 'Instancia no reconocida' }, { status: 403 });
   const chatId = String(payload.senderData?.chatId || '');
   const messageId = String(payload.idMessage || '');
-  if (!/^\d{5,30}@g\.us$/.test(chatId) || !messageId || messageId.length > 255) {
+  if (!isGreenApiGroupId(chatId) || isExcludedMotilWhatsappGroup(chatId) || !messageId || messageId.length > 255) {
     return NextResponse.json({ ok: true, skipped: 'not_selected_group' }, { headers: GREEN_NO_STORE });
   }
   const db = greenDb();
