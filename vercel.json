@@ -27,7 +27,7 @@
     },
     {
       "path": "/api/cron/whatsapp-vision",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     }
   ]
 }
