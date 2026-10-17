@@ -56,3 +56,34 @@ This is a staging and classification layer, not automatic propagation. Domain ow
 - Apply migration 20261016131500_motil_whatsapp_operational_log.sql before enabling recording.
 - Do not create dummy jobs in production to demonstrate the feature.
 - WhatsApp vision PR #530 is separate and cost controlled.
+
+## Source-backed live panels (2026-10-17)
+
+**Decision:** video is work evidence, not an inference source. Do not transcribe,
+inspect frames or charge vision/STT for video. The text/caption of WhatsApp is
+the reported activity. Keep the original stored video and source timestamp.
+
+- `/api/produccion/whatsapp-activity?mode=overview|plant|dispatch|drilling`
+  projects source messages from **currently enabled** and non-excluded groups,
+  scoped to the same MOTIL organization and module read permission.
+- The production overview, Planta/Metalurgia, Perforación and Concentrate Dispatch
+  sections display reported updates and **Última actualización informada
+  (WhatsApp)** using `occurred_at`. This is distinct from certified production
+  data-through/cutoff dates and does not change any KPI.
+- If the caption is on the same WhatsApp message as its media, attach that
+  evidence directly. If the video arrives separately, a single caption by the
+  same sender in the same group within five minutes is only a **temporal
+  association**; multiple candidates remain **unassigned evidence of the turn**.
+  In composite reports, the attachment proves only its presence in that report,
+  never each listed activity.
+- Photos with source captions remain original attachments. The image OCR pipeline
+  is separate and may continue with human review.
+- Source statuses remain `reported_done`, `pending`, `planned` or `unclear`.
+  A `PENDIENTE` block must not be marked done from nearby completed text.
+- The production evidence endpoint authorizes by tenant, module, active group,
+  private storage path and a short-lived signed URL.
+- **No writes** to `production_*`, `maintenance_work_orders`, `warehouse_*`,
+  assets, HSE or dispatch certification are authorized by this live projection.
+  Canonical promotion remains a separate review/reconciliation transaction.
+- PR #548 was closed without merge when video transcription was explicitly
+  removed from scope; no transcription migration should be applied.

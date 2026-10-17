@@ -33,3 +33,25 @@ Repositorio: `traviscomber/motil`; Supabase: `ttlptyheuqeotadtcbaw`; proyecto Ve
 Fuentes oficiales:
 - https://green-api.com/en/docs/api/receiving/files/DownloadFile/
 - https://green-api.com/en/docs/api/receiving/notifications-format/incoming-message/ImageMessage/
+
+## Videos como evidencia y actualización de módulos (decisión 17-10-2026)
+
+- Un video MP4 **no necesita transcripción ni análisis visual** para participar en la
+  operación. Conservarlo como evidencia privada y asociar la novedad al texto
+  original de WhatsApp, con `message_id`, grupo y `occurred_at`.
+- Si media y texto comparten `message_id`, son del mismo mensaje. Si son mensajes
+  distintos, asociar solo por grupo + mismo remitente + una única leyenda dentro
+  de cinco minutos, mostrando "vínculo temporal"; con varias leyendas posibles,
+  mantener el video sin atribución exacta en "Evidencias del turno".
+- La proyección read-only `/api/produccion/whatsapp-activity` ofrece modos
+  `overview`, `plant`, `dispatch` y `drilling` con permisos por módulo,
+  grupo habilitado y organización. Mostrar la **última actualización informada
+  desde WhatsApp** con hora del mensaje, separada del corte certificado.
+- Separar bloques `PENDIENTE`, realizado y programado. No inferir que un video
+  certifica todos los trabajos de un mensaje mixto. Jamás crear OT, HSE,
+  producción canónica, despacho o movimientos de stock por leer un chat.
+- Abrir las evidencias solo mediante un endpoint autenticado y URL firmada
+  temporal. Grupos deshabilitados, incluido el chat histórico de mantenimiento,
+  quedan excluidos de la vista y de los enlaces.
+- El procesamiento OCR de imágenes sigue independiente; esta regla de video
+  no deshabilita fotografías ni lectura de planillas completas.

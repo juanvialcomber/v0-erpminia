@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight, Drill, Gem, MapPin, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductionSectionShell } from '@/components/production/production-section-shell';
+import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 
 export default function SondajePage() {
   return (
@@ -17,6 +18,8 @@ export default function SondajePage() {
         'Vínculo al mismo sondaje canónico usado por Geología',
       ]}
     >
+      <WhatsappOperationalUpdates mode="drilling"/>
+
       <section className="rounded-lg border bg-muted/15 px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
