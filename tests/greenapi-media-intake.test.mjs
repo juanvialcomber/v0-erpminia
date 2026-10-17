@@ -54,7 +54,7 @@ test('private media and vision crons require CRON_SECRET and do not modify inbox
   assert.match(route,/authorization/);
   assert.match(proxy,new RegExp('\\/api\\/cron\\/'+name));
   if(name==='whatsapp-media') assert.ok(schedule.some(x=>x.path==='/api/cron/'+name));
-  else assert.equal(schedule.some(x=>x.path==='/api/cron/'+name),false);
+  else assert.ok(schedule.some(x=>x.path==='/api/cron/'+name && x.schedule==='*/5 * * * *'));
  }
 });
 
