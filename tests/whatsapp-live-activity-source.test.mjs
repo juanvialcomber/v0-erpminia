@@ -85,7 +85,7 @@ test('protected read routes preserve tenant boundaries and do not modify certifi
  assert.match(evidence,/requireModuleAccess/);
  assert.match(evidence,/groupPermittedForMode\(group,mode\)/);
  assert.match(evidence,/createSignedUrl\(file\.storage_path,120\)/);
- assert.match(ui,/Última actualización informada \(WhatsApp\)/);
+ assert.match(ui,/Último mensaje recibido/);
  assert.match(ui,/Video(s)? del turno sin actividad específica confirmada/);
  for(const src of [api,evidence]) {
    assert.doesNotMatch(src,/\.insert\(|\.upsert\(|\.update\(|\.delete\(/);
