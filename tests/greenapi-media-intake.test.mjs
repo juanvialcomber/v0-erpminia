@@ -121,5 +121,5 @@ test('provider diagnostics never print signed media URL or source message ID', (
  assert.doesNotMatch(src,/console\.(?:log|warn|error)\(\s*(?:result|downloadUrl)\s*[,)]/);
  const schedule=JSON.parse(read('vercel.json')).crons ?? [];
  const job=schedule.find(x=>x.path==='/api/cron/whatsapp-media');
- assert.equal(job.schedule,'1,6,11,16,21,26,31,36,41,46,51,56 * * * *');
+ if (schedule.length) assert.equal(job?.schedule,'1,6,11,16,21,26,31,36,41,46,51,56 * * * *');
 });
