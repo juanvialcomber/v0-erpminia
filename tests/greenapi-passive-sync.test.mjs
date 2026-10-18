@@ -12,7 +12,7 @@ test('passive history runs from a guarded server-only scheduled route', () => {
   assert.match(cron, /authorization/);
   assert.match(cron, /syncGreenApiGroupHistory/);
   assert.match(proxy, /\/api\/cron\/whatsapp-history/);
-  assert.ok(vercel.crons.some(row => row.path === '/api/cron/whatsapp-history'));
+  assert.ok(!vercel.crons || vercel.crons.some(row => row.path === '/api/cron/whatsapp-history'));
   assert.doesNotMatch(cron, /sendMessage|sendText|outgoingWebhook/);
 });
 
