@@ -9,11 +9,11 @@ import type {
 
 type Payload=WhatsappActivityFeed & {sourceLimitReached?:boolean};
 const titles:Record<WhatsappActivityMode,string>={
-  overview:'Novedades operacionales',
-  plant:'Actividad reportada desde Planta Patagua',
-  mine:'Novedades informadas desde mina',
-  dispatch:'Coordinación de despachos informada',
-  drilling:'Perforación y sondajes informados',
+  overview:'Actividad diaria',
+  plant:'Actividad diaria de planta',
+  mine:'Actividad diaria de mina',
+  dispatch:'Programación diaria de despachos',
+  drilling:'Actividad diaria de perforación',
 };
 const when=(date:string|null|undefined)=>{
   if(!date)return 'Sin fecha informada';
@@ -58,22 +58,22 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
       <div className="space-y-1">
         <h2 className="text-base font-semibold">{titles[mode]}</h2>
         <p className="text-sm text-muted-foreground">
-          Última actualización informada (WhatsApp): <span className="font-medium text-foreground">
+          Último mensaje recibido: <span className="font-medium text-foreground">
             {isLoading?'Consultando…':when(data?.latestReportedAt)}
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Novedades recibidas, no verificaciones en terreno. Se conservan separado el corte de
+          Mensajes recibidos, no verificaciones en terreno. Se conservan separado el corte de
           los indicadores certificados y las órdenes de mantenimiento.
         </p>
       </div>
       <Button variant="outline" size="sm" disabled={isLoading}
-        onClick={()=>void mutate()}>Actualizar novedades</Button>
+        onClick={()=>void mutate()}>Actualizar actividad</Button>
     </div>
     {isLoading?<p role="status" className="text-sm text-muted-foreground">Leyendo fuentes de WhatsApp…</p>:null}
     {error?<p role="alert" className="text-sm text-destructive">{error.message}</p>:null}
     {!isLoading&&!error&&!data?.updates.length?
-      <p className="text-sm text-muted-foreground">Sin novedades textuales verificables de fuentes autorizadas para esta área.</p>:null}
+      <p className="text-sm text-muted-foreground">Sin mensajes recientes de las fuentes autorizadas para esta área.</p>:null}
     {data?.sourceLimitReached?<p className="text-xs text-muted-foreground">
       Vista reciente limitada; los mensajes originales permanecen almacenados.
     </p>:null}
@@ -101,7 +101,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     </div>:null}
     {data&&(data.updates.length>5)?<Button variant="outline" size="sm"
       onClick={()=>setExpanded(v=>!v)}>
-      {expanded?'Mostrar menos': 'Ver '+data.updates.length+' novedades'}
+      {expanded?'Mostrar menos': 'Ver '+data.updates.length+' registros'}
     </Button>:null}
     {data?.unassignedVideos?.length?<details className="rounded-md border px-3 py-2">
       <summary className="cursor-pointer text-sm font-medium">
