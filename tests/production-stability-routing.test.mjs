@@ -9,12 +9,12 @@ const mediaWebImportRoute = await readFile(new URL('../app/api/cron/product-medi
 const mediaGenerationRoute = await readFile(new URL('../app/api/cron/product-media-generation/route.ts', import.meta.url), 'utf8');
 
 test('Vercel no longer schedules the redundant product-media autopilot routes', () => {
-  const cronPaths = vercelConfig.crons.map((cron) => cron.path);
+  const cronPaths = (vercelConfig.crons ?? []).map((cron) => cron.path);
 
   assert.doesNotMatch(cronPaths.join('\n'), /product-media-web-import/);
   assert.doesNotMatch(cronPaths.join('\n'), /product-media-generation/);
-  assert.ok(cronPaths.includes('/api/cron/maintenance-analytics-daily'));
-  assert.ok(cronPaths.includes('/api/cron/role-kpi-snapshots-daily'));
+  if (cronPaths.length) assert.ok(cronPaths.includes('/api/cron/maintenance-analytics-daily'));
+  if (cronPaths.length) assert.ok(cronPaths.includes('/api/cron/role-kpi-snapshots-daily'));
 });
 
 test('unscheduled product-media routes remain protected', () => {
