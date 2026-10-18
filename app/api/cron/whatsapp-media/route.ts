@@ -1,11 +1,20 @@
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 import { NextRequest, NextResponse } from 'next/server';
+// Explicit handover gate: disabled unless this deployment is the appointed cron executor.
+function cronExecutorEnabled() {
+  return process.env.MOTIL_CRON_EXECUTOR_ENABLED === 'true';
+}
+
 import { downloadGreenApiEvidenceBatch } from '@/lib/messages/greenapi-media';
 import { GREEN_NO_STORE } from '@/lib/messages/greenapi';
 
 // Scheduled passive processing. No WhatsApp send methods or canonical OT writes.
 export async function GET(request: NextRequest) {
+  if (!cronExecutorEnabled()) {
+    return NextResponse.json({ error: 'Cron executor disabled on this deployment' }, { status: 503 });
+  }
+
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 24 || request.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401, headers: GREEN_NO_STORE });
