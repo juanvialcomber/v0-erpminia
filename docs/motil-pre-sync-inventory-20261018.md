@@ -42,3 +42,17 @@ La app original también configura, y la recuperada aún no:
 ## Puerta de seguridad
 
 Este documento **no representa una sincronización ejecutada**. No se han copiado registros ni activado schedulers. El repositorio original no está accesible por GitHub, así que falta auditoría diferencial completa de su código.
+
+## Verificación adicional (2026-10-18)
+
+Inventario de objetos por bucket Supabase (conteo directo de `storage.objects`): `product-media` 1.523, `motil-whatsapp-evidence` 181, `module-documents` 91, `maintenance-work-order-evidence` 31, `geology-core-images` 0. Todos los buckets son privados. No se necesita copiar objetos entre los dos proyectos Vercel, ambos apuntan al mismo Supabase. Confirmar autorización por usuario y firma temporal de URLs para cada módulo.
+
+Se encontraron 51 Supabase Edge Functions. La lista incluye variantes de importadores y herramientas históricas; clasificarlas por alcance, llamadas y necesidad de conservación antes de desactivar cualquiera.
+
+WhatsApp por grupo (lectura directa de base): Grupo 2: 18 mensajes, habilitado; Planta Patagua: 184, habilitado; Programación Despacho Concentrado CMLP: 8, habilitado; Mantenimiento MOTIL la patagua: 55, deshabilitado. Estos conteos corresponden a lo almacenado, no al total necesariamente disponible en Green API.
+
+## Corrección del gate de CI
+
+El commit `01dc95db` falló en `tests/whatsapp-live-activity-source.test.mjs`: la aserción buscaba el texto anterior «Última actualización informada (WhatsApp)», renombrado a «Último mensaje recibido». Se corrigió esa aserción en commit `692adcf9`. Su CI y despliegue requieren comprobación posterior; hasta entonces estado HOLD.
+
+**No activar aún crons ni Green API en el proyecto recuperado**: el proyecto original todavía está enlazado con la fuente y sería posible duplicar consumidores. Preparar traspaso controlado en ventana de corte.
