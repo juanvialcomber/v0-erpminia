@@ -6,10 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * Runs once per day to pre-compute analytics and populate aggregation tables
  * Can be called via Vercel Crons or external scheduler
  */
-export async function POST(req: NextRequest) {
-  // Verify cron secret if provided
-  const cronSecret = req.headers.get('authorization');
-  if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+async function runDailyMaintenanceAnalytics(req: NextRequest) {
+  // Vercel Cron uses GET; fail closed if the secret is absent.
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 24 || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -111,3 +111,7 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
     throw error;
   }
 }
+
+// Vercel scheduled invocations use GET. POST remains available to authorized operators.
+export const GET = runDailyMaintenanceAnalytics;
+export const POST = runDailyMaintenanceAnalytics;
