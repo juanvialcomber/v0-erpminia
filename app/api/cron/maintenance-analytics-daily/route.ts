@@ -1,5 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+// Explicit handover gate: disabled unless this deployment is the appointed cron executor.
+function cronExecutorEnabled() {
+  return process.env.MOTIL_CRON_EXECUTOR_ENABLED === 'true';
+}
+
 
 /**
  * Daily maintenance analytics aggregation job
@@ -7,6 +12,10 @@ import { NextRequest, NextResponse } from 'next/server';
  * Can be called via Vercel Crons or external scheduler
  */
 async function runDailyMaintenanceAnalytics(req: NextRequest) {
+  if (!cronExecutorEnabled()) {
+    return NextResponse.json({ error: 'Cron executor disabled on this deployment' }, { status: 503 });
+  }
+
   // Vercel Cron uses GET; fail closed if the secret is absent.
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 24 || req.headers.get('authorization') !== `Bearer ${secret}`) {
