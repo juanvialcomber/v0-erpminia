@@ -49,3 +49,16 @@ PASS solo con evidencia de cada control. En cualquier incumplimiento, mantener H
 Consulta de alias **motil.app** resolvió al deployment `dpl_77PXeZEgGHQsii3iqusfwc7XTqSj`, SHA `8d0d5169f5b2aaf0e0ac3d2e09908a1ed1791234`, rama `main`, repositorio `traviscomber/motil`, estado `READY`, target `production`; alias `motil.app` y `www.motil.app` confirmados. Proyecto original `prj_EaDtlCXr00V6feocyDavSMsMXtaZ`. Este es el candidato de rollback a conservar; **rollback no probado** y la existencia de un deployment no garantiza su restauración tras el cambio de repositorio. Antes del corte verificar permisos y compatibilidad del mecanismo de rollback sin ejecutarlo sobre producción.
 
 La última rama recuperada `3ff12a3f82ccc52a191bd3fa86dd110f0a28fe75` debe superar CI y preview exactos además de QA autenticado. El navegador conectado no estuvo disponible desde esta sesión. **HOLD**.
+
+## Control de ejecutor exclusivo en nueva versión
+
+El commit `67c8e5c3894fc75432fd3c47787a0aed99e3aacf` agrega un opt-in estricto en los siete endpoints de cron. Requiere `MOTIL_CRON_EXECUTOR_ENABLED=true`; por defecto retorna 503 y no procesa. Se agregó `tests/cron-executor-handover-gate.test.mjs` con cobertura de los siete endpoints. **La protección está aún pendiente de CI y QA en el SHA exacto.**
+
+Plan de corte seguro:
+1. Confirmar disponibilidad y cron efectivo del sistema original antes del corte, además de snapshots y lag de las colas.
+2. No habilitar la bandera del proyecto recuperado en Preview ni otro proyecto que comparte Supabase.
+3. Reconciliar aplicación y entorno productivo original en una ventana de corte: identificar un único ejecutor para cada job; desligar el programador anterior antes de habilitar el nuevo; registrar hora de último éxito y primera ejecución.
+4. Una vez validada la nueva aplicación y obtenido permiso de cambio de GitHub, activar la bandera en **solo el proyecto productivo elegido** durante el corte; verificar trabajo único por mensaje, aviso, día y empresa. La bandera no cubre webhooks entrantes ni workers ajenos a las siete rutas: inspeccionarlos aparte.
+5. Si falla: deshabilitar el ejecutor nuevo antes de restaurar el anterior. Rollback del código por sí solo no deshace trabajos ya procesados.
+
+**Advertencia de continuidad:** si la versión recuperada entra en producción sin la variable, estos siete jobs se detienen intencionalmente y retornan 503. La sincronización de datos seguiría existiendo, pero no habría actualización por cron hasta completar la habilitación. No declarar traspaso PASS sin prueba del primer ciclo.
