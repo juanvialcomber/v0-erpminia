@@ -10,6 +10,7 @@ import { GeologiaInterpretation } from '@/components/production/geologia-interpr
 import { GeologiaInterpretationMatrix } from '@/components/production/geologia-interpretation-matrix';
 import { GeologiaNextBestEvidence } from '@/components/production/geologia-next-best-evidence';
 import { GeologiaCoreVision } from '@/components/production/geologia-corevision';
+import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 
 const tabs = [
   ['today', 'Resumen'],
@@ -185,6 +186,14 @@ export function GeologiaWorkspaceShell() {
           </div>
           <Button size="sm" variant="outline" onClick={() => selectTab('pending')}>Abrir Hoy → Tareas</Button>
         </section>
+      ) : null}
+
+      {tab === 'today' ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Mina · Información diaria</p>
+          <WhatsappOperationalUpdates mode="mine" />
+          <p className="text-xs text-muted-foreground">Después de las novedades del turno se muestran las tareas, indicadores y antecedentes geológicos. Los mensajes no sustituyen los registros oficiales.</p>
+        </div>
       ) : null}
 
       <div ref={dashboardRef} className={dashboardClassName}>
