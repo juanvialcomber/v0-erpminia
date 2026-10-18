@@ -43,3 +43,9 @@ Vercel Preview no demuestra ejecución productiva de cron. La lista es de config
 ## Criterio final
 
 PASS solo con evidencia de cada control. En cualquier incumplimiento, mantener HOLD y funcionamiento actual de `motil.app`. No interpretar build READY como equivalencia funcional o seguridad de corte.
+
+## Confirmación de producción y reversión (18-10-2026)
+
+Consulta de alias **motil.app** resolvió al deployment `dpl_77PXeZEgGHQsii3iqusfwc7XTqSj`, SHA `8d0d5169f5b2aaf0e0ac3d2e09908a1ed1791234`, rama `main`, repositorio `traviscomber/motil`, estado `READY`, target `production`; alias `motil.app` y `www.motil.app` confirmados. Proyecto original `prj_EaDtlCXr00V6feocyDavSMsMXtaZ`. Este es el candidato de rollback a conservar; **rollback no probado** y la existencia de un deployment no garantiza su restauración tras el cambio de repositorio. Antes del corte verificar permisos y compatibilidad del mecanismo de rollback sin ejecutarlo sobre producción.
+
+La última rama recuperada `3ff12a3f82ccc52a191bd3fa86dd110f0a28fe75` debe superar CI y preview exactos además de QA autenticado. El navegador conectado no estuvo disponible desde esta sesión. **HOLD**.
