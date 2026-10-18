@@ -13,3 +13,10 @@ test('maintenance analytics cron rejects an absent secret or wrong authorization
   assert.match(route, /!secret \|\| secret\.length < 24/);
   assert.match(route, /req\.headers\.get\('authorization'\) !== `Bearer \$\{secret\}`/);
 });
+
+test('maintenance analytics cron reports failures instead of publishing empty or unsaved summaries', () => {
+  assert.match(route, /if \(organizationsError\) throw organizationsError/);
+  assert.match(route, /if \(workOrdersError\) throw/);
+  assert.match(route, /if \(upsertError\) throw/);
+  assert.match(route, /Maintenance analytics database not configured/);
+});
