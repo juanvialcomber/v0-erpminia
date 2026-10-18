@@ -1,33 +1,3 @@
 {
-  "buildCommand": "npm run build",
-  "crons": [
-    {
-      "path": "/api/cron/maintenance-analytics-daily",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/role-kpi-snapshots-daily",
-      "schedule": "30 6 * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-daily",
-      "schedule": "30 9 * * *"
-    },
-    {
-      "path": "/api/cron/messages-push",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-history",
-      "schedule": "7,37 * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-media",
-      "schedule": "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-vision",
-      "schedule": "* * * * *"
-    }
-  ]
+  "buildCommand": "npm run build"
 }
