@@ -190,7 +190,7 @@ export function GeologiaWorkspaceShell() {
 
       {tab === 'today' ? (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Mina · Información diaria</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Mina · Actividad diaria</p>
           <WhatsappOperationalUpdates mode="mine" />
           <p className="text-xs text-muted-foreground">Después de las novedades del turno se muestran las tareas, indicadores y antecedentes geológicos. Los mensajes no sustituyen los registros oficiales.</p>
         </div>
