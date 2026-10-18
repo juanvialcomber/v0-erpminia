@@ -62,3 +62,15 @@ Plan de corte seguro:
 5. Si falla: deshabilitar el ejecutor nuevo antes de restaurar el anterior. Rollback del código por sí solo no deshace trabajos ya procesados.
 
 **Advertencia de continuidad:** si la versión recuperada entra en producción sin la variable, estos siete jobs se detienen intencionalmente y retornan 503. La sincronización de datos seguiría existiendo, pero no habría actualización por cron hasta completar la habilitación. No declarar traspaso PASS sin prueba del primer ciclo.
+
+## Verificación final sin cambios productivos (18-10-2026)
+
+- HEAD anterior `b72787c9fc3f527a8a578794cbe7c70c53d10ad5`: GitHub Actions SUCCESS y Vercel Preview READY.
+- Alias `motil.app`: confirmado por Vercel apuntando al despliegue original `dpl_77PXeZEgGHQsii3iqusfwc7XTqSj`, proyecto `prj_EaDtlCXr00V6feocyDavSMsMXtaZ`.
+- Original conserva variables `GREENAPI_API_URL`, `GREENAPI_ID_INSTANCE`, `GREENAPI_WEBHOOK_TOKEN`, `GREENAPI_API_TOKEN_INSTANCE`, `CRON_SECRET` en sus targets declarados. Solo se inspeccionaron **nombres/targets**, no valores. Recuperación sin esas variables; permanecerá inerte para esos procesos.
+- La API Vercel de la cuenta ofrece `request_rollback(projectId,deploymentId,...)` y `assign_alias`; la acción de rollback **no se ejecutó**. No se ha demostrado aún que restaurar el original después de cambiar la conexión Git sea aceptado por plataforma y mantenga configuración.
+- La consola de Green API en Opera no devolvió contenido de configuración verificable; **callback efectivo aún no acreditado**. No modificar la URL ni el token desde una suposición.
+- Para un corte seguro: mantener el proyecto Vercel original como destino, acreditar el rollback pre-corte sin ejecutarlo, conservar su deployment y configuración; inspeccionar callback actual en Green API; sincronizar último mensaje y colas; activar exactamente un receptor y un ejecutor. No habilitar los flags en dos despliegues simultáneos.
+- QA funcional con Ariel, Joaquín, Daniel y Elías fue confirmado por el usuario en Opera, sin constituir prueba automatizada de aislamiento RBAC.
+
+**Gate actual: HOLD** por callback Green API no verificado, reversión no practicada y ausencia de aprobación expresa del cambio productivo. No se cambió alias, repositorio, base ni workers.
