@@ -113,11 +113,17 @@ export interface WorkbookEvidenceManifest {
     originalIsAuthority: true;
   };
 }
+export type WorkbookEvidenceCapabilities = {
+  canSaveDraft: boolean;
+  reason: string | null;
+};
+
 export type WorkbookEvidenceResponse = {
   ok: true;
   manifest: WorkbookEvidenceManifest;
   counts: WorkbookEvidenceCounts;
   warnings: string[];
+  capabilities: WorkbookEvidenceCapabilities;
   persisted: boolean;
   reused?: boolean;
   document?: { id: string; fileName: string; status: 'draft'; sha256: string; version?: number; previousVersionId?: string | null };

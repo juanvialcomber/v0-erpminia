@@ -13,7 +13,7 @@ This change adds a source catalogue and an explicit native workbook review workf
 3. Open an available original through an authenticated, short-lived link. Missing originals and unverified provenance have explicit reasons.
 4. Choose an XLSX or binary XLS, then **Examinar todas las hojas**. This first action performs no persistence.
 5. Inspect every sheet, including hidden sheets, filter formulas and locate an exact cell address. The interface pages the cells; the complete manifest remains available for download.
-6. Choose **Guardar original y borrador** to archive the original bytes and the extraction for review. An explicit predecessor links a new version; an unchanged original does not become another version.
+6. When the server confirms write permission, choose **Guardar original y borrador** to archive the original bytes and the extraction for review. Readers can inspect and download the manifest; they are shown a clear explanation instead of a save action. An explicit predecessor links a new version; an unchanged original does not become another version.
 
 The source sender, person who uploaded the file and recorded reviewer are distinct roles. Extraction is not document approval. Document approval or an asset link alone does not establish the technical applicability of a maintenance guideline.
 
@@ -30,7 +30,9 @@ Catalogue identities are `planning_import:<id>`, `module_document:<id>` and `wha
 
 The native intake protocol is `motil.workbook-evidence.v1`. The document ID is UUIDv5 over organization, binary SHA-256 and the explicit predecessor. Storage paths contain the same identity and organization. Storage upload uses `upsert: false`; database insertion uses the existing primary key. Retries and concurrent identical uploads can reuse only verified identical bytes and a matching draft. A renamed copy retains the first stored original filename.
 
-A failed database insertion after a successful original upload returns an explicit incomplete-save error. The immutable original stays recoverable by retrying the same upload; the handler never deletes a path that a concurrent request may already have referenced.
+Successful responses include `capabilities.canSaveDraft` and an optional explanatory `reason`, computed from both module write access and the same maintenance role predicate used by the write gate. The UI denies saving when this capability is absent or false. This does not replace authorization on each save request or expand the existing permitted roles.
+
+A recoverable database insertion failure after a successful original upload returns an explicit incomplete-save error. The immutable original stays recoverable by retrying the same upload; the handler never deletes a path that a concurrent request may already have referenced. A document that was removed from the catalogue instead returns a deterministic HTTP 409, including conflicts discovered during an identical concurrent save. It is not restored or assigned a different identity, and the error does not advise an impossible retry.
 
 ## Evidence fidelity
 
@@ -52,7 +54,7 @@ Historic `source_file_sha256` values are displayed as registered hashes without 
 
 ## Authorization and operational boundaries
 
-All new routes require `MANT_OPERACIONES` and an authenticated organization. Saving also requires write capability and the existing maintenance write-role gate. Original lookup, version lookup and duplicate reuse are scoped to that organization. Deleted documents are excluded; historical versions stay distinct.
+All new routes require `MANT_OPERACIONES` and an authenticated organization. Saving also requires write capability and the existing maintenance write-role gate. Original lookup, version lookup and duplicate reuse are scoped to that organization. Deleted documents are excluded from the catalogue and original access; the save path checks their retained identity to report a conflict. Historical versions stay distinct. The existing `super_admin` role discrepancy is not used to grant new maintenance write access: both the advertised capability and write gate preserve the existing denial.
 
 WhatsApp access requires an explicit server-side `MAINTENANCE_SOURCE_GROUP_IDS` allowlist as well as current organization membership, enabled group state and the existing archived-source exclusion. An unset allowlist contributes no WhatsApp records. Group display names never grant access. This release does not set that environment variable, reopen archived chats, sync history or change the integration.
 
@@ -66,10 +68,12 @@ The first release uses exact text filters and native evidence. It does not add a
 
 ## Validation record
 
-The complete repository gate passed on 2026-10-18: 1,776 tests passed with zero failures or skips; all 297 migration versions were unique; the repository ESLint and TypeScript checks passed; and the optimized Next.js build completed with 301 static pages plus the dynamic evidence endpoints. The repository secret guard also passed. This change adds 52 focused regression cases across source projection, native workbook intake, UI state and document-list compatibility.
+The initial implementation's complete repository gate passed on 2026-10-18: 1,776 tests passed with zero failures or skips; all 297 migration versions were unique; the repository ESLint and TypeScript checks passed; and the optimized Next.js build completed with 301 static pages plus the dynamic evidence endpoints. The repository secret guard also passed. That implementation added 52 focused regression cases across source projection, native workbook intake, UI state and document-list compatibility.
+
+The follow-up save checks cover reader/editor capabilities using the real organization gate with controlled authentication/database doubles, permitted roles, the existing `super_admin` denial, missing capabilities in the UI, and retained deleted identities before upload and during concurrent-save recovery. The current commit's complete build and hosted verification are recorded in the PR release review.
 
 Independent verification against the XML in two authentic workbooks compared 95,869 cells across 14 sheets. It found zero discrepancies in the audited fields: cell addresses, XML types/styles/values/formulas and attributes, literal and cached scalar presence, custom number formats, sheet visibility, merged ranges and defined names. One workbook's 10,337 formulas have no numeric cache; the other has 10,345 cached formulas, including 5,348 explicit empty strings. The parser preserves these distinctions without recalculation.
 
 Real Chromium interaction with the actual components, styles and native parser passed at desktop (1440 × 1000) and mobile (390 × 844) sizes. Checks covered catalogue filtering, all-sheet inspection, formula lookup, gzip response handling and explicit save behavior, with zero page errors or horizontal overflow. The desktop download contained the complete manifest. Persistence was simulated in this browser harness; it made no Supabase writes.
 
-Test fixtures remain synthetic; authentic private workbooks are used only in local verification and are not committed to this public repository. An authenticated user's real save to shared storage/database is not part of this verification. The deployment identity and hosted CI results are recorded with the release review.
+Test fixtures remain synthetic; authentic private workbooks are used only in local and authorized LAB verification and are not committed to this public repository. The initial verification did not include an authenticated user's real save to shared storage/database. Any subsequent authenticated save, original verification and idempotency results are recorded with their exact deployment identity in the release review.

@@ -207,8 +207,13 @@ class FakeNextResponse extends Response {
 function harness(options = {}) {
   const rows = new Map(); const objects = new Map(); const calls = [];
   let failures = options.insertFailures ?? 0;
+  const role = () => Object.hasOwn(options, 'role') ? options.role : options.denyRole ? 'lector' : 'admin';
   const database = {
     from(table) {
+      if (table === 'profiles') return {
+        select() { return this; }, eq() { return this; },
+        async maybeSingle() { return { data: null, error: null }; },
+      };
       assert.equal(table, 'module_documents');
       const query = { columns: '', filters: [] };
       const builder = {
@@ -228,6 +233,9 @@ function harness(options = {}) {
         async insert(row) {
           calls.push({ kind: 'insert', row });
           if (failures-- > 0) return { error: { code: 'fixture-temporary-db-error' } };
+          if (options.archiveDuringInsert && !rows.has(row.id)) {
+            rows.set(row.id, { ...row, is_active: false, deleted_at: '2026-10-18T18:00:00Z' });
+          }
           if (rows.has(row.id)) return { error: { code: '23505' } };
           rows.set(row.id, { ...row, is_active: true, deleted_at: null });
           return { error: null };
@@ -246,23 +254,35 @@ function harness(options = {}) {
         },
         async download(key) {
           calls.push({ kind: 'download', key });
+          if (options.archiveDuringDownload) {
+            const row = [...rows.values()].find((entry) => entry.file_path === key);
+            if (row) { row.is_active = false; row.deleted_at = '2026-10-18T18:00:00Z'; }
+          }
           return objects.has(key) ? { data: new Blob([objects.get(key)]), error: null } : { error: { code: '404' } };
         },
       };
     } },
   };
+  const organizationContext = load('lib/api/organization-context.ts', {
+    'next/server': { NextResponse: FakeNextResponse },
+    '@/lib/api/guard': { async requireAuth() { return { authorized: true, user: { id: USER }, organizationId: ORG, role: role() }; } },
+    '@/lib/supabase-server': { getSupabaseServerClient: () => database },
+    '@/lib/maintenance/workshop-site-scope': {},
+  });
   const api = load('app/api/maintenance/source-workbooks/route.ts', {
     'next/server': { NextResponse: FakeNextResponse },
     '@/lib/maintenance/workbook-evidence': evidence,
     '@/lib/api/module-access': { MODULE_KEYS: { MANT_OPERACIONES: 'mant_operaciones' },
       async requireModuleAccess(_request, key, write = false) {
         calls.push({ kind: 'guard', key, write });
-        if (options.unauthenticated || (write && options.readOnly)) return { authorized: false, response: FakeNextResponse.json({ error: 'No autorizado' }, { status: options.unauthenticated ? 401 : 403 }) };
-        return { authorized: true, user: { id: USER }, organizationId: ORG };
+        const accessLevel = options.accessLevel ?? (options.readOnly ? 'LEC' : 'ED');
+        const canWrite = accessLevel === 'ED';
+        if (options.unauthenticated || accessLevel === 'SR' || (write && !canWrite)) return { authorized: false, response: FakeNextResponse.json({ error: 'No autorizado' }, { status: options.unauthenticated ? 401 : 403 }) };
+        return { authorized: true, user: { id: USER }, organizationId: ORG, accessLevel, canWrite, role: role() };
       } },
-    '@/lib/api/organization-context': { async getOrganizationContext() {
+    '@/lib/api/organization-context': { hasMaintenanceWriteRole: organizationContext.hasMaintenanceWriteRole, async getOrganizationContext(request) {
       calls.push({ kind: 'role-guard' });
-      return options.denyRole ? { ok: false, response: FakeNextResponse.json({ error: 'Forbidden' }, { status: 403 }) } : { ok: true, organizationId: ORG, userId: USER, supabase: database };
+      return organizationContext.getOrganizationContext(Object.assign(request, { nextUrl: new URL(request.url) }));
     } },
     '@/lib/supabase-server': { getSupabaseServerClient: () => database },
   });
@@ -287,7 +307,9 @@ test('preview is authenticated MANT_OPERACIONES, tenant-bound and never persists
   assert.equal(denied.calls.length, 1);
   const api = harness(); const response = await api.POST(uploadRequest(workbook()));
   assert.equal(response.status, 200);
-  assert.equal((await body(response)).persisted, false);
+  const result = await body(response);
+  assert.equal(result.persisted, false);
+  assert.deepEqual(result.capabilities, { canSaveDraft: true, reason: null });
   assert.deepEqual(api.calls.map((call) => call.kind), ['guard']);
 });
 
@@ -299,10 +321,50 @@ test('save requires both module write and existing maintenance role gate', async
   }
 });
 
+test('analysis advertises the same module and role boundary enforced by saving, including super_admin', async () => {
+  const cases = [
+    { role: 'operador', accessLevel: 'LEC', allowed: false, reason: /solo lectura/ },
+    { role: 'jefe_mantencion', accessLevel: 'LEC', allowed: false, reason: /solo lectura/ },
+    { role: 'jefe_mina', accessLevel: 'ED', allowed: false, reason: /rol actual/ },
+    { role: 'super_admin', accessLevel: 'ED', allowed: false, reason: /rol actual/ },
+    { role: null, accessLevel: 'ED', allowed: false, reason: /rol actual/ },
+    ...['admin', 'superadmin', 'operaciones-supervisor', 'jefe_mantencion', ' ADMIN '].map((role) => ({ role, accessLevel: 'ED', allowed: true })),
+  ];
+  const bytes = workbook();
+  for (const scenario of cases) {
+    const api = harness(scenario);
+    const analyzed = await api.POST(uploadRequest(bytes));
+    assert.equal(analyzed.status, 200, String(scenario.role));
+    const preview = await body(analyzed);
+    assert.equal(preview.capabilities.canSaveDraft, scenario.allowed, String(scenario.role));
+    assert.equal(preview.persisted, false);
+    assert.equal(api.objects.size, 0); assert.equal(api.rows.size, 0);
+    if (!scenario.allowed) assert.match(preview.capabilities.reason, scenario.reason);
+    const saved = await api.POST(uploadRequest(bytes, 'save-draft'));
+    assert.equal(saved.status, scenario.allowed ? 200 : 403, String(scenario.role));
+    if (scenario.allowed) assert.deepEqual((await body(saved)).capabilities, { canSaveDraft: true, reason: null });
+    else {
+      assert.equal(api.objects.size, 0); assert.equal(api.rows.size, 0);
+      assert.equal(api.calls.some((call) => call.kind === 'upload' || call.kind === 'insert'), false);
+    }
+  }
+});
+
+test('saving rechecks module access when permission changes after analysis', async () => {
+  const options = { role: 'jefe_mantencion', accessLevel: 'ED' };
+  const api = harness(options); const bytes = workbook();
+  assert.equal((await body(await api.POST(uploadRequest(bytes)))).capabilities.canSaveDraft, true);
+  options.accessLevel = 'LEC';
+  assert.equal((await api.POST(uploadRequest(bytes, 'save-draft'))).status, 403);
+  assert.equal((await body(await api.POST(uploadRequest(bytes)))).capabilities.canSaveDraft, false);
+  assert.equal(api.objects.size, 0); assert.equal(api.rows.size, 0);
+});
+
 test('explicit save stores original bytes and server-derived manifest once; retry returns the persisted extraction', async () => {
   const api = harness(); const bytes = emptyValueFixture();
   const first = await body(await api.POST(uploadRequest(bytes, 'save-draft', { extractedData: '{"forged":true}', organizationId: 'spoofed' })));
   assert.equal(first.ok, true); assert.equal(first.persisted, true); assert.equal(first.reused, false);
+  assert.deepEqual(first.capabilities, { canSaveDraft: true, reason: null });
   const row = api.rows.get(first.document.id);
   assert.equal(row.organization_id, ORG); assert.equal(row.status, 'draft');
   assert.equal(row.provenance_status, 'supporting'); assert.equal(row.canonical_role, 'supporting');
@@ -311,6 +373,7 @@ test('explicit save stores original bytes and server-derived manifest once; retr
   row.extracted_data.manifest.warnings.push('Persisted extraction marker');
   const second = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
   assert.equal(second.reused, true); assert.equal(second.document.id, first.document.id);
+  assert.deepEqual(second.capabilities, first.capabilities);
   assert.ok(second.manifest.warnings.includes('Persisted extraction marker'));
   assert.equal(api.calls.filter((call) => call.kind === 'upload').length, 1);
   assert.equal(api.rows.size, 1);
@@ -332,6 +395,71 @@ test('failed DB insert retains immutable bytes and retries safely; concurrent id
   assert.equal(concurrent.rows.size, 1); assert.equal(concurrent.objects.size, 1);
 });
 
+test('an archived deterministic identity returns 409 before uploading or inserting without altering its tombstone', async () => {
+  const api = harness(); const bytes = workbook();
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  const row = api.rows.get(saved.document.id);
+  // deleted_at is authoritative even if a legacy record kept is_active=true.
+  row.deleted_at = '2026-10-18T18:00:00Z';
+  const snapshot = JSON.stringify(row);
+  api.calls.length = 0;
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  const rejected = await body(response);
+  assert.equal(response.status, 409); assert.equal(rejected.code, 'DOCUMENT_ARCHIVED');
+  assert.match(rejected.error, /documento eliminado/);
+  assert.doesNotMatch(rejected.error, /reintent|inténtalo/i);
+  assert.equal(api.calls.some((call) => ['upload', 'insert', 'download'].includes(call.kind)), false);
+  assert.equal(JSON.stringify(row), snapshot);
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
+});
+
+test('an archive racing the insert yields the same scoped 409 and never restores or changes the identity', async () => {
+  const api = harness({ archiveDuringInsert: true }); const bytes = workbook();
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  const rejected = await body(response);
+  assert.equal(response.status, 409); assert.equal(rejected.code, 'DOCUMENT_ARCHIVED');
+  assert.doesNotMatch(rejected.error, /reintent|inténtalo/i);
+  assert.equal(api.calls.filter((call) => call.kind === 'upload').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'insert').length, 1);
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
+  const row = [...api.rows.values()][0]; const snapshot = JSON.stringify(row);
+  assert.equal(row.organization_id, ORG); assert.equal(row.is_active, false); assert.ok(row.deleted_at);
+  api.calls.length = 0;
+  assert.equal((await api.POST(uploadRequest(bytes, 'save-draft'))).status, 409);
+  assert.equal(api.calls.some((call) => call.kind === 'upload' || call.kind === 'insert'), false);
+  assert.equal(JSON.stringify(row), snapshot);
+});
+
+test('a deletion during an existing draft download returns 409 instead of suggesting an impossible retry', async () => {
+  const options = {}; const api = harness(options); const bytes = workbook();
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  options.archiveDuringDownload = true;
+  api.calls.length = 0;
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  const rejected = await body(response);
+  assert.equal(response.status, 409); assert.equal(rejected.code, 'DOCUMENT_ARCHIVED');
+  assert.doesNotMatch(rejected.error, /reintent|inténtalo/i);
+  assert.equal(api.calls.some((call) => call.kind === 'upload' || call.kind === 'insert'), false);
+  assert.equal(api.calls.filter((call) => call.kind === 'download').length, 1);
+  const row = api.rows.get(saved.document.id);
+  assert.ok(row.deleted_at); assert.equal(row.is_active, false);
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
+});
+
+test('an archived row outside the organization cannot be disclosed by a deterministic identity conflict', async () => {
+  const api = harness(); const bytes = workbook();
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  const row = api.rows.get(saved.document.id);
+  row.organization_id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  row.deleted_at = '2026-10-18T18:00:00Z';
+  const snapshot = JSON.stringify(row);
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  const rejected = await body(response);
+  assert.equal(response.status, 503); assert.equal(rejected.code, 'DRAFT_SAVE_INCOMPLETE');
+  assert.doesNotMatch(rejected.error, /eliminad|archivad/i);
+  assert.equal(JSON.stringify(row), snapshot);
+});
+
 test('version links validate predecessor identity, tenant and changed bytes without mutating the predecessor', async () => {
   const api = harness(); const bytes = workbook();
   const first = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
@@ -343,13 +471,17 @@ test('version links validate predecessor identity, tenant and changed bytes with
   assert.equal((await api.POST(uploadRequest(bytes, 'save-draft', { previousVersionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }))).status, 404);
 });
 
-test('stored-original analysis admits historical legacy maintenance rows but rejects deleted or foreign tenant paths', async () => {
-  const api = harness(); const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'; const bytes = workbook();
+test('stored-original analysis admits read-only historical legacy rows but rejects deleted or foreign tenant paths', async () => {
+  const api = harness({ readOnly: true, role: 'operador' }); const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'; const bytes = workbook();
   const row = { id, organization_id: ORG, module: 'maintenance', category: 'legacy', document_name: 'legacy.xlsx',
     is_active: false, deleted_at: null, file_path: 'maintenance/legacy/original.xlsx', file_size_bytes: bytes.length };
   api.rows.set(id, row); api.objects.set(row.file_path, bytes);
   const response = await api.POST(sourceRequest(id));
-  assert.equal(response.status, 200); assert.equal((await body(response)).manifest.file.sha256, digest(bytes));
+  assert.equal(response.status, 200);
+  const analyzed = await body(response);
+  assert.equal(analyzed.manifest.file.sha256, digest(bytes));
+  assert.equal(analyzed.capabilities.canSaveDraft, false);
+  assert.match(analyzed.capabilities.reason, /solo lectura/);
   row.deleted_at = '2026-01-01T00:00:00Z';
   assert.equal((await api.POST(sourceRequest(id))).status, 404);
   row.deleted_at = null; row.file_path = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd/maintenance/original.xlsx';

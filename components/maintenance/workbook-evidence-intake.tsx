@@ -133,6 +133,7 @@ export function WorkbookEvidenceIntake({ sourceDocument, previousVersionOptions 
   const inFlight = useRef(false);
   const requestGeneration = useRef(0);
   const fileInput = useRef<HTMLInputElement | null>(null);
+  const canSaveDraft = result?.capabilities?.canSaveDraft === true;
 
   useEffect(() => {
     requestGeneration.current += 1;
@@ -159,7 +160,7 @@ export function WorkbookEvidenceIntake({ sourceDocument, previousVersionOptions 
 
   async function submit(action: 'analyze' | 'save-draft') {
     if (inFlight.current || (!file && !sourceDocument)) return;
-    if (action === 'save-draft' && (!file || !result || result.persisted || sourceDocument)) return;
+    if (action === 'save-draft' && (!file || !result || !canSaveDraft || result.persisted || sourceDocument)) return;
     inFlight.current = true;
     const generation = requestGeneration.current;
     setBusy(action);
@@ -207,7 +208,7 @@ export function WorkbookEvidenceIntake({ sourceDocument, previousVersionOptions 
   }
 
   return <section aria-label="Revisión de Excel" className="space-y-4 rounded-md border p-4 sm:p-5" aria-busy={busy !== null}>
-    <div className="space-y-1"><h3 className="text-base font-semibold">Revisar el archivo original</h3><p className="text-sm text-muted-foreground">Examina sus hojas, celdas y fórmulas. Después puedes conservar el original y un borrador para revisión.</p></div>
+    <div className="space-y-1"><h3 className="text-base font-semibold">Revisar el archivo original</h3><p className="text-sm text-muted-foreground">Examina sus hojas, celdas y fórmulas. Con permiso de escritura, también puedes conservar el original y un borrador para revisión.</p></div>
     {saveNotice ? <p role="status" className="break-words rounded-md border bg-muted/40 p-3 text-sm">{saveNotice}</p> : null}
     {sourceDocument ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><p className="break-words text-sm">Archivo guardado: <strong>{sourceDocument.fileName}</strong></p><Button type="button" variant="outline" className="min-h-10" onClick={onClearDocument} disabled={busy !== null}>Elegir otro archivo</Button></div>
       : <div className="space-y-2"><label htmlFor="maintenance-workbook-file" className="text-sm font-medium">Archivo Excel</label><Input ref={fileInput} id="maintenance-workbook-file" type="file" accept=".xlsx,.xls" className="h-auto min-h-10 py-2" disabled={busy !== null} onChange={(event) => chooseFile(event.target.files?.[0] || null)} aria-describedby="maintenance-workbook-file-help" /><p id="maintenance-workbook-file-help" className="text-xs text-muted-foreground">Formatos .xlsx y .xls · Hasta 3 MB. Se incluyen las hojas ocultas.</p></div>}
@@ -215,7 +216,7 @@ export function WorkbookEvidenceIntake({ sourceDocument, previousVersionOptions 
     {!result ? <Button type="button" className="min-h-10" disabled={busy !== null || (!file && !sourceDocument)} onClick={() => void submit('analyze')}>{busy === 'analyze' ? 'Examinando archivo…' : 'Examinar todas las hojas'}</Button> : null}
     {busy ? <p role="status" className="text-sm text-muted-foreground">{busy === 'save-draft' ? 'Conservando el original y el borrador…' : 'Leyendo la estructura y las celdas del archivo…'}</p> : null}
     {result ? <>
-      {file && !sourceDocument && !result.persisted ? <div className="space-y-1.5 border-t pt-4">
+      {file && !sourceDocument && !result.persisted && canSaveDraft ? <div className="space-y-1.5 border-t pt-4">
         <label htmlFor="workbook-previous-version" className="text-sm font-medium">Relación con archivos anteriores</label>
         <select id="workbook-previous-version" className={selectClassName} value={previousVersionId} disabled={busy !== null} onChange={(event) => setPreviousVersionId(event.target.value)}>
           <option value="">Archivo independiente · Primera versión</option>
@@ -223,10 +224,11 @@ export function WorkbookEvidenceIntake({ sourceDocument, previousVersionOptions 
         </select>
         <p className="text-xs text-muted-foreground">Selecciona una evidencia previa si este archivo la actualiza. Se conserva el original anterior. Solo aparecen versiones elegibles entre los archivos cargados.</p>
       </div> : null}
+      {file && !sourceDocument && !result.persisted && !canSaveDraft ? <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">{result.capabilities?.reason || 'No se pudo confirmar tu permiso para guardar. Puedes examinar el archivo y descargar el manifiesto.'}</p> : null}
       <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><Badge variant="outline">{result.persisted ? `Borrador guardado${result.document?.version ? ` · Versión ${result.document.version}` : ''}` : sourceDocument ? 'Original ya guardado' : 'Vista previa'}</Badge><p className="mt-2 text-xs text-muted-foreground">{result.persisted ? `El original y la extracción están conservados para revisión.${result.document?.previousVersionId ? ' La versión anterior quedó vinculada.' : ''}` : sourceDocument ? 'Esta lectura corresponde al original archivado.' : 'El archivo quedará archivado al guardar el borrador.'}</p></div>
+        <div><Badge variant="outline">{result.persisted ? `Borrador guardado${result.document?.version ? ` · Versión ${result.document.version}` : ''}` : sourceDocument ? 'Original ya guardado' : 'Vista previa'}</Badge><p className="mt-2 text-xs text-muted-foreground">{result.persisted ? `El original y la extracción están conservados para revisión.${result.document?.previousVersionId ? ' La versión anterior quedó vinculada.' : ''}` : sourceDocument ? 'Esta lectura corresponde al original archivado.' : canSaveDraft ? 'El archivo quedará archivado al guardar el borrador.' : 'Esta revisión no ha guardado el archivo en la biblioteca.'}</p></div>
         <div className="flex flex-wrap gap-2">
-          {file && !sourceDocument && !result.persisted ? <Button type="button" className="min-h-10" disabled={busy !== null} onClick={() => void submit('save-draft')}>{busy === 'save-draft' ? 'Guardando…' : 'Guardar original y borrador'}</Button> : null}
+          {file && !sourceDocument && !result.persisted && canSaveDraft ? <Button type="button" className="min-h-10" disabled={busy !== null} onClick={() => void submit('save-draft')}>{busy === 'save-draft' ? 'Guardando…' : 'Guardar original y borrador'}</Button> : null}
           <Button type="button" variant="outline" className="min-h-10" onClick={downloadManifest} disabled={busy !== null}>Descargar manifiesto JSON</Button>
         </div>
       </div>

@@ -104,6 +104,10 @@ function workbook() {
   };
 }
 
+function workbookResponse(manifest, patch = {}) {
+  return { ok: true, manifest, counts: manifest.counts, warnings: [], persisted: false, capabilities: { canSaveDraft: true, reason: null }, ...patch };
+}
+
 test('the actual document row shows missing authority and keeps MP250 units unknown', () => {
   const { SourceEvidenceRow } = loadUi(libraryPath);
   const html = renderToStaticMarkup(React.createElement(SourceEvidenceRow, { record: sourceRecord(), opening: false, onOpen() {}, onExamineWorkbook() {} }));
@@ -258,7 +262,7 @@ test('intake analyzes without saving, then archives only after the explicit save
   const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (url, init) => {
     const action = init.body.get('action');
     calls.push({ url, action, file: init.body.get('file') });
-    return { ok: true, json: async () => ({ ok: true, manifest, counts: manifest.counts, warnings: [], persisted: action === 'save-draft' }) };
+    return { ok: true, json: async () => workbookResponse(manifest, { persisted: action === 'save-draft' }) };
   } });
   const props = { sourceDocument: null, onClearDocument() {}, onSaved() { saved++; } };
   let tree = harness.render(props);
@@ -277,6 +281,64 @@ test('intake analyzes without saving, then archives only after the explicit save
   assert.equal(saved, 1);
   tree = harness.render(props);
   assert.equal(findElement(tree, (node) => node.props?.children === 'Guardar original y borrador'), null);
+});
+
+test('read-only or unconfirmed capability keeps analysis and download available without offering persistence', async () => {
+  const cases = [
+    { capabilities: { canSaveDraft: false, reason: 'Tu acceso a mantenimiento es de solo lectura. Puedes examinar el archivo y descargar el manifiesto.' }, message: /solo lectura/ },
+    { capabilities: undefined, message: /No se pudo confirmar tu permiso para guardar/ },
+    { capabilities: { canSaveDraft: 'true', reason: null }, message: /No se pudo confirmar tu permiso para guardar/ },
+  ];
+  for (const scenario of cases) {
+    const calls = []; const manifest = workbook();
+    const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (_url, init) => {
+      calls.push(init.body.get('action'));
+      return { ok: true, json: async () => workbookResponse(manifest, { capabilities: scenario.capabilities }) };
+    } });
+    const props = { sourceDocument: null, onClearDocument() {}, onSaved() { throw new Error('Read-only preview cannot save'); } };
+    let tree = harness.render(props);
+    findElement(tree, (node) => node.props?.id === 'maintenance-workbook-file').props.onChange({ target: { files: [new File(['fixture'], 'maestro.xlsx')] } });
+    tree = harness.render(props);
+    findElement(tree, (node) => node.props?.children === 'Examinar todas las hojas').props.onClick();
+    await settle();
+    tree = harness.render(props);
+    assert.deepEqual(calls, ['analyze']);
+    assert.ok(findElement(tree, (node) => node.props?.manifest === manifest));
+    const download = findElement(tree, (node) => node.props?.children === 'Descargar manifiesto JSON');
+    assert.ok(download); assert.equal(download.props.disabled, false);
+    assert.equal(findElement(tree, (node) => node.props?.children === 'Guardar original y borrador'), null);
+    assert.equal(findElement(tree, (node) => node.props?.id === 'workbook-previous-version'), null);
+    assert.ok(findElement(tree, (node) => node.props?.role === 'status' && typeof node.props?.children === 'string' && scenario.message.test(node.props.children)));
+    assert.ok(findElement(tree, (node) => node.type === 'p' && node.props?.children === 'Esta revisión no ha guardado el archivo en la biblioteca.'));
+  }
+});
+
+test('selecting another file clears the previous capability and uses only its own analysis response', async () => {
+  const calls = []; const manifest = workbook();
+  const nextManifest = { ...manifest, file: { ...manifest.file, name: 'otro.xlsx', sha256: 'b'.repeat(64) } };
+  const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (_url, init) => {
+    const name = init.body.get('file').name;
+    calls.push({ action: init.body.get('action'), name });
+    return { ok: true, json: async () => name === 'maestro.xlsx' ? workbookResponse(manifest) : workbookResponse(nextManifest, { capabilities: { canSaveDraft: false, reason: 'Tu rol actual no permite guardar borradores de mantenimiento.' } }) };
+  } });
+  const props = { sourceDocument: null, onClearDocument() {}, onSaved() { throw new Error('Changing files does not save'); } };
+  let tree = harness.render(props);
+  findElement(tree, (node) => node.props?.id === 'maintenance-workbook-file').props.onChange({ target: { files: [new File(['first'], 'maestro.xlsx')] } });
+  tree = harness.render(props);
+  findElement(tree, (node) => node.props?.children === 'Examinar todas las hojas').props.onClick();
+  await settle();
+  tree = harness.render(props);
+  assert.ok(findElement(tree, (node) => node.props?.children === 'Guardar original y borrador'));
+  findElement(tree, (node) => node.props?.id === 'maintenance-workbook-file').props.onChange({ target: { files: [new File(['second'], 'otro.xlsx')] } });
+  tree = harness.render(props);
+  assert.equal(findElement(tree, (node) => node.props?.children === 'Guardar original y borrador'), null);
+  assert.equal(findElement(tree, (node) => node.props?.manifest), null);
+  findElement(tree, (node) => node.props?.children === 'Examinar todas las hojas').props.onClick();
+  await settle();
+  tree = harness.render(props);
+  assert.ok(findElement(tree, (node) => node.props?.manifest === nextManifest));
+  assert.equal(findElement(tree, (node) => node.props?.children === 'Guardar original y borrador'), null);
+  assert.deepEqual(calls, [{ action: 'analyze', name: 'maestro.xlsx' }, { action: 'analyze', name: 'otro.xlsx' }]);
 });
 
 test('intake blocks repeated in-flight actions and exposes rejected analysis without enabling save', async () => {
@@ -307,7 +369,7 @@ test('a save confirmed after changing workbooks refreshes the catalog without re
   let saved = 0;
   const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (_url, init) => {
     if (init.body instanceof FormData && init.body.get('action') === 'analyze') {
-      return { ok: true, json: async () => ({ ok: true, manifest, counts: manifest.counts, warnings: [], persisted: false }) };
+      return { ok: true, json: async () => workbookResponse(manifest) };
     }
     return new Promise((resolve) => { resolvePending = resolve; });
   } });
@@ -323,8 +385,8 @@ test('a save confirmed after changing workbooks refreshes the catalog without re
 
   const nextProps = { ...callbacks, sourceDocument: { id: 'next-workbook', fileName: 'otro-maestro.xlsx' } };
   harness.render(nextProps);
-  resolvePending({ ok: true, json: async () => ({
-    ok: true, manifest, counts: manifest.counts, warnings: [], persisted: true,
+  resolvePending({ ok: true, json: async () => workbookResponse(manifest, {
+    persisted: true,
     document: { id: 'saved-workbook', fileName: 'maestro-archivado.xlsx', status: 'draft', sha256: manifest.file.sha256, version: 2 },
   }) });
   await settle();
@@ -339,7 +401,7 @@ test('a save confirmed after changing workbooks refreshes the catalog without re
   findElement(tree, (node) => node.props?.children === 'Examinar todas las hojas').props.onClick();
   const latestProps = { ...callbacks, sourceDocument: { id: 'latest-workbook', fileName: 'tercer-maestro.xlsx' } };
   harness.render(latestProps);
-  resolvePending({ ok: true, json: async () => ({ ok: true, manifest, counts: manifest.counts, warnings: [], persisted: false }) });
+  resolvePending({ ok: true, json: async () => workbookResponse(manifest) });
   await settle();
   tree = harness.render(latestProps);
   assert.equal(saved, 1);
@@ -352,7 +414,7 @@ test('an existing workbook is analyzed through its protected identity without re
   const manifest = workbook();
   const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (_url, init) => {
     sent = JSON.parse(init.body);
-    return { ok: true, json: async () => ({ ok: true, manifest, counts: manifest.counts, warnings: [], persisted: false }) };
+    return { ok: true, json: async () => workbookResponse(manifest) };
   } });
   const props = { sourceDocument: { id: 'existing-document', fileName: 'maestro.xlsx' }, onClearDocument() {}, onSaved() { throw new Error('Reading an original must not resave it'); } };
   let tree = harness.render(props);
@@ -369,7 +431,7 @@ test('a predecessor is sent only after explicit selection for saving a new versi
   const harness = hookHarness(workbookPath, 'WorkbookEvidenceIntake', { apiFetch: async (_url, init) => {
     const action = init.body.get('action');
     actions.push({ action, previous: init.body.get('previousVersionId') });
-    return { ok: true, json: async () => ({ ok: true, manifest, counts: manifest.counts, warnings: [], persisted: action === 'save-draft' }) };
+    return { ok: true, json: async () => workbookResponse(manifest, { persisted: action === 'save-draft' }) };
   } });
   const props = { sourceDocument: null, previousVersionOptions: [{ id: 'prior-document', fileName: 'maestro.xlsx', version: '1', receivedAtLabel: '18-10-2026' }], onClearDocument() {}, onSaved() {} };
   let tree = harness.render(props);

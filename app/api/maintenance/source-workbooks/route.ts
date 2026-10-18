@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { gzipSync } from 'node:zlib';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
-import { getOrganizationContext, type OrganizationSuccessContext } from '@/lib/api/organization-context';
+import { getOrganizationContext, hasMaintenanceWriteRole, type OrganizationSuccessContext } from '@/lib/api/organization-context';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { sourceEvidenceStoragePath } from '@/lib/maintenance/source-evidence';
 import { workbookEvidenceDocumentId, workbookEvidenceStoragePath, verifiedWorkbookEvidenceIdentity, type WorkbookEvidenceIdentityRow } from '@/lib/maintenance/workbook-evidence-identity';
 import {
   parseWorkbookEvidence, workbookBytesSha256, WorkbookEvidenceError,
   WORKBOOK_EVIDENCE_SCHEMA_VERSION, WORKBOOK_EVIDENCE_LIMITS, WORKBOOK_UPLOAD_MAX_BYTES,
-  type WorkbookEvidenceManifest, type WorkbookEvidenceResponse,
+  type WorkbookEvidenceCapabilities, type WorkbookEvidenceManifest, type WorkbookEvidenceResponse,
 } from '@/lib/maintenance/workbook-evidence';
 
 export const dynamic = 'force-dynamic';
@@ -83,9 +83,10 @@ async function boundedRequestBytes(request: NextRequest, maximum: number) {
   return Buffer.concat(chunks, total);
 }
 
-async function documentById(database: Database, organizationId: string, id: string, onlyEvidence = false) {
+async function documentById(database: Database, organizationId: string, id: string, { onlyEvidence = false, includeDeleted = false }: { onlyEvidence?: boolean; includeDeleted?: boolean } = {}) {
   let query = database.from('module_documents').select(DOCUMENT_COLUMNS)
-    .eq('organization_id', organizationId).eq('id', id).is('deleted_at', null);
+    .eq('organization_id', organizationId).eq('id', id);
+  if (!includeDeleted) query = query.is('deleted_at', null);
   query = onlyEvidence ? query.eq('module', MODULE).eq('category', CATEGORY) : query.in('module', [MODULE, 'maintenance']);
   const { data, error } = await query.maybeSingle();
   if (error) throw new WorkbookEvidenceError('DOCUMENT_LOOKUP_FAILED', 'No se pudo verificar el documento dentro de tu organización.', 503);
@@ -103,11 +104,24 @@ async function downloadOriginal(database: Database, organizationId: string, path
   return new Uint8Array(await data.arrayBuffer());
 }
 
-function responsePayload(manifest: WorkbookEvidenceManifest, document?: Extract<WorkbookEvidenceResponse, { ok: true }>['document'], reused = false): Extract<WorkbookEvidenceResponse, { ok: true }> {
-  return { ok: true, manifest, counts: manifest.counts, warnings: manifest.warnings, persisted: Boolean(document), ...(document ? { document, reused } : {}) };
+function saveDraftCapabilities(canWrite: boolean, role?: string | null): WorkbookEvidenceCapabilities {
+  if (!canWrite) return { canSaveDraft: false, reason: 'Tu acceso a mantenimiento es de solo lectura. Puedes examinar el archivo y descargar el manifiesto.' };
+  if (!hasMaintenanceWriteRole(role)) return { canSaveDraft: false, reason: 'Tu rol actual no permite guardar borradores de mantenimiento. Puedes examinar el archivo y descargar el manifiesto.' };
+  return { canSaveDraft: true, reason: null };
 }
 
-async function reuseDraft(database: Database, row: DocumentRow, expected: WorkbookEvidenceManifest, path: string, previousVersionId: string | null, request: NextRequest) {
+function responsePayload(manifest: WorkbookEvidenceManifest, capabilities: WorkbookEvidenceCapabilities, document?: Extract<WorkbookEvidenceResponse, { ok: true }>['document'], reused = false): Extract<WorkbookEvidenceResponse, { ok: true }> {
+  return { ok: true, manifest, counts: manifest.counts, warnings: manifest.warnings, capabilities, persisted: Boolean(document), ...(document ? { document, reused } : {}) };
+}
+
+function assertDraftNotArchived(row: DocumentRow) {
+  if (row.deleted_at !== null) {
+    throw new WorkbookEvidenceError('DOCUMENT_ARCHIVED', 'Este original ya pertenece a un documento eliminado de la biblioteca. No se puede crear otro borrador con el mismo archivo y la misma versión anterior.', 409);
+  }
+}
+
+async function reuseDraft(database: Database, row: DocumentRow, expected: WorkbookEvidenceManifest, path: string, previousVersionId: string | null, request: NextRequest, capabilities: WorkbookEvidenceCapabilities) {
+  assertDraftNotArchived(row);
   const verified = verifiedWorkbookEvidenceIdentity(row);
   if (!row.is_active || row.status !== 'draft' || row.file_path !== path ||
       row.previous_version_id !== previousVersionId || !verified || verified.file.sha256 !== expected.file.sha256) {
@@ -123,18 +137,23 @@ async function reuseDraft(database: Database, row: DocumentRow, expected: Workbo
   const { data, error } = await database.from('module_documents').select('manifest:extracted_data->manifest')
     .eq('organization_id', row.organization_id).eq('module', MODULE).eq('category', CATEGORY)
     .eq('id', row.id).eq('status', 'draft').eq('is_active', true).is('deleted_at', null).maybeSingle();
+  if (!error && !data) {
+    // A deletion may race the original download after the first identity read.
+    const current = await documentById(database, row.organization_id, row.id, { onlyEvidence: true, includeDeleted: true });
+    if (current) assertDraftNotArchived(current);
+  }
   const manifest = data?.manifest as WorkbookEvidenceManifest | undefined;
   if (error || manifest?.schemaVersion !== WORKBOOK_EVIDENCE_SCHEMA_VERSION || manifest?.file?.sha256 !== expected.file.sha256 ||
       !Array.isArray(manifest.sheets) || !manifest.counts || !Array.isArray(manifest.warnings)) {
     throw new WorkbookEvidenceError('STORED_MANIFEST_UNAVAILABLE', 'No se pudo recuperar el manifiesto del borrador existente. No se modificó el original.', 503);
   }
-  return evidenceResponse(responsePayload(manifest, { id: row.id, fileName: row.document_name, status: 'draft', sha256: expected.file.sha256, version: row.version, previousVersionId }, true), request);
+  return evidenceResponse(responsePayload(manifest, capabilities, { id: row.id, fileName: row.document_name, status: 'draft', sha256: expected.file.sha256, version: row.version, previousVersionId }, true), request);
 }
 
-async function saveDraft(context: OrganizationSuccessContext, bytes: Uint8Array, manifest: WorkbookEvidenceManifest, previousVersionId: string | null, request: NextRequest) {
+async function saveDraft(context: OrganizationSuccessContext, bytes: Uint8Array, manifest: WorkbookEvidenceManifest, previousVersionId: string | null, request: NextRequest, capabilities: WorkbookEvidenceCapabilities) {
   let version = 1;
   if (previousVersionId) {
-    const previous = await documentById(context.supabase, context.organizationId, previousVersionId, true);
+    const previous = await documentById(context.supabase, context.organizationId, previousVersionId, { onlyEvidence: true });
     const verified = previous ? verifiedWorkbookEvidenceIdentity(previous) : null;
     if (!previous?.is_active || !verified ||
         !Number.isSafeInteger(previous.version) || previous.version < 1 || previous.version >= 2147483647) {
@@ -149,12 +168,14 @@ async function saveDraft(context: OrganizationSuccessContext, bytes: Uint8Array,
   }
   const id = workbookEvidenceDocumentId(context.organizationId, manifest.file.sha256, previousVersionId);
   const path = workbookEvidenceStoragePath(context.organizationId, id, manifest.file.extension);
-  const existing = await documentById(context.supabase, context.organizationId, id, true);
-  if (existing) return reuseDraft(context.supabase, existing, manifest, path, previousVersionId, request);
+  // The deterministic identity survives soft deletion. Check its tombstone
+  // before upload, and again after an insert conflict, without restoring it.
+  const existing = await documentById(context.supabase, context.organizationId, id, { onlyEvidence: true, includeDeleted: true });
+  if (existing) return reuseDraft(context.supabase, existing, manifest, path, previousVersionId, request, capabilities);
 
   // Prepare the exact reviewable response before performing the explicit save.
   // A gzip negotiation or size error must never leave a newly saved draft.
-  const preparedResponse = evidenceResponse(responsePayload(manifest, { id, fileName: manifest.file.name, status: 'draft', sha256: manifest.file.sha256, version, previousVersionId }), request);
+  const preparedResponse = evidenceResponse(responsePayload(manifest, capabilities, { id, fileName: manifest.file.name, status: 'draft', sha256: manifest.file.sha256, version, previousVersionId }), request);
   const { error: uploadError } = await context.supabase.storage.from(BUCKET).upload(path, bytes, {
     contentType: manifest.file.extension === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.ms-excel',
     cacheControl: '0', upsert: false,
@@ -177,8 +198,8 @@ async function saveDraft(context: OrganizationSuccessContext, bytes: Uint8Array,
     extracted_data: { schemaVersion: WORKBOOK_EVIDENCE_SCHEMA_VERSION, manifest, review_status: 'unreviewed' },
   });
   if (insertError) {
-    const concurrent = await documentById(context.supabase, context.organizationId, id, true);
-    if (concurrent) return reuseDraft(context.supabase, concurrent, manifest, path, previousVersionId, request);
+    const concurrent = await documentById(context.supabase, context.organizationId, id, { onlyEvidence: true, includeDeleted: true });
+    if (concurrent) return reuseDraft(context.supabase, concurrent, manifest, path, previousVersionId, request, capabilities);
     throw new WorkbookEvidenceError('DRAFT_SAVE_INCOMPLETE', 'El original quedó conservado, pero no se pudo crear el borrador. Reintenta con el mismo archivo para completar el guardado.', 503);
   }
   return preparedResponse;
@@ -189,6 +210,7 @@ export async function POST(request: NextRequest) {
     const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
     if (!access.authorized) return access.response;
     if (!access.organizationId || !access.user) throw new WorkbookEvidenceError('ORGANIZATION_REQUIRED', 'No se pudo verificar la organización de la sesión.', 403);
+    let capabilities = saveDraftCapabilities(access.canWrite, access.role);
     const contentType = request.headers.get('content-type') ?? '';
     if (contentType.toLowerCase().startsWith('application/json')) {
       let input: { action?: string; sourceKind?: string; sourceId?: string };
@@ -212,7 +234,7 @@ export async function POST(request: NextRequest) {
       const manifest = parseWorkbookEvidence(bytes, fileName);
       const storedHash = verified?.file.sha256;
       if (storedHash && storedHash !== manifest.file.sha256) throw new WorkbookEvidenceError('ORIGINAL_HASH_MISMATCH', 'El original no coincide con el hash de la evidencia guardada.', 409);
-      return evidenceResponse(responsePayload(manifest), request);
+      return evidenceResponse(responsePayload(manifest, capabilities), request);
     }
     if (!contentType.toLowerCase().startsWith('multipart/form-data')) {
       throw new WorkbookEvidenceError('INVALID_CONTENT_TYPE', 'Adjunta el archivo como multipart/form-data.', 415);
@@ -239,6 +261,7 @@ export async function POST(request: NextRequest) {
         throw new WorkbookEvidenceError('AUTH_CONTEXT_CHANGED', 'La sesión cambió durante la solicitud. Vuelve a intentarlo.', 403);
       }
       writeContext = context;
+      capabilities = saveDraftCapabilities(writeAccess.canWrite, context.role);
       const previous = form.get('previousVersionId');
       if (previous) {
         if (typeof previous !== 'string' || !UUID.test(previous)) throw new WorkbookEvidenceError('INVALID_PREVIOUS_VERSION', 'La referencia de versión anterior no es válida.', 400);
@@ -247,7 +270,7 @@ export async function POST(request: NextRequest) {
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
     const manifest = parseWorkbookEvidence(bytes, file.name, { maxBytes: WORKBOOK_UPLOAD_MAX_BYTES });
-    if (writeContext) return await saveDraft(writeContext, bytes, manifest, previousVersionId, request);
-    return evidenceResponse(responsePayload(manifest), request);
+    if (writeContext) return await saveDraft(writeContext, bytes, manifest, previousVersionId, request, capabilities);
+    return evidenceResponse(responsePayload(manifest, capabilities), request);
   } catch (error) { return errorResponse(error); }
 }
