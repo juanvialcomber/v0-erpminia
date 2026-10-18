@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { WhatsappFindingReview } from '@/components/whatsapp/whatsapp-finding-review';
 import { WhatsappOperationalLog } from '@/components/whatsapp/whatsapp-operational-log';
 import { WhatsappTriageInbox } from '@/components/whatsapp/whatsapp-triage-inbox';
+import { WhatsappSourceRegistry } from '@/components/whatsapp/whatsapp-source-registry';
 type Group={id?:string;chatId?:string;chat_id?:string;name?:string;display_name?:string;enabled?:boolean;last_received_at?:string|null};
 type GroupDiscovery={total:number;truncated:boolean;sources:{chats:boolean;contacts:boolean}};
 type Report={report_date:string;status:string;message_count:number;summary:string;truncated:boolean;findings:any[];source_scope_stale?:boolean};
@@ -110,6 +111,7 @@ export default function WhatsappAdminPage() {
       <h1 className="text-2xl font-semibold">WhatsApp · Inteligencia operacional</h1>
       <p className="max-w-2xl text-sm text-muted-foreground">Selecciona qué grupos autorizados pueden aportar evidencia a MOTIL. Los mensajes nunca modifican automáticamente órdenes de trabajo, producción o registros HSE.</p>
     </header>
+    <WhatsappSourceRegistry />
     {error&&<div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm"><AlertCircle className="h-4 w-4"/>{error}</div>}
     {loading?<p role="status" className="text-sm text-muted-foreground">Cargando configuración…</p>:<>
       <section className="space-y-3">
