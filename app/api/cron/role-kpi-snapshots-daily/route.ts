@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+// Explicit handover gate: disabled unless this deployment is the appointed cron executor.
+function cronExecutorEnabled() {
+  return process.env.MOTIL_CRON_EXECUTOR_ENABLED === 'true';
+}
+
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +29,10 @@ function chileBusinessDate(date = new Date()) {
 }
 
 async function capture(request: NextRequest) {
+  if (!cronExecutorEnabled()) {
+    return NextResponse.json({ error: 'Cron executor disabled on this deployment' }, { status: 503 });
+  }
+
   const authHeader = request.headers.get('authorization');
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

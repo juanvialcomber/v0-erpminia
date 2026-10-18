@@ -1,25 +1,38 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+// Explicit handover gate: disabled unless this deployment is the appointed cron executor.
+function cronExecutorEnabled() {
+  return process.env.MOTIL_CRON_EXECUTOR_ENABLED === 'true';
+}
+
 
 /**
  * Daily maintenance analytics aggregation job
  * Runs once per day to pre-compute analytics and populate aggregation tables
  * Can be called via Vercel Crons or external scheduler
  */
-export async function POST(req: NextRequest) {
-  // Verify cron secret if provided
-  const cronSecret = req.headers.get('authorization');
-  if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+async function runDailyMaintenanceAnalytics(req: NextRequest) {
+  if (!cronExecutorEnabled()) {
+    return NextResponse.json({ error: 'Cron executor disabled on this deployment' }, { status: 503 });
+  }
+
+  // Vercel Cron uses GET; fail closed if the secret is absent.
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 24 || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'Maintenance analytics database not configured' }, { status: 503 });
+  }
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   try {
     console.log('[v0] Starting daily maintenance analytics aggregation...');
 
     // Get all organizations (in this case, just the main one)
-    const { data: orgs } = await sb.from('organizations').select('id');
+    const { data: orgs, error: organizationsError } = await sb.from('organizations').select('id').limit(100);
+    if (organizationsError) throw organizationsError;
 
     if (!orgs || orgs.length === 0) {
       return NextResponse.json({ error: 'No organizations found' }, { status: 400 });
@@ -54,11 +67,12 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
     }
 
     // Fetch work orders
-    const { data: workOrders } = await sb
+    const { data: workOrders, error: workOrdersError } = await sb
       .from('maintenance_work_orders')
       .select('id, status, priority, created_at, completion_date, scheduled_date, total_timer_minutes')
       .eq('organization_id', orgId)
-      .gte('created_at', thirtyDaysAgo.toISOString()) as { data: WorkOrder[] | null };
+      .gte('created_at', thirtyDaysAgo.toISOString()) as { data: WorkOrder[] | null; error: { message: string } | null };
+    if (workOrdersError) throw new Error(`maintenance_orders_read_failed: ${workOrdersError.message}`);
 
     const woList: WorkOrder[] = workOrders || [];
 
@@ -90,7 +104,7 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
     const totalHoursLogged = woList.reduce((sum: number, wo: WorkOrder) => sum + (wo.total_timer_minutes || 0), 0) / 60;
 
     // Insert aggregation data
-    await sb.from('maintenance_analytics_daily').upsert(
+    const { error: upsertError } = await sb.from('maintenance_analytics_daily').upsert(
       {
         organization_id: orgId,
         analysis_date: today,
@@ -105,9 +119,14 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
       { onConflict: 'organization_id,analysis_date' }
     );
 
+    if (upsertError) throw new Error(`maintenance_analytics_write_failed: ${upsertError.message}`);
     console.log(`[v0] Aggregated ${orgId} analytics for ${today}`);
   } catch (error) {
     console.error(`[v0] Error aggregating org ${orgId}:`, error);
     throw error;
   }
 }
+
+// Vercel scheduled invocations use GET. POST remains available to authorized operators.
+export const GET = runDailyMaintenanceAnalytics;
+export const POST = runDailyMaintenanceAnalytics;

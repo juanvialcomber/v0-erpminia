@@ -7,6 +7,12 @@ import { isExcludedMotilWhatsappGroup } from '@/lib/messages/greenapi-group-scop
 // Always acknowledge irrelevant notification types to avoid retry storms.
 // The webhook is intentionally distinct from MOTIL's internal messaging inbox.
 export async function POST(request: NextRequest) {
+  // Fail closed on the recovered deployment until the provider callback is deliberately transferred.
+  if (process.env.MOTIL_GREENAPI_WEBHOOK_ENABLED !== 'true') {
+    return NextResponse.json({ error: 'Webhook receptor no habilitado en este despliegue' },
+      { status: 503, headers: GREEN_NO_STORE });
+  }
+
   const bearerToken = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || null;
   const headerToken = request.headers.get('x-greenapi-token');
   if (![bearerToken, headerToken].some((token) => validWebhookToken(token))) {

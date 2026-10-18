@@ -9,11 +9,11 @@ import type {
 
 type Payload=WhatsappActivityFeed & {sourceLimitReached?:boolean};
 const titles:Record<WhatsappActivityMode,string>={
-  overview:'Novedades operacionales',
-  plant:'Actividad reportada desde Planta Patagua',
-  mine:'Novedades informadas desde mina',
-  dispatch:'Coordinación de despachos informada',
-  drilling:'Perforación y sondajes informados',
+  overview:'Actividad diaria',
+  plant:'Actividad diaria de planta',
+  mine:'Actividad diaria de mina',
+  dispatch:'Programación diaria de despachos',
+  drilling:'Actividad diaria de perforación',
 };
 const when=(date:string|null|undefined)=>{
   if(!date)return 'Sin fecha informada';
@@ -53,35 +53,36 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     '/api/produccion/whatsapp-activity?mode='+encodeURIComponent(mode),
     fetcher,{refreshInterval:60000,revalidateOnFocus:true});
   const updates=expanded?data?.updates||[]:(data?.updates||[]).slice(0,5);
-  return <section aria-label={titles[mode]} className="space-y-3 rounded-lg border bg-card p-4 sm:p-5">
+  return <section aria-label={titles[mode]} className="space-y-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold">{titles[mode]}</h2>
+      <div className="min-w-0 space-y-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Información recibida · WhatsApp</p>
+        <h2 className="text-lg font-semibold tracking-tight">{titles[mode]}</h2>
         <p className="text-sm text-muted-foreground">
-          Última actualización informada (WhatsApp): <span className="font-medium text-foreground">
+          Último mensaje recibido: <span className="font-medium text-foreground">
             {isLoading?'Consultando…':when(data?.latestReportedAt)}
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Novedades recibidas, no verificaciones en terreno. Se conservan separado el corte de
+          Mensajes recibidos, no verificaciones en terreno. Se conservan separado el corte de
           los indicadores certificados y las órdenes de mantenimiento.
         </p>
       </div>
       <Button variant="outline" size="sm" disabled={isLoading}
-        onClick={()=>void mutate()}>Actualizar novedades</Button>
+        onClick={()=>void mutate()}>Actualizar actividad</Button>
     </div>
     {isLoading?<p role="status" className="text-sm text-muted-foreground">Leyendo fuentes de WhatsApp…</p>:null}
     {error?<p role="alert" className="text-sm text-destructive">{error.message}</p>:null}
     {!isLoading&&!error&&!data?.updates.length?
-      <p className="text-sm text-muted-foreground">Sin novedades textuales verificables de fuentes autorizadas para esta área.</p>:null}
+      <p className="text-sm text-muted-foreground">Sin mensajes recientes de las fuentes autorizadas para esta área.</p>:null}
     {data?.sourceLimitReached?<p className="text-xs text-muted-foreground">
       Vista reciente limitada; los mensajes originales permanecen almacenados.
     </p>:null}
-    {updates.length>0?<div className="divide-y rounded-md border">
-      {updates.map(item=><article key={item.id} className="space-y-2 px-3 py-3 text-sm">
+    {updates.length>0?<div className="divide-y divide-border/70 overflow-hidden rounded-lg border border-border/80">
+      {updates.map(item=><article key={item.id} className="space-y-2.5 bg-card px-3 py-4 text-sm transition-colors hover:bg-muted/20 sm:px-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{item.groupName} · {item.destination}</span>
-          <time dateTime={item.reportedAt}>{when(item.reportedAt)}</time>
+          <span className="min-w-0 break-words font-medium text-foreground/80">{item.groupName} · {item.destination}</span>
+          <time className="shrink-0 tabular-nums" dateTime={item.reportedAt}>{when(item.reportedAt)}</time>
         </div>
         {item.text.length>480?<details className="space-y-2">
           <summary className="cursor-pointer whitespace-pre-wrap break-words leading-relaxed">
@@ -89,7 +90,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
           </summary>
           <p className="whitespace-pre-wrap break-words pt-2 leading-relaxed">{item.text}</p>
         </details>:<p className="whitespace-pre-wrap break-words leading-relaxed">{item.text}</p>}
-        <p className="text-xs text-muted-foreground">
+        <p className="border-l-2 border-border pl-2 text-xs leading-relaxed text-muted-foreground">
           {reportedStateLabel[item.reportedState]||'Estado por corroborar'}
           {' · '}Mensaje #{item.sourceMessageId}
           {item.partial?' · Parte de un reporte con varias actividades; los adjuntos no certifican cada tarea':''}
@@ -101,7 +102,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     </div>:null}
     {data&&(data.updates.length>5)?<Button variant="outline" size="sm"
       onClick={()=>setExpanded(v=>!v)}>
-      {expanded?'Mostrar menos': 'Ver '+data.updates.length+' novedades'}
+      {expanded?'Mostrar menos': 'Ver '+data.updates.length+' registros'}
     </Button>:null}
     {data?.unassignedVideos?.length?<details className="rounded-md border px-3 py-2">
       <summary className="cursor-pointer text-sm font-medium">

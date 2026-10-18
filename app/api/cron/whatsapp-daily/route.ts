@@ -1,11 +1,20 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+// Explicit handover gate: disabled unless this deployment is the appointed cron executor.
+function cronExecutorEnabled() {
+  return process.env.MOTIL_CRON_EXECUTOR_ENABLED === 'true';
+}
+
 import { greenDb, localDay, GREEN_NO_STORE } from '@/lib/messages/greenapi';
 import { whatsappOperationalReviewEnabled } from '@/lib/messages/whatsapp-operational-feature.mjs';
 
 // Runs at 09:30 UTC (06:30/05:30 Santiago depending on daylight saving).
 // Always processes the previous local day, irrespective of DST.
 export async function GET(request: NextRequest) {
+  if (!cronExecutorEnabled()) {
+    return NextResponse.json({ error: 'Cron executor disabled on this deployment' }, { status: 503 });
+  }
+
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 24 || request.headers.get('authorization') !== `Bearer ${secret}`)
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
