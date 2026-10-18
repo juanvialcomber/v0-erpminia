@@ -16,10 +16,11 @@ test('maintenance source registry is organization scoped and permission guarded'
 
 test('maintenance source registry preserves provenance and review-required state', async () => {
   const source = await readFile(pageUrl, 'utf8');
-  assert.match(source, /SHA-256/);
-  assert.match(source, /Responsable fuente/);
+  assert.match(source, /TechnicalGuidelineLibrary/);
+  assert.match(source, /\/dashboard\/planificacion\/datos/);
   assert.match(source, /Revisión requerida/);
   assert.match(source, /sólo convierte coincidencias verificables en datos canónicos/);
+  assert.doesNotMatch(source, /MOTIL conserva el original/);
 });
 
 test('maintenance exposes source provenance to planning and leadership users', async () => {
