@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle, workshopSiteFromKnownLocation } from '@/lib/maintenance/workshop-site-scope';
+import { chileTodayDateKey, daysUntilWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
@@ -52,16 +53,15 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const inThirtyDays = new Date(today); inThirtyDays.setDate(inThirtyDays.getDate() + 30);
+    const today = chileTodayDateKey();
     const summary = schedules.reduce((totals, schedule) => {
       totals.total += 1;
       if (!schedule.enabled) totals.disabled += 1;
       if (schedule.generated_work_order_id) totals.generated += 1;
-      if (schedule.next_scheduled_date) {
-        const due = new Date(`${schedule.next_scheduled_date}T00:00:00`);
-        if (due < today) totals.overdue += 1;
-        else if (due <= inThirtyDays) totals.dueSoon += 1;
+      const daysUntil = daysUntilWorkOrderDate(schedule.next_scheduled_date, today);
+      if (daysUntil !== null) {
+        if (daysUntil < 0) totals.overdue += 1;
+        else if (daysUntil <= 30) totals.dueSoon += 1;
       }
       return totals;
     }, { total: 0, overdue: 0, dueSoon: 0, disabled: 0, generated: 0 });
