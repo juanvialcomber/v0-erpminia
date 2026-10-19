@@ -201,11 +201,13 @@ export async function GET(request: NextRequest) {
       const latestSignalAt = newest(statusAt, planningAt, emailAt, whatsappAt, workOrderAt);
       const planningCurrent = Boolean(planningAt) && (!operationalCutoff || sameOrAfter(planningAt?.slice(0, 10) || null, operationalCutoff));
 
-      const emailMeter = numberValue(email?.meter_value);
+      const emailCurrent = Boolean(emailAt) && (!operationalCutoff || sameOrAfter(emailAt, operationalCutoff));
+      const whatsappCurrent = Boolean(whatsappAt) && (!operationalCutoff || sameOrAfter(whatsappAt.slice(0, 10), operationalCutoff));
+      const emailMeter = emailCurrent ? numberValue(email?.meter_value) : null;
       const planMeter = planningCurrent ? numberValue(plan?.current_reading) : null;
       const emailMeterUsable = emailMeter != null && (!plan?.meter_unit || !email?.meter_unit || String(plan.meter_unit).toLowerCase() === String(email.meter_unit).toLowerCase());
       const effectiveMeter = emailMeterUsable && (!planningAt || sameOrAfter(emailAt, planningAt.slice(0, 10))) ? emailMeter : planMeter;
-      const nextDueMeter = numberValue(email?.next_maintenance_meter) ?? (planningCurrent ? numberValue(plan?.next_due_meter) : null);
+      const nextDueMeter = (emailCurrent ? numberValue(email?.next_maintenance_meter) : null) ?? (planningCurrent ? numberValue(plan?.next_due_meter) : null);
       const effectiveRemaining = effectiveMeter != null && nextDueMeter != null
         ? nextDueMeter - effectiveMeter
         : planningCurrent ? numberValue(plan?.remaining_meter) : null;
@@ -219,19 +221,19 @@ export async function GET(request: NextRequest) {
 
       const currentReportedStatus =
         textValue(status?.new_state) ||
-        textValue(email?.reported_equipment_status) ||
-        (isStoppedSignal(whatsapp?.description) ? 'Reportado fuera de servicio' : null);
+        (emailCurrent ? textValue(email?.reported_equipment_status) : null) ||
+        (whatsappCurrent && isStoppedSignal(whatsapp?.description) ? 'Reportado fuera de servicio' : null);
 
       const stopped =
         isStoppedSignal(status?.new_state) ||
-        isStoppedSignal(email?.reported_equipment_status) ||
-        isStoppedSignal(whatsapp?.description);
+        (emailCurrent && isStoppedSignal(email?.reported_equipment_status)) ||
+        (whatsappCurrent && isStoppedSignal(whatsapp?.description));
 
       const partsPending =
         (planningCurrent && isPartsPending(plan?.parts_status_raw)) ||
-        isPartsPending(email?.parts_requested) ||
-        isPartsPending(email?.reported_issue) ||
-        isPartsPending(whatsapp?.description);
+        (emailCurrent && isPartsPending(email?.parts_requested)) ||
+        (emailCurrent && isPartsPending(email?.reported_issue)) ||
+        (whatsappCurrent && isPartsPending(whatsapp?.description));
 
       const rank = planningCurrent ? priorityRank(plan?.priority) : 9;
       const activeRecommendation = planningCurrent ? textValue(plan?.recommended_action) : null;
@@ -251,6 +253,9 @@ export async function GET(request: NextRequest) {
         planningPriority: planningCurrent ? textValue(plan?.priority) : null,
         priorityRank: rank,
         planningCurrent,
+        emailCurrent,
+        whatsappCurrent,
+        currentCoverage: emailCurrent || whatsappCurrent || Boolean(status?.new_state) || openOrders.length > 0,
         planningImportedAt: planningAt,
         planningSourceFile: textValue(plan?.source_file),
         planningScheduledDate: planningCurrent ? textValue(plan?.scheduled_date) : null,
@@ -310,15 +315,16 @@ export async function GET(request: NextRequest) {
       return String(b.latestSignalAt || '').localeCompare(String(a.latestSignalAt || ''));
     });
 
+    const currentRows = rows.filter((row) => row.currentCoverage);
     const openWorkOrders = workOrders.filter((order) => !isClosed(order.status));
     const completedWorkOrders = workOrders.filter((order) => ['completed', 'closed'].includes(String(order.status).toLowerCase()));
     const today = new Date().toISOString().slice(0, 10);
     const overdueOpen = openWorkOrders.filter((order) => order.scheduled_date && String(order.scheduled_date) < today);
     const criticalOpen = openWorkOrders.filter((order) => priorityRank(order.priority) === 1);
-    const stoppedRows = rows.filter((row) => row.reportedStopped);
-    const attentionRows = rows.filter((row) => row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending);
+    const stoppedRows = currentRows.filter((row) => row.reportedStopped);
+    const attentionRows = currentRows.filter((row) => row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending);
 
-    const preventiveRows = rows.filter((row) => row.nextDueMeter != null || row.reportedMpStatus || row.planningPriority);
+    const preventiveRows = currentRows.filter((row) => row.nextDueMeter != null || row.reportedMpStatus || row.planningPriority);
     const overduePreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter <= 0);
     const dueSoonPreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter > 0 && row.remainingMeter <= 100);
     const stalePlanning = rows.filter((row) => row.planningImportedAt && !row.planningCurrent);
@@ -379,7 +385,8 @@ export async function GET(request: NextRequest) {
       mode: 'read_only',
       operationalCutoff,
       summary: {
-        activeAssets: rows.length,
+        canonicalAssets: rows.length,
+        activeAssets: currentRows.length,
         attentionAssets: attentionRows.length,
         stoppedAssets: stoppedRows.length,
         openWorkOrders: openWorkOrders.length,
@@ -419,7 +426,7 @@ export async function GET(request: NextRequest) {
         .slice(0, 60),
       workOrders: workOrderRows,
       recentSignals,
-      rows,
+      rows: currentRows,
       pendingEmail: (pendingEmailResult.data || []).slice(0, 30).map((row: any) => ({
         id: row.id,
         reportDate: textValue(row.report_date),
