@@ -31,6 +31,9 @@ type MaterialRow = {
   quantity_required?: number | string | null;
   quantity_available?: number | string | null;
   quantity_shortage?: number | string | null;
+  informed_available?: number | string | null;
+  informed_updated_at?: string | null;
+  informed_source?: string | null;
 };
 
 type CatalogRow = {
@@ -60,6 +63,11 @@ const issued = (row: MaterialRow) => Number(row.issued ?? 0);
 const reserved = (row: MaterialRow) => Number(row.reserved ?? Math.max(available(row) - issued(row), 0));
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
+const informedAvailable = (row: MaterialRow) => row.informed_available == null ? null : Number(row.informed_available);
+const informedCanCover = (row: MaterialRow) => {
+  const informed = informedAvailable(row);
+  return informed != null && Number.isFinite(informed) && informed >= shortage(row);
+};
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
 
 export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string }) {
@@ -81,6 +89,8 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const issuedTotal = rows.reduce((sum, row) => sum + issued(row), 0);
   const requiredTotal = rows.reduce((sum, row) => sum + required(row), 0);
   const shortageTotal = rows.reduce((sum, row) => sum + shortage(row), 0);
+  const shortageRows = rows.filter((row) => shortage(row) > 0);
+  const informedCoveragePending = shortageRows.length > 0 && shortageRows.every(informedCanCover);
   const procurementTotal = rows.reduce((sum, row) => sum + inProcurement(row), 0);
   const alreadySent = Boolean(status.procurement_request_id) || ['sent_to_procurement', 'partially_covered', 'covered'].includes(status.supply_status || '');
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
@@ -163,8 +173,10 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
     ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
     : reservedTotal > 0
       ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
-      : shortageTotal > 0 && !alreadySent
-        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
+      : shortageTotal > 0 && informedCoveragePending
+        ? { title: 'Confirmar Bodega antes de Compras', detail: 'El stock informado podría cubrir el faltante, pero todavía no está reservado para esta OT.', action: 'confirm_stock' as const }
+        : shortageTotal > 0 && !alreadySent
+          ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada, entregada ni señal suficiente en Bodega.`, action: 'procure' as const }
         : shortageTotal > 0
           ? { title: 'Compras está gestionando los faltantes', detail: `${procurementTotal || shortageTotal} unidad(es) están registradas en el flujo de abastecimiento.`, action: 'waiting' as const }
           : { title: 'Materiales listos para ejecución', detail: `${issuedTotal} de ${requiredTotal} unidad(es) requeridas ya fueron entregadas.`, action: 'ready' as const };
@@ -186,6 +198,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
             {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
             {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
+            {primaryAction.action === 'confirm_stock' ? <Badge variant="secondary"><PackageSearch className="mr-1 h-3.5 w-3.5" />Confirmar Bodega</Badge> : null}
             {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
             {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
@@ -238,6 +251,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
               <div><p className="text-xs text-muted-foreground">Entregado</p><p className="font-medium tabular-nums">{issuedQty}</p></div>
               <div><p className="text-xs text-muted-foreground">Faltante</p><p className={missing > 0 ? 'font-semibold tabular-nums text-destructive' : 'font-medium tabular-nums'}>{missing}</p></div>
               <div><p className="text-xs text-muted-foreground">En Compras</p><p className="font-medium tabular-nums">{purchasingQty}</p></div>
+              {informedAvailable(row) != null ? <div className="col-span-2 sm:col-span-5 text-xs text-muted-foreground">Stock informado Bodega: {informedAvailable(row)} · confirmar antes de comprar o ejecutar.</div> : null}
             </div>
           </div>;
         })}</div> : null}
