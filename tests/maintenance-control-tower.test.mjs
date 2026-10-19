@@ -36,3 +36,14 @@ test('control tower refreshes and rotates automatically with no operational acti
   assert.doesNotMatch(page, /onClick=/);
   assert.doesNotMatch(page, /<Button/);
 });
+
+
+test('control tower pins attention assets and rotates only the non-critical fleet', () => {
+  assert.match(api, /attentionRows/);
+  assert.match(api, /fleetRows/);
+  assert.match(api, /recentSignals/);
+  assert.match(page, /Atención ahora/);
+  assert.match(page, /Cambios recientes/);
+  assert.match(page, /Resto de la flota/);
+  assert.match(page, /La rotación automática afecta sólo a equipos sin atención prioritaria/);
+});
