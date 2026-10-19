@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
@@ -18,7 +18,7 @@ function load(relativePath, injections = {}) {
   }).outputText);
   const target = { exports: {} };
   runInNewContext(compiled.get(relativePath), {
-    exports: target.exports, Buffer, Response, Uint8Array,
+    exports: target.exports, Buffer, Response, Uint8Array, console: injections.console ?? console,
     require(name) {
       if (Object.hasOwn(injections, name)) return injections[name];
       if (name.startsWith('@/')) return load(`${name.slice(2)}.ts`, injections);
@@ -29,6 +29,8 @@ function load(relativePath, injections = {}) {
   return target.exports;
 }
 const evidence = load('lib/maintenance/workbook-evidence.ts');
+const manifestStorage = load('lib/maintenance/workbook-manifest-storage.ts');
+const identity = load('lib/maintenance/workbook-evidence-identity.ts');
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -205,8 +207,9 @@ class FakeNextResponse extends Response {
   static json(value, init) { return new FakeNextResponse(JSON.stringify(value), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } }); }
 }
 function harness(options = {}) {
-  const rows = new Map(); const objects = new Map(); const calls = [];
+  const rows = new Map(); const objects = new Map(); const manifestObjects = new Map(); const calls = []; const diagnostics = [];
   let failures = options.insertFailures ?? 0;
+  let inserted = false;
   const role = () => Object.hasOwn(options, 'role') ? options.role : options.denyRole ? 'lector' : 'admin';
   const database = {
     from(table) {
@@ -223,16 +226,24 @@ function harness(options = {}) {
         in(key, values) { query.filters.push((row) => values.includes(row[key])); return builder; },
         async maybeSingle() {
           calls.push({ kind: 'lookup', query });
+          if (options.recoveryLookupError && inserted) return { data: null, ...options.recoveryLookupError };
           const row = [...rows.values()].find((entry) => query.filters.every((predicate) => predicate(entry)));
           if (!row) return { data: null, error: null };
           if (query.columns === 'manifest:extracted_data->manifest') return { data: { manifest: row.extracted_data.manifest }, error: null };
           return { data: { ...row, extraction_schema: row.extracted_data?.schemaVersion,
             manifest_schema: row.extracted_data?.manifest?.schemaVersion, extraction_file: row.extracted_data?.manifest?.file,
-            extraction_counts: row.extracted_data?.manifest?.counts }, error: null };
+            extraction_counts: row.extracted_data?.manifest?.counts,
+            manifest_representation: row.extracted_data?.manifestRepresentation,
+            manifest_storage: row.extracted_data?.manifestStorage }, error: null };
         },
         async insert(row) {
           calls.push({ kind: 'insert', row });
-          if (failures-- > 0) return { error: { code: 'fixture-temporary-db-error' } };
+          inserted = true;
+          if (failures-- > 0) return options.insertError ?? { error: { code: 'FIXTURE_TEMPORARY_DB_ERROR' }, status: 503 };
+          if (options.beforeInsert) {
+            const outcome = await options.beforeInsert(row, { rows, objects, manifestObjects });
+            if (outcome) return outcome;
+          }
           if (options.archiveDuringInsert && !rows.has(row.id)) {
             rows.set(row.id, { ...row, is_active: false, deleted_at: '2026-10-18T18:00:00Z' });
           }
@@ -244,21 +255,25 @@ function harness(options = {}) {
       return builder;
     },
     storage: { from(bucket) {
-      assert.equal(bucket, 'module-documents');
+      assert.ok(['module-documents', manifestStorage.WORKBOOK_MANIFEST_BUCKET].includes(bucket));
+      const bucketObjects = bucket === 'module-documents' ? objects : manifestObjects;
       return {
         async upload(key, bytes, settings) {
-          calls.push({ kind: 'upload', key, settings });
+          calls.push({ kind: 'upload', bucket, key, settings });
           assert.equal(settings.upsert, false);
-          if (objects.has(key)) return { error: { statusCode: '409' } };
-          objects.set(key, Buffer.from(bytes)); return { error: null };
+          if (bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET && options.manifestUploadError) return options.manifestUploadError;
+          if (bucketObjects.has(key)) return { error: { statusCode: '409' } };
+          bucketObjects.set(key, Buffer.from(bytes)); return { error: null };
         },
         async download(key) {
-          calls.push({ kind: 'download', key });
+          calls.push({ kind: 'download', bucket, key });
           if (options.archiveDuringDownload) {
             const row = [...rows.values()].find((entry) => entry.file_path === key);
             if (row) { row.is_active = false; row.deleted_at = '2026-10-18T18:00:00Z'; }
           }
-          return objects.has(key) ? { data: new Blob([objects.get(key)]), error: null } : { error: { code: '404' } };
+          if (options.beforeDownload) await options.beforeDownload(bucket, key, { rows, objects, manifestObjects });
+          if (bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET && options.manifestDownloadError) return options.manifestDownloadError;
+          return bucketObjects.has(key) ? { data: new Blob([bucketObjects.get(key)]), error: null } : { error: { code: '404' } };
         },
       };
     } },
@@ -270,8 +285,12 @@ function harness(options = {}) {
     '@/lib/maintenance/workshop-site-scope': {},
   });
   const api = load('app/api/maintenance/source-workbooks/route.ts', {
+    console: { error: (...args) => diagnostics.push(plain(args)) },
     'next/server': { NextResponse: FakeNextResponse },
-    '@/lib/maintenance/workbook-evidence': evidence,
+    '@/lib/maintenance/workbook-evidence': { ...evidence, parseWorkbookEvidence(...args) {
+      const manifest = evidence.parseWorkbookEvidence(...args);
+      return options.transformManifest ? options.transformManifest(manifest) : manifest;
+    } },
     '@/lib/api/module-access': { MODULE_KEYS: { MANT_OPERACIONES: 'mant_operaciones' },
       async requireModuleAccess(_request, key, write = false) {
         calls.push({ kind: 'guard', key, write });
@@ -286,10 +305,10 @@ function harness(options = {}) {
     } },
     '@/lib/supabase-server': { getSupabaseServerClient: () => database },
   });
-  return { ...api, rows, objects, calls };
+  return { ...api, rows, objects, manifestObjects, calls, diagnostics };
 }
-function uploadRequest(bytes, action = 'analyze', extra = {}, gzip = true) {
-  const form = new FormData(); form.set('file', new Blob([bytes]), 'fixture.xlsx'); form.set('action', action);
+function uploadRequest(bytes, action = 'analyze', extra = {}, gzip = true, fileName = 'fixture.xlsx') {
+  const form = new FormData(); form.set('file', new Blob([bytes]), fileName); form.set('action', action);
   for (const [key, value] of Object.entries(extra)) form.set(key, value);
   return new Request('https://lab.invalid/api/maintenance/source-workbooks', { method: 'POST', body: form, headers: gzip ? { 'accept-encoding': 'gzip' } : {} });
 }
@@ -299,6 +318,26 @@ function sourceRequest(id) {
 async function body(response) {
   const bytes = Buffer.from(await response.arrayBuffer());
   return JSON.parse((response.headers.get('content-encoding') === 'gzip' ? gunzipSync(bytes) : bytes).toString('utf8'));
+}
+
+function legacyDraft(bytes, fileName = 'fixture.xlsx') {
+  const manifest = evidence.parseWorkbookEvidence(bytes, fileName);
+  const id = identity.workbookEvidenceDocumentId(ORG, manifest.file.sha256);
+  return {
+    id, organization_id: ORG, module: 'mantenimiento', category: 'source-workbooks', canonical_section: 'library',
+    canonical_role: 'supporting', provenance_status: 'supporting', document_name: fileName,
+    file_path: identity.workbookEvidenceStoragePath(ORG, id, 'xlsx'), file_size_bytes: bytes.length,
+    status: 'draft', version: 1, previous_version_id: null, is_active: true, deleted_at: null,
+    extracted_data: { schemaVersion: manifest.schemaVersion, manifest, review_status: 'unreviewed' },
+  };
+}
+
+function storeArtifactFixture(api, row, manifest) {
+  const artifact = manifestStorage.createWorkbookManifestArtifact(manifest, row.organization_id, row.id);
+  row.extracted_data = { schemaVersion: manifest.schemaVersion, manifestRepresentation: manifestStorage.WORKBOOK_MANIFEST_REPRESENTATION,
+    manifest: artifact.summary, manifestStorage: artifact.descriptor, review_status: 'unreviewed' };
+  api.manifestObjects.set(artifact.descriptor.path, artifact.bytes);
+  return artifact;
 }
 
 test('preview is authenticated MANT_OPERACIONES, tenant-bound and never persists', async () => {
@@ -361,7 +400,7 @@ test('saving rechecks module access when permission changes after analysis', asy
 });
 
 test('explicit save stores original bytes and server-derived manifest once; retry returns the persisted extraction', async () => {
-  const api = harness(); const bytes = emptyValueFixture();
+  const options = {}; const api = harness(options); const bytes = emptyValueFixture();
   const first = await body(await api.POST(uploadRequest(bytes, 'save-draft', { extractedData: '{"forged":true}', organizationId: 'spoofed' })));
   assert.equal(first.ok, true); assert.equal(first.persisted, true); assert.equal(first.reused, false);
   assert.deepEqual(first.capabilities, { canSaveDraft: true, reason: null });
@@ -370,29 +409,210 @@ test('explicit save stores original bytes and server-derived manifest once; retr
   assert.equal(row.provenance_status, 'supporting'); assert.equal(row.canonical_role, 'supporting');
   assert.equal(row.extracted_data.manifest.file.sha256, digest(bytes));
   assert.deepEqual(api.objects.get(row.file_path), bytes);
-  row.extracted_data.manifest.warnings.push('Persisted extraction marker');
-  const second = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  assert.equal(row.extracted_data.manifestRepresentation, 'storage-gzip-v1');
+  assert.equal(Object.hasOwn(row.extracted_data.manifest, 'sheets'), false);
+  assert.ok(Buffer.byteLength(JSON.stringify(row)) < 16 * 1024);
+  assert.deepEqual(JSON.parse(gunzipSync(api.manifestObjects.get(row.extracted_data.manifestStorage.path))), first.manifest);
+  options.transformManifest = (manifest) => ({ ...manifest, warnings: [...manifest.warnings, 'New parser run marker'] });
+  const second = await body(await api.POST(uploadRequest(bytes, 'save-draft', {}, true, 'renamed.xlsx')));
   assert.equal(second.reused, true); assert.equal(second.document.id, first.document.id);
   assert.deepEqual(second.capabilities, first.capabilities);
-  assert.ok(second.manifest.warnings.includes('Persisted extraction marker'));
-  assert.equal(api.calls.filter((call) => call.kind === 'upload').length, 1);
+  assert.deepEqual(second.manifest, first.manifest, 'the complete persisted extraction wins over a new parser result and filename');
+  assert.equal(second.document.fileName, 'fixture.xlsx');
+  assert.equal(api.calls.filter((call) => call.kind === 'upload' && call.bucket === 'module-documents').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'upload' && call.bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET).length, 1);
   assert.equal(api.rows.size, 1);
   api.objects.set(row.file_path, Buffer.from('corrupt bytes'));
   const conflict = await api.POST(uploadRequest(bytes, 'save-draft'));
   assert.equal(conflict.status, 409); assert.equal((await body(conflict)).code, 'ORIGINAL_HASH_MISMATCH');
 });
 
+test('an existing inline v1 draft remains literal and is never migrated or rewritten during retry', async () => {
+  const options = { transformManifest: (manifest) => ({ ...manifest, warnings: ['New parser marker'] }) };
+  const api = harness(options); const bytes = emptyValueFixture(); const row = legacyDraft(bytes, 'stored.xlsx');
+  row.extracted_data.manifest.warnings.push('Legacy persisted marker');
+  api.rows.set(row.id, row); api.objects.set(row.file_path, bytes);
+  const before = JSON.stringify(row);
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  assert.equal(saved.ok, true); assert.equal(saved.reused, true);
+  assert.deepEqual(saved.manifest, plain(row.extracted_data.manifest));
+  assert.equal(saved.document.fileName, 'stored.xlsx');
+  assert.equal(JSON.stringify(row), before);
+  assert.equal(api.manifestObjects.size, 0);
+  assert.equal(api.calls.some((call) => call.kind === 'upload' || call.kind === 'insert'), false);
+  options.archiveDuringDownload = true;
+  const archived = await api.POST(uploadRequest(bytes, 'save-draft'));
+  assert.equal(archived.status, 409); assert.equal((await body(archived)).code, 'DOCUMENT_ARCHIVED');
+});
+
 test('failed DB insert retains immutable bytes and retries safely; concurrent identical saves create one PK', async () => {
   const api = harness({ insertFailures: 1 }); const bytes = workbook();
   const failed = await api.POST(uploadRequest(bytes, 'save-draft'));
   assert.equal(failed.status, 503); assert.equal((await body(failed)).code, 'DRAFT_SAVE_INCOMPLETE');
-  assert.equal(api.objects.size, 1); assert.equal(api.rows.size, 0);
+  assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1); assert.equal(api.rows.size, 0);
   assert.equal((await api.POST(uploadRequest(bytes, 'save-draft'))).status, 200);
-  assert.equal(api.objects.size, 1); assert.equal(api.rows.size, 1);
+  assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1); assert.equal(api.rows.size, 1);
   const concurrent = harness();
   const results = await Promise.all([concurrent.POST(uploadRequest(bytes, 'save-draft')), concurrent.POST(uploadRequest(bytes, 'save-draft'))]);
   assert.ok(results.every((response) => response.status === 200));
-  assert.equal(concurrent.rows.size, 1); assert.equal(concurrent.objects.size, 1);
+  assert.equal(concurrent.rows.size, 1); assert.equal(concurrent.objects.size, 1); assert.equal(concurrent.manifestObjects.size, 1);
+});
+
+test('an original-only orphan is verified and completed under the same document identity without another version', async () => {
+  const api = harness(); const bytes = workbook(); const orphan = legacyDraft(bytes);
+  api.objects.set(orphan.file_path, Buffer.from(bytes));
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  assert.equal(saved.ok, true); assert.equal(saved.reused, false);
+  assert.equal(saved.document.id, orphan.id); assert.equal(saved.document.version, 1);
+  assert.equal(saved.document.previousVersionId, null);
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1);
+  assert.deepEqual(api.objects.get(orphan.file_path), bytes);
+  const sequence = api.calls.filter((call) => ['upload', 'download', 'insert'].includes(call.kind));
+  assert.deepEqual(sequence.map((call) => [call.kind, call.bucket ?? 'database']), [
+    ['upload', 'module-documents'], ['download', 'module-documents'],
+    ['upload', manifestStorage.WORKBOOK_MANIFEST_BUCKET], ['download', manifestStorage.WORKBOOK_MANIFEST_BUCKET], ['insert', 'database'],
+  ]);
+  const compact = api.rows.get(orphan.id).extracted_data;
+  assert.deepEqual(JSON.parse(gunzipSync(api.manifestObjects.get(compact.manifestStorage.path))), saved.manifest);
+});
+
+test('an existing gzip encoding can be reused only for the exact same complete JSON content', async () => {
+  const api = harness(); const bytes = workbook(); const orphan = legacyDraft(bytes);
+  const artifact = manifestStorage.createWorkbookManifestArtifact(orphan.extracted_data.manifest, ORG, orphan.id);
+  const otherEncoding = gzipSync(Buffer.from(JSON.stringify(orphan.extracted_data.manifest)), { level: 9 });
+  assert.notEqual(digest(otherEncoding), artifact.descriptor.gzipSha256);
+  api.objects.set(orphan.file_path, bytes); api.manifestObjects.set(artifact.descriptor.path, otherEncoding);
+  const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+  assert.equal(saved.ok, true);
+  const descriptor = api.rows.get(orphan.id).extracted_data.manifestStorage;
+  assert.equal(descriptor.jsonSha256, artifact.descriptor.jsonSha256);
+  assert.equal(descriptor.gzipSha256, digest(otherEncoding)); assert.equal(descriptor.gzipByteLength, otherEncoding.length);
+  assert.deepEqual(api.manifestObjects.get(descriptor.path), otherEncoding, 'immutable bytes are never replaced');
+});
+
+test('a committed concurrent winner is returned literally even after an ambiguous INSERT error', async () => {
+  const bytes = workbook();
+  const api = harness({ async beforeInsert(row, state) {
+    const winner = { ...row, document_name: 'winner.xlsx', is_active: true, deleted_at: null };
+    const manifest = JSON.parse(gunzipSync(state.manifestObjects.get(row.extracted_data.manifestStorage.path)));
+    manifest.file.name = 'winner.xlsx'; manifest.warnings.push('Persisted winner marker');
+    storeArtifactFixture(state, winner, manifest); state.rows.set(winner.id, winner);
+    return { error: { code: '', message: 'Transient connection lost after commit' }, status: 520 };
+  } });
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  assert.equal(response.status, 200);
+  const saved = await body(response);
+  assert.equal(saved.reused, true); assert.equal(saved.document.fileName, 'winner.xlsx');
+  assert.equal(saved.manifest.file.name, 'winner.xlsx');
+  assert.ok(saved.manifest.warnings.includes('Persisted winner marker'));
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
+  assert.equal(api.manifestObjects.size, 2, 'an unreferenced immutable loser is retained rather than race-deleted');
+  assert.deepEqual(saved.capabilities, { canSaveDraft: true, reason: null });
+});
+
+test('a manifest upload failure leaves a recoverable original and never inserts a pointer without verified bytes', async () => {
+  const options = { manifestUploadError: { error: { code: 'NoSuchBucket', statusCode: '400', message: 'private storage error' } } };
+  const api = harness(options); const bytes = workbook();
+  const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+  assert.equal(response.status, 503); assert.equal((await body(response)).code, 'STORED_MANIFEST_UNAVAILABLE');
+  assert.equal(api.rows.size, 0); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 0);
+  assert.equal(api.calls.some((call) => call.kind === 'insert'), false);
+  assert.ok(api.diagnostics.some((entry) => entry[1].stage === 'manifest_upload' && entry[1].status === 400));
+  delete options.manifestUploadError;
+  const recovered = await api.POST(uploadRequest(bytes, 'save-draft'));
+  assert.equal(recovered.status, 200); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1);
+});
+
+test('even a successful manifest upload must pass read-back verification before the compact INSERT', async () => {
+  const api = harness({ beforeDownload(bucket, key, state) {
+    if (bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET) state.manifestObjects.set(key, Buffer.from('damaged gzip'));
+  } });
+  const response = await api.POST(uploadRequest(workbook(), 'save-draft'));
+  assert.equal(response.status, 409); assert.equal((await body(response)).code, 'STORED_MANIFEST_INVALID');
+  assert.equal(api.rows.size, 0); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1);
+  assert.equal(api.calls.some((call) => call.kind === 'insert'), false);
+});
+
+test('invalid compact descriptors fail closed without fallback, foreign downloads, inserts or object changes', async () => {
+  const bytes = workbook();
+  const cases = [
+    (data) => { data.manifestStorage = null; },
+    (data) => { delete data.manifestRepresentation; },
+    (data) => { data.manifestRepresentation = 'unknown'; },
+    (data) => { data.manifestStorage.bucket = 'module-documents'; },
+    (data) => { data.manifestStorage.path = data.manifestStorage.path.replace(ORG, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'); },
+  ];
+  for (const alter of cases) {
+    const api = harness(); const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+    const row = api.rows.get(saved.document.id); alter(row.extracted_data);
+    const before = JSON.stringify(row); const storedObjects = [...api.manifestObjects].map(([key, value]) => [key, digest(value)]);
+    api.calls.length = 0;
+    const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+    assert.equal(response.status, 409); assert.equal((await body(response)).code, 'STORED_MANIFEST_INVALID');
+    assert.equal(api.calls.some((call) => call.kind === 'insert' || call.kind === 'upload' || (call.kind === 'download' && call.bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET)), false);
+    assert.equal(JSON.stringify(row), before);
+    assert.deepEqual([...api.manifestObjects].map(([key, value]) => [key, digest(value)]), storedObjects);
+  }
+});
+
+test('missing or corrupt saved artifacts are never replaced by a fresh parser result', async () => {
+  const bytes = workbook();
+  for (const corruption of ['missing', 'bytes', 'counts']) {
+    const api = harness(); const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+    const row = api.rows.get(saved.document.id); const key = row.extracted_data.manifestStorage.path;
+    if (corruption === 'missing') api.manifestObjects.delete(key);
+    else if (corruption === 'bytes') api.manifestObjects.set(key, Buffer.from('wrong compressed bytes'));
+    else row.extracted_data.manifest.counts.cachedFormulaCells += 1;
+    const before = JSON.stringify(row); api.calls.length = 0;
+    const response = await api.POST(uploadRequest(bytes, 'save-draft'));
+    assert.equal(response.status, corruption === 'missing' ? 503 : 409);
+    assert.equal((await body(response)).code, corruption === 'missing' ? 'STORED_MANIFEST_UNAVAILABLE' : 'STORED_MANIFEST_INVALID');
+    assert.equal(api.calls.some((call) => call.kind === 'insert' || call.kind === 'upload'), false);
+    assert.equal(JSON.stringify(row), before);
+  }
+});
+
+test('deletion or reference changes during a saved artifact download do not confirm a stale draft', async () => {
+  const bytes = workbook();
+  for (const change of ['delete', 'descriptor']) {
+    const options = {}; const api = harness(options); const saved = await body(await api.POST(uploadRequest(bytes, 'save-draft')));
+    const row = api.rows.get(saved.document.id);
+    options.beforeDownload = (bucket, key, state) => {
+      if (bucket !== manifestStorage.WORKBOOK_MANIFEST_BUCKET) return;
+      if (change === 'delete') { row.deleted_at = '2026-10-19T11:00:00Z'; row.is_active = false; }
+      else {
+        const different = JSON.parse(gunzipSync(state.manifestObjects.get(key)));
+        different.warnings.push('Metadata changed during read'); storeArtifactFixture(state, row, different);
+      }
+    };
+    api.calls.length = 0;
+    const response = await api.POST(uploadRequest(bytes, 'save-draft')); const result = await body(response);
+    assert.equal(response.status, 409);
+    assert.equal(result.code, change === 'delete' ? 'DOCUMENT_ARCHIVED' : 'EXISTING_DOCUMENT_CONFLICT');
+    assert.equal(api.calls.some((call) => call.kind === 'insert' || call.kind === 'upload'), false);
+  }
+});
+
+test('an INSERT 520 followed by recovery GET 521 preserves the primary diagnostic without leaking private data', async () => {
+  const privateText = 'private-person-file.xlsx';
+  const options = { insertFailures: 1,
+    insertError: { status: 520, error: { code: '', message: privateText, details: `${ORG} ${USER}`, hint: 'payload must not escape' } },
+    recoveryLookupError: { status: 521, error: { code: '57P03', message: privateText, details: ORG } },
+  };
+  const api = harness(options); const bytes = workbook();
+  const response = await api.POST(uploadRequest(bytes, 'save-draft', {}, true, privateText));
+  const result = await body(response);
+  assert.equal(response.status, 503); assert.equal(result.code, 'DRAFT_SAVE_UNCONFIRMED');
+  assert.deepEqual(result.details, { stage: 'document_insert', status: 520, code: 'UNCLASSIFIED', recoveryLookupFailed: true });
+  assert.deepEqual(api.diagnostics.map((entry) => entry[1]), [
+    { stage: 'document_lookup', status: 521, code: '57P03' }, { stage: 'document_insert', status: 520, code: 'UNCLASSIFIED' },
+  ]);
+  const exposed = JSON.stringify([result, api.diagnostics]);
+  for (const secret of [privateText, ORG, USER, 'payload must not escape']) assert.equal(exposed.includes(secret), false);
+  assert.equal(api.rows.size, 0); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1);
+  delete options.recoveryLookupError;
+  assert.equal((await api.POST(uploadRequest(bytes, 'save-draft', {}, true, privateText))).status, 200);
+  assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1); assert.equal(api.manifestObjects.size, 1);
 });
 
 test('an archived deterministic identity returns 409 before uploading or inserting without altering its tombstone', async () => {
@@ -419,7 +639,8 @@ test('an archive racing the insert yields the same scoped 409 and never restores
   const rejected = await body(response);
   assert.equal(response.status, 409); assert.equal(rejected.code, 'DOCUMENT_ARCHIVED');
   assert.doesNotMatch(rejected.error, /reintent|inténtalo/i);
-  assert.equal(api.calls.filter((call) => call.kind === 'upload').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'upload' && call.bucket === 'module-documents').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'upload' && call.bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET).length, 1);
   assert.equal(api.calls.filter((call) => call.kind === 'insert').length, 1);
   assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
   const row = [...api.rows.values()][0]; const snapshot = JSON.stringify(row);
@@ -440,7 +661,8 @@ test('a deletion during an existing draft download returns 409 instead of sugges
   assert.equal(response.status, 409); assert.equal(rejected.code, 'DOCUMENT_ARCHIVED');
   assert.doesNotMatch(rejected.error, /reintent|inténtalo/i);
   assert.equal(api.calls.some((call) => call.kind === 'upload' || call.kind === 'insert'), false);
-  assert.equal(api.calls.filter((call) => call.kind === 'download').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'download' && call.bucket === 'module-documents').length, 1);
+  assert.equal(api.calls.filter((call) => call.kind === 'download' && call.bucket === manifestStorage.WORKBOOK_MANIFEST_BUCKET).length, 1);
   const row = api.rows.get(saved.document.id);
   assert.ok(row.deleted_at); assert.equal(row.is_active, false);
   assert.equal(api.rows.size, 1); assert.equal(api.objects.size, 1);
@@ -498,8 +720,17 @@ test('large complete manifests use gzip; transport rejection happens before expl
   const api = harness();
   const rejected = await api.POST(uploadRequest(bytes, 'save-draft', {}, false));
   assert.equal(rejected.status, 406); assert.equal((await body(rejected)).code, 'GZIP_REQUIRED');
-  assert.equal(api.objects.size, 0); assert.equal(api.rows.size, 0);
+  assert.equal(api.objects.size, 0); assert.equal(api.manifestObjects.size, 0); assert.equal(api.rows.size, 0);
   const response = await api.POST(uploadRequest(bytes));
   assert.equal(response.status, 200); assert.equal(response.headers.get('content-encoding'), 'gzip');
   const parsed = await body(response); assert.equal(parsed.counts.cells, 12000); assert.equal(parsed.manifest.sheets[0].cells.length, 12000);
+  const savedResponse = await api.POST(uploadRequest(bytes, 'save-draft'));
+  assert.equal(savedResponse.status, 200); assert.equal(savedResponse.headers.get('content-encoding'), 'gzip');
+  const saved = await body(savedResponse); assert.equal(saved.manifest.sheets[0].cells.length, 12000);
+  const row = api.rows.get(saved.document.id); const inserted = api.calls.find((call) => call.kind === 'insert').row;
+  assert.ok(Buffer.byteLength(JSON.stringify(inserted)) < 16 * 1024, 'database payload is bounded independently of cell count');
+  assert.equal(JSON.stringify(inserted).includes('"sheets":['), false);
+  assert.equal(JSON.stringify(inserted).includes('"cells":['), false);
+  const complete = JSON.parse(gunzipSync(api.manifestObjects.get(row.extracted_data.manifestStorage.path)));
+  assert.deepEqual(complete, saved.manifest, 'all cells and metadata survive full artifact storage');
 });
