@@ -487,13 +487,14 @@ export async function GET(request: NextRequest) {
       acc[row.lifecycleStage] = (acc[row.lifecycleStage] || 0) + 1;
       return acc;
     }, {});
-    const preventiveBasis = preventiveRows.reduce((acc: { hours: number; km: number; other: number }, row: any) => {
+    const preventiveBasis = preventiveRows.reduce((acc: { hours: number; km: number; annual: number; other: number }, row: any) => {
       const unit = String(row.meterUnit || '').toLowerCase();
       if (/^h$|hr|hora/.test(unit)) acc.hours += 1;
       else if (/km|kil[oó]m/.test(unit)) acc.km += 1;
+      else if (/anual|año|year/.test(unit)) acc.annual += 1;
       else acc.other += 1;
       return acc;
-    }, { hours: 0, km: 0, other: 0 });
+    }, { hours: 0, km: 0, annual: 0, other: 0 });
 
     const recentSignals = [...rows]
       .filter((row) => row.latestSignalAt)
