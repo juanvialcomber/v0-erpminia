@@ -153,6 +153,18 @@ export async function downloadGreenApiEvidenceBatch(limit = 2) {
         });
         throw new Error('invalid_download_response');
       }
+      // A malformed provider URL is a transient contract failure, not evidence of an
+      // untrusted host. Retry it within the existing five-attempt budget.
+      // Keep well-formed but untrusted hosts permanently blocked (SSRF defense).
+      try {
+        new URL(downloadUrl);
+      } catch {
+        console.warn('[whatsapp-evidence] provider returned malformed downloadUrl', {
+          source_type: job.source_type,
+          value_length: downloadUrl.length,
+        });
+        throw new Error('invalid_download_response');
+      }
       if (!isTrustedGreenMediaUrl(downloadUrl)) {
         // Hostname-only telemetry is safe; media URLs often contain signed secrets.
         let hostname = 'invalid';
