@@ -36,7 +36,7 @@ import {
 
 type CalendarSource = 'maintenance' | 'hse' | 'legal' | 'procurement' | 'finance' | 'people';
 type CalendarScope = 'active' | 'historical' | 'all';
-type CalendarPeriod = '7' | '14' | 'month';
+type CalendarPeriod = '7' | '14' | '21' | 'month';
 
 type OperationalCalendarItem = {
   id: string;
@@ -117,6 +117,7 @@ const BAR_HEIGHT = 42;
 const PERIOD_CONFIG: Record<CalendarPeriod, { label: string; days: number; dayWidth: number }> = {
   '7': { label: '7 días', days: 7, dayWidth: 112 },
   '14': { label: '14 días', days: 14, dayWidth: 86 },
+  '21': { label: '3 semanas', days: 21, dayWidth: 72 },
   month: { label: 'Mes', days: 31, dayWidth: 48 },
 };
 
@@ -204,7 +205,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   const [scope, setScope] = useState<CalendarScope>('all');
   const [perspective, setPerspective] = useState<'mine' | 'area' | 'organization'>(initialArea ? 'area' : 'mine');
   const [source, setSource] = useState<'all' | CalendarSource>(initialArea || 'all');
-  const [period, setPeriod] = useState<CalendarPeriod>('14');
+  const [period, setPeriod] = useState<CalendarPeriod>('21');
   const [anchorDate, setAnchorDate] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('all');
@@ -219,8 +220,10 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   );
 
   const today = data?.range.today || toDateKey(new Date());
-  // Open on Monday: the two-week view shows this week AND the coming work week.
-  const currentAnchor = anchorDate || startOfChileanWorkWeek(today);
+  // Default operational window: previous week + current week + coming week.
+  // Keeping one week behind preserves recently closed OTs in the same context as upcoming work.
+  const currentWeekStart = startOfChileanWorkWeek(today);
+  const currentAnchor = anchorDate || addDays(currentWeekStart, -7);
   const periodConfig = PERIOD_CONFIG[period];
   const dates = useMemo(
     () => buildDates(currentAnchor, periodConfig.days),
@@ -298,7 +301,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
           <Button variant="outline" size="sm" onClick={() => shiftPeriod(1)}>
             Siguiente <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setPerspective("area"); setSource("maintenance"); setScope("historical"); setPeriod("14"); setAnchorDate(addDays(today, -13)); }} disabled={data?.allowedSources?.maintenance === false}>
+          <Button variant="outline" size="sm" onClick={() => { setPerspective("area"); setSource("maintenance"); setScope("historical"); setPeriod("21"); setAnchorDate(addDays(startOfChileanWorkWeek(today), -7)); }} disabled={data?.allowedSources?.maintenance === false}>
             <History className="mr-1 h-4 w-4" /> OT finalizadas
           </Button>
           <Button variant="outline" size="sm" onClick={() => void mutate()} disabled={isValidating}>
@@ -348,6 +351,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
           <SelectContent>
             <SelectItem value="7">7 días</SelectItem>
             <SelectItem value="14">14 días</SelectItem>
+            <SelectItem value="21">3 semanas</SelectItem>
             <SelectItem value="month">Mes</SelectItem>
           </SelectContent>
         </Select>
@@ -607,7 +611,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
       ) : null}
 
       <p className="text-xs leading-5 text-muted-foreground">
-        Vista continua de solo lectura. Abre un registro para ver su detalle; usa Anterior para revisar días pasados. Las modificaciones se realizan en el módulo responsable.
+        Vista continua de solo lectura. Por defecto muestra la semana anterior, la actual y la próxima para conservar contexto de OT cerradas y trabajo planificado. Las modificaciones se realizan en el módulo responsable.
       </p>
     </div>
   );
