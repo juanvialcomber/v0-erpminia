@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getInventoryConflictEvidence } from '@/lib/inventory-trust';
 
 const LA_PATAGUA_ORGANIZATION_ID = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
 
@@ -41,10 +42,13 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
 
     if (skus.length === 0) return NextResponse.json({ data });
 
-    const { data: bodegaRows, error: bodegaError } = await context.supabase
-      .from('bodega_inventory')
-      .select('sku,quantity,quantity_reported,updated_at')
-      .in('sku', skus);
+    const [{ data: bodegaRows, error: bodegaError }, conflictEvidence] = await Promise.all([
+      context.supabase
+        .from('bodega_inventory')
+        .select('sku,quantity,quantity_reported,updated_at')
+        .in('sku', skus),
+      getInventoryConflictEvidence(context.supabase, context.organizationId),
+    ]);
     if (bodegaError) throw bodegaError;
 
     const informedBySku = new Map(
@@ -62,11 +66,14 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
       data: {
         ...data,
         materials: materials.map((row: any) => {
-          const signal = informedBySku.get(String(row.product_code || '').trim().toUpperCase()) || null;
+          const code = String(row.product_code || '').trim().toUpperCase();
+          const signal = informedBySku.get(code) || null;
+          const conflict = conflictEvidence.conflictCodes.has(code);
           return {
             ...row,
-            informed_available: signal?.informedAvailable ?? null,
+            informed_available: conflict ? null : signal?.informedAvailable ?? null,
             informed_updated_at: signal?.informedUpdatedAt ?? null,
+            informed_status: conflict ? 'conflict' : signal ? 'usable' : 'missing',
             informed_source: signal ? 'bodega_inventory' : null,
           };
         }),
