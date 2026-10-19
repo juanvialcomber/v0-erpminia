@@ -336,6 +336,7 @@ function PreventiveSlide({ data }: { data: any }) {
         <div className="mt-5 grid gap-2">
           <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
           <BasisRow label="Kilómetros" value={data?.lifecycle?.preventiveBasis?.km || 0} />
+          <BasisRow label="Anual" value={data?.lifecycle?.preventiveBasis?.annual || 0} />
           <BasisRow label="Otra / sin unidad" value={data?.lifecycle?.preventiveBasis?.other || 0} />
         </div>
         <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
