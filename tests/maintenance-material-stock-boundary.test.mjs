@@ -26,13 +26,15 @@ test('material editor tells planner that availability and reservation are distin
   assert.match(coverage, /Stock informado/);
   assert.match(coverage, /Reservable ahora/);
   assert.match(coverage, /La reserva real se confirma sólo al agregar el material a la OT/);
-  assert.match(coverage, /Informado \{item\.informedQuantity/);
+  assert.match(coverage, /item\.informedStatus === 'conflict'/);
+  assert.match(coverage, /item\.informedQuantity/);
   assert.match(coverage, /Reservable \{item\.reservableQuantity/);
 });
 
 
 test('OT creation shows advisory stock and canonical reservation separately', () => {
-  assert.match(createWorkOrder, /Informado \{item\.informedQuantity/);
+  assert.match(createWorkOrder, /Informado: En conciliación/);
+  assert.match(createWorkOrder, /item\.informedQuantity/);
   assert.match(createWorkOrder, /Reservable \{item\.reservableQuantity/);
   assert.match(createWorkOrder, /Con reserva posible/);
   assert.match(createWorkOrder, /la reserva se intenta contra Bodega canónica/);
