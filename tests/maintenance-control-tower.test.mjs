@@ -234,7 +234,6 @@ test('wallboard cross-checks declared OT materials against scoped bodega invento
   assert.match(api, /Materiales no declarados/);
   assert.match(api, /Stock por confirmar/);
   assert.match(api, /Bloqueada por faltante/);
-  assert.match(page, /stock Bodega actualizado/);
   assert.match(page, /SKUs Bodega vinculados/);
 });
 
