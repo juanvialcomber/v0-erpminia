@@ -45,6 +45,7 @@ type CatalogRow = {
   unit: string | null;
   informedQuantity: number | null;
   informedUpdatedAt: string | null;
+  informedStatus: 'usable' | 'conflict' | 'missing';
   reservableQuantity: number;
   reservableUpdatedAt: string | null;
   stockSignalSource: string | null;
@@ -227,13 +228,13 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm">
             <p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p>
             <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
-              <p>Stock informado: {selected.informedQuantity == null ? 'Sin señal reciente' : `${selected.informedQuantity} ${selected.unit || 'unid.'}`}</p>
+              <p>Stock informado: {selected.informedStatus === 'conflict' ? 'En conciliación' : selected.informedQuantity == null ? 'Sin señal reciente' : `${selected.informedQuantity} ${selected.unit || 'unid.'}`}</p>
               <p>Reservable ahora: {selected.reservableQuantity} {selected.unit || 'unid.'}</p>
               <p>La reserva real se confirma sólo al agregar el material a la OT.</p>
             </div>
           </div> : null}
           {!selected && query.trim().length >= 2 ? <div className="mt-3 max-h-56 overflow-auto rounded-md border bg-card">
-            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.family ? `${item.family} · ` : ''}Informado {item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}</p></button>)}
+            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.family ? `${item.family} · ` : ''}Informado {item.informedStatus === 'conflict' ? 'En conciliación' : item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}</p></button>)}
           </div> : null}
         </div> : null}
 
