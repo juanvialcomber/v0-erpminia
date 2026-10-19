@@ -26,8 +26,12 @@ test('live wallboard master assembles canonical state and evidence without a sec
 test('control tower applies freshness and excludes stale planning recommendations', () => {
   assert.match(api, /operationalCutoff/);
   assert.match(api, /planningCurrent/);
+  assert.match(api, /operationalCutoff/);
+  assert.match(api, /sameOrAfter\(planningAt\?\.slice\(0, 10\) \|\| null, operationalCutoff\)/);
   assert.match(api, /activeRecommendation = planningCurrent/);
   assert.match(api, /stalePlanningAssets/);
+  assert.match(api, /planningPriority: planningCurrent \?/);
+  assert.match(api, /partsPending =\n        \(planningCurrent && isPartsPending/);
 });
 
 test('control tower includes email and whatsapp freshness plus unresolved email evidence', () => {
