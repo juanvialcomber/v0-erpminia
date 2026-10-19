@@ -386,8 +386,16 @@ export async function GET(request: NextRequest) {
     const attentionRows = currentRows.filter((row) => row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending);
 
     const preventiveRows = currentRows.filter((row) => row.nextDueMeter != null || row.reportedMpStatus || row.planningPriority);
-    const overduePreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter <= 0);
-    const dueSoonPreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter > 0 && row.remainingMeter <= 100);
+    const overduePreventive = preventiveRows.filter((row) =>
+      /vencid/i.test(String(row.reportedMpStatus || '')) ||
+      (row.remainingMeter != null && row.remainingMeter <= 0)
+    );
+    const dueSoonPreventive = preventiveRows.filter((row) =>
+      /pr[oó]xim/i.test(String(row.reportedMpStatus || ''))
+    );
+    const dateReviewPreventive = preventiveRows.filter((row) =>
+      /revisar fecha/i.test(String(row.reportedMpStatus || ''))
+    );
     const stalePlanning = rows.filter((row) => row.planningImportedAt && !row.planningCurrent);
 
     const assigneeCoordination = [...openWorkOrders.reduce((map, order: any) => {
@@ -546,6 +554,7 @@ export async function GET(request: NextRequest) {
         preventiveTracked: preventiveRows.length,
         preventiveOverdue: overduePreventive.length,
         preventiveDueSoon: dueSoonPreventive.length,
+        preventiveDateReview: dateReviewPreventive.length,
         stalePlanningAssets: stalePlanning.length,
         pendingEmailMatches: (pendingEmailResult.data || []).filter((row: any) => !operationalCutoff || String(row.report_date || '') >= operationalCutoff).length,
         pendingWhatsAppInputs: pendingWhatsappInputs.length,
