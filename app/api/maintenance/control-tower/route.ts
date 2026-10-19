@@ -703,7 +703,7 @@ export async function GET(request: NextRequest) {
         latestEmailSubject: textValue(latestEmailResult.data?.email_subject),
         latestEmailFilename: textValue(latestEmailResult.data?.filename),
         latestWhatsAppAt,
-        latestPublishedWhatsAppAt,
+        latestPublishedWhatsAppAt: latestPublishedWhatsappAt,
       },
       attentionRows: attentionRows.slice(0, 40),
       stoppedRows: stoppedRows.slice(0, 40),
