@@ -4,33 +4,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
-const OPEN_WORK_ORDER_STATES = ['open', 'assigned', 'pending', 'planned', 'in_progress', 'in-progress', 'paused'];
-
-function asText(value: unknown) {
-  const text = String(value ?? '').trim();
-  return text || null;
+function textValue(value: unknown) {
+  const valueText = String(value ?? '').trim();
+  return valueText || null;
 }
 
-function asNumber(value: unknown) {
+function numberValue(value: unknown) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function priorityRank(priority: unknown) {
-  const text = String(priority ?? '').toUpperCase();
-  if (text.startsWith('P1')) return 1;
-  if (text.startsWith('P2')) return 2;
-  if (text.startsWith('P3')) return 3;
-  if (text.startsWith('P4')) return 4;
+  const value = String(priority ?? '').toUpperCase();
+  if (value.startsWith('P1')) return 1;
+  if (value.startsWith('P2')) return 2;
+  if (value.startsWith('P3')) return 3;
+  if (value.startsWith('P4')) return 4;
   return 9;
-}
-
-function ageDays(importedAt: string | null) {
-  if (!importedAt) return null;
-  const timestamp = Date.parse(importedAt);
-  if (Number.isNaN(timestamp)) return null;
-  return Math.max(0, Math.floor((Date.now() - timestamp) / 86400000));
 }
 
 export async function GET(request: NextRequest) {
@@ -41,120 +32,136 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const [sourceResult, planningResult, workOrdersResult] = await Promise.all([
+    const [masterResult, pendingEmailResult, sourceResult, whatsappResult] = await Promise.all([
       context.supabase
-        .from('planning_maintenance_source_imports')
-        .select('id,source_file,source_owner,source_role,source_sheet,imported_at,status,notes')
+        .from('motil_maintenance_live_master_v1')
+        .select('*')
         .eq('organization_id', context.organizationId)
-        .order('imported_at', { ascending: false })
+        .order('latest_signal_at', { ascending: false, nullsFirst: false })
+        .limit(5000),
+      context.supabase
+        .from('motil_email_equipment_meter_stage')
+        .select('id,report_date,asset_name_raw,mine_name,reported_equipment_status,reported_issue,reported_work,parts_requested,review_status,source_manifest_id')
+        .eq('organization_id', context.organizationId)
+        .is('candidate_asset_id', null)
+        .order('report_date', { ascending: false })
+        .limit(1000),
+      context.supabase
+        .from('motil_email_source_manifest')
+        .select('email_sent_at,email_sender,email_subject,filename,ingest_state,domain')
+        .eq('organization_id', context.organizationId)
+        .order('email_sent_at', { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle(),
       context.supabase
-        .from('planning_maintenance_priority_v1')
-        .select('source_row_id,canonical_asset_id,asset_code,asset_name,mine_raw,meter_unit,current_reading,next_due_meter,remaining_meter,priority,recommended_action,scheduled_date,programming_status_raw,responsible_raw,parts_status_raw,observations,match_method,match_score,source_file,imported_at')
+        .from('motil_whatsapp_messages')
+        .select('occurred_at')
         .eq('organization_id', context.organizationId)
-        .order('total_score', { ascending: false, nullsFirst: false })
-        .order('asset_name', { ascending: true })
-        .limit(2000),
-      context.supabase
-        .from('maintenance_work_orders')
-        .select('id,work_order_number,canonical_asset_id,status,priority,scheduled_date,assigned_to_name,updated_at')
-        .eq('organization_id', context.organizationId)
-        .in('status', OPEN_WORK_ORDER_STATES)
-        .order('updated_at', { ascending: false })
-        .limit(1000),
+        .order('occurred_at', { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
-    const error = sourceResult.error || planningResult.error || workOrdersResult.error;
+    const error = masterResult.error || pendingEmailResult.error || sourceResult.error || whatsappResult.error;
     if (error) throw error;
 
-    const openWorkOrdersByAsset = new Map<string, any[]>();
-    for (const row of workOrdersResult.data || []) {
-      const assetId = asText(row.canonical_asset_id);
-      if (!assetId) continue;
-      const list = openWorkOrdersByAsset.get(assetId) || [];
-      list.push(row);
-      openWorkOrdersByAsset.set(assetId, list);
-    }
+    const rows = (masterResult.data || []).map((row: any) => ({
+      canonicalAssetId: row.canonical_asset_id,
+      assetCode: textValue(row.asset_code),
+      assetName: textValue(row.asset_name) || 'Equipo sin nombre',
+      site: textValue(row.site) || 'Sin faena',
+      canonicalStatus: textValue(row.canonical_status),
+      canonicalStatusReason: textValue(row.canonical_status_reason),
+      canonicalStatusChangedAt: textValue(row.canonical_status_changed_at),
 
-    const rows = (planningResult.data || []).map((row: any) => {
-      const assetId = asText(row.canonical_asset_id);
-      const openWorkOrders = assetId ? openWorkOrdersByAsset.get(assetId) || [] : [];
-      const primaryWorkOrder = openWorkOrders[0] || null;
-      return {
-        id: asText(row.source_row_id) || asText(row.canonical_asset_id) || `${row.asset_name || 'asset'}-${row.mine_raw || 'site'}`,
-        canonicalAssetId: assetId,
-        assetCode: asText(row.asset_code),
-        assetName: asText(row.asset_name) || 'Equipo sin nombre',
-        site: asText(row.mine_raw) || 'Sin faena',
-        meterUnit: asText(row.meter_unit),
-        currentReading: asNumber(row.current_reading),
-        nextDueMeter: asNumber(row.next_due_meter),
-        remainingMeter: asNumber(row.remaining_meter),
-        priority: asText(row.priority) || 'Sin prioridad',
-        priorityRank: priorityRank(row.priority),
-        recommendedAction: asText(row.recommended_action),
-        scheduledDate: asText(row.scheduled_date),
-        programmingStatus: asText(row.programming_status_raw) || 'Sin estado',
-        responsible: asText(row.responsible_raw),
-        partsStatus: asText(row.parts_status_raw) || 'Sin estado',
-        observations: asText(row.observations),
-        matchMethod: asText(row.match_method),
-        matchScore: asNumber(row.match_score),
-        sourceFile: asText(row.source_file),
-        importedAt: asText(row.imported_at),
-        openWorkOrders: openWorkOrders.length,
-        workOrderNumber: asText(primaryWorkOrder?.work_order_number),
-        workOrderStatus: asText(primaryWorkOrder?.status),
-        workOrderPriority: asText(primaryWorkOrder?.priority),
-        workOrderScheduledDate: asText(primaryWorkOrder?.scheduled_date),
-        workOrderAssignee: asText(primaryWorkOrder?.assigned_to_name),
-      };
+      planningPriority: textValue(row.planning_priority),
+      priorityRank: priorityRank(row.planning_priority),
+      planningMeterUnit: textValue(row.planning_meter_unit),
+      planningCurrentReading: numberValue(row.planning_current_reading),
+      planningNextDueMeter: numberValue(row.planning_next_due_meter),
+      planningRemainingMeter: numberValue(row.planning_remaining_meter),
+      recommendedAction: textValue(row.recommended_action),
+      planningScheduledDate: textValue(row.planning_scheduled_date),
+      programmingStatus: textValue(row.programming_status_raw),
+      responsible: textValue(row.responsible_raw),
+      partsStatus: textValue(row.parts_status_raw),
+      planningObservations: textValue(row.planning_observations),
+      planningSourceFile: textValue(row.planning_source_file),
+      planningImportedAt: textValue(row.planning_imported_at),
+
+      emailReportDate: textValue(row.email_report_date),
+      emailSentAt: textValue(row.email_sent_at),
+      emailSubject: textValue(row.email_subject),
+      emailFilename: textValue(row.email_filename),
+      emailMeterUnit: textValue(row.email_meter_unit),
+      emailMeterValue: numberValue(row.email_meter_value),
+      emailReportedMpStatus: textValue(row.reported_mp_status),
+      emailReportedStatus: textValue(row.reported_equipment_status),
+      emailIssue: textValue(row.reported_issue),
+      emailWork: textValue(row.reported_work),
+      emailPartsRequested: textValue(row.parts_requested),
+      emailReviewStatus: textValue(row.email_review_status),
+
+      whatsappOccurredAt: textValue(row.whatsapp_occurred_at),
+      whatsappGroup: textValue(row.whatsapp_group),
+      whatsappSender: textValue(row.whatsapp_sender_name),
+      whatsappDescription: textValue(row.whatsapp_description),
+      whatsappEventClass: textValue(row.whatsapp_event_class),
+
+      openWorkOrders: Number(row.open_work_orders || 0),
+      nextWorkOrderDate: textValue(row.next_work_order_date),
+      latestSignalAt: textValue(row.latest_signal_at),
+      latestSignalSource: textValue(row.latest_signal_source),
+    }));
+
+    rows.sort((a, b) => {
+      const aAttention = (a.openWorkOrders > 0 ? 100 : 0) + (a.priorityRank === 1 ? 50 : a.priorityRank === 2 ? 25 : 0);
+      const bAttention = (b.openWorkOrders > 0 ? 100 : 0) + (b.priorityRank === 1 ? 50 : b.priorityRank === 2 ? 25 : 0);
+      if (aAttention !== bAttention) return bAttention - aAttention;
+      return String(b.latestSignalAt || '').localeCompare(String(a.latestSignalAt || ''));
     });
-
-    const source = sourceResult.data || null;
-    const importedAt = asText(source?.imported_at) || (rows[0]?.importedAt ?? null);
-    const sourceAgeDays = ageDays(importedAt);
-    const sites = Array.from(new Set(rows.map((row) => row.site))).sort((a, b) => a.localeCompare(b, 'es'));
 
     const p1 = rows.filter((row) => row.priorityRank === 1).length;
     const p2 = rows.filter((row) => row.priorityRank === 2).length;
-    const scheduled = rows.filter((row) => /programado/i.test(row.programmingStatus) && !/no programado/i.test(row.programmingStatus)).length;
-    const partsPending = rows.filter((row) => /pendiente|faltante|solicitud|comprar/i.test(row.partsStatus)).length;
-    const unmatched = rows.filter((row) => !row.canonicalAssetId).length;
-    const openWorkOrders = Array.from(openWorkOrdersByAsset.values()).reduce((sum, list) => sum + list.length, 0);
+    const openWorkOrders = rows.reduce((sum, row) => sum + row.openWorkOrders, 0);
+    const withRecentEmail = rows.filter((row) => row.emailSentAt).length;
+    const withWhatsApp = rows.filter((row) => row.whatsappOccurredAt).length;
+    const pendingEmail = pendingEmailResult.data || [];
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
-      source: {
-        file: asText(source?.source_file) || rows[0]?.sourceFile || null,
-        owner: asText(source?.source_owner),
-        role: asText(source?.source_role),
-        sheet: asText(source?.source_sheet),
-        importedAt,
-        status: asText(source?.status),
-        notes: asText(source?.notes),
-        ageDays: sourceAgeDays,
-        freshness: sourceAgeDays == null ? 'unknown' : sourceAgeDays <= 1 ? 'fresh' : sourceAgeDays <= 7 ? 'aging' : 'stale',
-      },
+      refreshSeconds: 60,
+      mode: 'read_only',
       summary: {
-        total: rows.length,
+        activeAssets: rows.length,
         p1,
         p2,
         urgent: p1 + p2,
-        scheduled,
-        partsPending,
         openWorkOrders,
-        unmatched,
+        linkedEmailAssets: withRecentEmail,
+        linkedWhatsAppAssets: withWhatsApp,
+        pendingEmailMatches: pendingEmail.length,
       },
-      sites,
+      freshness: {
+        latestEmailAt: textValue(sourceResult.data?.email_sent_at),
+        latestEmailSubject: textValue(sourceResult.data?.email_subject),
+        latestEmailFilename: textValue(sourceResult.data?.filename),
+        latestWhatsAppAt: textValue(whatsappResult.data?.occurred_at),
+      },
+      pendingEmail: pendingEmail.slice(0, 30).map((row: any) => ({
+        id: row.id,
+        reportDate: textValue(row.report_date),
+        assetNameRaw: textValue(row.asset_name_raw),
+        site: textValue(row.mine_name),
+        reportedStatus: textValue(row.reported_equipment_status),
+        issue: textValue(row.reported_issue),
+        work: textValue(row.reported_work),
+        partsRequested: textValue(row.parts_requested),
+        reviewStatus: textValue(row.review_status),
+      })),
       rows,
-      mode: 'read_only',
-      refreshSeconds: 60,
     }, {
-      headers: {
-        'Cache-Control': 'no-store, max-age=0',
-      },
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
   } catch (error) {
     return NextResponse.json(
