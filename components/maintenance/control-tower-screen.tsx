@@ -366,12 +366,12 @@ function ScheduleSlide({ data }: { data: any }) {
         <SmallMetric label="Vencidas" value={data?.summary?.overdueOpenWorkOrders} />
         <SmallMetric label="Para hoy" value={data?.summary?.dueTodayOpenWorkOrders} />
         <SmallMetric label="Para mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} />
-        <SmallMetric label="En ejecución / pausa" value={data?.summary?.inProgressOpenWorkOrders} />
+        <SmallMetric label="Mañana por confirmar" value={data?.summary?.dueTomorrowNotReadyWorkOrders} />
         <SmallMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders} />
       </div>
       <Panel title="Programa de ejecución" subtitle="Lo que Planificación debe coordinar con taller y responsables">
         <DataTable
-          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Bodega']}
+          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
           rows={open.slice(0, 12).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
@@ -379,13 +379,7 @@ function ScheduleSlide({ data }: { data: any }) {
             row.assignedTo || 'Sin responsable',
             `${row.overdue ? 'Vencida · ' : row.scheduledDate === today ? 'Hoy · ' : row.scheduledDate === tomorrow ? 'Mañana · ' : ''}${row.lifecycleStage || statusLabel(row.status)}`,
             row.priority || '—',
-            row.materialShortages > 0
-              ? 'Faltante'
-              : row.openProcurementRequests > 0 || row.undeliveredOrders > 0
-                ? 'En compra'
-                : row.supplyStatus === 'no_supply_evidence'
-                  ? 'Sin evidencia'
-                  : 'Cubierta',
+            row.executionReadiness || 'Por confirmar',
           ])}
         />
       </Panel>
