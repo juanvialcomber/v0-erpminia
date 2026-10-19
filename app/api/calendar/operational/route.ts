@@ -675,11 +675,11 @@ export async function GET(request: NextRequest) {
       historical: visibleItems.filter((item) => item.historical).length,
       by_source: {
         maintenance: visibleItems.filter((item) => item.source === 'maintenance').length,
-        hse: items.filter((item) => item.source === 'hse').length,
-        legal: items.filter((item) => item.source === 'legal').length,
-        procurement: items.filter((item) => item.source === 'procurement').length,
-        finance: items.filter((item) => item.source === 'finance').length,
-        people: items.filter((item) => item.source === 'people').length,
+        hse: visibleItems.filter((item) => item.source === 'hse').length,
+        legal: visibleItems.filter((item) => item.source === 'legal').length,
+        procurement: visibleItems.filter((item) => item.source === 'procurement').length,
+        finance: visibleItems.filter((item) => item.source === 'finance').length,
+        people: visibleItems.filter((item) => item.source === 'people').length,
       },
     };
 
