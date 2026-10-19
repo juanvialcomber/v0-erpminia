@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const api = await readFile(new URL('../app/api/maintenance/control-tower/route.ts', import.meta.url), 'utf8');
-const page = await readFile(new URL('../app/dashboard/mantenimiento/torre-control/page.tsx', import.meta.url), 'utf8');
+const page = await readFile(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
+const monitor = await readFile(new URL('../app/monitor/mantenimiento/page.tsx', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/20261019162500_maintenance_live_master_v1.sql', import.meta.url), 'utf8');
 
 test('control tower is read-only and tenant-scoped', () => {
@@ -46,4 +47,13 @@ test('control tower pins attention assets and rotates only the non-critical flee
   assert.match(page, /Cambios recientes/);
   assert.match(page, /Resto de la flota/);
   assert.match(page, /La rotación automática afecta sólo a equipos sin atención prioritaria/);
+});
+
+
+test('standalone maintenance monitor keeps authentication but removes dashboard chrome', () => {
+  assert.match(monitor, /cookies\(\)/);
+  assert.match(monitor, /auth_token/);
+  assert.match(monitor, /redirect\('\/login\?next=\/monitor\/mantenimiento'\)/);
+  assert.match(monitor, /MaintenanceControlTowerPage/);
+  assert.doesNotMatch(monitor, /DashboardShell/);
 });
