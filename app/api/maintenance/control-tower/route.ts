@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
       const planningCurrent = Boolean(planningAt) && (!operationalCutoff || sameOrAfter(planningAt?.slice(0, 10) || null, operationalCutoff));
 
       const emailCurrent = Boolean(emailAt) && (!operationalCutoff || sameOrAfter(emailAt, operationalCutoff));
-      const whatsappCurrent = Boolean(whatsappAt) && (!operationalCutoff || sameOrAfter(whatsappAt.slice(0, 10), operationalCutoff));
+      const whatsappCurrent = whatsappAt ? (!operationalCutoff || sameOrAfter(whatsappAt.slice(0, 10), operationalCutoff)) : false;
       const emailMeter = emailCurrent ? numberValue(email?.meter_value) : null;
       const planMeter = planningCurrent ? numberValue(plan?.current_reading) : null;
       const emailMeterUsable = emailMeter != null && (!plan?.meter_unit || !email?.meter_unit || String(plan.meter_unit).toLowerCase() === String(email.meter_unit).toLowerCase());
