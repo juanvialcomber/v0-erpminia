@@ -24,6 +24,14 @@ function priorityRank(priority: unknown) {
   return 9;
 }
 
+function preventiveStatusRank(status: unknown) {
+  const value = String(status ?? '');
+  if (/vencid/i.test(value)) return 1;
+  if (/pr[oó]xim/i.test(value)) return 2;
+  if (/revisar fecha/i.test(value)) return 3;
+  return 9;
+}
+
 function newest(...values: Array<string | null | undefined>) {
   return values.filter((value): value is string => Boolean(value)).sort().at(-1) || null;
 }
@@ -607,7 +615,10 @@ export async function GET(request: NextRequest) {
       attentionRows: attentionRows.slice(0, 40),
       stoppedRows: stoppedRows.slice(0, 40),
       preventiveRows: preventiveRows
-        .sort((a, b) => (a.remainingMeter ?? Number.POSITIVE_INFINITY) - (b.remainingMeter ?? Number.POSITIVE_INFINITY))
+        .sort((a, b) =>
+          preventiveStatusRank(a.reportedMpStatus) - preventiveStatusRank(b.reportedMpStatus) ||
+          (a.remainingMeter ?? Number.POSITIVE_INFINITY) - (b.remainingMeter ?? Number.POSITIVE_INFINITY)
+        )
         .slice(0, 60),
       workOrders: workOrderRows,
       recentSignals,
