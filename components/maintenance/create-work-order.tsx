@@ -53,6 +53,7 @@ type MaterialCatalogItem = {
   unit: string | null;
   informedQuantity: number | null;
   informedUpdatedAt: string | null;
+  informedStatus: 'usable' | 'conflict' | 'missing';
   reservableQuantity: number;
   reservableUpdatedAt: string | null;
   stockSignalSource: string | null;
@@ -463,7 +464,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName || 'Producto'}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Informado {item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}
+                        {item.informedStatus === 'conflict' ? 'Informado: En conciliación' : `Informado ${item.informedQuantity == null ? '—' : item.informedQuantity}`} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-muted-foreground">
@@ -481,7 +482,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName || 'Producto'}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Requerido: {item.quantityRequired} {item.unit || 'unid.'} · Informado: {item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable: {item.reservableQuantity}
+                      Requerido: {item.quantityRequired} {item.unit || 'unid.'} · Informado: {item.informedStatus === 'conflict' ? 'En conciliación' : item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable: {item.reservableQuantity}
                     </p>
                   </div>
                   <Button type="button" variant="ghost" size="icon-sm" aria-label="Quitar insumo" onClick={() => setPlannedMaterials((current) => current.filter((row) => row.productId !== item.productId))}>
