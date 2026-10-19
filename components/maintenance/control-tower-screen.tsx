@@ -370,7 +370,10 @@ function ScheduleSlide({ data }: { data: any }) {
         <SmallMetric label="Mañana por confirmar" value={data?.summary?.dueTomorrowNotReadyWorkOrders} />
         <SmallMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders} />
       </div>
-      <Panel title="Programa de ejecución" subtitle="Lo que Planificación debe coordinar con taller y responsables">
+      <Panel
+        title="Programa de ejecución"
+        subtitle={`Planificación + materiales · stock Bodega actualizado ${dateTime(data?.inventory?.latestAt)}`}
+      >
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
           rows={open.slice(0, 12).map((row: any) => [
@@ -384,6 +387,11 @@ function ScheduleSlide({ data }: { data: any }) {
           ])}
         />
       </Panel>
+      <div className="grid gap-2 md:grid-cols-3">
+        <BasisRow label="SKUs Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
+        <BasisRow label="SKUs con stock positivo" value={data?.inventory?.positiveStockSkus || 0} />
+        <BasisRow label="Fuente" value={data?.inventory?.sourceRows || 0} />
+      </div>
       {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="No hay trabajo activo pendiente de coordinación." /> : null}
     </div>
   );
@@ -467,7 +475,7 @@ function ManagementSlide({ data }: { data: any }) {
           <ManagementMetric
             label="OT sin evidencia Bodega"
             value={data?.coordination?.blockers?.openOrdersWithoutSupplyEvidence ?? '—'}
-            detail="No equivale a materiales cubiertos ni a faltante confirmado"
+            detail="Ahora significa que la OT aún no declara productos/cantidades requeridas"
           />
           <ManagementMetric label="Horas detención registradas" value={number(management.recordedDowntimeHours)} detail={management.recordedDowntimeHours == null ? 'Sin base suficiente' : 'OT con dato explícito'} />
         </div>
