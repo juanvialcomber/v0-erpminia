@@ -141,8 +141,9 @@ export default function MaintenanceControlTowerPage() {
           </div>
         </div>
         <div className="grid gap-1 text-right text-[11px] text-muted-foreground">
-          <span>Correo mantención La Patagua: {dateTime(data?.freshness?.latestEmailAt)}</span>
-          <span>WhatsApp: {dateTime(data?.freshness?.latestWhatsAppAt)}</span>
+          <span>Correo mantención: {dateTime(data?.freshness?.latestEmailAt)}</span>
+          <span>WhatsApp entrada · Grupo 2: {dateTime(data?.freshness?.latestWhatsAppAt)}</span>
+          <span>WhatsApp vinculado a equipos: {dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
           <span>Actualización pantalla: {dateTime(data?.generatedAt)}</span>
         </div>
       </header>
@@ -152,7 +153,11 @@ export default function MaintenanceControlTowerPage() {
         <TopMetric icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
         <TopMetric icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
         <TopMetric icon={TimerReset} label="MP vencidas" value={data?.summary?.preventiveOverdue} />
-        <TopMetric icon={Radio} label="Evidencia por vincular" value={data?.summary?.pendingEmailMatches} />
+        <TopMetric
+          icon={Radio}
+          label="Entradas por revisar"
+          value={Number(data?.summary?.pendingEmailMatches || 0) + Number(data?.summary?.pendingWhatsAppInputs || 0)}
+        />
       </section>
 
       <main
@@ -222,9 +227,23 @@ function AnalysisSlide({ data }: { data: any }) {
         </div>
       </Panel>
 
-      <Panel title="Cambios recientes" subtitle="Últimas señales trazables">
-        <div className="divide-y">
-          {signals.slice(0, 8).map((signal: any) => (
+      <Panel title="Fuentes y cambios recientes" subtitle="Entrada viva separada de evidencia ya vinculada">
+        <div className="mb-3 grid gap-2">
+          <SourceHealth
+            label="Correo @lapatagua.cl"
+            inputAt={data?.liveInputs?.email?.latestAt}
+            publishedAt={data?.liveInputs?.email?.latestAt}
+            pending={data?.summary?.pendingEmailMatches}
+          />
+          <SourceHealth
+            label="WhatsApp · Grupo 2"
+            inputAt={data?.liveInputs?.whatsapp?.latestAt}
+            publishedAt={data?.liveInputs?.whatsapp?.latestPublishedAt}
+            pending={data?.liveInputs?.whatsapp?.pendingCount}
+          />
+        </div>
+        <div className="divide-y border-t">
+          {signals.slice(0, 6).map((signal: any) => (
             <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="space-y-1 py-3 first:pt-0">
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-sm font-semibold">{signal.assetName}</p>
@@ -441,6 +460,24 @@ function ManagementSlide({ data }: { data: any }) {
           <EmptyState title="Sin base de OT terminadas" text="No se calcula un porcentaje sin denominador canónico." />
         )}
       </Panel>
+    </div>
+  );
+}
+
+function SourceHealth({ label, inputAt, publishedAt, pending }: { label: string; inputAt: unknown; publishedAt: unknown; pending: unknown }) {
+  const pendingCount = Number(pending || 0);
+  return (
+    <div className="grid gap-1 rounded-md border bg-muted/10 px-3 py-2 text-xs">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold">{label}</span>
+        <Badge variant={pendingCount > 0 ? 'secondary' : 'outline'}>
+          {pendingCount > 0 ? `${pendingCount} por revisar` : 'al día'}
+        </Badge>
+      </div>
+      <div className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+        <span>Entrada: {dateTime(inputAt)}</span>
+        <span>Vinculado: {dateTime(publishedAt)}</span>
+      </div>
     </div>
   );
 }
