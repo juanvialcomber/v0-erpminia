@@ -21,6 +21,8 @@ test('terrain lists all assigned orders including future tasks and does not expo
   assert.match(terrain, /actions\.map\(\(action\) =>/);
   assert.match(terrain, /prioridad es una recomendación/);
   assert.match(terrain, /OT crítica asignada/);
+  assert.match(terrain, /OT vencidas/);
+  assert.match(terrain, /action\.isOverdue \? <Badge variant="destructive">Vencida<\/Badge>/);
   assert.match(terrain, /refreshInterval: 30_000/);
   assert.match(terrain, /toast\.warning/);
   assert.match(terrain, /Perfil aún no vinculado/);
@@ -41,4 +43,23 @@ test('my-work API requires canonical person linkage and scopes work orders to th
   assert.match(myWork, /\.eq\('assigned_person_id', person\.id\)/);
   assert.match(myWork, /buildAssignedWorkActions/);
   assert.match(myWork, /\.in\('status', \['open', 'assigned', 'pending', 'planned', 'in_progress'\]\)/);
+});
+
+
+test('assigned-work priority derives overdue state from the scheduled date without changing canonical priority', async () => {
+  const { buildAssignedWorkActions } = await import('../lib/maintenance/my-work-priority.mjs');
+  const [action] = buildAssignedWorkActions([{
+    id: 'wo-1',
+    work_order_number: 'OT-2026-0014',
+    title: 'Cambio de neumático',
+    status: 'open',
+    priority: 'high',
+    scheduled_date: '2026-10-14',
+    timer_status: 'idle',
+    created_at: '2026-10-13T20:34:07Z',
+  }], '2026-10-19');
+  assert.equal(action.priority, 'high');
+  assert.equal(action.isCritical, false);
+  assert.equal(action.isOverdue, true);
+  assert.equal(action.daysUntil, -5);
 });
