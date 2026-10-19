@@ -141,7 +141,7 @@ export default function MaintenanceControlTowerPage() {
           </div>
         </div>
         <div className="grid gap-1 text-right text-[11px] text-muted-foreground">
-          <span>Correo La Patagua: {dateTime(data?.freshness?.latestEmailAt)}</span>
+          <span>Correo mantención La Patagua: {dateTime(data?.freshness?.latestEmailAt)}</span>
           <span>WhatsApp: {dateTime(data?.freshness?.latestWhatsAppAt)}</span>
           <span>Actualización pantalla: {dateTime(data?.generatedAt)}</span>
         </div>
