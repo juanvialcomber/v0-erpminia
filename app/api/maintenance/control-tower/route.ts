@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
         .limit(40),
       context.supabase
         .from('work_order_supply_chain_v1')
-        .select('work_order_id,work_order_number,material_requirement_count,material_shortage_count,open_supply_need_count,open_procurement_request_count,undelivered_order_count,supply_chain_status')
+        .select('work_order_id,work_order_number,material_requirement_count,material_shortage_count,open_supply_need_count,open_procurement_request_count,undelivered_order_count,part_line_count,parts_requested,parts_issued,parts_installed,supply_chain_status')
         .eq('organization_id', context.organizationId)
         .limit(1000),
       context.supabase
@@ -523,7 +523,12 @@ export async function GET(request: NextRequest) {
                 ? 'Stock por confirmar'
                 : Number(supply?.open_procurement_request_count || 0) > 0 || Number(supply?.undelivered_order_count || 0) > 0
                   ? 'En compra'
-                  : 'Lista';
+                  : Number(supply?.parts_requested || 0) > 0 &&
+                      Number(supply?.parts_issued || 0) >= Number(supply?.parts_requested || 0)
+                    ? 'Lista'
+                    : Number(supply?.part_line_count || 0) > 0
+                      ? 'Reservada · pendiente entrega'
+                      : 'Stock informado disponible';
       return {
         id: order.id,
         workOrderNumber: order.work_order_number,
@@ -552,6 +557,9 @@ export async function GET(request: NextRequest) {
         stockKnownCount,
         stockShortageCount,
         stockChecks,
+        partsRequested: Number(supply?.parts_requested || 0),
+        partsIssued: Number(supply?.parts_issued || 0),
+        partsInstalled: Number(supply?.parts_installed || 0),
         supplyStatus: textValue(supply?.supply_chain_status) || 'no_supply_evidence',
         materialRequirements: Number(supply?.material_requirement_count || 0),
         materialShortages: Number(supply?.material_shortage_count || 0),
