@@ -103,3 +103,10 @@ test('stale email and whatsapp evidence cannot activate stopped or parts-pending
   assert.match(api, /emailCurrent && isPartsPending/);
   assert.match(api, /whatsappCurrent && isPartsPending/);
 });
+
+
+test('wallboard shows live coverage against the canonical fleet', () => {
+  assert.match(page, /equipos con señal actual/);
+  assert.match(page, /summary\?\.activeAssets/);
+  assert.match(page, /summary\?\.canonicalAssets/);
+});
