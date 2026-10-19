@@ -157,7 +157,8 @@ test('wallboard exposes bodega evidence without treating missing evidence as cov
   assert.match(api, /supplyStatus/);
   assert.match(page, /OT sin evidencia Bodega/);
   assert.match(page, /Preparación/);
-  assert.match(api, /Por confirmar Bodega/);
+  assert.match(api, /Materiales no declarados/);
+  assert.match(api, /Stock por confirmar/);
   assert.match(api, /Bloqueada por faltante/);
   assert.match(api, /En compra/);
 });
