@@ -265,3 +265,12 @@ test('wallboard labels recent bodega stock as advisory while reservation remains
   assert.match(page, /stock informado/);
   assert.match(page, /reserva canónica separada/);
 });
+
+
+test('wallboard excludes conflicted inventory from usable stock coverage', () => {
+  assert.match(api, /getInventoryConflictEvidence/);
+  assert.match(api, /trustedBodegaRows/);
+  assert.match(api, /conflictedSkus/);
+  assert.match(page, /SKUs en conciliación/);
+  assert.match(page, /SKUs con stock usable/);
+});
