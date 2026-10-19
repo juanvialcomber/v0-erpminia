@@ -5,6 +5,8 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
+const LA_PATAGUA_ORGANIZATION_ID = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
+
 type MaterialInput = {
   canonicalProductId: string;
   quantityRequired: number;
@@ -25,7 +27,52 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
       p_work_order_id: id,
     });
     if (error) throw error;
-    return NextResponse.json({ data });
+
+    const materials = Array.isArray(data?.materials) ? data.materials : [];
+    if (context.organizationId !== LA_PATAGUA_ORGANIZATION_ID || materials.length === 0) {
+      return NextResponse.json({ data });
+    }
+
+    const skus = [...new Set(
+      materials
+        .map((row: any) => String(row.product_code || '').trim())
+        .filter(Boolean),
+    )];
+
+    if (skus.length === 0) return NextResponse.json({ data });
+
+    const { data: bodegaRows, error: bodegaError } = await context.supabase
+      .from('bodega_inventory')
+      .select('sku,quantity,quantity_reported,updated_at')
+      .in('sku', skus);
+    if (bodegaError) throw bodegaError;
+
+    const informedBySku = new Map(
+      (bodegaRows || []).map((row: any) => {
+        const reported = row.quantity_reported == null ? null : Number(row.quantity_reported);
+        const informed = Number.isFinite(reported) ? reported : Number(row.quantity || 0);
+        return [String(row.sku || '').trim().toUpperCase(), {
+          informedAvailable: informed,
+          informedUpdatedAt: row.updated_at || null,
+        }];
+      }),
+    );
+
+    return NextResponse.json({
+      data: {
+        ...data,
+        materials: materials.map((row: any) => {
+          const signal = informedBySku.get(String(row.product_code || '').trim().toUpperCase()) || null;
+          return {
+            ...row,
+            informed_available: signal?.informedAvailable ?? null,
+            informed_updated_at: signal?.informedUpdatedAt ?? null,
+            informed_source: signal ? 'bodega_inventory' : null,
+          };
+        }),
+        stock_signal_role: 'advisory_confirmation_before_procurement',
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la cobertura de materiales';
     return NextResponse.json({ error: message }, { status: 500 });
