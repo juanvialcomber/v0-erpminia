@@ -26,3 +26,8 @@ test('production reads the linked maintenance work order instead of copying its 
   assert.match(component, /Aceptar y crear OT/);
   assert.match(page, /OperationalMaintenanceReviews/);
 });
+
+
+test('dismissed drilling evidence is removed from active maintenance flow', () => {
+  assert.match(api, /\.neq\('status', 'dismissed'\)/);
+});
