@@ -243,3 +243,9 @@ test('missing OT material declaration is not presented as stock coverage', () =>
   assert.match(api, /Materiales no declarados/);
   assert.match(page, /aún no declara productos\/cantidades requeridas/);
 });
+
+
+test('reported bodega quantity takes precedence over integer storage quantity', () => {
+  assert.match(api, /numberValue\(stock\?\.quantity_reported\) \?\? numberValue\(stock\?\.quantity\)/);
+  assert.match(api, /numberValue\(row\.quantity_reported\) \?\? numberValue\(row\.quantity\)/);
+});
