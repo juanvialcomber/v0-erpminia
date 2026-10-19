@@ -258,3 +258,11 @@ test('planning readiness separates stock availability reservation and delivery',
   assert.match(api, /parts_issued/);
   assert.match(api, /partsInstalled/);
 });
+
+
+test('wallboard labels recent bodega stock as advisory while reservation remains canonical warehouse stock', () => {
+  assert.match(api, /role: 'advisory_stock_signal'/);
+  assert.match(api, /reservationSource: 'warehouse_stock'/);
+  assert.match(page, /stock informado/);
+  assert.match(page, /reserva canónica separada/);
+});
