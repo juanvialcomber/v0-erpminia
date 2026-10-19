@@ -334,9 +334,9 @@ function PreventiveSlide({ data }: { data: any }) {
       <Panel title="Prioridad y base de control" subtitle="Horas, kilómetros y vigencia del plan no se mezclan">
         <BarList rows={pCounts} />
         <div className="mt-5 grid gap-2">
-          <SourceHealth label="Base horaria" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.hours || 0} />
-          <SourceHealth label="Base kilométrica" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.km || 0} />
-          <SourceHealth label="Otra base" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.other || 0} />
+          <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
+          <BasisRow label="Kilómetros" value={data?.lifecycle?.preventiveBasis?.km || 0} />
+          <BasisRow label="Otra / sin unidad" value={data?.lifecycle?.preventiveBasis?.other || 0} />
         </div>
         <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
           <p className="text-sm font-semibold">Plan preventivo vigente</p>
@@ -503,6 +503,15 @@ function ManagementSlide({ data }: { data: any }) {
           />
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function BasisRow({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="flex items-center justify-between rounded-md border bg-muted/10 px-3 py-2 text-xs">
+      <span className="font-medium">{label}</span>
+      <span className="text-lg font-semibold tabular-nums">{number(value, 0)}</span>
     </div>
   );
 }
