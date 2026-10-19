@@ -49,3 +49,12 @@ test('work order UI exposes approved steps controls and canonical materials', ()
   assert.match(panel, /Repuestos requeridos/);
   assert.match(detail, /WorkOrderStandardPlanPanel/);
 });
+
+
+test('test-only or UAT standard plans cannot be applied to operational work orders', () => {
+  assert.match(apply, /maintenance_standard_job_plan_steps/);
+  assert.match(apply, /declaredNonOperational/);
+  assert.match(apply, /uat controlado/);
+  assert.match(apply, /no representa una intervencion real de terreno/);
+  assert.match(apply, /UAT\/prueba/);
+});
