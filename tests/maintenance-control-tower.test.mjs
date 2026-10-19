@@ -85,3 +85,21 @@ test('reduced motion keeps the timed wallboard loop but removes slide animation 
   assert.match(page, /window\.setInterval/);
   assert.match(page, /!reduceMotion && 'animate-in fade-in duration-300'/);
 });
+
+
+test('wallboard separates canonical fleet from live operational coverage', () => {
+  assert.match(api, /emailCurrent/);
+  assert.match(api, /whatsappCurrent/);
+  assert.match(api, /currentCoverage/);
+  assert.match(api, /const currentRows = rows\.filter\(\(row\) => row\.currentCoverage\)/);
+  assert.match(api, /canonicalAssets: rows\.length/);
+  assert.match(api, /activeAssets: currentRows\.length/);
+  assert.match(api, /rows: currentRows/);
+});
+
+test('stale email and whatsapp evidence cannot activate stopped or parts-pending state', () => {
+  assert.match(api, /emailCurrent && isStoppedSignal/);
+  assert.match(api, /whatsappCurrent && isStoppedSignal/);
+  assert.match(api, /emailCurrent && isPartsPending/);
+  assert.match(api, /whatsappCurrent && isPartsPending/);
+});
