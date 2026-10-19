@@ -48,3 +48,14 @@ test('OT material coverage uses informed Bodega stock as a confirmation gate bef
   assert.match(coverage, /informedCoveragePending/);
   assert.match(coverage, /no tienen cobertura reservada, entregada ni señal suficiente en Bodega/);
 });
+
+
+test('conflicted Bodega evidence remains visible but cannot cover an OT shortage', async () => {
+  const trust = await readFile(new URL('../lib/inventory-trust.ts', import.meta.url), 'utf8');
+  const materialsRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/materials/route.ts', import.meta.url), 'utf8');
+  assert.match(trust, /Combustible001/);
+  assert.match(materialsRoute, /informed_status: conflict \? 'conflict'/);
+  assert.match(coverage, /row\.informed_status === 'conflict'/);
+  assert.match(coverage, /En conciliación/);
+  assert.match(createWorkOrder, /Informado: En conciliación/);
+});
