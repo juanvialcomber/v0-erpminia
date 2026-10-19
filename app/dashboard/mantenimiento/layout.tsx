@@ -20,6 +20,7 @@ const flowItems: NavItem[] = [
 
 const supportItems: NavItem[] = [
   { href: '/dashboard/mantenimiento', label: 'Resumen' },
+  { href: '/dashboard/mantenimiento/torre-control', label: 'Torre' },
   { href: '/dashboard/mantenimiento/ordenes-trabajo/imputacion', label: 'Imputación' },
   { href: '/dashboard/mantenimiento/equipos', label: 'Activos' },
   { href: '/dashboard/mantenimiento/maestranza', label: 'Maestranza' },
@@ -31,11 +32,11 @@ const supportItems: NavItem[] = [
 const roleNavigation: Record<ViewerMode, { flow: string[]; support: string[] }> = {
   leadership: {
     flow: ['Planificar', 'Órdenes', 'Cierre'],
-    support: ['Resumen', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes'],
+    support: ['Resumen', 'Torre', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes'],
   },
   planning: {
     flow: ['Planificar', 'Órdenes'],
-    support: ['Resumen', 'Activos', 'Fuentes'],
+    support: ['Resumen', 'Torre', 'Activos', 'Fuentes'],
   },
   execution: {
     flow: ['Órdenes', 'Cierre'],
