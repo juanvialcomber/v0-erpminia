@@ -202,3 +202,13 @@ test('tomorrow work readiness distinguishes confirmed execution from unknown bod
   assert.match(page, /Mañana por confirmar/);
   assert.match(page, /Preparación/);
 });
+
+
+test('preventive status uses explicit source labels without cross-unit proximity thresholds', () => {
+  assert.match(api, /dateReviewPreventive/);
+  assert.match(api, /revisar fecha/i);
+  assert.match(api, /pr\[oó\]xim/i);
+  assert.doesNotMatch(api, /remainingMeter > 0 && row\.remainingMeter <= 100/);
+  assert.match(page, /Revisar fecha/);
+  assert.match(page, /Estado MP/);
+});
