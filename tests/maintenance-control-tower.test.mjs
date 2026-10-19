@@ -57,3 +57,11 @@ test('standalone maintenance monitor keeps authentication but removes dashboard 
   assert.match(monitor, /MaintenanceControlTowerPage/);
   assert.doesNotMatch(monitor, /DashboardShell/);
 });
+
+
+test('wallboard respects reduced motion and keeps next action informational', () => {
+  assert.match(page, /prefers-reduced-motion: reduce/);
+  assert.match(page, /Siguiente acción/);
+  assert.doesNotMatch(page, /<Button/);
+  assert.doesNotMatch(page, /onClick=/);
+});
