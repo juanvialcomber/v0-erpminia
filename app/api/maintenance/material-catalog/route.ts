@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
+import { getInventoryConflictEvidence } from '@/lib/inventory-trust';
 
 const LA_PATAGUA_ORGANIZATION_ID = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     const productIds = productRows.map((row) => row.id).filter(Boolean);
     const productCodes = productRows.map((row) => row.product_code).filter((value): value is string => Boolean(value));
 
-    const [{ data: reservableRows, error: reservableError }, informedResult] = await Promise.all([
+    const [{ data: reservableRows, error: reservableError }, informedResult, conflictEvidence] = await Promise.all([
       productIds.length
         ? context.supabase
             .from('warehouse_stock')
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
             .select('sku,quantity,quantity_reported,updated_at')
             .in('sku', productCodes)
         : Promise.resolve({ data: [], error: null }),
+      getInventoryConflictEvidence(context.supabase, context.organizationId),
     ]);
 
     if (reservableError) throw reservableError;
@@ -87,7 +89,9 @@ export async function GET(request: NextRequest) {
       .map((product) => {
         const code = product.product_code || null;
         const reservable = reservableByProduct.get(String(product.id)) || { quantity: 0, latestAt: null };
-        const informed = code ? informedBySku.get(code.trim().toUpperCase()) || null : null;
+        const normalizedCode = code ? code.trim().toUpperCase() : '';
+        const informed = normalizedCode ? informedBySku.get(normalizedCode) || null : null;
+        const informedConflict = normalizedCode ? conflictEvidence.conflictCodes.has(normalizedCode) : false;
         return {
           productId: product.id,
           productCode: code,
@@ -96,8 +100,9 @@ export async function GET(request: NextRequest) {
           unit: product.unit || null,
           reservableQuantity: reservable.quantity,
           reservableUpdatedAt: reservable.latestAt,
-          informedQuantity: informed?.quantity ?? null,
+          informedQuantity: informedConflict ? null : informed?.quantity ?? null,
           informedUpdatedAt: informed?.latestAt ?? null,
+          informedStatus: informedConflict ? 'conflict' : informed ? 'usable' : 'missing',
           stockSignalSource: informed ? 'bodega_inventory' : null,
           reservationSource: 'warehouse_stock',
         };
