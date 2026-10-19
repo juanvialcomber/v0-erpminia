@@ -42,7 +42,7 @@ function evidenceLabel(source: string | null | undefined) {
 
 function statusText(row: any) {
   if (row.canonicalStatus) return row.canonicalStatus;
-  if (row.emailReportedStatus) return \`Reportado: \${row.emailReportedStatus}\`;
+  if (row.emailReportedStatus) return `Reportado: ${row.emailReportedStatus}`;
   if (row.whatsappDescription) return 'Señal operacional';
   return 'Sin estado validado';
 }
@@ -132,7 +132,7 @@ export default function MaintenanceControlTowerPage() {
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-4" aria-label="Resumen operacional">
         <Metric icon={Gauge} label="Equipos activos" value={summary.activeAssets} detail="Maestro canónico" />
-        <Metric icon={AlertTriangle} label="P1 + P2" value={summary.urgent} detail={\`\${summary.p1 || 0} P1 · \${summary.p2 || 0} P2\`} />
+        <Metric icon={AlertTriangle} label="P1 + P2" value={summary.urgent} detail={`${summary.p1 || 0} P1 · ${summary.p2 || 0} P2`} />
         <Metric icon={Wrench} label="OT abiertas" value={summary.openWorkOrders} detail="Ejecución vigente" />
         <Metric icon={Radio} label="Evidencia por vincular" value={summary.pendingEmailMatches} detail="Correo recibido" />
       </section>
