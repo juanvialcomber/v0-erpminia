@@ -257,7 +257,9 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
 
       const itemEnd = item.historical && item.completed_at
         ? item.completed_at.slice(0, 10)
-        : item.date;
+        : item.overdue
+          ? today
+          : item.date;
 
       return item.date <= rangeEnd && itemEnd >= currentAnchor;
     });
@@ -454,7 +456,11 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
 
             {!isLoading ? filteredItems.map((item) => {
               const SourceIcon = SOURCE_META[item.source].icon;
-              const rawEnd = item.historical && item.completed_at ? item.completed_at.slice(0, 10) : item.date;
+              const rawEnd = item.historical && item.completed_at
+                ? item.completed_at.slice(0, 10)
+                : item.overdue
+                  ? today
+                  : item.date;
               const clippedStart = item.date < currentAnchor ? currentAnchor : item.date;
               const clippedEnd = rawEnd > rangeEnd ? rangeEnd : rawEnd;
               const startIndex = Math.max(0, diffDays(currentAnchor, clippedStart));
