@@ -123,3 +123,13 @@ test('provider diagnostics never print signed media URL or source message ID', (
  const job=schedule.find(x=>x.path==='/api/cron/whatsapp-media');
  if (schedule.length) assert.equal(job?.schedule,'1,6,11,16,21,26,31,36,41,46,51,56 * * * *');
 });
+
+
+test('malformed Green API download URLs are bounded-retry failures, never trusted hosts',()=>{
+ const s=read('lib/messages/greenapi-media.ts');
+ assert.match(s,/new URL\(downloadUrl\)/);
+ assert.match(s,/provider returned malformed downloadUrl/);
+ assert.match(s,/throw new Error\('invalid_download_response'\)/);
+ assert.match(s,/if \(!isTrustedGreenMediaUrl\(downloadUrl\)\)/);
+ assert.match(s,/permanent = \['media_too_large','unsupported_media_signature','untrusted_media_host'\]/);
+});
