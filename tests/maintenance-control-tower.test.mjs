@@ -212,3 +212,12 @@ test('preventive status uses explicit source labels without cross-unit proximity
   assert.match(page, /Revisar fecha/);
   assert.match(page, /Estado MP/);
 });
+
+
+test('preventive exceptions are ordered across meter bases by source severity', () => {
+  assert.match(api, /function preventiveStatusRank/);
+  assert.match(api, /vencid/i);
+  assert.match(api, /pr\[oó\]xim/i);
+  assert.match(api, /revisar fecha/i);
+  assert.match(api, /preventiveStatusRank\(a\.reportedMpStatus\)/);
+});
