@@ -221,3 +221,23 @@ test('preventive exceptions are ordered across meter bases by source severity', 
   assert.match(api, /revisar fecha/i);
   assert.match(api, /preventiveStatusRank\(a\.reportedMpStatus\)/);
 });
+
+
+test('wallboard cross-checks declared OT materials against scoped bodega inventory by canonical product code', () => {
+  assert.match(api, /work_order_material_requirements/);
+  assert.match(api, /canonical_products_v1/);
+  assert.match(api, /bodega_inventory/);
+  assert.match(api, /organizationProductSkus/);
+  assert.match(api, /stockChecks/);
+  assert.match(api, /Materiales no declarados/);
+  assert.match(api, /Stock por confirmar/);
+  assert.match(api, /Bloqueada por faltante/);
+  assert.match(page, /stock Bodega actualizado/);
+  assert.match(page, /SKUs Bodega vinculados/);
+});
+
+test('missing OT material declaration is not presented as stock coverage', () => {
+  assert.match(api, /requirements\.length === 0/);
+  assert.match(api, /Materiales no declarados/);
+  assert.match(page, /aún no declara productos\/cantidades requeridas/);
+});
