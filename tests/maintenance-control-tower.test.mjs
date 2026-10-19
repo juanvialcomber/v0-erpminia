@@ -188,3 +188,14 @@ test('fleet slide shows source coverage and freshness by site', () => {
   assert.match(page, /WhatsApp \{site\.whatsapp\}/);
   assert.match(page, /dateTime\(site\.latestAt\)/);
 });
+
+
+test('tomorrow work readiness distinguishes confirmed execution from unknown bodega coverage', () => {
+  assert.match(api, /executionReadiness/);
+  assert.match(api, /Por confirmar Bodega/);
+  assert.match(api, /Bloqueada por faltante/);
+  assert.match(api, /En compra/);
+  assert.match(api, /dueTomorrowNotReadyWorkOrders/);
+  assert.match(page, /Mañana por confirmar/);
+  assert.match(page, /Preparación/);
+});
