@@ -148,3 +148,15 @@ test('schedule horizon uses Santiago local day and keeps overdue today tomorrow 
   assert.match(page, /Para hoy/);
   assert.match(page, /Para mañana/);
 });
+
+
+test('wallboard exposes bodega evidence without treating missing evidence as covered stock', () => {
+  assert.match(api, /work_order_supply_chain_v1/);
+  assert.match(api, /openOrdersWithoutSupplyEvidence/);
+  assert.match(api, /openOrdersWithShortage/);
+  assert.match(api, /supplyStatus/);
+  assert.match(page, /OT sin evidencia Bodega/);
+  assert.match(page, /Sin evidencia/);
+  assert.match(page, /Faltante/);
+  assert.match(page, /En compra/);
+});
