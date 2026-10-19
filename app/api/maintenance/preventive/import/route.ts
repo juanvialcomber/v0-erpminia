@@ -5,15 +5,22 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { loadXlsxModule, sheetToMatrix } from '@/lib/xlsx';
 
-type AssetRow = {
+type CanonicalAssetRow = {
   id: string;
   asset_code: string | null;
   name: string | null;
 };
 
+type LegacyAssetRow = {
+  id: string;
+  asset_code: string | null;
+  asset_name: string | null;
+};
+
 type ScheduleRow = {
   id: string;
   asset_id: string | null;
+  canonical_asset_id: string | null;
   task_name: string | null;
   frequency_days: number | string | null;
   frequency_hours: number | string | null;
@@ -80,7 +87,9 @@ function parseNumber(value: string, fallback = 0) {
 }
 
 function parseOptionalNumber(value: string) {
-  const parsed = Number(String(value).replace(',', '.'));
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const parsed = Number(text.replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -176,32 +185,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se encontraron filas validas para importar' }, { status: 400 });
     }
 
-    const { data: assets, error: assetsError } = await context.supabase
-      .from('maintenance_canonical_assets_v1')
-      .select('id, asset_code, name')
-      .eq('organization_id', context.organizationId)
-      .eq('is_active', true);
+    const [{ data: canonicalAssets, error: canonicalAssetsError }, { data: legacyAssets, error: legacyAssetsError }] = await Promise.all([
+      context.supabase
+        .from('maintenance_canonical_assets_v1')
+        .select('id, asset_code, name')
+        .eq('organization_id', context.organizationId)
+        .eq('is_active', true),
+      context.supabase
+        .from('maintenance_assets')
+        .select('id, asset_code, asset_name')
+        .eq('organization_id', context.organizationId),
+    ]);
 
-    if (assetsError) throw assetsError;
+    if (canonicalAssetsError) throw canonicalAssetsError;
+    if (legacyAssetsError) throw legacyAssetsError;
 
+    const legacyIds = new Set((Array.isArray(legacyAssets) ? (legacyAssets as LegacyAssetRow[]) : []).map((asset) => asset.id));
     const assetMap = new Map<string, string>();
-    (Array.isArray(assets) ? (assets as AssetRow[]) : []).forEach((asset) => {
+    (Array.isArray(canonicalAssets) ? (canonicalAssets as CanonicalAssetRow[]) : []).forEach((asset) => {
+      if (!legacyIds.has(asset.id)) return;
       if (asset.asset_code) assetMap.set(normalizeKey(asset.asset_code), asset.id);
       if (asset.name) assetMap.set(normalizeKey(asset.name), asset.id);
     });
 
     const { data: existingSchedules, error: schedulesError } = await context.supabase
       .from('preventive_maintenance_schedules')
-      .select('id, canonical_asset_id, task_name, frequency_days, frequency_hours')
+      .select('id, asset_id, canonical_asset_id, task_name, frequency_days, frequency_hours')
       .eq('organization_id', context.organizationId);
 
     if (schedulesError) throw schedulesError;
 
     const scheduleMap = new Map<string, ScheduleRow>();
     (Array.isArray(existingSchedules) ? (existingSchedules as ScheduleRow[]) : []).forEach((schedule) => {
-      const scheduleAny = schedule as ScheduleRow & { canonical_asset_id?: string | null };
-      if (!scheduleAny.canonical_asset_id || !schedule.task_name) return;
-      scheduleMap.set(buildScheduleKey(scheduleAny.canonical_asset_id, schedule.task_name, schedule.frequency_days == null ? null : Number(schedule.frequency_days), schedule.frequency_hours == null ? null : Number(schedule.frequency_hours)), schedule);
+      const scheduleAssetId = schedule.canonical_asset_id || schedule.asset_id;
+      if (!scheduleAssetId || !schedule.task_name) return;
+      scheduleMap.set(buildScheduleKey(scheduleAssetId, schedule.task_name, schedule.frequency_days == null ? null : Number(schedule.frequency_days), schedule.frequency_hours == null ? null : Number(schedule.frequency_hours)), schedule);
     });
 
     let inserted = 0;
@@ -228,6 +246,7 @@ export async function POST(request: NextRequest) {
 
       const payload = {
         organization_id: context.organizationId,
+        asset_id: assetId,
         canonical_asset_id: assetId,
         task_name: row.taskName,
         description: row.description || null,
@@ -238,6 +257,7 @@ export async function POST(request: NextRequest) {
         estimated_duration_hours: row.estimatedDurationHours,
         priority: row.priority,
         enabled: row.enabled,
+        source_reference: file.name,
         updated_at: new Date().toISOString(),
       };
 
