@@ -199,7 +199,6 @@ export async function GET(request: NextRequest) {
       const statusAt = textValue(status?.changed_at);
       const workOrderAt = newest(...assetOrders.map((order) => textValue(order.updated_at)));
       const latestSignalAt = newest(statusAt, planningAt, emailAt, whatsappAt, workOrderAt);
-      const latestEvidenceAt = newest(emailAt, whatsappAt, statusAt);
       const planningCurrent = Boolean(planningAt) && (!operationalCutoff || sameOrAfter(planningAt?.slice(0, 10) || null, operationalCutoff));
 
       const emailMeter = numberValue(email?.meter_value);
