@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
       pendingEmailResult,
       latestEmailResult,
       whatsappInputResult,
+      supplyChainResult,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -138,12 +139,17 @@ export async function GET(request: NextRequest) {
         .eq('group_name', 'Grupo 2')
         .order('occurred_at', { ascending: false, nullsFirst: false })
         .limit(40),
+      context.supabase
+        .from('work_order_supply_chain_v1')
+        .select('work_order_id,work_order_number,material_requirement_count,material_shortage_count,open_supply_need_count,open_procurement_request_count,undelivered_order_count,supply_chain_status')
+        .eq('organization_id', context.organizationId)
+        .limit(1000),
     ]);
 
     const error =
       assetsResult.error || planningResult.error || emailResult.error || whatsappResult.error ||
       statusResult.error || workOrdersResult.error || pendingEmailResult.error ||
-      latestEmailResult.error || whatsappInputResult.error;
+      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error;
     if (error) throw error;
 
     const assets = assetsResult.data || [];
@@ -152,6 +158,8 @@ export async function GET(request: NextRequest) {
     const whatsappRows = whatsappResult.data || [];
     const statusRows = statusResult.data || [];
     const workOrders = workOrdersResult.data || [];
+    const supplyRows = supplyChainResult.data || [];
+    const supplyByWorkOrder = new Map(supplyRows.map((row: any) => [String(row.work_order_id || ''), row]));
 
     const latestPlanning = new Map<string, any>();
     for (const row of planningRows) {
@@ -377,6 +385,7 @@ export async function GET(request: NextRequest) {
 
     const workOrderRows = workOrders.map((order: any) => {
       const asset = rows.find((row) => row.canonicalAssetId === String(order.canonical_asset_id || ''));
+      const supply = supplyByWorkOrder.get(String(order.id)) || null;
       return {
         id: order.id,
         workOrderNumber: order.work_order_number,
@@ -396,6 +405,12 @@ export async function GET(request: NextRequest) {
         assignedTo: textValue(order.assigned_to_name),
         timerStatus: textValue(order.timer_status),
         totalTimerMinutes: numberValue(order.total_timer_minutes),
+        supplyStatus: textValue(supply?.supply_chain_status) || 'no_supply_evidence',
+        materialRequirements: Number(supply?.material_requirement_count || 0),
+        materialShortages: Number(supply?.material_shortage_count || 0),
+        openSupplyNeeds: Number(supply?.open_supply_need_count || 0),
+        openProcurementRequests: Number(supply?.open_procurement_request_count || 0),
+        undeliveredOrders: Number(supply?.undelivered_order_count || 0),
         overdue: !isClosed(order.status) && Boolean(order.scheduled_date) && String(order.scheduled_date) < today,
       };
     });
@@ -462,6 +477,14 @@ export async function GET(request: NextRequest) {
         byAssignee: assigneeCoordination,
         blockers: {
           partsPendingAssets: rows.filter((row) => row.partsPending).length,
+          openOrdersWithoutSupplyEvidence: openWorkOrders.filter((order: any) => {
+            const supply = supplyByWorkOrder.get(String(order.id));
+            return !supply || String(supply.supply_chain_status || '') === 'no_supply_evidence';
+          }).length,
+          openOrdersWithShortage: openWorkOrders.filter((order: any) => {
+            const supply = supplyByWorkOrder.get(String(order.id));
+            return Number(supply?.material_shortage_count || 0) > 0;
+          }).length,
           unresolvedEmailInputs: (pendingEmailResult.data || []).filter((row: any) => !operationalCutoff || String(row.report_date || '') >= operationalCutoff).length,
           unresolvedWhatsAppInputs: pendingWhatsappInputs.length,
         },
