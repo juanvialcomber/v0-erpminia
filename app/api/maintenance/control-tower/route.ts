@@ -206,10 +206,16 @@ export async function GET(request: NextRequest) {
     const productById = new Map(
       (canonicalProductsResult.data || []).map((row: any) => [String(row.id), row])
     );
+    const organizationProductSkus = new Set(
+      (canonicalProductsResult.data || [])
+        .map((row: any) => textValue(row.product_code)?.trim().toUpperCase())
+        .filter(Boolean)
+    );
+    const matchedBodegaRows = (bodegaInventoryResult.data || []).filter((row: any) =>
+      row.sku && organizationProductSkus.has(String(row.sku).trim().toUpperCase())
+    );
     const bodegaBySku = new Map(
-      (bodegaInventoryResult.data || [])
-        .filter((row: any) => row.sku)
-        .map((row: any) => [String(row.sku).trim().toUpperCase(), row])
+      matchedBodegaRows.map((row: any) => [String(row.sku).trim().toUpperCase(), row])
     );
     const requirementsByWorkOrder = new Map<string, any[]>();
     for (const row of materialRequirementsResult.data || []) {
@@ -219,7 +225,7 @@ export async function GET(request: NextRequest) {
       rows.push(row);
       requirementsByWorkOrder.set(workOrderId, rows);
     }
-    const bodegaLatestAt = newest(...(bodegaInventoryResult.data || []).map((row: any) => textValue(row.updated_at)));
+    const bodegaLatestAt = newest(...matchedBodegaRows.map((row: any) => textValue(row.updated_at)));
 
     const activePreventiveSchedules = preventiveSchedulesResult.data || [];
     const supplyRows = supplyChainResult.data || [];
@@ -668,9 +674,10 @@ export async function GET(request: NextRequest) {
       inventory: {
         source: 'bodega_inventory',
         latestAt: bodegaLatestAt,
-        sourceRows: (bodegaInventoryResult.data || []).length,
-        matchedCanonicalSkus: (canonicalProductsResult.data || []).filter((product: any) =>
-          product.product_code && bodegaBySku.has(String(product.product_code).trim().toUpperCase())
+        sourceRows: matchedBodegaRows.length,
+        matchedCanonicalSkus: matchedBodegaRows.length,
+        positiveStockSkus: matchedBodegaRows.filter((row: any) =>
+          (numberValue(row.quantity) ?? numberValue(row.quantity_reported) ?? 0) > 0
         ).length,
       },
       freshness: {
