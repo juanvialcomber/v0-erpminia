@@ -134,17 +134,17 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
     }finally{setSourceLoading(null)}
   }
   if(!dates.length)return null;
-  return <section className="space-y-4 border-t pt-5" aria-label="Bandeja de clasificación de WhatsApp">
+  return <section className="space-y-4 border-t pt-5" aria-label="Novedades de WhatsApp">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Bandeja de clasificación</h2>
+        <h2 className="text-lg font-semibold">Novedades de WhatsApp</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Destino sugerido por contenido y grupo. Ningún mensaje se convierte automáticamente
-          en OT, cifra de producción, despacho ejecutado o incidente HSE.
+          Lectura diaria de los grupos autorizados. Primero se muestran las novedades; la clasificación
+          y los mensajes originales quedan disponibles para revisión.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="triage-date" className="text-xs text-muted-foreground">Informe</label>
+        <label htmlFor="triage-date" className="text-xs text-muted-foreground">Día</label>
         <select id="triage-date" className="h-9 rounded-md border bg-background px-3 text-sm"
           value={day} onChange={event=>{setDay(event.target.value);resetFilters()}}>
           {dates.map(date=><option value={date} key={date}>{date}</option>)}
@@ -153,169 +153,194 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
           onClick={()=>setReloadCounter(v=>v+1)}>Actualizar</Button>
       </div>
     </div>
-    {busy?<p role="status" className="text-sm text-muted-foreground">Clasificando fuentes del día…</p>:null}
+
+    {busy?<p role="status" className="text-sm text-muted-foreground">Leyendo mensajes del día…</p>:null}
     {error?<p role="alert" className="rounded-md border p-3 text-sm text-destructive">{error}</p>:null}
+
     {triage?<>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          [triage.totals.messages,'Mensajes recibidos'],
-          [triage.totals.findings,'Hallazgos IA'],
-          [triage.totals.uncoveredText,'Textos sin hallazgo'],
-          [triage.totals.mediaWithoutText,'Mensajes sin texto'],
-        ].map(([value,label])=><div key={label} className="rounded-lg border p-3">
-          <p className="text-xl font-semibold tabular-nums">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>)}
-      </div>
-      {triage.sourceMayHaveChanged||triage.truncated ? <p className="rounded-md border p-3 text-xs text-muted-foreground">
-        El conjunto disponible hoy puede no coincidir con el informe original
-        ({triage.sourceCountAtReport} mensajes al generarse,
-        {' '}{triage.sourceCountNow} en la consulta actual).
-        {triage.truncated?' Se alcanzó el límite de lectura; faltan fuentes por revisar.':''}
-        {' '}No asumir cobertura completa.
-      </p>:null}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Destinos propuestos (no aplicados)</p>
-        <div className="flex flex-wrap gap-2">
-          {triage.bySection.map(item=><button key={item.id} type="button"
-            onClick={()=>{setSection(section===item.id?'all':item.id);setLimit(20)}}
-            aria-pressed={section===item.id}
-            className={'rounded-md border px-3 py-1.5 text-xs transition-colors '+
-              (section===item.id?'bg-muted font-semibold':'hover:bg-muted/40')}>
-            {item.label} · {item.total}
-          </button>)}
+      <article className="rounded-lg border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div>
+            <p className="font-medium">{triage.reportDate}</p>
+            <p className="text-xs text-muted-foreground">
+              {triage.totals.messages} mensajes · {triage.totals.findings} novedades detectadas
+              {triage.totals.mediaWithoutText ? ` · ${triage.totals.mediaWithoutText} sin texto` : ''}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {triage.reportStatus==='ready'?'Actualizado':
+              triage.reportStatus==='partial'?'Datos parciales':
+              triage.reportStatus==='processing'?'Procesando':triage.reportStatus}
+          </p>
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-        <Button size="sm" variant={view==='findings'?'default':'outline'}
-          onClick={()=>{setView('findings');setLimit(20)}}>Hallazgos ({triage.findings.length})</Button>
-        <Button size="sm" variant={view==='sources'?'default':'outline'}
-          onClick={()=>{setView('sources');setLimit(20)}}>Todos los mensajes ({triage.items.length})</Button>
-        <div className="min-w-[170px] flex-1">
-          <Input aria-label="Buscar por mensaje o actividad" value={query}
-            onChange={event=>{setQuery(event.target.value);setLimit(20)}}
-            placeholder="Buscar novedad o mensaje" />
-        </div>
-        {view==='sources'?<select aria-label="Cobertura de extracción" value={coverage}
-          onChange={event=>{setCoverage(event.target.value);setLimit(20)}}
-          className="h-9 rounded-md border bg-background px-2 text-sm">
-          <option value="all">Todos los estados</option>
-          <option value="not_extracted">Sin hallazgo IA</option>
-          <option value="referenced">Citados por IA</option>
-          <option value="media_pending">Sin texto</option>
-        </select>:null}
-        {(section!=='all'||coverage!=='all'||query)?<Button variant="ghost" size="sm"
-          onClick={resetFilters}>Limpiar filtros</Button>:null}
-      </div>
-      {view==='findings' ? <>
-        {triage.possibleRepeats.length?<p className="rounded-md border p-3 text-xs text-muted-foreground">
-          Posibles menciones repetidas: {triage.possibleRepeats.map(x=>
-            x.indices.map(i=>'#'+(i+1)).join(' y ')).join('; ')}.
-          {' '}Reconciliar los mensajes antes de contar actividades distintas.
+
+        {triage.sourceMayHaveChanged||triage.truncated ? <p className="mx-4 mt-3 rounded-md border p-3 text-xs text-muted-foreground">
+          La fuente disponible puede haber cambiado desde el informe original
+          ({triage.sourceCountAtReport} mensajes al generarse, {triage.sourceCountNow} ahora).
+          {triage.truncated?' La lectura está limitada; no asumir cobertura completa.':''}
         </p>:null}
-        <div className="divide-y rounded-lg border">
-          {filtered.findings.slice(0,limit).map(item=><div key={item.index} className="space-y-1 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>#{item.index+1} · {item.suggestion.label}</span>
-              <span>{reviewLabel[item.reviewStatus]||item.reviewStatus}</span>
-            </div>
-            <p className="text-sm">{item.detail}</p>
-            <p className="text-xs text-muted-foreground">
-              {item.groups.join(' / ')||'Origen por confirmar'} · Mensajes: {item.sourceIds.join(', ')}
-              {!item.sourceComplete?' · Hay fuentes no recuperadas':''}
-            </p>
-          </div>)}
-          {!filtered.findings.length?<p className="p-4 text-sm text-muted-foreground">
-            No hay hallazgos que coincidan con los filtros.
+
+        <div className="space-y-4 px-4 py-4">
+          {triage.possibleRepeats.length?<p className="text-xs text-muted-foreground">
+            Posibles menciones repetidas: {triage.possibleRepeats.map(x=>
+              x.indices.map(i=>'#'+(i+1)).join(' y ')).join('; ')}. Revisar antes de contarlas como actividades distintas.
           </p>:null}
-        </div>
-        <p className="text-xs text-muted-foreground">Para corroborar fuentes y registrar
-          novedades, usa el panel «Novedades diarias» inmediatamente debajo.</p>
-      </>:<div className="divide-y rounded-lg border">
-        {filtered.messages.slice(0,limit).map(item=><details key={item.id} className="group p-3">
-          <summary className="cursor-pointer list-none space-y-1">
-            <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-              <span>{item.proposal.label} · {stageLabel[item.coverage]}</span>
-              <span>{formatWhen(item.occurredAt)} · #{item.id}</span>
-            </div>
-            <p className="text-sm">{item.excerpt.slice(0,170)||
-              'Archivo sin texto extraíble: revisar original antes de clasificar.'}
-              {item.excerpt.length>170?'…':''}</p>
-            <p className="text-xs text-muted-foreground">
-              {item.groupName} {item.siteHint ? ' · ' + item.siteHint + ' (mencionada)' : ''}
-              {item.proposal.needsMediaReview?' · Contiene multimedia':''}
-              {item.proposal.safetyReview?' · Revisar posible riesgo':''}
-              {item.proposal.mixedClaim?' · Incluye actividades y pendientes: separar':''}
-              {item.sections.length>1?' · '+item.sections.length+' bloques distintos':''}
-            </p>
-          </summary>
-          <div className="mt-3 space-y-2 border-t pt-3">
-            <p className="whitespace-pre-wrap break-words text-sm">
-              {item.excerpt||'No hay texto que permita inferir la actividad.'}
-            </p>
-            <p className="text-xs text-muted-foreground">{item.proposal.reason}</p>
-            {item.findingIndexes.length?<p className="text-xs text-muted-foreground">
-              Hallazgos que citan esta fuente: {item.findingIndexes.map(i=>'#'+(i+1)).join(', ')}.
-              La cita no acredita que se haya extraído todo el contenido del mensaje.
-            </p>:null}
-            {item.sections.length>1?<div className="space-y-2">
-              <p className="text-xs font-semibold">Bloques encontrados en el mensaje
-                {' '}({item.sections.length}) · Sugerencias, no registros confirmados
-              </p>
-              {item.sections.map((block,i)=><div key={String(block.lineStart)+'-'+i}
-                className="space-y-1 rounded-md border px-3 py-2">
-                <p className="text-xs font-medium">{block.proposal.label}
-                  {' · '}Líneas {block.lineStart}–{block.lineEnd}
-                  {block.siteHint?' · '+block.siteHint:''}
+
+          {triage.findings.length ? triage.findings.map(item=>
+            <div key={item.index} className="border-l-2 border-border pl-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm">
+                  <span className="font-medium">{item.suggestion.label}: </span>{item.detail}
                 </p>
-                <p className="text-xs text-muted-foreground">{block.title.slice(0,95)}</p>
-                <p className="whitespace-pre-wrap break-words text-xs">{block.excerpt.slice(0,350)}</p>
-                {block.needsNumericalReview?<p className="text-xs text-destructive">
-                  Verificar formato y unidad de lectura de horómetro antes de utilizar cifras.
-                </p>:null}
-              </div>)}
-            </div>:null}
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" disabled={sourceLoading===item.id}
-                onClick={()=>void loadFullSource(item.id)}>
-                {sourceLoading===item.id?'Consultando…':'Ver mensaje completo y adjuntos'}
-              </Button>
-              {activeSource===item.id&&sourceError?<p role="alert" className="text-xs text-destructive">
-                {sourceError}</p>:null}
-              {activeSource===item.id&&sourceDetail?.id===item.id?<div className="space-y-2 rounded-md border p-3">
-                <p className="text-xs font-semibold">Mensaje original #{item.id}</p>
-                <p className="whitespace-pre-wrap break-words text-sm">{sourceDetail.body||
-                  'El mensaje original no contiene texto. Consulta los archivos.'}</p>
-                {sourceDetail.bodyTruncated?<p className="text-xs text-muted-foreground">
-                  Texto demasiado extenso; se muestra un máximo de 20.000 caracteres.
-                </p>:null}
-                {sourceDetail.attachments.map(file=><div key={file.id}
-                  className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span>{file.original_file_name||file.mime_type||'Archivo'} ·
-                    {' '}{file.scan_status==='review_ready'?'Extraído: pendiente de revisión':
-                      file.scan_status==='pending'?'Lectura pendiente':
-                      file.scan_status==='manual'?'Revisión manual':
-                      file.scan_status}
-                  </span>
-                  {file.download_status==='stored'?<a className="underline"
-                    href={'/api/admin/whatsapp/evidence/'+encodeURIComponent(file.id)+'?file=1'}
-                    target="_blank" rel="noopener noreferrer">Ver original</a>:null}
-                </div>)}
-              </div>:null}
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {reviewLabel[item.reviewStatus]||item.reviewStatus}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {item.groups.join(' / ')||'Origen por confirmar'} · {item.sourceIds.length} mensaje{item.sourceIds.length===1?'':'s'} de origen
+                {!item.sourceComplete?' · Hay fuentes no recuperadas':''}
+              </p>
+            </div>
+          ) : <p className="text-sm text-muted-foreground">No hay novedades extraídas para este día.</p>}
+        </div>
+      </article>
+
+      <details className="rounded-lg border">
+        <summary className="cursor-pointer list-none px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">Revisar clasificación y mensajes originales</p>
+              <p className="text-xs text-muted-foreground">
+                Filtros, destinos sugeridos, mensajes sin hallazgo y adjuntos.
+              </p>
+            </div>
+            <span className="text-xs text-muted-foreground">{triage.totals.messages} mensajes</span>
+          </div>
+        </summary>
+
+        <div className="space-y-4 border-t px-4 py-4">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Destino sugerido</p>
+            <div className="flex flex-wrap gap-2">
+              {triage.bySection.map(item=><button key={item.id} type="button"
+                onClick={()=>{setSection(section===item.id?'all':item.id);setLimit(20)}}
+                aria-pressed={section===item.id}
+                className={'rounded-md border px-3 py-1.5 text-xs transition-colors '+
+                  (section===item.id?'bg-muted font-semibold':'hover:bg-muted/40')}>
+                {item.label} · {item.total}
+              </button>)}
             </div>
           </div>
-        </details>)}
-        {!filtered.messages.length?<p className="p-4 text-sm text-muted-foreground">
-          No hay mensajes que coincidan con los filtros.
-        </p>:null}
-      </div>}
-      {((view==='findings'?filtered.findings.length:filtered.messages.length)>limit) ?
-        <Button variant="outline" size="sm" onClick={()=>setLimit(v=>v+20)}>
-          Mostrar 20 más</Button>:null}
-      <p className="text-xs text-muted-foreground">
-        Clasificación provisional. El estado «reportado como realizado» refleja el texto,
-        no verificación en terreno. Los mensajes sin texto requieren lectura de multimedia.
-      </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant={view==='findings'?'default':'outline'}
+              onClick={()=>{setView('findings');setLimit(20)}}>Novedades ({triage.findings.length})</Button>
+            <Button size="sm" variant={view==='sources'?'default':'outline'}
+              onClick={()=>{setView('sources');setLimit(20)}}>Mensajes originales ({triage.items.length})</Button>
+            <div className="min-w-[170px] flex-1">
+              <Input aria-label="Buscar por mensaje o actividad" value={query}
+                onChange={event=>{setQuery(event.target.value);setLimit(20)}}
+                placeholder="Buscar mensaje o actividad" />
+            </div>
+            {view==='sources'?<select aria-label="Cobertura de extracción" value={coverage}
+              onChange={event=>{setCoverage(event.target.value);setLimit(20)}}
+              className="h-9 rounded-md border bg-background px-2 text-sm">
+              <option value="all">Todos</option>
+              <option value="not_extracted">Sin novedad extraída</option>
+              <option value="referenced">Incluidos en novedades</option>
+              <option value="media_pending">Sin texto</option>
+            </select>:null}
+            {(section!=='all'||coverage!=='all'||query)?<Button variant="ghost" size="sm"
+              onClick={resetFilters}>Limpiar</Button>:null}
+          </div>
+
+          {view==='findings' ? <div className="space-y-3">
+            {filtered.findings.slice(0,limit).map(item=>
+              <div key={item.index} className="border-l-2 border-border pl-3">
+                <p className="text-sm"><span className="font-medium">{item.suggestion.label}: </span>{item.detail}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {reviewLabel[item.reviewStatus]||item.reviewStatus} · {item.groups.join(' / ')||'Origen por confirmar'}
+                  {' · '}Mensajes {item.sourceIds.join(', ')}
+                </p>
+              </div>)}
+            {!filtered.findings.length?<p className="text-sm text-muted-foreground">Sin coincidencias.</p>:null}
+          </div> : <div className="divide-y rounded-md border">
+            {filtered.messages.slice(0,limit).map(item=><details key={item.id} className="group px-3 py-3">
+              <summary className="cursor-pointer list-none space-y-1">
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{item.groupName} · {item.proposal.label}</span>
+                  <span>{formatWhen(item.occurredAt)}</span>
+                </div>
+                <p className="text-sm leading-relaxed">{item.excerpt.slice(0,220)||
+                  'Archivo sin texto extraíble: revisar original antes de clasificar.'}
+                  {item.excerpt.length>220?'…':''}</p>
+                <p className="text-xs text-muted-foreground">
+                  {stageLabel[item.coverage]}
+                  {item.siteHint ? ' · ' + item.siteHint : ''}
+                  {item.proposal.needsMediaReview?' · Multimedia':''}
+                  {item.proposal.safetyReview?' · Revisar posible riesgo':''}
+                  {item.sections.length>1?' · '+item.sections.length+' bloques':''}
+                </p>
+              </summary>
+              <div className="mt-3 space-y-2 border-t pt-3">
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                  {item.excerpt||'No hay texto que permita inferir la actividad.'}
+                </p>
+                <p className="text-xs text-muted-foreground">{item.proposal.reason}</p>
+                {item.sections.length>1?<div className="space-y-2">
+                  {item.sections.map((block,i)=><div key={String(block.lineStart)+'-'+i}
+                    className="space-y-1 rounded-md border px-3 py-2">
+                    <p className="text-xs font-medium">{block.proposal.label}
+                      {' · '}Líneas {block.lineStart}–{block.lineEnd}
+                      {block.siteHint?' · '+block.siteHint:''}
+                    </p>
+                    <p className="whitespace-pre-wrap break-words text-xs">{block.excerpt.slice(0,350)}</p>
+                    {block.needsNumericalReview?<p className="text-xs text-destructive">
+                      Verificar formato y unidad de lectura antes de utilizar cifras.
+                    </p>:null}
+                  </div>)}
+                </div>:null}
+                <Button variant="outline" size="sm" disabled={sourceLoading===item.id}
+                  onClick={()=>void loadFullSource(item.id)}>
+                  {sourceLoading===item.id?'Consultando…':'Ver mensaje completo y adjuntos'}
+                </Button>
+                {activeSource===item.id&&sourceError?<p role="alert" className="text-xs text-destructive">
+                  {sourceError}</p>:null}
+                {activeSource===item.id&&sourceDetail?.id===item.id?<div className="space-y-2 rounded-md border p-3">
+                  <p className="text-xs font-semibold">Mensaje original · {item.groupName}</p>
+                  <p className="whitespace-pre-wrap break-words text-sm">{sourceDetail.body||
+                    'El mensaje original no contiene texto. Consulta los archivos.'}</p>
+                  {sourceDetail.bodyTruncated?<p className="text-xs text-muted-foreground">
+                    Se muestra un máximo de 20.000 caracteres.
+                  </p>:null}
+                  {sourceDetail.attachments.map(file=><div key={file.id}
+                    className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span>{file.original_file_name||file.mime_type||'Archivo'} ·
+                      {' '}{file.scan_status==='review_ready'?'Extraído: pendiente de revisión':
+                        file.scan_status==='pending'?'Lectura pendiente':
+                        file.scan_status==='manual'?'Revisión manual':
+                        file.scan_status}
+                    </span>
+                    {file.download_status==='stored'?<a className="underline"
+                      href={'/api/admin/whatsapp/evidence/'+encodeURIComponent(file.id)+'?file=1'}
+                      target="_blank" rel="noopener noreferrer">Ver original</a>:null}
+                  </div>)}
+                </div>:null}
+              </div>
+            </details>)}
+            {!filtered.messages.length?<p className="p-4 text-sm text-muted-foreground">Sin coincidencias.</p>:null}
+          </div>}
+
+          {((view==='findings'?filtered.findings.length:filtered.messages.length)>limit) ?
+            <Button variant="outline" size="sm" onClick={()=>setLimit(v=>v+20)}>
+              Mostrar 20 más</Button>:null}
+
+          <p className="text-xs text-muted-foreground">
+            La clasificación es provisional. “Reportado como realizado” refleja el texto de origen,
+            no una verificación en terreno. Ningún mensaje crea automáticamente una OT, KPI o incidente.
+          </p>
+        </div>
+      </details>
     </>:null}
   </section>;
 }
