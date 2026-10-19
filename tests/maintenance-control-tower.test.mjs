@@ -181,6 +181,8 @@ test('preventive slide separates hour and kilometer bases and reports active sch
   assert.match(api, /approvedPreventiveSchedules/);
   assert.match(page, /Horas/);
   assert.match(page, /Kilómetros/);
+  assert.match(page, /Anual/);
+  assert.match(api, /acc\.annual/);
   assert.match(page, /Plan preventivo vigente/);
 });
 
