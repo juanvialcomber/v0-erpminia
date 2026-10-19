@@ -2,9 +2,20 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { AlertTriangle, Clock3, Gauge, Monitor, Radio, Wrench } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  Gauge,
+  Monitor,
+  Radio,
+  ShieldAlert,
+  TimerReset,
+  Wrench,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
 import { cn } from '@/lib/utils';
 
@@ -15,9 +26,21 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-const number = (value: unknown) => value == null
-  ? '—'
-  : new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(Number(value));
+const slides = [
+  { key: 'analysis', label: 'Análisis operacional', icon: Activity },
+  { key: 'stopped', label: 'Equipos detenidos', icon: ShieldAlert },
+  { key: 'preventive', label: 'Mantenciones preventivas', icon: TimerReset },
+  { key: 'schedule', label: 'Programación de trabajos', icon: CalendarDays },
+  { key: 'fleet', label: 'Control general de flota', icon: Gauge },
+  { key: 'management', label: 'Indicadores de gestión', icon: BarChart3 },
+] as const;
+
+const number = (value: unknown, digits = 1) => {
+  if (value === null || value === undefined || value === '') return '—';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return '—';
+  return new Intl.NumberFormat('es-CL', { maximumFractionDigits: digits }).format(parsed);
+};
 
 const dateTime = (value: unknown) => {
   if (!value) return 'Sin actualización';
@@ -26,260 +49,528 @@ const dateTime = (value: unknown) => {
   return parsed.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
 };
 
-function priorityVariant(rank: number) {
-  if (rank === 1) return 'destructive' as const;
-  if (rank === 2) return 'secondary' as const;
-  return 'outline' as const;
-}
+const shortDate = (value: unknown) => {
+  if (!value) return '—';
+  const text = String(value).slice(0, 10);
+  const parsed = new Date(`${text}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+};
 
-function evidenceLabel(source: string | null | undefined) {
-  if (source === 'email') return 'Correo';
-  if (source === 'whatsapp') return 'WhatsApp';
-  if (source === 'canonical_status') return 'Estado validado';
-  if (source === 'planning_master') return 'Planificación';
-  return 'Maestro de activos';
-}
-
-function statusText(row: any) {
-  if (row.canonicalStatus) return row.canonicalStatus;
-  if (row.emailReportedStatus) return `Reportado: ${row.emailReportedStatus}`;
-  if (row.whatsappDescription) return 'Señal operacional';
-  return 'Sin estado validado';
-}
-
-function evidenceText(row: any) {
-  if (row.latestSignalSource === 'email') {
-    return row.emailIssue || row.emailWork || row.emailReportedStatus || row.emailSubject || 'Actualización por correo';
-  }
-  if (row.latestSignalSource === 'whatsapp') {
-    return row.whatsappDescription || 'Actualización por WhatsApp';
-  }
-  if (row.canonicalStatusReason) return row.canonicalStatusReason;
-  return row.recommendedAction || row.planningObservations || 'Sin novedades registradas';
-}
-
-function signalAge(hours: unknown) {
+const ageLabel = (hours: unknown) => {
   const value = Number(hours);
   if (!Number.isFinite(value)) return 'sin fecha';
   if (value < 1) return 'ahora';
   if (value < 24) return `hace ${value} h`;
   return `hace ${Math.floor(value / 24)} d`;
-}
+};
+
+const statusLabel = (value: unknown) => {
+  const status = String(value || '').toLowerCase();
+  if (status === 'completed' || status === 'closed') return 'Terminada';
+  if (status === 'in_progress' || status === 'in-progress') return 'En ejecución';
+  if (status === 'paused') return 'Pausada';
+  if (status === 'open' || status === 'assigned' || status === 'pending' || status === 'planned') return 'Pendiente';
+  return value ? String(value) : 'Sin estado';
+};
+
+const sourceLabel = (source: unknown) => {
+  if (source === 'email') return 'Correo';
+  if (source === 'whatsapp') return 'WhatsApp';
+  if (source === 'canonical_status') return 'Estado validado';
+  if (source === 'work_order') return 'OT';
+  if (source === 'planning_master') return 'Planificación';
+  return 'Maestro';
+};
+
+const signalText = (row: any) => {
+  if (row.latestSignalSource === 'email') return row.emailIssue || row.emailWork || row.emailReportedStatus || 'Actualización por correo';
+  if (row.latestSignalSource === 'whatsapp') return row.whatsappDescription || 'Actualización por WhatsApp';
+  if (row.latestSignalSource === 'work_order') return row.openWorkOrderNumbers?.length ? `OT abiertas: ${row.openWorkOrderNumbers.join(', ')}` : 'Actualización de OT';
+  return row.canonicalStatusReason || row.recommendedAction || row.planningObservations || row.currentReportedStatus || 'Sin novedad operacional reciente';
+};
 
 export default function MaintenanceControlTowerPage() {
   const { data, error, isLoading } = useSWR('/api/maintenance/control-tower', fetcher, {
     refreshInterval: 60_000,
     revalidateOnFocus: true,
   });
-  const [pageIndex, setPageIndex] = useState(0);
-  const pageSize = 6;
-
-  const attentionRows = Array.isArray(data?.attentionRows) ? data.attentionRows : [];
-  const fleetRows = Array.isArray(data?.fleetRows) ? data.fleetRows : [];
-  const recentSignals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
-  const totalPages = Math.max(1, Math.ceil(fleetRows.length / pageSize));
-
-  useEffect(() => {
-    setPageIndex((current) => Math.min(current, totalPages - 1));
-  }, [totalPages]);
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const rotationMs = 30_000;
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (media.matches) return;
-    const timer = window.setInterval(() => {
-      setPageIndex((current) => (current + 1) % totalPages);
-    }, 15_000);
-    return () => window.clearInterval(timer);
-  }, [totalPages]);
+    const sync = () => setReduceMotion(media.matches);
+    sync();
+    media.addEventListener?.('change', sync);
+    return () => media.removeEventListener?.('change', sync);
+  }, []);
 
-  const visibleFleetRows = useMemo(
-    () => fleetRows.slice(pageIndex * pageSize, pageIndex * pageSize + pageSize),
-    [fleetRows, pageIndex],
-  );
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSlideIndex((current) => (current + 1) % slides.length);
+    }, rotationMs);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (isLoading) {
-    return <div className="min-h-[70vh]"><StatePanel tone="loading" title="Cargando Torre de Control" className="min-h-[70vh]" /></div>;
+    return <StatePanel tone="loading" title="Cargando Torre de Control" className="min-h-[88vh]" />;
   }
 
   if (error) {
-    return <div className="min-h-[70vh]"><StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="min-h-[70vh]" /></div>;
+    return <StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="min-h-[88vh]" />;
   }
 
-  const summary = data?.summary || {};
-  const freshness = data?.freshness || {};
-  const pendingEmailMatches = Number(summary.pendingEmailMatches || 0);
+  const slide = slides[slideIndex];
+  const SlideIcon = slide.icon;
 
   return (
-    <div className="mx-auto w-full max-w-[1900px] space-y-4 pb-2">
-      <header className="grid gap-4 border-b pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
+    <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1920px] flex-col gap-4 overflow-hidden">
+      <header className="grid shrink-0 gap-3 border-b pb-3 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <Monitor className="h-4 w-4" />
-            Mantenimiento · pantalla permanente
+            Compañía Minera La Patagua · Mantenimiento
             <Badge variant="outline">Solo lectura</Badge>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">Torre de Control</h1>
-          <p className="mt-1 max-w-4xl text-sm text-muted-foreground">
-            Estado validado, planificación y evidencia nueva de correo/WhatsApp en una sola vista operacional.
-          </p>
+          <div className="mt-1 flex items-center gap-3">
+            <SlideIcon className="h-6 w-6 text-primary" />
+            <h1 className="text-3xl font-semibold tracking-tight">{slide.label}</h1>
+            <span className="text-sm text-muted-foreground">Vista {slideIndex + 1} de {slides.length}</span>
+          </div>
         </div>
-        <div className="grid gap-1 text-right text-xs text-muted-foreground">
-          <span>Correo: {dateTime(freshness.latestEmailAt)}</span>
-          <span>WhatsApp: {dateTime(freshness.latestWhatsAppAt)}</span>
-          <span>Pantalla: {dateTime(data?.generatedAt)}</span>
+        <div className="grid gap-1 text-right text-[11px] text-muted-foreground">
+          <span>Correo La Patagua: {dateTime(data?.freshness?.latestEmailAt)}</span>
+          <span>WhatsApp: {dateTime(data?.freshness?.latestWhatsAppAt)}</span>
+          <span>Actualización pantalla: {dateTime(data?.generatedAt)}</span>
         </div>
       </header>
 
-      <section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-4" aria-label="Resumen operacional">
-        <Metric icon={AlertTriangle} label="Atención ahora" value={summary.attentionAssets} detail={`${summary.p1 || 0} P1 · ${summary.p2 || 0} P2`} />
-        <Metric icon={Wrench} label="OT abiertas" value={summary.openWorkOrders} detail="Ejecución vigente" />
-        <Metric icon={Gauge} label="Equipos activos" value={summary.activeAssets} detail="Maestro canónico" />
-        <Metric icon={Radio} label="Evidencia por vincular" value={summary.pendingEmailMatches} detail="Revisión humana" />
+      <section className="grid shrink-0 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-5">
+        <TopMetric icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
+        <TopMetric icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
+        <TopMetric icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
+        <TopMetric icon={TimerReset} label="MP vencidas" value={data?.summary?.preventiveOverdue} />
+        <TopMetric icon={Radio} label="Evidencia por vincular" value={data?.summary?.pendingEmailMatches} />
       </section>
 
-      {pendingEmailMatches > 0 ? (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-          <div>
-            <p className="font-semibold">{pendingEmailMatches} evidencia{pendingEmailMatches === 1 ? '' : 's'} sin vínculo confiable a equipo</p>
-            <p className="text-sm text-muted-foreground">Se conserva la fuente, pero no modifica el estado de un activo hasta resolver la identidad.</p>
+      <main
+        key={slide.key}
+        className={cn(
+          'min-h-0 flex-1 overflow-hidden rounded-lg border bg-card',
+          !reduceMotion && 'animate-in fade-in duration-300',
+        )}
+      >
+        {slide.key === 'analysis' ? <AnalysisSlide data={data} /> : null}
+        {slide.key === 'stopped' ? <StoppedSlide data={data} /> : null}
+        {slide.key === 'preventive' ? <PreventiveSlide data={data} /> : null}
+        {slide.key === 'schedule' ? <ScheduleSlide data={data} /> : null}
+        {slide.key === 'fleet' ? <FleetSlide data={data} /> : null}
+        {slide.key === 'management' ? <ManagementSlide data={data} /> : null}
+      </main>
+
+      <footer className="shrink-0 border-t pt-2">
+        <div className="flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Clock3 className="h-3.5 w-3.5" />
+            Rotación automática cada 30 s · datos cada {data?.refreshSeconds || 60} s
           </div>
-        </div>
-      ) : null}
-
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.65fr)]">
-        <Card className="overflow-hidden shadow-none">
-          <CardContent className="p-0">
-            <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
-              <div>
-                <p className="text-sm font-semibold">Atención ahora</p>
-                <p className="text-xs text-muted-foreground">P1, P2 y equipos con OT abierta permanecen fijos.</p>
-              </div>
-              <Badge variant={attentionRows.length > 0 ? 'destructive' : 'outline'}>{attentionRows.length}</Badge>
-            </div>
-
-            {attentionRows.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Sin equipos en atención prioritaria.</div>
-            ) : (
-              <div className="grid gap-px bg-border md:grid-cols-2">
-                {attentionRows.slice(0, 6).map((row: any) => (
-                  <AssetCard key={row.canonicalAssetId} row={row} critical />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="overflow-hidden shadow-none">
-          <CardContent className="p-0">
-            <div className="border-b bg-muted/30 px-4 py-3">
-              <p className="text-sm font-semibold">Cambios recientes</p>
-              <p className="text-xs text-muted-foreground">Qué cambió, en qué equipo y desde qué fuente.</p>
-            </div>
-            <div className="divide-y">
-              {recentSignals.slice(0, 6).map((signal: any) => (
-                <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="space-y-1 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="truncate text-sm font-semibold">{signal.assetName}</p>
-                    <Badge variant="outline">{evidenceLabel(signal.source)}</Badge>
-                  </div>
-                  <p className="line-clamp-2 text-sm">{signal.text || 'Actualización registrada'}</p>
-                  <p className="text-xs text-muted-foreground">{signal.site || 'Sin faena'} · {dateTime(signal.at)}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card className="overflow-hidden shadow-none">
-        <CardContent className="p-0">
-          <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">Resto de la flota</p>
-              <p className="text-xs text-muted-foreground">La rotación automática afecta sólo a equipos sin atención prioritaria.</p>
-            </div>
-            <p className="text-xs text-muted-foreground">Página {pageIndex + 1} de {totalPages}</p>
-          </div>
-          <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-3">
-            {visibleFleetRows.map((row: any) => (
-              <AssetCard key={row.canonicalAssetId} row={row} />
+          <div className="flex items-center gap-1.5" aria-label="Progreso de vistas">
+            {slides.map((item, index) => (
+              <span
+                key={item.key}
+                className={cn('h-1.5 rounded-full transition-[width] duration-300', index === slideIndex ? 'w-8 bg-primary' : 'w-3 bg-muted-foreground/25')}
+              />
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      <footer className="flex items-center justify-between gap-4 border-t pt-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Clock3 className="h-3.5 w-3.5" />
-          Refresco cada {data?.refreshSeconds || 60} s · rotación no crítica cada 15 s
+          <div>Corte operacional: {data?.operationalCutoff || 'sin corte'}</div>
         </div>
-        <div>{fleetRows.length} equipos fuera de atención prioritaria</div>
       </footer>
     </div>
   );
 }
 
-function AssetCard({ row, critical = false }: { row: any; critical?: boolean }) {
+function AnalysisSlide({ data }: { data: any }) {
+  const attention = Array.isArray(data?.attentionRows) ? data.attentionRows : [];
+  const signals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
+
   return (
-    <div className={cn('bg-card p-4', critical && row.priorityRank === 1 ? 'bg-destructive/[0.035]' : '')}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold">{row.assetName}</p>
-          <p className="truncate text-xs text-muted-foreground">{row.site} · {row.assetCode || 'sin código'}</p>
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.2fr_.8fr]">
+      <Panel title="Resumen inteligente" subtitle="Qué requiere atención y por qué">
+        <div className="grid gap-3 md:grid-cols-2">
+          <Insight tone="critical" title="Equipos detenidos" value={data?.summary?.stoppedAssets} text="Señal actual validada o reportada por fuente reciente." />
+          <Insight tone="warning" title="OT vencidas abiertas" value={data?.summary?.overdueOpenWorkOrders} text="Trabajo programado antes de hoy que sigue abierto." />
+          <Insight tone="warning" title="Repuestos / espera" value={data?.summary?.partsPendingAssets} text="Evidencia actual que menciona repuesto, solicitud o espera." />
+          <Insight tone="neutral" title="Planificación desactualizada" value={data?.summary?.stalePlanningAssets} text="Se excluye de recomendaciones activas hasta reconciliarse con evidencia reciente." />
         </div>
-        <Badge variant={priorityVariant(row.priorityRank)}>{row.planningPriority || 'Sin P'}</Badge>
-      </div>
+        <div className="mt-4 divide-y rounded-md border">
+          {attention.slice(0, 6).map((row: any) => (
+            <div key={row.canonicalAssetId} className="grid gap-2 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <p className="text-sm font-semibold">{row.assetName}</p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{signalText(row)}</p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant={row.reportedStopped ? 'destructive' : row.priorityRank <= 2 ? 'secondary' : 'outline'}>
+                  {row.reportedStopped ? 'Detenido' : row.planningPriority || 'Atención'}
+                </Badge>
+                <span className="text-muted-foreground">{sourceLabel(row.latestSignalSource)} · {ageLabel(row.latestSignalAgeHours)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Estado validado</p>
-          <p className="mt-1 font-medium">{statusText(row)}</p>
+      <Panel title="Cambios recientes" subtitle="Últimas señales trazables">
+        <div className="divide-y">
+          {signals.slice(0, 8).map((signal: any) => (
+            <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="space-y-1 py-3 first:pt-0">
+              <div className="flex items-center justify-between gap-3">
+                <p className="truncate text-sm font-semibold">{signal.assetName}</p>
+                <Badge variant="outline">{sourceLabel(signal.source)}</Badge>
+              </div>
+              <p className="line-clamp-2 text-sm">{signal.text || 'Actualización registrada'}</p>
+              <p className="text-xs text-muted-foreground">{signal.site || 'Sin faena'} · {dateTime(signal.at)}</p>
+            </div>
+          ))}
         </div>
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Medidor / próximo MP</p>
-          <p className="mt-1 font-medium tabular-nums">
-            {number(row.emailMeterValue ?? row.planningCurrentReading)} {row.emailMeterUnit || row.planningMeterUnit || ''}
+      </Panel>
+    </div>
+  );
+}
+
+function StoppedSlide({ data }: { data: any }) {
+  const rows = Array.isArray(data?.stoppedRows) ? data.stoppedRows : [];
+
+  return (
+    <div className="flex h-full flex-col gap-4 p-4">
+      <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
+        <SmallMetric label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
+        <SmallMetric label="Críticos con OT" value={data?.summary?.criticalOpenWorkOrders} />
+        <SmallMetric label="OT abiertas" value={data?.summary?.openWorkOrders} />
+        <SmallMetric label="Repuestos pendientes" value={data?.summary?.partsPendingAssets} />
+      </div>
+      <Panel title="Detalle de equipos detenidos" subtitle="Sólo condiciones actuales respaldadas por evidencia">
+        {rows.length === 0 ? (
+          <EmptyState title="Sin equipos detenidos con evidencia vigente" text="No se arrastran estados históricos como detención actual." />
+        ) : (
+          <DataTable
+            headers={['Equipo', 'Faena', 'Estado / señal', 'Desde', 'OT', 'Repuestos']}
+            rows={rows.slice(0, 12).map((row: any) => [
+              row.assetName,
+              row.site,
+              row.currentReportedStatus || signalText(row),
+              row.stoppedSince ? dateTime(row.stoppedSince) : '—',
+              row.openWorkOrderNumbers?.join(', ') || '—',
+              row.partsPending ? 'Pendiente' : 'Sin señal',
+            ])}
+          />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function PreventiveSlide({ data }: { data: any }) {
+  const rows = Array.isArray(data?.preventiveRows) ? data.preventiveRows : [];
+  const pCounts = ['P1', 'P2', 'P3', 'P4', 'P5'].map((priority) => ({
+    label: priority,
+    value: rows.filter((row: any) => String(row.planningPriority || '').toUpperCase().startsWith(priority)).length,
+  }));
+
+  return (
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.35fr_.65fr]">
+      <Panel title="Mantenciones preventivas" subtitle="Base horaria / kilométrica con evidencia vigente">
+        <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
+          <SmallMetric label="MP vencidas" value={data?.summary?.preventiveOverdue} />
+          <SmallMetric label="Próximas" value={data?.summary?.preventiveDueSoon} />
+          <SmallMetric label="Equipos con base" value={data?.summary?.preventiveTracked} />
+          <SmallMetric label="Plan desactualizado" value={data?.summary?.stalePlanningAssets} />
+        </div>
+        <div className="mt-4">
+          <DataTable
+            headers={['Equipo', 'Faena', 'Medidor', 'Próx. MP', 'Saldo', 'Prioridad']}
+            rows={rows.slice(0, 10).map((row: any) => [
+              row.assetName,
+              row.site,
+              `${number(row.currentMeter)} ${row.meterUnit || ''}`,
+              number(row.nextDueMeter),
+              row.remainingMeter == null ? '—' : `${number(row.remainingMeter)} ${row.meterUnit || ''}`,
+              row.planningPriority || 'Sin P',
+            ])}
+          />
+        </div>
+      </Panel>
+
+      <Panel title="Distribución por prioridad" subtitle="Sólo prioridades con base disponible">
+        <BarList rows={pCounts} />
+        <div className="mt-6 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
+          <p className="text-sm font-semibold">Regla de confianza</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Una planificación más antigua que la última evidencia del equipo no se usa como recomendación activa hasta reconciliarse.
           </p>
-          <p className="text-xs text-muted-foreground">Próx. {number(row.planningNextDueMeter)} · resta {number(row.planningRemainingMeter)}</p>
         </div>
+      </Panel>
+    </div>
+  );
+}
+
+function ScheduleSlide({ data }: { data: any }) {
+  const rows = Array.isArray(data?.workOrders) ? data.workOrders : [];
+  const open = rows.filter((row: any) => !['completed', 'closed', 'cancelled', 'canceled'].includes(String(row.status).toLowerCase()));
+
+  return (
+    <div className="flex h-full flex-col gap-4 p-4">
+      <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-5">
+        <SmallMetric label="Trabajos abiertos" value={data?.summary?.openWorkOrders} />
+        <SmallMetric label="Vencidos" value={data?.summary?.overdueOpenWorkOrders} />
+        <SmallMetric label="Terminados registrados" value={data?.summary?.completedWorkOrders} />
+        <SmallMetric label="Críticos abiertos" value={data?.summary?.criticalOpenWorkOrders} />
+        <SmallMetric label="Pend. evidencia" value={data?.summary?.pendingEmailMatches} />
       </div>
+      <Panel title="Programa de trabajos" subtitle="OT canónicas; las vencidas permanecen visibles hasta cierre">
+        <DataTable
+          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Plan h', 'Real h']}
+          rows={rows.slice(0, 12).map((row: any) => [
+            row.workOrderNumber,
+            shortDate(row.scheduledDate),
+            row.assetName,
+            row.assignedTo || 'Sin responsable',
+            row.overdue ? 'Vencida' : statusLabel(row.status),
+            number(row.plannedHours),
+            number(row.actualHours),
+          ])}
+        />
+      </Panel>
+      {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="La programación activa está al día." /> : null}
+    </div>
+  );
+}
 
-      <div className="mt-3 rounded-md border bg-muted/20 px-3 py-2">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Última señal</p>
-          <p className="text-xs text-muted-foreground">{evidenceLabel(row.latestSignalSource)} · {signalAge(row.latestSignalAgeHours)}</p>
+function FleetSlide({ data }: { data: any }) {
+  const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const sites = useMemo(() => {
+    const map = new Map<string, { total: number; attention: number; stopped: number }>();
+    rows.forEach((row: any) => {
+      const site = row.site || 'Sin faena';
+      const current = map.get(site) || { total: 0, attention: 0, stopped: 0 };
+      current.total += 1;
+      if (row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending) current.attention += 1;
+      if (row.reportedStopped) current.stopped += 1;
+      map.set(site, current);
+    });
+    return [...map.entries()].map(([label, value]) => ({ label, ...value })).sort((a, b) => b.total - a.total);
+  }, [rows]);
+
+  return (
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
+      <Panel title="Condición por unidad operacional" subtitle="Cobertura del maestro vivo">
+        <div className="space-y-3">
+          {sites.slice(0, 8).map((site) => (
+            <div key={site.label}>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="font-medium">{site.label}</span>
+                <span className="text-muted-foreground">{site.total} equipos · {site.attention} atención · {site.stopped} detenidos</span>
+              </div>
+              <div className="flex h-4 overflow-hidden rounded bg-muted">
+                <div className="bg-emerald-500/70" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
+                <div className="bg-amber-500/70" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
+                <div className="bg-destructive/80" style={{ width: `${site.total ? (site.stopped / site.total) * 100 : 0}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
-        <p className="mt-1 line-clamp-2 text-sm font-medium">{evidenceText(row)}</p>
+      </Panel>
+
+      <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
+        <DataTable
+          headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']}
+          rows={(data?.attentionRows || []).slice(0, 10).map((row: any) => [
+            row.assetName,
+            row.site,
+            row.reportedStopped ? 'DETENIDO' : row.planningPriority || 'Atención',
+            row.openWorkOrders || '—',
+            row.partsPending ? 'Pendiente' : '—',
+            sourceLabel(row.latestSignalSource),
+          ])}
+        />
+      </Panel>
+    </div>
+  );
+}
+
+function ManagementSlide({ data }: { data: any }) {
+  const management = data?.management || {};
+  const completed = Number(data?.summary?.completedWorkOrders || 0);
+  const open = Number(data?.summary?.openWorkOrders || 0);
+  const total = completed + open;
+  const completionPct = total > 0 ? (completed / total) * 100 : null;
+  const preventive = Number(management.preventiveCompleted || 0);
+  const corrective = Number(management.correctiveCompleted || 0);
+  const workMixTotal = preventive + corrective;
+
+  return (
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
+      <Panel title="Indicadores de gestión" subtitle="Sólo métricas con base canónica suficiente">
+        <div className="grid gap-3 md:grid-cols-2">
+          <ManagementMetric label="Cumplimiento OT registradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total}` : 'Sin base'} />
+          <ManagementMetric label="Disponibilidad operacional" value="—" detail={management.availabilityBasis || 'Sin base canónica'} />
+          <ManagementMetric label="HH planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
+          <ManagementMetric label="HH reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
+          <ManagementMetric label="Backlog actual" value={data?.summary?.openWorkOrders ?? '—'} detail={`${data?.summary?.overdueOpenWorkOrders || 0} vencidas`} />
+          <ManagementMetric label="Horas detención registradas" value={number(management.recordedDowntimeHours)} detail={management.recordedDowntimeHours == null ? 'Sin base suficiente' : 'OT con dato explícito'} />
+        </div>
+      </Panel>
+
+      <Panel title="Preventivas vs correctivas" subtitle="Mix de OT terminadas registradas">
+        {workMixTotal > 0 ? (
+          <div className="space-y-6">
+            <DonutLike
+              primary={preventive}
+              secondary={corrective}
+              primaryLabel="Preventivas"
+              secondaryLabel="Correctivas"
+            />
+            <div className="grid gap-3 md:grid-cols-2">
+              <ManagementMetric label="Preventivas terminadas" value={preventive} detail={`${number((preventive / workMixTotal) * 100, 0)}% del mix`} />
+              <ManagementMetric label="Correctivas terminadas" value={corrective} detail={`${number((corrective / workMixTotal) * 100, 0)}% del mix`} />
+            </div>
+          </div>
+        ) : (
+          <EmptyState title="Sin base de OT terminadas" text="No se calcula un porcentaje sin denominador canónico." />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <section className="min-h-0 overflow-hidden rounded-lg border bg-background/20">
+      <div className="border-b bg-muted/25 px-4 py-3">
+        <p className="text-sm font-semibold">{title}</p>
+        {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
 
-      {critical && row.recommendedAction ? (
-        <div className="mt-3 border-l-2 border-primary/40 pl-3">
-          <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Siguiente acción</p>
-          <p className="mt-1 text-sm font-medium">{row.recommendedAction}</p>
-        </div>
-      ) : null}
+function TopMetric({ icon: Icon, label, value }: { icon: any; label: string; value: unknown }) {
+  return (
+    <div className="bg-card px-4 py-3">
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
+    </div>
+  );
+}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span>{row.programmingStatus || 'Sin programación'}</span>
-        <span>{row.responsible || 'Sin responsable'}</span>
-        {row.partsStatus ? <span>Rep.: {row.partsStatus}</span> : null}
-        {Number(row.openWorkOrders || 0) > 0 ? <span className="font-semibold text-foreground">{row.openWorkOrders} OT abierta{row.openWorkOrders === 1 ? '' : 's'}</span> : null}
+function SmallMetric({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="bg-card px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
+    </div>
+  );
+}
+
+function Insight({ tone, title, value, text }: { tone: 'critical' | 'warning' | 'neutral'; title: string; value: unknown; text: string }) {
+  return (
+    <div className={cn(
+      'rounded-md border p-4',
+      tone === 'critical' && 'border-destructive/30 bg-destructive/5',
+      tone === 'warning' && 'border-amber-500/30 bg-amber-500/5',
+      tone === 'neutral' && 'bg-muted/20',
+    )}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{text}</p>
+    </div>
+  );
+}
+
+function ManagementMetric({ label, value, detail }: { label: string; value: React.ReactNode; detail: string }) {
+  return (
+    <div className="rounded-md border bg-muted/10 p-4">
+      <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="flex min-h-40 items-center justify-center rounded-md border border-dashed p-8 text-center">
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{text}</p>
       </div>
     </div>
   );
 }
 
-function Metric({ icon: Icon, label, value, detail }: { icon: any; label: string; value: unknown; detail: string }) {
+function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<React.ReactNode>> }) {
   return (
-    <div className="bg-card px-5 py-4">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Icon className="h-4 w-4" />
-        <span>{label}</span>
+    <div className="overflow-hidden rounded-md border">
+      <div className="grid bg-muted/40 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+        {headers.map((header) => <div key={header} className="px-3 py-2">{header}</div>)}
       </div>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <p className="text-3xl font-semibold tracking-tight tabular-nums">{value == null ? '—' : number(value)}</p>
-        <p className="text-right text-xs text-muted-foreground">{detail}</p>
+      <div className="divide-y">
+        {rows.length === 0 ? (
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">Sin registros para esta vista.</div>
+        ) : rows.map((row, rowIndex) => (
+          <div key={rowIndex} className="grid text-xs" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+            {row.map((cell, cellIndex) => (
+              <div key={cellIndex} className={cn('min-w-0 truncate px-3 py-2.5', cellIndex === 0 && 'font-medium text-foreground')}>
+                {cell ?? '—'}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="font-medium">{row.label}</span>
+            <span className="tabular-nums text-muted-foreground">{row.value}</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded bg-muted">
+            <div className="h-full bg-primary/75" style={{ width: `${(row.value / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DonutLike({ primary, secondary, primaryLabel, secondaryLabel }: { primary: number; secondary: number; primaryLabel: string; secondaryLabel: string }) {
+  const total = Math.max(1, primary + secondary);
+  const primaryPct = (primary / total) * 100;
+  return (
+    <div className="grid items-center gap-5 md:grid-cols-[180px_1fr]">
+      <div
+        className="mx-auto grid h-44 w-44 place-items-center rounded-full"
+        style={{ background: `conic-gradient(hsl(var(--primary)) 0 ${primaryPct}%, hsl(var(--muted)) ${primaryPct}% 100%)` }}
+      >
+        <div className="grid h-28 w-28 place-items-center rounded-full bg-background text-center">
+          <div><p className="text-3xl font-semibold">{primary + secondary}</p><p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">OT</p></div>
+        </div>
+      </div>
+      <div className="space-y-3 text-sm">
+        <div className="flex items-center justify-between border-b pb-2"><span>{primaryLabel}</span><span className="font-semibold">{primary}</span></div>
+        <div className="flex items-center justify-between border-b pb-2"><span>{secondaryLabel}</span><span className="font-semibold">{secondary}</span></div>
       </div>
     </div>
   );
