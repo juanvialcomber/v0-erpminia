@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
       supplyChainResult,
       workOrderEvidenceResult,
       supervisorReviewsResult,
+      preventiveSchedulesResult,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -156,12 +157,18 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,id,status,reviewed_at,reviewed_by_name')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('preventive_maintenance_schedules')
+        .select('id,canonical_asset_id,frequency_days,frequency_hours,meter_unit,next_scheduled_date,enabled')
+        .eq('organization_id', context.organizationId)
+        .eq('enabled', true)
+        .limit(5000),
     ]);
 
     const error =
       assetsResult.error || planningResult.error || emailResult.error || whatsappResult.error ||
       statusResult.error || workOrdersResult.error || pendingEmailResult.error ||
-      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error;
+      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error || preventiveSchedulesResult.error;
     if (error) throw error;
 
     const assets = assetsResult.data || [];
@@ -170,6 +177,7 @@ export async function GET(request: NextRequest) {
     const whatsappRows = whatsappResult.data || [];
     const statusRows = statusResult.data || [];
     const workOrders = workOrdersResult.data || [];
+    const activePreventiveSchedules = preventiveSchedulesResult.data || [];
     const supplyRows = supplyChainResult.data || [];
     const supplyByWorkOrder = new Map(supplyRows.map((row: any) => [String(row.work_order_id || ''), row]));
     const evidenceCountByWorkOrder = new Map<string, number>();
@@ -549,8 +557,10 @@ export async function GET(request: NextRequest) {
       lifecycle: {
         counts: lifecycleCounts,
         preventiveBasis,
-        approvedPreventiveSchedules: 0,
-        approvedPreventiveSchedulesBasis: 'Sin planes preventivos operacionales activos',
+        approvedPreventiveSchedules: activePreventiveSchedules.length,
+        approvedPreventiveSchedulesBasis: activePreventiveSchedules.length
+          ? 'Planes preventivos operacionales activos'
+          : 'Sin planes preventivos operacionales activos',
       },
       management: {
         plannedHoursCompleted: completedPlannedHours || null,
