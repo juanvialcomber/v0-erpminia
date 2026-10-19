@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     .from('drilling_maintenance_review_queue_v1')
     .select('review_id,source_report_id,canonical_asset_id,asset_code,asset_name,operation_date,review_reason,equipment_status_raw,machine_observations,review_status,linked_work_order_id,has_linked_work_order,policy')
     .eq('organization_id', context.organizationId)
+    .neq('review_status', 'dismissed')
     .order('operation_date', { ascending: false })
     .order('asset_name', { ascending: true });
 
