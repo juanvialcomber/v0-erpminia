@@ -184,7 +184,7 @@ export default function MaintenanceControlTowerPage() {
               />
             ))}
           </div>
-          <div>Corte operacional: {data?.operationalCutoff || 'sin corte'}</div>
+          <div>{data?.summary?.activeAssets || 0}/{data?.summary?.canonicalAssets || 0} equipos con señal actual · corte {data?.operationalCutoff || 'sin corte'}</div>
         </div>
       </footer>
     </div>
