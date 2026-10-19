@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
       workOrderEvidenceResult,
       supervisorReviewsResult,
       preventiveSchedulesResult,
+      materialRequirementsResult,
+      canonicalProductsResult,
+      bodegaInventoryResult,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -171,12 +174,27 @@ export async function GET(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .eq('enabled', true)
         .limit(5000),
+      context.supabase
+        .from('work_order_material_requirements')
+        .select('id,work_order_id,canonical_product_id,quantity_required,status,required_date')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('canonical_products_v1')
+        .select('id,product_code,name,is_active')
+        .eq('organization_id', context.organizationId)
+        .eq('is_active', true)
+        .limit(20000),
+      context.supabase
+        .from('bodega_inventory')
+        .select('sku,name,quantity,quantity_reported,updated_at')
+        .limit(10000),
     ]);
 
     const error =
       assetsResult.error || planningResult.error || emailResult.error || whatsappResult.error ||
       statusResult.error || workOrdersResult.error || pendingEmailResult.error ||
-      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error || preventiveSchedulesResult.error;
+      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error || preventiveSchedulesResult.error || materialRequirementsResult.error || canonicalProductsResult.error || bodegaInventoryResult.error;
     if (error) throw error;
 
     const assets = assetsResult.data || [];
@@ -185,6 +203,24 @@ export async function GET(request: NextRequest) {
     const whatsappRows = whatsappResult.data || [];
     const statusRows = statusResult.data || [];
     const workOrders = workOrdersResult.data || [];
+    const productById = new Map(
+      (canonicalProductsResult.data || []).map((row: any) => [String(row.id), row])
+    );
+    const bodegaBySku = new Map(
+      (bodegaInventoryResult.data || [])
+        .filter((row: any) => row.sku)
+        .map((row: any) => [String(row.sku).trim().toUpperCase(), row])
+    );
+    const requirementsByWorkOrder = new Map<string, any[]>();
+    for (const row of materialRequirementsResult.data || []) {
+      const workOrderId = String(row.work_order_id || '');
+      if (!workOrderId) continue;
+      const rows = requirementsByWorkOrder.get(workOrderId) || [];
+      rows.push(row);
+      requirementsByWorkOrder.set(workOrderId, rows);
+    }
+    const bodegaLatestAt = newest(...(bodegaInventoryResult.data || []).map((row: any) => textValue(row.updated_at)));
+
     const activePreventiveSchedules = preventiveSchedulesResult.data || [];
     const supplyRows = supplyChainResult.data || [];
     const supplyByWorkOrder = new Map(supplyRows.map((row: any) => [String(row.work_order_id || ''), row]));
@@ -433,6 +469,24 @@ export async function GET(request: NextRequest) {
       const asset = rows.find((row) => row.canonicalAssetId === String(order.canonical_asset_id || ''));
       const workOrderId = String(order.id);
       const supply = supplyByWorkOrder.get(workOrderId) || null;
+      const requirements = requirementsByWorkOrder.get(workOrderId) || [];
+      const stockChecks = requirements.map((requirement: any) => {
+        const product = productById.get(String(requirement.canonical_product_id || ''));
+        const sku = textValue(product?.product_code);
+        const stock = sku ? bodegaBySku.get(sku.trim().toUpperCase()) : null;
+        const required = numberValue(requirement.quantity_required) || 0;
+        const available = numberValue(stock?.quantity) ?? numberValue(stock?.quantity_reported);
+        return {
+          canonicalProductId: requirement.canonical_product_id,
+          sku,
+          productName: textValue(product?.name),
+          required,
+          available,
+          sufficient: available != null ? available >= required : null,
+        };
+      });
+      const stockKnownCount = stockChecks.filter((row: any) => row.available != null).length;
+      const stockShortageCount = stockChecks.filter((row: any) => row.sufficient === false).length;
       const evidenceCount = evidenceCountByWorkOrder.get(workOrderId) || 0;
       const supervisorReviewCount = reviewCountByWorkOrder.get(workOrderId) || 0;
       const executionStarted =
@@ -455,13 +509,15 @@ export async function GET(request: NextRequest) {
         ? 'Cerrada'
         : !textValue(order.assigned_to_name)
           ? 'Sin responsable'
-          : Number(supply?.material_shortage_count || 0) > 0
-            ? 'Bloqueada por faltante'
-            : Number(supply?.open_procurement_request_count || 0) > 0 || Number(supply?.undelivered_order_count || 0) > 0
-              ? 'En compra'
-              : !supply || String(supply.supply_chain_status || '') === 'no_supply_evidence'
-                ? 'Por confirmar Bodega'
-                : 'Lista';
+          : requirements.length === 0
+            ? 'Materiales no declarados'
+            : stockShortageCount > 0 || Number(supply?.material_shortage_count || 0) > 0
+              ? 'Bloqueada por faltante'
+              : stockKnownCount < requirements.length
+                ? 'Stock por confirmar'
+                : Number(supply?.open_procurement_request_count || 0) > 0 || Number(supply?.undelivered_order_count || 0) > 0
+                  ? 'En compra'
+                  : 'Lista';
       return {
         id: order.id,
         workOrderNumber: order.work_order_number,
@@ -486,6 +542,10 @@ export async function GET(request: NextRequest) {
         executionStarted,
         lifecycleStage,
         executionReadiness,
+        materialRequirementCount: requirements.length,
+        stockKnownCount,
+        stockShortageCount,
+        stockChecks,
         supplyStatus: textValue(supply?.supply_chain_status) || 'no_supply_evidence',
         materialRequirements: Number(supply?.material_requirement_count || 0),
         materialShortages: Number(supply?.material_shortage_count || 0),
@@ -577,8 +637,8 @@ export async function GET(request: NextRequest) {
         blockers: {
           partsPendingAssets: rows.filter((row) => row.partsPending).length,
           openOrdersWithoutSupplyEvidence: openWorkOrders.filter((order: any) => {
-            const supply = supplyByWorkOrder.get(String(order.id));
-            return !supply || String(supply.supply_chain_status || '') === 'no_supply_evidence';
+            const requirements = requirementsByWorkOrder.get(String(order.id)) || [];
+            return requirements.length === 0;
           }).length,
           openOrdersWithShortage: openWorkOrders.filter((order: any) => {
             const supply = supplyByWorkOrder.get(String(order.id));
@@ -604,6 +664,14 @@ export async function GET(request: NextRequest) {
         recordedDowntimeHours: workOrders.reduce((sum, order) => sum + (numberValue(order.down_time_hours) || 0), 0) || null,
         availabilityPct: null,
         availabilityBasis: 'Sin base canónica de disponibilidad diaria',
+      },
+      inventory: {
+        source: 'bodega_inventory',
+        latestAt: bodegaLatestAt,
+        sourceRows: (bodegaInventoryResult.data || []).length,
+        matchedCanonicalSkus: (canonicalProductsResult.data || []).filter((product: any) =>
+          product.product_code && bodegaBySku.has(String(product.product_code).trim().toUpperCase())
+        ).length,
       },
       freshness: {
         latestEmailAt,
