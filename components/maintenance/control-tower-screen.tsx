@@ -372,7 +372,7 @@ function ScheduleSlide({ data }: { data: any }) {
       </div>
       <Panel
         title="Programa de ejecución"
-        subtitle={`Planificación + materiales · stock Bodega actualizado ${dateTime(data?.inventory?.latestAt)}`}
+        subtitle={`Planificación + materiales · stock informado ${dateTime(data?.inventory?.latestAt)} · reserva canónica separada`}
       >
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
