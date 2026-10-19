@@ -45,6 +45,15 @@ function isClosed(status: unknown) {
   return ['completed', 'closed', 'cancelled', 'canceled'].includes(String(status ?? '').toLowerCase());
 }
 
+function santiagoDay(offsetDays = 0) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.now() + offsetDays * 86400000));
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!access.authorized) return access.response;
@@ -327,8 +336,13 @@ export async function GET(request: NextRequest) {
     const currentRows = rows.filter((row) => row.currentCoverage);
     const openWorkOrders = workOrders.filter((order) => !isClosed(order.status));
     const completedWorkOrders = workOrders.filter((order) => ['completed', 'closed'].includes(String(order.status).toLowerCase()));
-    const today = new Date().toISOString().slice(0, 10);
+    const today = santiagoDay();
+    const tomorrow = santiagoDay(1);
     const overdueOpen = openWorkOrders.filter((order) => order.scheduled_date && String(order.scheduled_date) < today);
+    const dueTodayOpen = openWorkOrders.filter((order) => String(order.scheduled_date || '') === today);
+    const dueTomorrowOpen = openWorkOrders.filter((order) => String(order.scheduled_date || '') === tomorrow);
+    const unassignedOpen = openWorkOrders.filter((order) => !textValue(order.assigned_to_name));
+    const inProgressOpen = openWorkOrders.filter((order) => ['in_progress', 'in-progress', 'paused'].includes(String(order.status || '').toLowerCase()));
     const criticalOpen = openWorkOrders.filter((order) => priorityRank(order.priority) === 1);
     const stoppedRows = currentRows.filter((row) => row.reportedStopped);
     const attentionRows = currentRows.filter((row) => row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending);
@@ -337,6 +351,29 @@ export async function GET(request: NextRequest) {
     const overduePreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter <= 0);
     const dueSoonPreventive = preventiveRows.filter((row) => row.remainingMeter != null && row.remainingMeter > 0 && row.remainingMeter <= 100);
     const stalePlanning = rows.filter((row) => row.planningImportedAt && !row.planningCurrent);
+
+    const assigneeCoordination = [...openWorkOrders.reduce((map, order: any) => {
+      const assignee = textValue(order.assigned_to_name) || 'Sin responsable';
+      const current = map.get(assignee) || {
+        assignee,
+        open: 0,
+        overdue: 0,
+        dueToday: 0,
+        dueTomorrow: 0,
+        highCritical: 0,
+        nextScheduledDate: null as string | null,
+      };
+      const scheduledDate = textValue(order.scheduled_date);
+      current.open += 1;
+      if (scheduledDate && scheduledDate < today) current.overdue += 1;
+      if (scheduledDate === today) current.dueToday += 1;
+      if (scheduledDate === tomorrow) current.dueTomorrow += 1;
+      if (priorityRank(order.priority) <= 2) current.highCritical += 1;
+      if (scheduledDate && (!current.nextScheduledDate || scheduledDate < current.nextScheduledDate)) current.nextScheduledDate = scheduledDate;
+      map.set(assignee, current);
+      return map;
+    }, new Map<string, any>()).values()]
+      .sort((a, b) => b.overdue - a.overdue || b.highCritical - a.highCritical || b.open - a.open);
 
     const workOrderRows = workOrders.map((order: any) => {
       const asset = rows.find((row) => row.canonicalAssetId === String(order.canonical_asset_id || ''));
@@ -401,6 +438,10 @@ export async function GET(request: NextRequest) {
         openWorkOrders: openWorkOrders.length,
         completedWorkOrders: completedWorkOrders.length,
         overdueOpenWorkOrders: overdueOpen.length,
+        dueTodayOpenWorkOrders: dueTodayOpen.length,
+        dueTomorrowOpenWorkOrders: dueTomorrowOpen.length,
+        unassignedOpenWorkOrders: unassignedOpen.length,
+        inProgressOpenWorkOrders: inProgressOpen.length,
         criticalOpenWorkOrders: criticalOpen.length,
         partsPendingAssets: rows.filter((row) => row.partsPending).length,
         p1: rows.filter((row) => row.priorityRank === 1).length,
@@ -413,6 +454,17 @@ export async function GET(request: NextRequest) {
         pendingWhatsAppInputs: pendingWhatsappInputs.length,
         linkedEmailAssets: rows.filter((row) => row.emailReportDate).length,
         linkedWhatsAppAssets: rows.filter((row) => row.whatsappOccurredAt).length,
+      },
+      coordination: {
+        role: 'planning_coordination',
+        today,
+        tomorrow,
+        byAssignee: assigneeCoordination,
+        blockers: {
+          partsPendingAssets: rows.filter((row) => row.partsPending).length,
+          unresolvedEmailInputs: (pendingEmailResult.data || []).filter((row: any) => !operationalCutoff || String(row.report_date || '') >= operationalCutoff).length,
+          unresolvedWhatsAppInputs: pendingWhatsappInputs.length,
+        },
       },
       management: {
         plannedHoursCompleted: completedPlannedHours || null,
