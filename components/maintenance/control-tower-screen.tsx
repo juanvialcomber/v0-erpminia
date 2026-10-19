@@ -311,21 +311,21 @@ function PreventiveSlide({ data }: { data: any }) {
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.35fr_.65fr]">
       <Panel title="Mantenciones preventivas" subtitle="Base horaria / kilométrica con evidencia vigente">
         <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
-          <SmallMetric label="MP vencidas" value={data?.summary?.preventiveOverdue} />
+          <SmallMetric label="Vencidas" value={data?.summary?.preventiveOverdue} />
           <SmallMetric label="Próximas" value={data?.summary?.preventiveDueSoon} />
+          <SmallMetric label="Revisar fecha" value={data?.summary?.preventiveDateReview} />
           <SmallMetric label="Equipos con base" value={data?.summary?.preventiveTracked} />
-          <SmallMetric label="Plan desactualizado" value={data?.summary?.stalePlanningAssets} />
         </div>
         <div className="mt-4">
           <DataTable
-            headers={['Equipo', 'Faena', 'Medidor', 'Próx. MP', 'Saldo', 'Prioridad']}
+            headers={['Equipo', 'Faena', 'Base', 'Lectura', 'Próx. MP', 'Estado MP']}
             rows={rows.slice(0, 10).map((row: any) => [
               row.assetName,
               row.site,
-              `${number(row.currentMeter)} ${row.meterUnit || ''}`,
-              number(row.nextDueMeter),
-              row.remainingMeter == null ? '—' : `${number(row.remainingMeter)} ${row.meterUnit || ''}`,
-              row.planningPriority || 'Sin P',
+              row.meterUnit || '—',
+              row.currentMeter == null ? '—' : number(row.currentMeter),
+              row.nextDueMeter == null ? '—' : number(row.nextDueMeter),
+              row.reportedMpStatus || row.planningPriority || 'Sin estado',
             ])}
           />
         </div>
