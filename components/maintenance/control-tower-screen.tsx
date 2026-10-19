@@ -389,8 +389,8 @@ function ScheduleSlide({ data }: { data: any }) {
       </Panel>
       <div className="grid gap-2 md:grid-cols-3">
         <BasisRow label="SKUs Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
-        <BasisRow label="SKUs con stock positivo" value={data?.inventory?.positiveStockSkus || 0} />
-        <BasisRow label="Fuente" value={data?.inventory?.sourceRows || 0} />
+        <BasisRow label="SKUs con stock usable" value={data?.inventory?.positiveStockSkus || 0} />
+        <BasisRow label="SKUs en conciliación" value={data?.inventory?.conflictedSkus || 0} />
       </div>
       {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="No hay trabajo activo pendiente de coordinación." /> : null}
     </div>
