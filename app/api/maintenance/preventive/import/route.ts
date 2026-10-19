@@ -2,12 +2,13 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { loadXlsxModule, sheetToMatrix } from '@/lib/xlsx';
 
 type AssetRow = {
   id: string;
   asset_code: string | null;
-  asset_name: string | null;
+  name: string | null;
 };
 
 type ScheduleRow = {
@@ -15,6 +16,7 @@ type ScheduleRow = {
   asset_id: string | null;
   task_name: string | null;
   frequency_days: number | string | null;
+  frequency_hours: number | string | null;
 };
 
 type NormalizedRow = {
@@ -22,7 +24,7 @@ type NormalizedRow = {
   assetName: string;
   taskName: string;
   description: string;
-  frequencyDays: number;
+  frequencyDays: number | null;
   frequencyHours: number | null;
   lastExecutedDate: string | null;
   nextScheduledDate: string | null;
@@ -108,10 +110,11 @@ function normalizeRow(record: Record<string, unknown>): NormalizedRow | null {
   const assetName = readCell(record, HEADER_ALIASES.assetName);
   const taskName = readCell(record, HEADER_ALIASES.taskName);
   const frequencyDaysText = readCell(record, HEADER_ALIASES.frequencyDays);
-  const frequencyDays = parseNumber(frequencyDaysText, 0);
+  const frequencyDays = parseOptionalNumber(frequencyDaysText);
+  const frequencyHours = parseOptionalNumber(readCell(record, HEADER_ALIASES.frequencyHours));
   const nextScheduledDate = toIsoDate(readCell(record, HEADER_ALIASES.nextScheduledDate));
 
-  if (!taskName || frequencyDays <= 0) return null;
+  if (!taskName || !((frequencyDays ?? 0) > 0 || (frequencyHours ?? 0) > 0)) return null;
 
   return {
     assetCode,
@@ -119,7 +122,7 @@ function normalizeRow(record: Record<string, unknown>): NormalizedRow | null {
     taskName,
     description: readCell(record, HEADER_ALIASES.description),
     frequencyDays,
-    frequencyHours: parseOptionalNumber(readCell(record, HEADER_ALIASES.frequencyHours)),
+    frequencyHours,
     lastExecutedDate: toIsoDate(readCell(record, HEADER_ALIASES.lastExecutedDate)) || null,
     nextScheduledDate: nextScheduledDate || null,
     estimatedDurationHours: parseOptionalNumber(readCell(record, HEADER_ALIASES.estimatedDurationHours)),
@@ -128,11 +131,13 @@ function normalizeRow(record: Record<string, unknown>): NormalizedRow | null {
   };
 }
 
-function buildScheduleKey(assetId: string, taskName: string, frequencyDays: number) {
-  return `${assetId}::${normalizeKey(taskName)}::${frequencyDays}`;
+function buildScheduleKey(assetId: string, taskName: string, frequencyDays: number | null, frequencyHours: number | null) {
+  return `${assetId}::${normalizeKey(taskName)}::d${frequencyDays ?? ''}::h${frequencyHours ?? ''}`;
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
+  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
@@ -172,29 +177,31 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: assets, error: assetsError } = await context.supabase
-      .from('maintenance_assets')
-      .select('id, asset_code, asset_name')
-      .eq('organization_id', context.organizationId);
+      .from('maintenance_canonical_assets_v1')
+      .select('id, asset_code, name')
+      .eq('organization_id', context.organizationId)
+      .eq('is_active', true);
 
     if (assetsError) throw assetsError;
 
     const assetMap = new Map<string, string>();
     (Array.isArray(assets) ? (assets as AssetRow[]) : []).forEach((asset) => {
       if (asset.asset_code) assetMap.set(normalizeKey(asset.asset_code), asset.id);
-      if (asset.asset_name) assetMap.set(normalizeKey(asset.asset_name), asset.id);
+      if (asset.name) assetMap.set(normalizeKey(asset.name), asset.id);
     });
 
     const { data: existingSchedules, error: schedulesError } = await context.supabase
       .from('preventive_maintenance_schedules')
-      .select('id, asset_id, task_name, frequency_days')
+      .select('id, canonical_asset_id, task_name, frequency_days, frequency_hours')
       .eq('organization_id', context.organizationId);
 
     if (schedulesError) throw schedulesError;
 
     const scheduleMap = new Map<string, ScheduleRow>();
     (Array.isArray(existingSchedules) ? (existingSchedules as ScheduleRow[]) : []).forEach((schedule) => {
-      if (!schedule.asset_id || !schedule.task_name || schedule.frequency_days === null || schedule.frequency_days === undefined) return;
-      scheduleMap.set(buildScheduleKey(schedule.asset_id, schedule.task_name, Number(schedule.frequency_days)), schedule);
+      const scheduleAny = schedule as ScheduleRow & { canonical_asset_id?: string | null };
+      if (!scheduleAny.canonical_asset_id || !schedule.task_name) return;
+      scheduleMap.set(buildScheduleKey(scheduleAny.canonical_asset_id, schedule.task_name, schedule.frequency_days == null ? null : Number(schedule.frequency_days), schedule.frequency_hours == null ? null : Number(schedule.frequency_hours)), schedule);
     });
 
     let inserted = 0;
@@ -215,13 +222,13 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const nextScheduledDate =
-        row.nextScheduledDate ||
-        (row.lastExecutedDate ? addDays(row.lastExecutedDate, row.frequencyDays) : addDays(null, row.frequencyDays));
+      const nextScheduledDate = row.frequencyDays && row.frequencyDays > 0
+        ? row.nextScheduledDate || (row.lastExecutedDate ? addDays(row.lastExecutedDate, row.frequencyDays) : addDays(null, row.frequencyDays))
+        : row.nextScheduledDate || null;
 
       const payload = {
         organization_id: context.organizationId,
-        asset_id: assetId,
+        canonical_asset_id: assetId,
         task_name: row.taskName,
         description: row.description || null,
         frequency_days: row.frequencyDays,
@@ -234,7 +241,7 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString(),
       };
 
-      const existing = scheduleMap.get(buildScheduleKey(assetId, row.taskName, row.frequencyDays));
+      const existing = scheduleMap.get(buildScheduleKey(assetId, row.taskName, row.frequencyDays, row.frequencyHours));
       if (existing) {
         const { error } = await context.supabase
           .from('preventive_maintenance_schedules')
