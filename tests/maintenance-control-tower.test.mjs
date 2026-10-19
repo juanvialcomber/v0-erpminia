@@ -160,3 +160,31 @@ test('wallboard exposes bodega evidence without treating missing evidence as cov
   assert.match(page, /Faltante/);
   assert.match(page, /En compra/);
 });
+
+
+test('wallboard distinguishes OT lifecycle stages from schedule urgency', () => {
+  assert.match(api, /work_order_evidence_files/);
+  assert.match(api, /work_order_supervisor_reviews/);
+  assert.match(api, /lifecycleStage/);
+  assert.match(api, /Revisada/);
+  assert.match(api, /Evidenciada/);
+  assert.match(api, /En ejecución/);
+  assert.match(page, /Etapa/);
+  assert.match(page, /Vencida ·/);
+  assert.match(page, /Mañana ·/);
+});
+
+test('preventive slide separates hour and kilometer bases and reports active schedule coverage', () => {
+  assert.match(api, /preventive_maintenance_schedules/);
+  assert.match(api, /preventiveBasis/);
+  assert.match(api, /approvedPreventiveSchedules/);
+  assert.match(page, /Horas/);
+  assert.match(page, /Kilómetros/);
+  assert.match(page, /Plan preventivo vigente/);
+});
+
+test('fleet slide shows source coverage and freshness by site', () => {
+  assert.match(page, /Correo \{site\.email\}/);
+  assert.match(page, /WhatsApp \{site\.whatsapp\}/);
+  assert.match(page, /dateTime\(site\.latestAt\)/);
+});
