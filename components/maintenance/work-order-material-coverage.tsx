@@ -33,6 +33,7 @@ type MaterialRow = {
   quantity_shortage?: number | string | null;
   informed_available?: number | string | null;
   informed_updated_at?: string | null;
+  informed_status?: 'usable' | 'conflict' | 'missing' | null;
   informed_source?: string | null;
 };
 
@@ -65,6 +66,7 @@ const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 const informedAvailable = (row: MaterialRow) => row.informed_available == null ? null : Number(row.informed_available);
 const informedCanCover = (row: MaterialRow) => {
+  if (row.informed_status === 'conflict') return false;
   const informed = informedAvailable(row);
   return informed != null && Number.isFinite(informed) && informed >= shortage(row);
 };
@@ -251,7 +253,11 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
               <div><p className="text-xs text-muted-foreground">Entregado</p><p className="font-medium tabular-nums">{issuedQty}</p></div>
               <div><p className="text-xs text-muted-foreground">Faltante</p><p className={missing > 0 ? 'font-semibold tabular-nums text-destructive' : 'font-medium tabular-nums'}>{missing}</p></div>
               <div><p className="text-xs text-muted-foreground">En Compras</p><p className="font-medium tabular-nums">{purchasingQty}</p></div>
-              {informedAvailable(row) != null ? <div className="col-span-2 sm:col-span-5 text-xs text-muted-foreground">Stock informado Bodega: {informedAvailable(row)} · confirmar antes de comprar o ejecutar.</div> : null}
+              {row.informed_status === 'conflict'
+                ? <div className="col-span-2 sm:col-span-5 text-xs text-destructive">Stock informado Bodega: En conciliación · no usar para cubrir, comprar o ejecutar hasta resolver la fuente.</div>
+                : informedAvailable(row) != null
+                  ? <div className="col-span-2 sm:col-span-5 text-xs text-muted-foreground">Stock informado Bodega: {informedAvailable(row)} · confirmar antes de comprar o ejecutar.</div>
+                  : null}
             </div>
           </div>;
         })}</div> : null}
