@@ -331,12 +331,17 @@ function PreventiveSlide({ data }: { data: any }) {
         </div>
       </Panel>
 
-      <Panel title="Distribución por prioridad" subtitle="Sólo prioridades con base disponible">
+      <Panel title="Prioridad y base de control" subtitle="Horas, kilómetros y vigencia del plan no se mezclan">
         <BarList rows={pCounts} />
-        <div className="mt-6 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
-          <p className="text-sm font-semibold">Regla de confianza</p>
+        <div className="mt-5 grid gap-2">
+          <SourceHealth label="Base horaria" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.hours || 0} />
+          <SourceHealth label="Base kilométrica" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.km || 0} />
+          <SourceHealth label="Otra base" inputAt={null} publishedAt={null} pending={data?.lifecycle?.preventiveBasis?.other || 0} />
+        </div>
+        <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
+          <p className="text-sm font-semibold">Plan preventivo vigente</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Una planificación más antigua que la última evidencia del equipo no se usa como recomendación activa hasta reconciliarse.
+            {data?.lifecycle?.approvedPreventiveSchedules || 0} planes activos · {data?.lifecycle?.approvedPreventiveSchedulesBasis || 'Sin base canónica'}
           </p>
         </div>
       </Panel>
@@ -366,13 +371,13 @@ function ScheduleSlide({ data }: { data: any }) {
       </div>
       <Panel title="Programa de ejecución" subtitle="Lo que Planificación debe coordinar con taller y responsables">
         <DataTable
-          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Prioridad', 'Bodega']}
+          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Bodega']}
           rows={open.slice(0, 12).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
             row.assignedTo || 'Sin responsable',
-            row.overdue ? 'Vencida' : row.scheduledDate === today ? 'Hoy' : row.scheduledDate === tomorrow ? 'Mañana' : statusLabel(row.status),
+            `${row.overdue ? 'Vencida · ' : row.scheduledDate === today ? 'Hoy · ' : row.scheduledDate === tomorrow ? 'Mañana · ' : ''}${row.lifecycleStage || statusLabel(row.status)}`,
             row.priority || '—',
             row.materialShortages > 0
               ? 'Faltante'
@@ -392,13 +397,16 @@ function ScheduleSlide({ data }: { data: any }) {
 function FleetSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const sites = useMemo(() => {
-    const map = new Map<string, { total: number; attention: number; stopped: number }>();
+    const map = new Map<string, { total: number; attention: number; stopped: number; latestAt: string | null; email: number; whatsapp: number }>();
     rows.forEach((row: any) => {
       const site = row.site || 'Sin faena';
-      const current = map.get(site) || { total: 0, attention: 0, stopped: 0 };
+      const current = map.get(site) || { total: 0, attention: 0, stopped: 0, latestAt: null, email: 0, whatsapp: 0 };
       current.total += 1;
       if (row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending) current.attention += 1;
       if (row.reportedStopped) current.stopped += 1;
+      if (row.emailCurrent) current.email += 1;
+      if (row.whatsappCurrent) current.whatsapp += 1;
+      if (row.latestSignalAt && (!current.latestAt || String(row.latestSignalAt) > current.latestAt)) current.latestAt = String(row.latestSignalAt);
       map.set(site, current);
     });
     return [...map.entries()].map(([label, value]) => ({ label, ...value })).sort((a, b) => b.total - a.total);
@@ -412,8 +420,9 @@ function FleetSlide({ data }: { data: any }) {
             <div key={site.label}>
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="font-medium">{site.label}</span>
-                <span className="text-muted-foreground">{site.total} equipos · {site.attention} atención · {site.stopped} detenidos</span>
+                <span className="text-muted-foreground">{site.total} equipos · {site.attention} atención · {site.stopped} detenidos · {dateTime(site.latestAt)}</span>
               </div>
+              <div className="mb-1 text-[10px] text-muted-foreground">Correo {site.email} · WhatsApp {site.whatsapp}</div>
               <div className="flex h-4 overflow-hidden rounded bg-muted">
                 <div className="bg-emerald-500/70" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
                 <div className="bg-amber-500/70" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
