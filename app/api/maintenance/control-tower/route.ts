@@ -435,6 +435,17 @@ export async function GET(request: NextRequest) {
           : textValue(order.assigned_to_name)
             ? 'Asignada'
             : 'Creada';
+      const executionReadiness = isClosed(order.status)
+        ? 'Cerrada'
+        : !textValue(order.assigned_to_name)
+          ? 'Sin responsable'
+          : Number(supply?.material_shortage_count || 0) > 0
+            ? 'Bloqueada por faltante'
+            : Number(supply?.open_procurement_request_count || 0) > 0 || Number(supply?.undelivered_order_count || 0) > 0
+              ? 'En compra'
+              : !supply || String(supply.supply_chain_status || '') === 'no_supply_evidence'
+                ? 'Por confirmar Bodega'
+                : 'Lista';
       return {
         id: order.id,
         workOrderNumber: order.work_order_number,
@@ -458,6 +469,7 @@ export async function GET(request: NextRequest) {
         supervisorReviewCount,
         executionStarted,
         lifecycleStage,
+        executionReadiness,
         supplyStatus: textValue(supply?.supply_chain_status) || 'no_supply_evidence',
         materialRequirements: Number(supply?.material_requirement_count || 0),
         materialShortages: Number(supply?.material_shortage_count || 0),
@@ -467,6 +479,9 @@ export async function GET(request: NextRequest) {
         overdue: !isClosed(order.status) && Boolean(order.scheduled_date) && String(order.scheduled_date) < today,
       };
     });
+
+    const dueTomorrowReadiness = workOrderRows.filter((row: any) => row.scheduledDate === tomorrow && !isClosed(row.status));
+    const dueTomorrowNotReady = dueTomorrowReadiness.filter((row: any) => row.executionReadiness !== 'Lista');
 
     const lifecycleCounts = workOrderRows.reduce((acc: Record<string, number>, row: any) => {
       acc[row.lifecycleStage] = (acc[row.lifecycleStage] || 0) + 1;
@@ -520,6 +535,7 @@ export async function GET(request: NextRequest) {
         overdueOpenWorkOrders: overdueOpen.length,
         dueTodayOpenWorkOrders: dueTodayOpen.length,
         dueTomorrowOpenWorkOrders: dueTomorrowOpen.length,
+        dueTomorrowNotReadyWorkOrders: dueTomorrowNotReady.length,
         unassignedOpenWorkOrders: unassignedOpen.length,
         inProgressOpenWorkOrders: inProgressOpen.length,
         criticalOpenWorkOrders: criticalOpen.length,
