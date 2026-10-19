@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
       latestEmailResult,
       whatsappInputResult,
       supplyChainResult,
+      workOrderEvidenceResult,
+      supervisorReviewsResult,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -144,12 +146,22 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,work_order_number,material_requirement_count,material_shortage_count,open_supply_need_count,open_procurement_request_count,undelivered_order_count,supply_chain_status')
         .eq('organization_id', context.organizationId)
         .limit(1000),
+      context.supabase
+        .from('work_order_evidence_files')
+        .select('work_order_id,id,evidence_type,captured_at,created_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('work_order_supervisor_reviews')
+        .select('work_order_id,id,status,reviewed_at,reviewed_by_name')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     const error =
       assetsResult.error || planningResult.error || emailResult.error || whatsappResult.error ||
       statusResult.error || workOrdersResult.error || pendingEmailResult.error ||
-      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error;
+      latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error;
     if (error) throw error;
 
     const assets = assetsResult.data || [];
@@ -160,6 +172,16 @@ export async function GET(request: NextRequest) {
     const workOrders = workOrdersResult.data || [];
     const supplyRows = supplyChainResult.data || [];
     const supplyByWorkOrder = new Map(supplyRows.map((row: any) => [String(row.work_order_id || ''), row]));
+    const evidenceCountByWorkOrder = new Map<string, number>();
+    for (const row of workOrderEvidenceResult.data || []) {
+      const id = String(row.work_order_id || '');
+      if (id) evidenceCountByWorkOrder.set(id, (evidenceCountByWorkOrder.get(id) || 0) + 1);
+    }
+    const reviewCountByWorkOrder = new Map<string, number>();
+    for (const row of supervisorReviewsResult.data || []) {
+      const id = String(row.work_order_id || '');
+      if (id) reviewCountByWorkOrder.set(id, (reviewCountByWorkOrder.get(id) || 0) + 1);
+    }
 
     const latestPlanning = new Map<string, any>();
     for (const row of planningRows) {
@@ -385,7 +407,26 @@ export async function GET(request: NextRequest) {
 
     const workOrderRows = workOrders.map((order: any) => {
       const asset = rows.find((row) => row.canonicalAssetId === String(order.canonical_asset_id || ''));
-      const supply = supplyByWorkOrder.get(String(order.id)) || null;
+      const workOrderId = String(order.id);
+      const supply = supplyByWorkOrder.get(workOrderId) || null;
+      const evidenceCount = evidenceCountByWorkOrder.get(workOrderId) || 0;
+      const supervisorReviewCount = reviewCountByWorkOrder.get(workOrderId) || 0;
+      const executionStarted =
+        Boolean(order.start_date) ||
+        Number(order.total_timer_seconds || 0) > 0 ||
+        ['running', 'paused'].includes(String(order.timer_status || '').toLowerCase()) ||
+        ['in_progress', 'in-progress', 'paused'].includes(String(order.status || '').toLowerCase());
+      const lifecycleStage = isClosed(order.status)
+        ? supervisorReviewCount > 0
+          ? 'Revisada'
+          : evidenceCount > 0
+            ? 'Evidenciada'
+            : 'Ejecutada'
+        : executionStarted
+          ? 'En ejecución'
+          : textValue(order.assigned_to_name)
+            ? 'Asignada'
+            : 'Creada';
       return {
         id: order.id,
         workOrderNumber: order.work_order_number,
@@ -405,6 +446,10 @@ export async function GET(request: NextRequest) {
         assignedTo: textValue(order.assigned_to_name),
         timerStatus: textValue(order.timer_status),
         totalTimerMinutes: numberValue(order.total_timer_minutes),
+        evidenceCount,
+        supervisorReviewCount,
+        executionStarted,
+        lifecycleStage,
         supplyStatus: textValue(supply?.supply_chain_status) || 'no_supply_evidence',
         materialRequirements: Number(supply?.material_requirement_count || 0),
         materialShortages: Number(supply?.material_shortage_count || 0),
@@ -414,6 +459,18 @@ export async function GET(request: NextRequest) {
         overdue: !isClosed(order.status) && Boolean(order.scheduled_date) && String(order.scheduled_date) < today,
       };
     });
+
+    const lifecycleCounts = workOrderRows.reduce((acc: Record<string, number>, row: any) => {
+      acc[row.lifecycleStage] = (acc[row.lifecycleStage] || 0) + 1;
+      return acc;
+    }, {});
+    const preventiveBasis = preventiveRows.reduce((acc: { hours: number; km: number; other: number }, row: any) => {
+      const unit = String(row.meterUnit || '').toLowerCase();
+      if (/^h$|hr|hora/.test(unit)) acc.hours += 1;
+      else if (/km|kil[oó]m/.test(unit)) acc.km += 1;
+      else acc.other += 1;
+      return acc;
+    }, { hours: 0, km: 0, other: 0 });
 
     const recentSignals = [...rows]
       .filter((row) => row.latestSignalAt)
@@ -488,6 +545,12 @@ export async function GET(request: NextRequest) {
           unresolvedEmailInputs: (pendingEmailResult.data || []).filter((row: any) => !operationalCutoff || String(row.report_date || '') >= operationalCutoff).length,
           unresolvedWhatsAppInputs: pendingWhatsappInputs.length,
         },
+      },
+      lifecycle: {
+        counts: lifecycleCounts,
+        preventiveBasis,
+        approvedPreventiveSchedules: 0,
+        approvedPreventiveSchedulesBasis: 'Sin planes preventivos operacionales activos',
       },
       management: {
         plannedHoursCompleted: completedPlannedHours || null,
