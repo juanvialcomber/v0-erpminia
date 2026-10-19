@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     const error = summaryResult.error || tasksResult.error || approvedPlansResult.error || linkedPlansResult.error;
     if (error) throw error;
     return NextResponse.json({
-      summary: summaryResult.data || { configured_tasks: 0, configured_assets: 0, overdue_tasks: 0, pending_tasks: 0, missing_meter_tasks: 0, meter_review_tasks: 0, tasks_using_runtime_reading: 0 },
+      summary: summaryResult.data || { configured_tasks: 0, configured_assets: 0, overdue_tasks: 0, pending_tasks: 0, missing_meter_tasks: 0, meter_review_tasks: 0, tasks_using_runtime_reading: 0, tasks_using_planning_reading: 0 },
       tasks: tasksResult.data || [],
       standardPlans: {
         approved: Number(approvedPlansResult.count || 0),
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       },
       canEdit: access.canWrite,
       rules: {
-        source: 'Pautas configuradas en preventive_maintenance_schedules.',
+        source: 'Pautas configuradas en preventive_maintenance_schedules con evidencia de horómetro desde runtime canónico, histórico horario de planificación o snapshot de pauta.',
         alert: 'Sólo se alerta cuando el horómetro efectivo alcanza o supera el vencimiento configurado.',
         conflict: 'Si una lectura nueva queda bajo el snapshot importado, la pauta pasa a revisión y no genera alerta automática.',
       },
