@@ -200,14 +200,16 @@ export async function GET(request: NextRequest) {
       const workOrderAt = newest(...assetOrders.map((order) => textValue(order.updated_at)));
       const latestSignalAt = newest(statusAt, planningAt, emailAt, whatsappAt, workOrderAt);
       const latestEvidenceAt = newest(emailAt, whatsappAt, statusAt);
-      const planningCurrent = Boolean(planningAt) && (!latestEvidenceAt || sameOrAfter(planningAt?.slice(0, 10) || null, latestEvidenceAt.slice(0, 10)));
+      const planningCurrent = Boolean(planningAt) && (!operationalCutoff || sameOrAfter(planningAt?.slice(0, 10) || null, operationalCutoff));
 
       const emailMeter = numberValue(email?.meter_value);
-      const planMeter = numberValue(plan?.current_reading);
+      const planMeter = planningCurrent ? numberValue(plan?.current_reading) : null;
       const emailMeterUsable = emailMeter != null && (!plan?.meter_unit || !email?.meter_unit || String(plan.meter_unit).toLowerCase() === String(email.meter_unit).toLowerCase());
       const effectiveMeter = emailMeterUsable && (!planningAt || sameOrAfter(emailAt, planningAt.slice(0, 10))) ? emailMeter : planMeter;
-      const nextDueMeter = numberValue(email?.next_maintenance_meter) ?? numberValue(plan?.next_due_meter);
-      const effectiveRemaining = effectiveMeter != null && nextDueMeter != null ? nextDueMeter - effectiveMeter : numberValue(plan?.remaining_meter);
+      const nextDueMeter = numberValue(email?.next_maintenance_meter) ?? (planningCurrent ? numberValue(plan?.next_due_meter) : null);
+      const effectiveRemaining = effectiveMeter != null && nextDueMeter != null
+        ? nextDueMeter - effectiveMeter
+        : planningCurrent ? numberValue(plan?.remaining_meter) : null;
 
       let latestSignalSource = 'asset_master';
       if (latestSignalAt === emailAt) latestSignalSource = 'email';
@@ -227,12 +229,12 @@ export async function GET(request: NextRequest) {
         isStoppedSignal(whatsapp?.description);
 
       const partsPending =
-        isPartsPending(plan?.parts_status_raw) ||
+        (planningCurrent && isPartsPending(plan?.parts_status_raw)) ||
         isPartsPending(email?.parts_requested) ||
         isPartsPending(email?.reported_issue) ||
         isPartsPending(whatsapp?.description);
 
-      const rank = priorityRank(plan?.priority);
+      const rank = planningCurrent ? priorityRank(plan?.priority) : 9;
       const activeRecommendation = planningCurrent ? textValue(plan?.recommended_action) : null;
 
       return {
@@ -247,23 +249,23 @@ export async function GET(request: NextRequest) {
         canonicalStatusReason: textValue(status?.reason),
         canonicalStatusChangedAt: statusAt,
 
-        planningPriority: textValue(plan?.priority),
+        planningPriority: planningCurrent ? textValue(plan?.priority) : null,
         priorityRank: rank,
         planningCurrent,
         planningImportedAt: planningAt,
         planningSourceFile: textValue(plan?.source_file),
-        planningScheduledDate: textValue(plan?.scheduled_date),
+        planningScheduledDate: planningCurrent ? textValue(plan?.scheduled_date) : null,
         programmingStatus: planningCurrent ? textValue(plan?.programming_status_raw) : null,
         responsible: planningCurrent ? textValue(plan?.responsible_raw) : null,
         partsStatus: planningCurrent ? textValue(plan?.parts_status_raw) : null,
         planningObservations: planningCurrent ? textValue(plan?.observations) : null,
         recommendedAction: activeRecommendation,
-        criticality: textValue(plan?.criticality_raw),
-        criticalityScore: numberValue(plan?.criticality_score),
+        criticality: planningCurrent ? textValue(plan?.criticality_raw) : null,
+        criticalityScore: planningCurrent ? numberValue(plan?.criticality_score) : null,
         projectedDays: planningCurrent ? numberValue(plan?.projected_days) : null,
         projectedDueAt: planningCurrent ? textValue(plan?.projected_due_at) : null,
 
-        meterUnit: textValue(email?.meter_unit) || textValue(plan?.meter_unit),
+        meterUnit: textValue(email?.meter_unit) || (planningCurrent ? textValue(plan?.meter_unit) : null),
         currentMeter: effectiveMeter,
         nextDueMeter,
         remainingMeter: effectiveRemaining,
