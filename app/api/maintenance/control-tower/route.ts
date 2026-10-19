@@ -112,6 +112,9 @@ export async function GET(request: NextRequest) {
       nextWorkOrderDate: textValue(row.next_work_order_date),
       latestSignalAt: textValue(row.latest_signal_at),
       latestSignalSource: textValue(row.latest_signal_source),
+      latestSignalAgeHours: row.latest_signal_at
+        ? Math.max(0, Math.floor((Date.now() - Date.parse(String(row.latest_signal_at))) / 3600000))
+        : null,
     }));
 
     rows.sort((a, b) => {
@@ -127,6 +130,25 @@ export async function GET(request: NextRequest) {
     const withRecentEmail = rows.filter((row) => row.emailSentAt).length;
     const withWhatsApp = rows.filter((row) => row.whatsappOccurredAt).length;
     const pendingEmail = pendingEmailResult.data || [];
+    const attentionRows = rows.filter((row) => row.openWorkOrders > 0 || row.priorityRank <= 2);
+    const attentionIds = new Set(attentionRows.map((row) => String(row.canonicalAssetId)));
+    const fleetRows = rows.filter((row) => !attentionIds.has(String(row.canonicalAssetId)));
+    const recentSignals = [...rows]
+      .filter((row) => row.latestSignalAt)
+      .sort((a, b) => String(b.latestSignalAt).localeCompare(String(a.latestSignalAt)))
+      .slice(0, 8)
+      .map((row) => ({
+        canonicalAssetId: row.canonicalAssetId,
+        assetName: row.assetName,
+        site: row.site,
+        source: row.latestSignalSource,
+        at: row.latestSignalAt,
+        text: row.latestSignalSource === 'email'
+          ? row.emailIssue || row.emailWork || row.emailReportedStatus || row.emailSubject
+          : row.latestSignalSource === 'whatsapp'
+            ? row.whatsappDescription
+            : row.canonicalStatusReason || row.recommendedAction || row.planningObservations,
+      }));
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
@@ -141,6 +163,7 @@ export async function GET(request: NextRequest) {
         linkedEmailAssets: withRecentEmail,
         linkedWhatsAppAssets: withWhatsApp,
         pendingEmailMatches: pendingEmail.length,
+        attentionAssets: attentionRows.length,
       },
       freshness: {
         latestEmailAt: textValue(sourceResult.data?.email_sent_at),
@@ -148,6 +171,9 @@ export async function GET(request: NextRequest) {
         latestEmailFilename: textValue(sourceResult.data?.filename),
         latestWhatsAppAt: textValue(whatsappResult.data?.occurred_at),
       },
+      attentionRows,
+      fleetRows,
+      recentSignals,
       pendingEmail: pendingEmail.slice(0, 30).map((row: any) => ({
         id: row.id,
         reportDate: textValue(row.report_date),
