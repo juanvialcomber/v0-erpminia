@@ -23,11 +23,14 @@ test('server filters timeline records by assigned module permissions', () => {
   assert.match(route, /data: visibleItems/);
 });
 
-test('timeline defaults to current and next work week with subtle today cue', () => {
+test('timeline defaults to previous current and next work week with subtle today cue', () => {
   const calendar = readFileSync('components/operational-calendar/comfortable-operational-calendar.tsx', 'utf8');
-  assert.match(calendar, /anchorDate \|\| startOfChileanWorkWeek\(today\)/);
-  assert.match(calendar, /getUTCDay\(\)/);
+  assert.match(calendar, /useState<CalendarPeriod>\('21'\)/);
+  assert.match(calendar, /'21': \{ label: '3 semanas', days: 21/);
+  assert.match(calendar, /currentWeekStart = startOfChileanWorkWeek\(today\)/);
+  assert.match(calendar, /anchorDate \|\| addDays\(currentWeekStart, -7\)/);
   assert.match(calendar, /setAnchorDate\(null\)/);
+  assert.match(calendar, /getUTCDay\(\)/);
   assert.match(calendar, /border-orange-500\/25/);
   assert.doesNotMatch(calendar, /border-l-2 border-orange-500\/80/);
 });
