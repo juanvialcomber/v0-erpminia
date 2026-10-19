@@ -38,3 +38,13 @@ test('OT creation shows advisory stock and canonical reservation separately', ()
   assert.match(createWorkOrder, /la reserva se intenta contra Bodega canónica/);
   assert.doesNotMatch(createWorkOrder, /quantityAvailable/);
 });
+
+
+test('OT material coverage uses informed Bodega stock as a confirmation gate before procurement', async () => {
+  const route = await readFile(new URL('../app/api/maintenance/work-orders/[id]/materials/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /informed_available/);
+  assert.match(route, /advisory_confirmation_before_procurement/);
+  assert.match(coverage, /Confirmar Bodega antes de Compras/);
+  assert.match(coverage, /informedCoveragePending/);
+  assert.match(coverage, /no tienen cobertura reservada, entregada ni señal suficiente en Bodega/);
+});
