@@ -110,3 +110,21 @@ test('wallboard shows live coverage against the canonical fleet', () => {
   assert.match(page, /summary\?\.activeAssets/);
   assert.match(page, /summary\?\.canonicalAssets/);
 });
+
+
+test('wallboard reads maintenance WhatsApp from Grupo 2 live registry and separates input from published asset evidence', () => {
+  assert.match(api, /motil_whatsapp_message_registry_v1/);
+  assert.match(api, /eq\('group_name', 'Grupo 2'\)/);
+  assert.match(api, /pendingWhatsAppInputs/);
+  assert.match(api, /latestPublishedWhatsappAt/);
+  assert.match(page, /WhatsApp entrada · Grupo 2/);
+  assert.match(page, /WhatsApp vinculado a equipos/);
+  assert.match(page, /Entrada viva separada de evidencia ya vinculada/);
+});
+
+test('wallboard intake metric combines current unresolved email and WhatsApp inputs without canonical promotion', () => {
+  assert.match(api, /pendingEmailMatches/);
+  assert.match(api, /pendingWhatsAppInputs/);
+  assert.match(page, /Entradas por revisar/);
+  assert.doesNotMatch(api, /update\(['"]maintenance_work_orders/);
+});
