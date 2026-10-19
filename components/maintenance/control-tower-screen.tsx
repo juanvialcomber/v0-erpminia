@@ -84,6 +84,8 @@ export default function MaintenanceControlTowerPage() {
   }, [totalPages]);
 
   useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (media.matches) return;
     const timer = window.setInterval(() => {
       setPageIndex((current) => (current + 1) % totalPages);
     }, 15_000);
@@ -250,6 +252,13 @@ function AssetCard({ row, critical = false }: { row: any; critical?: boolean }) 
         </div>
         <p className="mt-1 line-clamp-2 text-sm font-medium">{evidenceText(row)}</p>
       </div>
+
+      {critical && row.recommendedAction ? (
+        <div className="mt-3 border-l-2 border-primary/40 pl-3">
+          <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">Siguiente acción</p>
+          <p className="mt-1 text-sm font-medium">{row.recommendedAction}</p>
+        </div>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span>{row.programmingStatus || 'Sin programación'}</span>
