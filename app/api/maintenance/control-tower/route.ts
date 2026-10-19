@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getInventoryConflictEvidence } from '@/lib/inventory-trust';
 
 function textValue(value: unknown) {
   const valueText = String(value ?? '').trim();
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest) {
       materialRequirementsResult,
       canonicalProductsResult,
       bodegaInventoryResult,
+      inventoryConflictEvidence,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -189,6 +191,7 @@ export async function GET(request: NextRequest) {
         .from('bodega_inventory')
         .select('sku,name,quantity,quantity_reported,updated_at')
         .limit(10000),
+      getInventoryConflictEvidence(context.supabase, context.organizationId),
     ]);
 
     const error =
@@ -214,8 +217,11 @@ export async function GET(request: NextRequest) {
     const matchedBodegaRows = (bodegaInventoryResult.data || []).filter((row: any) =>
       row.sku && organizationProductSkus.has(String(row.sku).trim().toUpperCase())
     );
+    const trustedBodegaRows = matchedBodegaRows.filter((row: any) =>
+      !inventoryConflictEvidence.conflictCodes.has(String(row.sku || '').trim().toUpperCase())
+    );
     const bodegaBySku = new Map(
-      matchedBodegaRows.map((row: any) => [String(row.sku).trim().toUpperCase(), row])
+      trustedBodegaRows.map((row: any) => [String(row.sku).trim().toUpperCase(), row])
     );
     const requirementsByWorkOrder = new Map<string, any[]>();
     for (const row of materialRequirementsResult.data || []) {
@@ -225,7 +231,7 @@ export async function GET(request: NextRequest) {
       rows.push(row);
       requirementsByWorkOrder.set(workOrderId, rows);
     }
-    const bodegaLatestAt = newest(...matchedBodegaRows.map((row: any) => textValue(row.updated_at)));
+    const bodegaLatestAt = newest(...trustedBodegaRows.map((row: any) => textValue(row.updated_at)));
 
     const activePreventiveSchedules = preventiveSchedulesResult.data || [];
     const supplyRows = supplyChainResult.data || [];
@@ -686,7 +692,9 @@ export async function GET(request: NextRequest) {
         latestAt: bodegaLatestAt,
         sourceRows: matchedBodegaRows.length,
         matchedCanonicalSkus: matchedBodegaRows.length,
-        positiveStockSkus: matchedBodegaRows.filter((row: any) =>
+        conflictedSkus: matchedBodegaRows.length - trustedBodegaRows.length,
+        usableStockSkus: trustedBodegaRows.length,
+        positiveStockSkus: trustedBodegaRows.filter((row: any) =>
           (numberValue(row.quantity_reported) ?? numberValue(row.quantity) ?? 0) > 0
         ).length,
       },
