@@ -481,7 +481,7 @@ export async function GET(request: NextRequest) {
         const sku = textValue(product?.product_code);
         const stock = sku ? bodegaBySku.get(sku.trim().toUpperCase()) : null;
         const required = numberValue(requirement.quantity_required) || 0;
-        const available = numberValue(stock?.quantity) ?? numberValue(stock?.quantity_reported);
+        const available = numberValue(stock?.quantity_reported) ?? numberValue(stock?.quantity);
         return {
           canonicalProductId: requirement.canonical_product_id,
           sku,
@@ -677,7 +677,7 @@ export async function GET(request: NextRequest) {
         sourceRows: matchedBodegaRows.length,
         matchedCanonicalSkus: matchedBodegaRows.length,
         positiveStockSkus: matchedBodegaRows.filter((row: any) =>
-          (numberValue(row.quantity) ?? numberValue(row.quantity_reported) ?? 0) > 0
+          (numberValue(row.quantity_reported) ?? numberValue(row.quantity) ?? 0) > 0
         ).length,
       },
       freshness: {
