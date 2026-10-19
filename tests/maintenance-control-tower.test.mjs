@@ -5,7 +5,6 @@ import test from 'node:test';
 const api = await readFile(new URL('../app/api/maintenance/control-tower/route.ts', import.meta.url), 'utf8');
 const page = await readFile(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
 const monitor = await readFile(new URL('../app/monitor/mantenimiento/page.tsx', import.meta.url), 'utf8');
-const migration = await readFile(new URL('../supabase/migrations/20261019162500_maintenance_live_master_v1.sql', import.meta.url), 'utf8');
 
 test('control tower is read-only and tenant-scoped', () => {
   assert.match(api, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
@@ -14,41 +13,59 @@ test('control tower is read-only and tenant-scoped', () => {
   assert.match(api, /mode: 'read_only'/);
 });
 
-test('live maintenance master keeps canonical truth separate from email and whatsapp evidence', () => {
-  assert.match(migration, /canonical_status/);
-  assert.match(migration, /reported_equipment_status/);
-  assert.match(migration, /whatsapp_description/);
-  assert.match(migration, /latest_signal_source/);
-  assert.match(migration, /without silently promoting observations to canonical state/);
+test('live wallboard master assembles canonical state and evidence without a second DB master', () => {
+  assert.match(api, /maintenance_canonical_assets_v1/);
+  assert.match(api, /planning_maintenance_priority_v1/);
+  assert.match(api, /motil_email_equipment_meter_stage/);
+  assert.match(api, /motil_whatsapp_asset_360_latest_v1/);
+  assert.match(api, /maintenance_asset_status_history/);
+  assert.match(api, /maintenance_work_orders/);
+  assert.doesNotMatch(api, /motil_maintenance_live_master_v1/);
+});
+
+test('control tower applies freshness and excludes stale planning recommendations', () => {
+  assert.match(api, /operationalCutoff/);
+  assert.match(api, /planningCurrent/);
+  assert.match(api, /activeRecommendation = planningCurrent/);
+  assert.match(api, /stalePlanningAssets/);
 });
 
 test('control tower includes email and whatsapp freshness plus unresolved email evidence', () => {
-  assert.match(api, /motil_email_equipment_meter_stage/);
   assert.match(api, /motil_email_source_manifest/);
   assert.match(api, /motil_whatsapp_messages/);
   assert.match(api, /pendingEmailMatches/);
   assert.match(page, /Evidencia por vincular/);
+  assert.match(page, /Correo La Patagua/);
+  assert.match(page, /WhatsApp/);
 });
 
-test('control tower refreshes and rotates automatically with no operational actions', () => {
+test('wallboard rotates six operational views every thirty seconds and refreshes data independently', () => {
+  assert.match(page, /Análisis operacional/);
+  assert.match(page, /Equipos detenidos/);
+  assert.match(page, /Mantenciones preventivas/);
+  assert.match(page, /Programación de trabajos/);
+  assert.match(page, /Control general de flota/);
+  assert.match(page, /Indicadores de gestión/);
+  assert.match(page, /const rotationMs = 30_000/);
   assert.match(page, /refreshInterval: 60_000/);
-  assert.match(page, /15_000/);
+  assert.match(api, /rotationSeconds: 30/);
+});
+
+test('wallboard remains informational only', () => {
   assert.match(page, /Solo lectura/);
   assert.doesNotMatch(page, /onClick=/);
   assert.doesNotMatch(page, /<Button/);
+  assert.doesNotMatch(page, /<Input/);
+  assert.doesNotMatch(page, /<Select/);
+  assert.doesNotMatch(page, /<form/);
 });
 
-
-test('control tower pins attention assets and rotates only the non-critical fleet', () => {
-  assert.match(api, /attentionRows/);
-  assert.match(api, /fleetRows/);
-  assert.match(api, /recentSignals/);
-  assert.match(page, /Atención ahora/);
-  assert.match(page, /Cambios recientes/);
-  assert.match(page, /Resto de la flota/);
-  assert.match(page, /La rotación automática afecta sólo a equipos sin atención prioritaria/);
+test('wallboard preserves missing KPI truth instead of inventing availability', () => {
+  assert.match(api, /availabilityPct: null/);
+  assert.match(api, /Sin base canónica de disponibilidad diaria/);
+  assert.match(page, /Disponibilidad operacional/);
+  assert.match(page, /Sin base canónica/);
 });
-
 
 test('standalone maintenance monitor keeps authentication but removes dashboard chrome', () => {
   assert.match(monitor, /cookies\(\)/);
@@ -58,10 +75,8 @@ test('standalone maintenance monitor keeps authentication but removes dashboard 
   assert.doesNotMatch(monitor, /DashboardShell/);
 });
 
-
-test('wallboard respects reduced motion and keeps next action informational', () => {
+test('reduced motion keeps the timed wallboard loop but removes slide animation only', () => {
   assert.match(page, /prefers-reduced-motion: reduce/);
-  assert.match(page, /Siguiente acción/);
-  assert.doesNotMatch(page, /<Button/);
-  assert.doesNotMatch(page, /onClick=/);
+  assert.match(page, /window\.setInterval/);
+  assert.match(page, /!reduceMotion && 'animate-in fade-in duration-300'/);
 });
