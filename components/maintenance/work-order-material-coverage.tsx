@@ -39,8 +39,12 @@ type CatalogRow = {
   productName: string | null;
   family: string | null;
   unit: string | null;
-  quantityAvailable: number;
-  warehouses: string[];
+  informedQuantity: number | null;
+  informedUpdatedAt: string | null;
+  reservableQuantity: number;
+  reservableUpdatedAt: string | null;
+  stockSignalSource: string | null;
+  reservationSource: string;
 };
 
 type SupplyStatus = {
@@ -205,9 +209,16 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <div className="space-y-2"><p className="text-xs font-medium">Cantidad</p><Input type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
             <Button onClick={addMaterial} disabled={!selected || saving || Number(quantity) <= 0}>{saving ? 'Guardando…' : 'Agregar'}</Button>
           </div>
-          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm"><p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p><p className="mt-1 text-xs text-muted-foreground">Stock libre informado: {selected.quantityAvailable} {selected.unit || 'unid.'} · {selected.warehouses.length ? selected.warehouses.join(', ') : 'sin bodega informada'}</p></div> : null}
+          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm">
+            <p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p>
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <p>Stock informado: {selected.informedQuantity == null ? 'Sin señal reciente' : `${selected.informedQuantity} ${selected.unit || 'unid.'}`}</p>
+              <p>Reservable ahora: {selected.reservableQuantity} {selected.unit || 'unid.'}</p>
+              <p>La reserva real se confirma sólo al agregar el material a la OT.</p>
+            </div>
+          </div> : null}
           {!selected && query.trim().length >= 2 ? <div className="mt-3 max-h-56 overflow-auto rounded-md border bg-card">
-            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">Stock libre {item.quantityAvailable} {item.unit || 'unid.'}{item.family ? ` · ${item.family}` : ''}</p></button>)}
+            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.family ? `${item.family} · ` : ''}Informado {item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}</p></button>)}
           </div> : null}
         </div> : null}
 
