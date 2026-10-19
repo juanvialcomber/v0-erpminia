@@ -249,3 +249,12 @@ test('reported bodega quantity takes precedence over integer storage quantity', 
   assert.match(api, /numberValue\(stock\?\.quantity_reported\) \?\? numberValue\(stock\?\.quantity\)/);
   assert.match(api, /numberValue\(row\.quantity_reported\) \?\? numberValue\(row\.quantity\)/);
 });
+
+
+test('planning readiness separates stock availability reservation and delivery', () => {
+  assert.match(api, /Stock informado disponible/);
+  assert.match(api, /Reservada · pendiente entrega/);
+  assert.match(api, /parts_requested/);
+  assert.match(api, /parts_issued/);
+  assert.match(api, /partsInstalled/);
+});
