@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const catalog = await readFile(new URL('../app/api/maintenance/material-catalog/route.ts', import.meta.url), 'utf8');
 const coverage = await readFile(new URL('../components/maintenance/work-order-material-coverage.tsx', import.meta.url), 'utf8');
+const createWorkOrder = await readFile(new URL('../components/maintenance/create-work-order.tsx', import.meta.url), 'utf8');
 
 test('maintenance material catalog separates product identity informed stock and reservable stock', () => {
   assert.match(catalog, /canonical_products_v1/);
@@ -27,4 +28,13 @@ test('material editor tells planner that availability and reservation are distin
   assert.match(coverage, /La reserva real se confirma sólo al agregar el material a la OT/);
   assert.match(coverage, /Informado \{item\.informedQuantity/);
   assert.match(coverage, /Reservable \{item\.reservableQuantity/);
+});
+
+
+test('OT creation shows advisory stock and canonical reservation separately', () => {
+  assert.match(createWorkOrder, /Informado \{item\.informedQuantity/);
+  assert.match(createWorkOrder, /Reservable \{item\.reservableQuantity/);
+  assert.match(createWorkOrder, /Con reserva posible/);
+  assert.match(createWorkOrder, /la reserva se intenta contra Bodega canónica/);
+  assert.doesNotMatch(createWorkOrder, /quantityAvailable/);
 });
