@@ -199,15 +199,19 @@ export default function MaintenanceControlTowerPage() {
 function AnalysisSlide({ data }: { data: any }) {
   const attention = Array.isArray(data?.attentionRows) ? data.attentionRows : [];
   const signals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
+  const blockers =
+    Number(data?.coordination?.blockers?.partsPendingAssets || 0) +
+    Number(data?.coordination?.blockers?.unresolvedEmailInputs || 0) +
+    Number(data?.coordination?.blockers?.unresolvedWhatsAppInputs || 0);
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.2fr_.8fr]">
-      <Panel title="Resumen inteligente" subtitle="Qué requiere atención y por qué">
+      <Panel title="Prioridades de coordinación" subtitle="Qué debe ordenar, destrabar o confirmar Planificación">
         <div className="grid gap-3 md:grid-cols-2">
-          <Insight tone="critical" title="Equipos detenidos" value={data?.summary?.stoppedAssets} text="Señal actual validada o reportada por fuente reciente." />
-          <Insight tone="warning" title="OT vencidas abiertas" value={data?.summary?.overdueOpenWorkOrders} text="Trabajo programado antes de hoy que sigue abierto." />
-          <Insight tone="warning" title="Repuestos / espera" value={data?.summary?.partsPendingAssets} text="Evidencia actual que menciona repuesto, solicitud o espera." />
-          <Insight tone="neutral" title="Planificación desactualizada" value={data?.summary?.stalePlanningAssets} text="Se excluye de recomendaciones activas hasta reconciliarse con evidencia reciente." />
+          <Insight tone="critical" title="Equipos detenidos" value={data?.summary?.stoppedAssets} text="Condición vigente reportada o validada; priorizar impacto y recurso." />
+          <Insight tone="warning" title="OT vencidas" value={data?.summary?.overdueOpenWorkOrders} text="Trabajo programado antes de hoy que continúa abierto." />
+          <Insight tone="warning" title="Programadas mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} text="Carga inmediata a confirmar con responsables y recursos." />
+          <Insight tone="neutral" title="Bloqueos / revisión" value={blockers} text="Repuestos y entradas de evidencia que aún requieren resolución humana." />
         </div>
         <div className="mt-4 divide-y rounded-md border">
           {attention.slice(0, 6).map((row: any) => (
@@ -220,7 +224,7 @@ function AnalysisSlide({ data }: { data: any }) {
                 <Badge variant={row.reportedStopped ? 'destructive' : row.priorityRank <= 2 ? 'secondary' : 'outline'}>
                   {row.reportedStopped ? 'Detenido' : row.planningPriority || 'Atención'}
                 </Badge>
-                <span className="text-muted-foreground">{sourceLabel(row.latestSignalSource)} · {ageLabel(row.latestSignalAgeHours)}</span>
+                <span className="text-muted-foreground">{row.site} · {sourceLabel(row.latestSignalSource)} · {ageLabel(row.latestSignalAgeHours)}</span>
               </div>
             </div>
           ))}
@@ -337,32 +341,39 @@ function PreventiveSlide({ data }: { data: any }) {
 
 function ScheduleSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.workOrders) ? data.workOrders : [];
-  const open = rows.filter((row: any) => !['completed', 'closed', 'cancelled', 'canceled'].includes(String(row.status).toLowerCase()));
+  const today = String(data?.coordination?.today || '');
+  const tomorrow = String(data?.coordination?.tomorrow || '');
+  const open = rows
+    .filter((row: any) => !['completed', 'closed', 'cancelled', 'canceled'].includes(String(row.status).toLowerCase()))
+    .sort((a: any, b: any) => {
+      const rank = (row: any) => row.overdue ? 0 : row.scheduledDate === today ? 1 : row.scheduledDate === tomorrow ? 2 : 3;
+      return rank(a) - rank(b) || String(a.scheduledDate || '').localeCompare(String(b.scheduledDate || ''));
+    });
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
       <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-5">
-        <SmallMetric label="Trabajos abiertos" value={data?.summary?.openWorkOrders} />
-        <SmallMetric label="Vencidos" value={data?.summary?.overdueOpenWorkOrders} />
-        <SmallMetric label="Terminados registrados" value={data?.summary?.completedWorkOrders} />
-        <SmallMetric label="Críticos abiertos" value={data?.summary?.criticalOpenWorkOrders} />
-        <SmallMetric label="Pend. evidencia" value={data?.summary?.pendingEmailMatches} />
+        <SmallMetric label="Vencidas" value={data?.summary?.overdueOpenWorkOrders} />
+        <SmallMetric label="Para hoy" value={data?.summary?.dueTodayOpenWorkOrders} />
+        <SmallMetric label="Para mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} />
+        <SmallMetric label="En ejecución / pausa" value={data?.summary?.inProgressOpenWorkOrders} />
+        <SmallMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders} />
       </div>
-      <Panel title="Programa de trabajos" subtitle="OT canónicas; las vencidas permanecen visibles hasta cierre">
+      <Panel title="Programa de ejecución" subtitle="Lo que Planificación debe coordinar con taller y responsables">
         <DataTable
-          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Plan h', 'Real h']}
-          rows={rows.slice(0, 12).map((row: any) => [
+          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Prioridad', 'Plan h']}
+          rows={open.slice(0, 12).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
             row.assignedTo || 'Sin responsable',
-            row.overdue ? 'Vencida' : statusLabel(row.status),
+            row.overdue ? 'Vencida' : row.scheduledDate === today ? 'Hoy' : row.scheduledDate === tomorrow ? 'Mañana' : statusLabel(row.status),
+            row.priority || '—',
             number(row.plannedHours),
-            number(row.actualHours),
           ])}
         />
       </Panel>
-      {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="La programación activa está al día." /> : null}
+      {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="No hay trabajo activo pendiente de coordinación." /> : null}
     </div>
   );
 }
@@ -421,6 +432,7 @@ function FleetSlide({ data }: { data: any }) {
 
 function ManagementSlide({ data }: { data: any }) {
   const management = data?.management || {};
+  const coordination = Array.isArray(data?.coordination?.byAssignee) ? data.coordination.byAssignee : [];
   const completed = Number(data?.summary?.completedWorkOrders || 0);
   const open = Number(data?.summary?.openWorkOrders || 0);
   const total = completed + open;
@@ -442,23 +454,30 @@ function ManagementSlide({ data }: { data: any }) {
         </div>
       </Panel>
 
-      <Panel title="Preventivas vs correctivas" subtitle="Mix de OT terminadas registradas">
-        {workMixTotal > 0 ? (
-          <div className="space-y-6">
-            <DonutLike
-              primary={preventive}
-              secondary={corrective}
-              primaryLabel="Preventivas"
-              secondaryLabel="Correctivas"
-            />
-            <div className="grid gap-3 md:grid-cols-2">
-              <ManagementMetric label="Preventivas terminadas" value={preventive} detail={`${number((preventive / workMixTotal) * 100, 0)}% del mix`} />
-              <ManagementMetric label="Correctivas terminadas" value={corrective} detail={`${number((corrective / workMixTotal) * 100, 0)}% del mix`} />
-            </div>
-          </div>
-        ) : (
-          <EmptyState title="Sin base de OT terminadas" text="No se calcula un porcentaje sin denominador canónico." />
-        )}
+      <Panel title="Coordinación del equipo" subtitle="Carga abierta por responsable; apoyo para planificar y destrabar">
+        <DataTable
+          headers={['Responsable', 'Abiertas', 'Vencidas', 'Hoy', 'Mañana', 'Alta/Crítica']}
+          rows={coordination.slice(0, 7).map((row: any) => [
+            row.assignee,
+            row.open,
+            row.overdue,
+            row.dueToday,
+            row.dueTomorrow,
+            row.highCritical,
+          ])}
+        />
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <ManagementMetric
+            label="Preventivas terminadas"
+            value={workMixTotal ? preventive : '—'}
+            detail={workMixTotal ? `${number((preventive / workMixTotal) * 100, 0)}% del mix cerrado` : 'Sin base'}
+          />
+          <ManagementMetric
+            label="Correctivas terminadas"
+            value={workMixTotal ? corrective : '—'}
+            detail={workMixTotal ? `${number((corrective / workMixTotal) * 100, 0)}% del mix cerrado` : 'Sin base'}
+          />
+        </div>
       </Panel>
     </div>
   );
