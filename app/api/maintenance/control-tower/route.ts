@@ -681,6 +681,8 @@ export async function GET(request: NextRequest) {
       },
       inventory: {
         source: 'bodega_inventory',
+        role: 'advisory_stock_signal',
+        reservationSource: 'warehouse_stock',
         latestAt: bodegaLatestAt,
         sourceRows: matchedBodegaRows.length,
         matchedCanonicalSkus: matchedBodegaRows.length,
