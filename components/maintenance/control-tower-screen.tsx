@@ -211,7 +211,12 @@ function AnalysisSlide({ data }: { data: any }) {
           <Insight tone="critical" title="Equipos detenidos" value={data?.summary?.stoppedAssets} text="Condición vigente reportada o validada; priorizar impacto y recurso." />
           <Insight tone="warning" title="OT vencidas" value={data?.summary?.overdueOpenWorkOrders} text="Trabajo programado antes de hoy que continúa abierto." />
           <Insight tone="warning" title="Programadas mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} text="Carga inmediata a confirmar con responsables y recursos." />
-          <Insight tone="neutral" title="Bloqueos / revisión" value={blockers} text="Repuestos y entradas de evidencia que aún requieren resolución humana." />
+          <Insight
+            tone="neutral"
+            title="Bloqueos / revisión"
+            value={blockers + Number(data?.coordination?.blockers?.openOrdersWithoutSupplyEvidence || 0)}
+            text="Incluye repuestos, entradas por revisar y OT sin evidencia de Bodega."
+          />
         </div>
         <div className="mt-4 divide-y rounded-md border">
           {attention.slice(0, 6).map((row: any) => (
@@ -361,7 +366,7 @@ function ScheduleSlide({ data }: { data: any }) {
       </div>
       <Panel title="Programa de ejecución" subtitle="Lo que Planificación debe coordinar con taller y responsables">
         <DataTable
-          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Prioridad', 'Plan h']}
+          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Estado', 'Prioridad', 'Bodega']}
           rows={open.slice(0, 12).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
@@ -369,7 +374,13 @@ function ScheduleSlide({ data }: { data: any }) {
             row.assignedTo || 'Sin responsable',
             row.overdue ? 'Vencida' : row.scheduledDate === today ? 'Hoy' : row.scheduledDate === tomorrow ? 'Mañana' : statusLabel(row.status),
             row.priority || '—',
-            number(row.plannedHours),
+            row.materialShortages > 0
+              ? 'Faltante'
+              : row.openProcurementRequests > 0 || row.undeliveredOrders > 0
+                ? 'En compra'
+                : row.supplyStatus === 'no_supply_evidence'
+                  ? 'Sin evidencia'
+                  : 'Cubierta',
           ])}
         />
       </Panel>
@@ -449,7 +460,11 @@ function ManagementSlide({ data }: { data: any }) {
           <ManagementMetric label="Disponibilidad operacional" value="—" detail={management.availabilityBasis || 'Sin base canónica'} />
           <ManagementMetric label="HH planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
           <ManagementMetric label="HH reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
-          <ManagementMetric label="Backlog actual" value={data?.summary?.openWorkOrders ?? '—'} detail={`${data?.summary?.overdueOpenWorkOrders || 0} vencidas`} />
+          <ManagementMetric
+            label="OT sin evidencia Bodega"
+            value={data?.coordination?.blockers?.openOrdersWithoutSupplyEvidence ?? '—'}
+            detail="No equivale a materiales cubiertos ni a faltante confirmado"
+          />
           <ManagementMetric label="Horas detención registradas" value={number(management.recordedDowntimeHours)} detail={management.recordedDowntimeHours == null ? 'Sin base suficiente' : 'OT con dato explícito'} />
         </div>
       </Panel>
