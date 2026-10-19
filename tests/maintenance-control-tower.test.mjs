@@ -194,9 +194,10 @@ test('fleet slide shows source coverage and freshness by site', () => {
 });
 
 
-test('tomorrow work readiness distinguishes confirmed execution from unknown bodega coverage', () => {
+test('tomorrow work readiness distinguishes declared materials and stock coverage', () => {
   assert.match(api, /executionReadiness/);
-  assert.match(api, /Por confirmar Bodega/);
+  assert.match(api, /Materiales no declarados/);
+  assert.match(api, /Stock por confirmar/);
   assert.match(api, /Bloqueada por faltante/);
   assert.match(api, /En compra/);
   assert.match(api, /dueTomorrowNotReadyWorkOrders/);
