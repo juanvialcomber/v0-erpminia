@@ -128,3 +128,23 @@ test('wallboard intake metric combines current unresolved email and WhatsApp inp
   assert.match(page, /Entradas por revisar/);
   assert.doesNotMatch(api, /update\(['"]maintenance_work_orders/);
 });
+
+
+test('wallboard is planning-centered for Ariel coordination role', () => {
+  assert.match(api, /role: 'planning_coordination'/);
+  assert.match(api, /dueTodayOpenWorkOrders/);
+  assert.match(api, /dueTomorrowOpenWorkOrders/);
+  assert.match(api, /unassignedOpenWorkOrders/);
+  assert.match(api, /byAssignee: assigneeCoordination/);
+  assert.match(page, /Prioridades de coordinación/);
+  assert.match(page, /Programa de ejecución/);
+  assert.match(page, /Coordinación del equipo/);
+});
+
+test('schedule horizon uses Santiago local day and keeps overdue today tomorrow distinct', () => {
+  assert.match(api, /timeZone: 'America\/Santiago'/);
+  assert.match(api, /const today = santiagoDay\(\)/);
+  assert.match(api, /const tomorrow = santiagoDay\(1\)/);
+  assert.match(page, /Para hoy/);
+  assert.match(page, /Para mañana/);
+});
