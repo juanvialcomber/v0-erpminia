@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       workOrdersResult,
       pendingEmailResult,
       latestEmailResult,
-      latestWhatsappResult,
+      whatsappInputResult,
     ] = await Promise.all([
       context.supabase
         .from('maintenance_canonical_assets_v1')
@@ -123,18 +123,18 @@ export async function GET(request: NextRequest) {
         .limit(1)
         .maybeSingle(),
       context.supabase
-        .from('motil_whatsapp_messages')
-        .select('occurred_at')
+        .from('motil_whatsapp_message_registry_v1')
+        .select('message_id,group_name,sender_name,occurred_at,body,activity_count,published_count,exception_count,registry_state')
         .eq('organization_id', context.organizationId)
+        .eq('group_name', 'Grupo 2')
         .order('occurred_at', { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle(),
+        .limit(40),
     ]);
 
     const error =
       assetsResult.error || planningResult.error || emailResult.error || whatsappResult.error ||
       statusResult.error || workOrdersResult.error || pendingEmailResult.error ||
-      latestEmailResult.error || latestWhatsappResult.error;
+      latestEmailResult.error || whatsappInputResult.error;
     if (error) throw error;
 
     const assets = assetsResult.data || [];
@@ -178,11 +178,20 @@ export async function GET(request: NextRequest) {
     }
 
     const latestEmailAt = textValue(latestEmailResult.data?.email_sent_at);
-    const latestWhatsAppAt = textValue(latestWhatsappResult.data?.occurred_at);
+    const whatsappInputs = whatsappInputResult.data || [];
+    const latestWhatsAppAt = textValue(whatsappInputs[0]?.occurred_at);
     const operationalCutoff = newest(
       latestEmailAt ? latestEmailAt.slice(0, 10) : null,
       latestWhatsAppAt ? latestWhatsAppAt.slice(0, 10) : null,
     );
+
+    const currentWhatsappInputs = whatsappInputs.filter((row: any) =>
+      !operationalCutoff || sameOrAfter(textValue(row.occurred_at)?.slice(0, 10) || null, operationalCutoff)
+    );
+    const pendingWhatsappInputs = currentWhatsappInputs.filter((row: any) =>
+      Number(row.published_count || 0) === 0
+    );
+    const latestPublishedWhatsappAt = newest(...whatsappRows.map((row: any) => textValue(row.source_occurred_at)));
 
     const rows = assets.map((asset: any) => {
       const id = String(asset.id);
@@ -400,7 +409,8 @@ export async function GET(request: NextRequest) {
         preventiveOverdue: overduePreventive.length,
         preventiveDueSoon: dueSoonPreventive.length,
         stalePlanningAssets: stalePlanning.length,
-        pendingEmailMatches: (pendingEmailResult.data || []).length,
+        pendingEmailMatches: (pendingEmailResult.data || []).filter((row: any) => !operationalCutoff || String(row.report_date || '') >= operationalCutoff).length,
+        pendingWhatsAppInputs: pendingWhatsappInputs.length,
         linkedEmailAssets: rows.filter((row) => row.emailReportDate).length,
         linkedWhatsAppAssets: rows.filter((row) => row.whatsappOccurredAt).length,
       },
@@ -418,6 +428,7 @@ export async function GET(request: NextRequest) {
         latestEmailSubject: textValue(latestEmailResult.data?.email_subject),
         latestEmailFilename: textValue(latestEmailResult.data?.filename),
         latestWhatsAppAt,
+        latestPublishedWhatsAppAt,
       },
       attentionRows: attentionRows.slice(0, 40),
       stoppedRows: stoppedRows.slice(0, 40),
@@ -426,6 +437,29 @@ export async function GET(request: NextRequest) {
         .slice(0, 60),
       workOrders: workOrderRows,
       recentSignals,
+      liveInputs: {
+        email: {
+          latestAt: latestEmailAt,
+          subject: textValue(latestEmailResult.data?.email_subject),
+          filename: textValue(latestEmailResult.data?.filename),
+          ingestState: textValue(latestEmailResult.data?.ingest_state),
+        },
+        whatsapp: {
+          group: 'Grupo 2',
+          latestAt: latestWhatsAppAt,
+          latestPublishedAt: latestPublishedWhatsappAt,
+          pendingCount: pendingWhatsappInputs.length,
+          recent: currentWhatsappInputs.slice(0, 6).map((row: any) => ({
+            messageId: row.message_id,
+            sender: textValue(row.sender_name),
+            occurredAt: textValue(row.occurred_at),
+            body: textValue(row.body)?.slice(0, 700) || null,
+            activityCount: Number(row.activity_count || 0),
+            publishedCount: Number(row.published_count || 0),
+            registryState: textValue(row.registry_state),
+          })),
+        },
+      },
       rows: currentRows,
       pendingEmail: (pendingEmailResult.data || []).slice(0, 30).map((row: any) => ({
         id: row.id,
