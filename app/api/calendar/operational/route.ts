@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
   try {
     const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
     const canApproveMaintenance = creationCapability.accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(String(creationCapability.personName || ''));
-    const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult, approvalCandidatesResult, drillingReviewResult] = await Promise.all([
+    const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult, approvalCandidatesResult] = await Promise.all([
       context.supabase
         .from('maintenance_work_orders')
         .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,assigned_person_id,cost_center_id,canonical_asset_id,created_by')
@@ -305,13 +305,6 @@ export async function GET(request: NextRequest) {
         .eq('status', 'completed')
         .order('closed_at', { ascending: false, nullsFirst: false })
         .limit(100) : Promise.resolve({ data: [], error: null }),
-      creationCapability.canCreate ? context.supabase
-        .from('drilling_maintenance_review_queue_v1')
-        .select('source_report_id,review_id,canonical_asset_id,asset_name,operation_date,review_reason,machine_observations,review_status,linked_work_order_id')
-        .eq('organization_id', context.organizationId)
-        .in('review_status', ['pending', 'needs_review'])
-        .is('linked_work_order_id', null)
-        .limit(100) : Promise.resolve({ data: [], error: null }),
     ]);
 
     const warnings: string[] = [];
@@ -326,7 +319,6 @@ export async function GET(request: NextRequest) {
     if (credentialsResult.error) warnings.push('No se pudieron cargar los vencimientos de credenciales de Personas.');
     if (legalCasesResult.error) warnings.push('No se pudieron cargar los casos legales con plazo.');
     if (approvalCandidatesResult.error) warnings.push('No se pudieron cargar los cierres pendientes de revisión.');
-    if (drillingReviewResult.error) warnings.push('No se pudieron cargar las revisiones de Sondaje.');
 
     // Resolve evidence only for orders already scoped to the viewer's organization.
     const orderIds = (workOrdersResult.data || []).map((order) => order.id);
@@ -485,39 +477,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (creationCapability.canCreate) {
-      for (const row of drillingReviewResult.data || []) {
-        const reviewId = row.review_id || row.source_report_id;
-        if (!reviewId) continue;
-        const params = new URLSearchParams({
-          reviewId: String(reviewId),
-          workType: 'corrective',
-          priority: 'high',
-          ...(row.canonical_asset_id ? { assetId: String(row.canonical_asset_id) } : {}),
-        });
-        items.push(buildItem({
-          id: `drilling-review:${reviewId}`,
-          source: 'maintenance',
-          source_label: 'Mantenimiento',
-          kind: 'Revisar señal',
-          date: today,
-          title: row.asset_name ? `Revisar señal · ${row.asset_name}` : 'Revisar señal de Sondaje',
-          subtitle: normalizeText(row.machine_observations || row.review_reason),
-          reference: null,
-          status: 'action_required',
-          status_label: 'Revisar hoy',
-          priority: 'high',
-          owner: creationCapability.personName,
-          location: null,
-          href: `/dashboard/mantenimiento/ordenes-trabajo/create?${params.toString()}`,
-          historical: false,
-          completed_at: null,
-          actionable_for_me: true,
-          action_label: 'Revisar y decidir',
-          action_note: 'Puede requerir crear una OT.',
-        }, today));
-      }
-    }
 
     for (const row of complianceResult.data || []) {
       if (!row.due_date || !includeForScope(row.status, scope)) continue;
