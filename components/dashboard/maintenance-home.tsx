@@ -11,6 +11,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { MobileTerrainPanel } from '@/components/maintenance/mobile-terrain-panel';
 import { AutopilotDecisionStrip } from '@/components/maintenance/autopilot-decision-strip';
 import { CanonicalMaintenanceOverview } from '@/components/maintenance/canonical-maintenance-overview';
+import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
 type ActionItem = { id: string; kind: string; priority: number; title: string; description: string; evidence: string; href: string; assetHref?: string | null; autopilot?: { state: 'prepared'; risk: 'low' | 'medium' | 'high'; requiresHumanDecision: true; preparedAction: string; authority: string } };
@@ -170,6 +171,7 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
               : <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo"><ArrowRight className="h-4 w-4" />{t.cta.reviewOrders}</Link></Button>}
       </PageHeaderActions>
     </PageHeader>
+    <WhatsappOperationalUpdates mode="maintenance"/>
     <p className="text-sm text-muted-foreground">Lo que requiere tu atención aparece primero. Abre una acción para continuar o consulta el contexto en Ver más.</p>
     <Card className="shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="text-lg">{t.queue.titles[mode as WorkMode]}</CardTitle><CardDescription>{t.queue.descriptions[mode as WorkMode]}</CardDescription></div>{!isLoading && !error ? <Badge variant="outline">{fill(t.queue.actionsBadge, { n: actions.length })}</Badge> : null}</CardHeader>
