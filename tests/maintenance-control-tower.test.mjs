@@ -270,6 +270,6 @@ test('wallboard excludes conflicted inventory from usable stock coverage', () =>
   assert.match(api, /getInventoryConflictEvidence/);
   assert.match(api, /trustedBodegaRows/);
   assert.match(api, /conflictedSkus/);
-  assert.match(page, /SKUs en conciliación/);
-  assert.match(page, /SKUs con stock usable/);
+  assert.match(page, /Productos por revisar/);
+  assert.match(page, /Productos con stock disponible/);
 });
