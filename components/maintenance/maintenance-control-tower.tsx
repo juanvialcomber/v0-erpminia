@@ -261,13 +261,13 @@ export function MaintenanceControlTower() {
   const completedOrders = (data?.workOrders.workOrders || []).filter((row) => ['completed','closed'].includes(String(row.status || '').toLowerCase())).length;
   const openOrders = (data?.workOrders.workOrders || []).filter((row) => ['open','planned','in_progress'].includes(String(row.status || '').toLowerCase())).length;
 
-  return <div className="min-h-[calc(100vh-7rem)] bg-[#061725] p-4 text-slate-100 lg:p-5">
-    <header className="overflow-hidden rounded-xl border border-slate-700/70 border-cyan-900/60 bg-[linear-gradient(90deg,#07131f,#0b2636_55%,#102132)] shadow-2xl">
+  return <div className="min-h-[calc(100vh-7rem)] bg-background p-4 text-foreground lg:p-5">
+    <header className="overflow-hidden rounded-xl border border-border border-primary/30 bg-card shadow-none">
       <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-7">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-400">Compañía Minera La Patagua</p>
-        <h1 className="mt-1 text-3xl font-semibold uppercase tracking-[0.16em] text-sky-200">{current.title}</h1>
-        <p className="mt-1 text-sm text-slate-300">Departamento de Mantenimiento Mecánica · Torre de control MOTIL</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Compañía Minera La Patagua</p>
+        <h1 className="mt-1 text-3xl font-semibold uppercase tracking-[0.16em] text-foreground">{current.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Departamento de Mantenimiento Mecánica · Torre de control MOTIL</p>
       </div>
       <div className="flex items-center gap-3">
         <Badge variant="outline">{viewIndex + 1} / {VIEWS.length}</Badge>
@@ -282,11 +282,11 @@ export function MaintenanceControlTower() {
     {isLoading ? <div className="mt-8 grid gap-4 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className="h-36 animate-pulse rounded-lg bg-muted" />)}</div> : null}
 
     {!isLoading && !error && data ? <>
-      <section className="mt-4 rounded-xl border border-slate-700/70 border-slate-700/70 bg-[#0a2232] shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-700/70 px-5 py-3">
+      <section className="mt-4 rounded-xl border border-border border-border bg-card shadow-none">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Atención ahora</p>
-            <p className="mt-0.5 text-sm text-slate-400">Sólo lo que requiere decisión, revisión o destrabe</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Atención ahora</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Sólo lo que requiere decisión, revisión o destrabe</p>
           </div>
           <div className="flex gap-2 text-xs">
             <Badge variant="outline">{summary?.operationallyBlocked ?? 0} bloqueos</Badge>
@@ -295,9 +295,9 @@ export function MaintenanceControlTower() {
           </div>
         </div>
         <div className="grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-          {actions.length === 0 ? <div className="col-span-2 flex min-h-24 items-center gap-3 px-5 py-4"><CheckCircle2 className="h-5 w-5 text-slate-400" /><span className="font-medium">Sin acciones críticas pendientes.</span></div> : actions.map((action) => <div key={action.id} className="flex min-w-0 items-start gap-3 px-5 py-4">
-            <div className="mt-0.5 rounded-md border border-slate-700/70 p-2">{action.kind === 'operational_blocker' ? <AlertTriangle className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}</div>
-            <div className="min-w-0"><p className="font-medium">{action.title}</p><p className="mt-1 line-clamp-2 text-xs text-slate-400">{action.evidence}</p></div>
+          {actions.length === 0 ? <div className="col-span-2 flex min-h-24 items-center gap-3 px-5 py-4"><CheckCircle2 className="h-5 w-5 text-muted-foreground" /><span className="font-medium">Sin acciones críticas pendientes.</span></div> : actions.map((action) => <div key={action.id} className="flex min-w-0 items-start gap-3 px-5 py-4">
+            <div className="mt-0.5 rounded-md border border-border p-2">{action.kind === 'operational_blocker' ? <AlertTriangle className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}</div>
+            <div className="min-w-0"><p className="font-medium">{action.title}</p><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{action.evidence}</p></div>
           </div>)}
         </div>
       </section>
@@ -306,7 +306,7 @@ export function MaintenanceControlTower() {
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold">{current.title}</h2>
-            <p className="mt-1 text-sm text-slate-400">{current.subtitle}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{current.subtitle}</p>
           </div>
           <div className="flex gap-1">
             {VIEWS.map((view, index) => <button key={view.key} type="button" aria-label={view.title} onClick={() => { setViewIndex(index); setSeconds(30); }} className={`h-2.5 w-8 rounded-full ${index === viewIndex ? 'bg-primary' : 'bg-muted'}`} />)}
@@ -314,24 +314,24 @@ export function MaintenanceControlTower() {
         </div>
 
         {current.key === 'analysis' ? <div className="grid gap-4 lg:grid-cols-[1.05fr_1.35fr_.9fr]">
-          <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4">
-            <p className="text-sm font-semibold text-sky-200">Resumen operativo</p>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">Resumen operativo</p>
             <div className="mt-3 grid gap-2">
-              {actions.length === 0 ? <p className="rounded-lg border border-emerald-900/70 bg-emerald-950/20 p-3 text-sm text-emerald-300">Sin alertas críticas pendientes.</p> : actions.map((action) => <div key={action.id} className="rounded-lg border border-slate-700/70 bg-slate-950/20 p-3"><p className="font-medium">{action.title}</p><p className="mt-1 text-xs text-slate-400">{action.evidence}</p></div>)}
+              {actions.length === 0 ? <p className="rounded-lg border border-secondary/30 bg-secondary/10 p-3 text-sm text-secondary">Sin alertas críticas pendientes.</p> : actions.map((action) => <div key={action.id} className="rounded-lg border border-border bg-muted/10 p-3"><p className="font-medium">{action.title}</p><p className="mt-1 text-xs text-muted-foreground">{action.evidence}</p></div>)}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4">
-            <p className="text-sm font-semibold text-sky-200">Equipos que requieren atención</p>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">Equipos que requieren atención</p>
             <div className="mt-3 space-y-2">
-              {equipment.filter((row) => priorityScore(row) > 0).slice(0,6).map((row) => <div key={row.id} className="grid grid-cols-[1fr_110px_110px] gap-3 rounded-lg border border-slate-700/60 bg-slate-950/20 px-3 py-2 text-sm"><div><p className="font-medium">{row.name}</p><p className="text-xs text-slate-400">{row.specs?.location || 'Sin ubicación validada'}</p></div><span>{row.operational?.openWorkOrders || 0} OT</span><span>{row.operational?.operationalBlockers ? 'Bloqueado' : row.operational?.overduePreventives ? 'Preventivo' : 'Revisar'}</span></div>)}
+              {equipment.filter((row) => priorityScore(row) > 0).slice(0,6).map((row) => <div key={row.id} className="grid grid-cols-[1fr_110px_110px] gap-3 rounded-lg border border-border bg-muted/10 px-3 py-2 text-sm"><div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground">{row.specs?.location || 'Sin ubicación validada'}</p></div><span>{row.operational?.openWorkOrders || 0} OT</span><span>{row.operational?.operationalBlockers ? 'Bloqueado' : row.operational?.overduePreventives ? 'Preventivo' : 'Revisar'}</span></div>)}
             </div>
           </div>
-          <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4">
-            <p className="text-sm font-semibold text-sky-200">Señales</p>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold text-foreground">Señales</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-lg border border-red-900/60 bg-red-950/20 p-4"><p className="text-xs text-slate-400">Bloqueos</p><p className="mt-1 text-3xl font-semibold text-red-300">{summary?.operationallyBlocked ?? 0}</p></div>
-              <div className="rounded-lg border border-orange-900/60 bg-orange-950/20 p-4"><p className="text-xs text-slate-400">Por aprobar</p><p className="mt-1 text-3xl font-semibold text-orange-300">{summary?.pendingApprovals ?? 0}</p></div>
-              <div className="rounded-lg border border-sky-900/60 bg-sky-950/20 p-4"><p className="text-xs text-slate-400">Repeticiones</p><p className="mt-1 text-3xl font-semibold text-sky-300">{summary?.recurringReliabilityAssets ?? 0}</p></div>
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4"><p className="text-xs text-muted-foreground">Bloqueos</p><p className="mt-1 text-3xl font-semibold text-destructive">{summary?.operationallyBlocked ?? 0}</p></div>
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-4"><p className="text-xs text-muted-foreground">Por aprobar</p><p className="mt-1 text-3xl font-semibold text-primary">{summary?.pendingApprovals ?? 0}</p></div>
+              <div className="rounded-lg border border-secondary/30 bg-secondary/10 p-4"><p className="text-xs text-muted-foreground">Repeticiones</p><p className="mt-1 text-3xl font-semibold text-secondary">{summary?.recurringReliabilityAssets ?? 0}</p></div>
             </div>
           </div>
         </div> : null}
@@ -345,22 +345,22 @@ export function MaintenanceControlTower() {
               ['OT abiertas', openOrders],
               ['OT terminadas', completedOrders],
               ['Por aprobar', summary?.pendingApprovals ?? 0],
-            ].map(([label,value]) => <div key={String(label)} className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}
+            ].map(([label,value]) => <div key={String(label)} className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="font-semibold text-sky-200">Carga por estado de OT</p><div className="mt-4 space-y-3">{[['Abiertas',openOrders],['Terminadas',completedOrders],['Sin responsable',summary?.unassignedOpenWorkOrders ?? 0],['Bloqueadas',summary?.operationallyBlocked ?? 0]].map(([label,value]) => <div key={String(label)}><div className="mb-1 flex justify-between text-sm"><span>{label}</span><span>{value}</span></div><div className="h-2 rounded-full bg-slate-800"><div className="h-2 rounded-full bg-sky-500" style={{width:`${Math.min(100, Number(value) * 10)}%`}} /></div></div>)}</div></div>
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="font-semibold text-sky-200">Calidad del estado de flota</p><p className="mt-4 text-4xl font-semibold">{knownStatus} / {data.equipment.total ?? equipment.length}</p><p className="mt-2 text-sm text-slate-400">Equipos con estado operacional explícito. Los restantes no se clasifican como operativos o detenidos hasta tener un estado validado.</p></div>
+            <div className="rounded-xl border border-border bg-card p-4"><p className="font-semibold text-foreground">Carga por estado de OT</p><div className="mt-4 space-y-3">{[['Abiertas',openOrders],['Terminadas',completedOrders],['Sin responsable',summary?.unassignedOpenWorkOrders ?? 0],['Bloqueadas',summary?.operationallyBlocked ?? 0]].map(([label,value]) => <div key={String(label)}><div className="mb-1 flex justify-between text-sm"><span>{label}</span><span>{value}</span></div><div className="h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-secondary" style={{width:`${Math.min(100, Number(value) * 10)}%`}} /></div></div>)}</div></div>
+            <div className="rounded-xl border border-border bg-card p-4"><p className="font-semibold text-foreground">Calidad del estado de flota</p><p className="mt-4 text-4xl font-semibold">{knownStatus} / {data.equipment.total ?? equipment.length}</p><p className="mt-2 text-sm text-muted-foreground">Equipos con estado operacional explícito. Los restantes no se clasifican como operativos o detenidos hasta tener un estado validado.</p></div>
           </div>
         </div> : null}
 
-        {current.key === 'preventive' ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-slate-700/70 bg-slate-900/50 px-4 py-3 text-xs font-medium text-slate-400"><span>Equipo</span><span>Próxima mantención</span><span>Saldo</span><span>Prioridad</span><span>Fuente</span></div>
-          {preventive.length === 0 ? <div className="p-10 text-center"><p className="text-lg font-medium">Sin preventivos por horas activos en la vista actual</p><p className="mt-2 text-sm text-slate-400">No se inventan vencimientos cuando la fuente no entrega una pauta activa.</p></div> : preventive.map((row) => <div key={row.schedule_id} className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.asset_name || row.asset_code || 'Equipo'}</p><p className="text-xs text-slate-400">{row.asset_code || 'Sin código'}</p></div><span>{row.task_name || 'Preventivo'}</span><span>{row.remaining_hours != null ? `${Number(row.remaining_hours).toLocaleString('es-CL')} h` : 'Sin saldo'}</span><span>{row.alert_due ? 'Alta' : statusLabel(row.hour_status)}</span><div><p>{row.meter_evidence_source || 'Sin fuente'}</p><p className="text-xs text-slate-400">{row.source_reference || 'Sin referencia'}</p></div></div>)}
+        {current.key === 'preventive' ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-border bg-muted/15 px-4 py-3 text-xs font-medium text-muted-foreground"><span>Equipo</span><span>Próxima mantención</span><span>Saldo</span><span>Prioridad</span><span>Fuente</span></div>
+          {preventive.length === 0 ? <div className="p-10 text-center"><p className="text-lg font-medium">Sin preventivos por horas activos en la vista actual</p><p className="mt-2 text-sm text-muted-foreground">No se inventan vencimientos cuando la fuente no entrega una pauta activa.</p></div> : preventive.map((row) => <div key={row.schedule_id} className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.asset_name || row.asset_code || 'Equipo'}</p><p className="text-xs text-muted-foreground">{row.asset_code || 'Sin código'}</p></div><span>{row.task_name || 'Preventivo'}</span><span>{row.remaining_hours != null ? `${Number(row.remaining_hours).toLocaleString('es-CL')} h` : 'Sin saldo'}</span><span>{row.alert_due ? 'Alta' : statusLabel(row.hour_status)}</span><div><p>{row.meter_evidence_source || 'Sin fuente'}</p><p className="text-xs text-muted-foreground">{row.source_reference || 'Sin referencia'}</p></div></div>)}
         </div> : null}
 
-        {current.key === 'program' ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-slate-700/70 bg-slate-900/50 px-4 py-3 text-xs font-medium text-slate-400"><span>OT</span><span>Trabajo</span><span>Equipo</span><span>Responsable</span><span>Fecha</span><span>Estado</span></div>
-          {workOrders.length === 0 ? <div className="p-8 text-center text-slate-400">No hay OT operacionales abiertas.</div> : workOrders.map((row) => <div key={row.id} className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0"><span className="font-mono text-xs">{row.work_order_number || 'OT'}</span><div><p className="font-medium">{row.title || 'Sin nombre'}</p><p className="text-xs text-slate-400">{row.work_type === 'general' ? 'Trabajo general' : row.priority ? `Prioridad ${row.priority}` : 'Sin prioridad'}</p></div><span>{row.asset_name || (row.work_type === 'general' ? 'Trabajo general' : 'Sin equipo')}</span><span>{row.assigned_to_name || 'Sin responsable'}</span><span>{row.scheduled_date ? row.scheduled_date.slice(0,10) : 'Sin fecha'}</span><span>{statusLabel(row.status)}</span></div>)}
+        {current.key === 'program' ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-border bg-muted/15 px-4 py-3 text-xs font-medium text-muted-foreground"><span>OT</span><span>Trabajo</span><span>Equipo</span><span>Responsable</span><span>Fecha</span><span>Estado</span></div>
+          {workOrders.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay OT operacionales abiertas.</div> : workOrders.map((row) => <div key={row.id} className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"><span className="font-mono text-xs">{row.work_order_number || 'OT'}</span><div><p className="font-medium">{row.title || 'Sin nombre'}</p><p className="text-xs text-muted-foreground">{row.work_type === 'general' ? 'Trabajo general' : row.priority ? `Prioridad ${row.priority}` : 'Sin prioridad'}</p></div><span>{row.asset_name || (row.work_type === 'general' ? 'Trabajo general' : 'Sin equipo')}</span><span>{row.assigned_to_name || 'Sin responsable'}</span><span>{row.scheduled_date ? row.scheduled_date.slice(0,10) : 'Sin fecha'}</span><span>{statusLabel(row.status)}</span></div>)}
         </div> : null}
 
         {current.key === 'stopped' ? <div className="space-y-4">
@@ -372,48 +372,48 @@ export function MaintenanceControlTower() {
               ['Sin responsable', summary?.unassignedOpenWorkOrders ?? 0],
               ['Por aprobar', summary?.pendingApprovals ?? 0],
               ['Estado sin validar', Math.max(0,(data.equipment.total ?? equipment.length)-knownStatus)],
-            ].map(([label,value]) => <div key={String(label)} className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}
+            ].map(([label,value]) => <div key={String(label)} className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-            <div className="grid grid-cols-[minmax(260px,1.6fr)_1fr_1fr_120px] gap-3 border-b border-slate-700/70 bg-slate-900/50 px-4 py-3 text-xs font-medium text-slate-400"><span>Equipo</span><span>Ubicación</span><span>Estado</span><span>OT abiertas</span></div>
-            {operationallyStopped.length === 0 ? <div className="p-10 text-center"><p className="text-lg font-medium">No hay equipos con detención validada en la fuente actual</p><p className="mt-2 text-sm text-slate-400">Los equipos sin estado explícito no se presentan como detenidos.</p></div> : operationallyStopped.slice(0,12).map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1.6fr)_1fr_1fr_120px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.name}</p><p className="text-xs text-slate-400">{row.code || 'Sin código'}</p></div><span>{row.specs?.location || 'Sin ubicación'}</span><span>{statusLabel(row.status)}</span><span>{row.operational?.openWorkOrders || 0}</span></div>)}
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="grid grid-cols-[minmax(260px,1.6fr)_1fr_1fr_120px] gap-3 border-b border-border bg-muted/15 px-4 py-3 text-xs font-medium text-muted-foreground"><span>Equipo</span><span>Ubicación</span><span>Estado</span><span>OT abiertas</span></div>
+            {operationallyStopped.length === 0 ? <div className="p-10 text-center"><p className="text-lg font-medium">No hay equipos con detención validada en la fuente actual</p><p className="mt-2 text-sm text-muted-foreground">Los equipos sin estado explícito no se presentan como detenidos.</p></div> : operationallyStopped.slice(0,12).map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1.6fr)_1fr_1fr_120px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground">{row.code || 'Sin código'}</p></div><span>{row.specs?.location || 'Sin ubicación'}</span><span>{statusLabel(row.status)}</span><span>{row.operational?.openWorkOrders || 0}</span></div>)}
           </div>
         </div> : null}
 
-        {current.key === 'fleet' ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400">
+        {current.key === 'fleet' ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground">
             <span>Equipo</span><span>Faena</span><span>Estado</span><span>Lectura</span><span>Próximo</span><span>OT</span>
           </div>
-          {equipment.map((row) => <div key={row.id} className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0">
-            <div className="min-w-0"><p className="truncate font-medium">{row.name}</p><p className="truncate text-xs text-slate-400">{row.code || 'Sin código'} · {row.criticality || 'Sin criticidad'}</p></div>
+          {equipment.map((row) => <div key={row.id} className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.name}</p><p className="truncate text-xs text-muted-foreground">{row.code || 'Sin código'} · {row.criticality || 'Sin criticidad'}</p></div>
             <span className="truncate">{row.specs?.location || 'Sin ubicación'}</span>
             <span>{statusLabel(row.status)}</span>
             <span className="tabular-nums">{row.operational?.latestMeterHours != null ? `${Number(row.operational.latestMeterHours).toLocaleString('es-CL')} h` : 'Sin lectura'}</span>
-            <div className="min-w-0"><p className="truncate">{row.operational?.nextPreventiveTask || (row.operational?.operationalBlockers ? 'Resolver bloqueo' : 'Sin preventivo próximo')}</p><p className="text-xs text-slate-400">{row.operational?.nextPreventiveRemainingHours != null ? `${Number(row.operational.nextPreventiveRemainingHours).toLocaleString('es-CL')} h de saldo` : row.specs?.updated_at ? `Actualizado ${compactDate(row.specs.updated_at)}` : 'Sin saldo disponible'}</p></div>
+            <div className="min-w-0"><p className="truncate">{row.operational?.nextPreventiveTask || (row.operational?.operationalBlockers ? 'Resolver bloqueo' : 'Sin preventivo próximo')}</p><p className="text-xs text-muted-foreground">{row.operational?.nextPreventiveRemainingHours != null ? `${Number(row.operational.nextPreventiveRemainingHours).toLocaleString('es-CL')} h de saldo` : row.specs?.updated_at ? `Actualizado ${compactDate(row.specs.updated_at)}` : 'Sin saldo disponible'}</p></div>
             <span className="tabular-nums">{row.operational?.openWorkOrders || 0}{row.operational?.operationalBlockers ? ` · ${row.operational.operationalBlockers} bloqueo` : ''}</span>
           </div>)}
         </div> : null}
 
-        {false ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400">
+        {false ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground">
             <span>Equipo</span><span>Trabajo</span><span>Saldo</span><span>Estado</span><span>Fuente</span>
           </div>
-          {preventive.length === 0 ? <div className="p-8 text-center text-slate-400">Sin preventivos que requieran atención.</div> : preventive.map((row) => <div key={row.schedule_id} className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0">
-            <div className="min-w-0"><p className="truncate font-medium">{row.asset_name || row.asset_code || 'Equipo'}</p><p className="text-xs text-slate-400">{row.asset_code || 'Sin código'}</p></div>
+          {preventive.length === 0 ? <div className="p-8 text-center text-muted-foreground">Sin preventivos que requieran atención.</div> : preventive.map((row) => <div key={row.schedule_id} className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.asset_name || row.asset_code || 'Equipo'}</p><p className="text-xs text-muted-foreground">{row.asset_code || 'Sin código'}</p></div>
             <span className="truncate">{row.task_name || 'Preventivo'}</span>
             <span className="tabular-nums">{row.remaining_hours != null ? `${Number(row.remaining_hours).toLocaleString('es-CL')} h` : 'Sin saldo'}</span>
             <span>{statusLabel(row.hour_status)}</span>
-            <div className="min-w-0"><p className="truncate">{row.meter_evidence_source || 'Sin fuente'}</p><p className="truncate text-xs text-slate-400">{row.source_reference || (row.generated_work_order_id ? 'OT ya creada' : 'Sin referencia')}</p></div>
+            <div className="min-w-0"><p className="truncate">{row.meter_evidence_source || 'Sin fuente'}</p><p className="truncate text-xs text-muted-foreground">{row.source_reference || (row.generated_work_order_id ? 'OT ya creada' : 'Sin referencia')}</p></div>
           </div>)}
         </div> : null}
 
-        {false ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400">
+        {false ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground">
             <span>OT</span><span>Trabajo</span><span>Equipo</span><span>Responsable</span><span>Fecha</span><span>Estado</span>
           </div>
-          {workOrders.length === 0 ? <div className="p-8 text-center text-slate-400">No hay OT operacionales abiertas.</div> : workOrders.map((row) => <div key={row.id} className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0">
+          {workOrders.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay OT operacionales abiertas.</div> : workOrders.map((row) => <div key={row.id} className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
             <span className="font-mono text-xs">{row.work_order_number || 'OT'}</span>
-            <div className="min-w-0"><p className="truncate font-medium">{row.title || 'Sin nombre'}</p><p className="text-xs text-slate-400">{row.work_type === 'general' ? 'Trabajo general' : row.priority ? `Prioridad ${row.priority}` : 'Sin prioridad'}</p></div>
+            <div className="min-w-0"><p className="truncate font-medium">{row.title || 'Sin nombre'}</p><p className="text-xs text-muted-foreground">{row.work_type === 'general' ? 'Trabajo general' : row.priority ? `Prioridad ${row.priority}` : 'Sin prioridad'}</p></div>
             <span className="truncate">{row.asset_name || (row.work_type === 'general' ? 'Trabajo general' : 'Sin equipo')}</span>
             <span className="truncate">{row.assigned_to_name || 'Sin responsable'}</span>
             <span>{row.scheduled_date ? row.scheduled_date.slice(0,10) : 'Sin fecha'}</span>
@@ -421,14 +421,14 @@ export function MaintenanceControlTower() {
           </div>)}
         </div> : null}
 
-        {false ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400">
+        {false ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground">
             <span>Equipo</span><span>Lectura</span><span>Fecha</span><span>Canal</span><span>Referencia</span>
           </div>
-          {readings.length === 0 ? <div className="p-8 text-center text-slate-400">No hay lecturas registradas.</div> : readings.map((row) => {
+          {readings.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay lecturas registradas.</div> : readings.map((row) => {
             const asset = runtimeAssetMap.get(row.canonical_asset_id);
-            return <div key={row.id} className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0">
-              <div className="min-w-0"><p className="truncate font-medium">{asset?.name || asset?.asset_code || 'Equipo'}</p><p className="text-xs text-slate-400">{asset?.asset_code || 'Sin código'}</p></div>
+            return <div key={row.id} className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+              <div className="min-w-0"><p className="truncate font-medium">{asset?.name || asset?.asset_code || 'Equipo'}</p><p className="text-xs text-muted-foreground">{asset?.asset_code || 'Sin código'}</p></div>
               <span className="tabular-nums">{row.meter_hours != null ? `${Number(row.meter_hours).toLocaleString('es-CL')} h` : 'Sin lectura'}</span>
               <span>{compactDate(row.recorded_at)}</span>
               <span>{row.source_type === 'manual' ? 'Manual' : row.source_type === 'telemetry' ? 'Telemetría' : row.source_type === 'import' ? 'Importación' : row.source_type || 'Sin canal'}</span>
@@ -439,22 +439,22 @@ export function MaintenanceControlTower() {
 
         {false ? <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Costo registrado</p><p className="mt-1 text-2xl font-semibold">{money(Number(data?.costs.summary?.totalCost || 0))}</p></div>
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Equipos con costo</p><p className="mt-1 text-2xl font-semibold">{data?.costs.summary?.assets ?? 0}</p></div>
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Fuente</p><p className="mt-1 text-base font-medium">Movimientos por equipo</p></div>
+            <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Costo registrado</p><p className="mt-1 text-2xl font-semibold">{money(Number(data?.costs.summary?.totalCost || 0))}</p></div>
+            <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Equipos con costo</p><p className="mt-1 text-2xl font-semibold">{data?.costs.summary?.assets ?? 0}</p></div>
+            <div className="rounded-xl border border-border bg-card p-4"><p className="text-xs text-muted-foreground">Fuente</p><p className="mt-1 text-base font-medium">Movimientos por equipo</p></div>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-            <div className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400"><span>Equipo</span><span>Costo</span><span>Registros</span><span>Último movimiento</span></div>
-            {costs.map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.assetName}</p><p className="text-xs text-slate-400">{row.assetCode || 'Sin código'}</p></div><span className="font-medium tabular-nums">{money(row.totalCost)}</span><span>{row.rows ?? '—'}</span><span>{row.lastDate ? row.lastDate.slice(0,10) : 'Sin fecha'}</span></div>)}
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground"><span>Equipo</span><span>Costo</span><span>Registros</span><span>Último movimiento</span></div>
+            {costs.map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.assetName}</p><p className="text-xs text-muted-foreground">{row.assetCode || 'Sin código'}</p></div><span className="font-medium tabular-nums">{money(row.totalCost)}</span><span>{row.rows ?? '—'}</span><span>{row.lastDate ? row.lastDate.slice(0,10) : 'Sin fecha'}</span></div>)}
           </div>
         </div> : null}
 
-        {false ? <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
-          <div className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b bg-slate-900/40 px-4 py-3 text-xs font-medium text-slate-400">
+        {false ? <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b bg-muted/10 px-4 py-3 text-xs font-medium text-muted-foreground">
             <span>Archivo</span><span>Hoja</span><span>Responsable</span><span>Recibido</span><span>Estado</span>
           </div>
-          {sources.length === 0 ? <div className="p-8 text-center text-slate-400">No hay fuentes de planificación registradas.</div> : sources.map((row) => <div key={row.id} className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b border-slate-700/60 px-4 py-3 text-sm last:border-b-0">
-            <div className="min-w-0"><p className="truncate font-medium">{row.source_file || 'Archivo'}</p><p className="text-xs text-slate-400">Se conserva como evidencia de origen</p></div>
+          {sources.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay fuentes de planificación registradas.</div> : sources.map((row) => <div key={row.id} className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.source_file || 'Archivo'}</p><p className="text-xs text-muted-foreground">Se conserva como evidencia de origen</p></div>
             <span className="truncate">{row.source_sheet || 'Sin hoja'}</span>
             <span className="truncate">{row.source_owner || row.source_role || 'Sin responsable'}</span>
             <span>{compactDate(row.imported_at)}</span>
@@ -463,7 +463,7 @@ export function MaintenanceControlTower() {
         </div> : null}
       </section>
 
-      <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-700/70 pt-3 text-xs text-slate-400">
+      <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
         <span>Datos reales de MOTIL · diseño inspirado en la referencia de Ariel · Sondaje fuera del alcance</span>
         <span>Última actualización de pantalla: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(new Date())}</span>
       </footer>
