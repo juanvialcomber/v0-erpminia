@@ -474,9 +474,9 @@ export const dictionaries = {
               { label: 'Acciones críticas', detail: '{n} vencidas para tu cargo' },
             ],
             shortcuts: [
-              { key: 'productionIntel', label: 'Inteligencia Producción', detail: 'Plan, ritmo, confianza y forecast' },
-              { key: 'plantMetallurgy', label: 'Planta y metalurgia', detail: 'Turnos, tratamiento y metalurgia' },
-              { key: 'actions', label: 'Mis acciones', detail: 'Incluye Data Health asignado a Planta' },
+              { key: 'productionIntel', label: 'Producción', detail: 'Plan, ritmo y proyección' },
+              { key: 'plantMetallurgy', label: 'Planta', detail: 'Turnos, tratamiento y resultados' },
+              { key: 'actions', label: 'Mis acciones', detail: 'Pendientes asignados a Planta' },
             ],
           },
           maintenance: {
@@ -490,10 +490,10 @@ export const dictionaries = {
               { label: 'Acciones críticas', detail: '{n} vencidas para tu cargo' },
             ],
             shortcuts: [
-              { key: 'maintenanceIntel', label: 'Inteligencia Mantención', detail: 'Backlog, recurrencia y abastecimiento' },
+              { key: 'maintenanceIntel', label: 'Mantenimiento', detail: 'Pendientes, fallas repetidas y repuestos' },
               { key: 'availability', label: 'Disponibilidad', detail: 'Estado y disponibilidad por equipo' },
               { key: 'workOrders', label: 'Órdenes de trabajo', detail: 'Planificar, ejecutar y cerrar OT' },
-              { key: 'actions', label: 'Mis acciones', detail: 'Incluye Data Health y escalaciones del cargo' },
+              { key: 'actions', label: 'Mis acciones', detail: 'Pendientes asignados a tu cargo' },
             ],
           },
           drilling: {
@@ -517,9 +517,9 @@ export const dictionaries = {
             title: 'Mi Bodega',
             description: 'Stock canónico, calidad del inventario y necesidades que requieren acción.',
             shortcuts: [
-              { key: 'warehouseIntel', label: 'Inteligencia Bodega', detail: 'Stock, calidad y readiness predictivo' },
-              { key: 'warehouse', label: 'Bodega', detail: 'Existencias y productos canónicos' },
-              { key: 'actions', label: 'Mis acciones', detail: 'Data Health y reposición asignada a Bodega' },
+              { key: 'warehouseIntel', label: 'Bodega', detail: 'Stock, faltantes y reposición' },
+              { key: 'warehouse', label: 'Bodega', detail: 'Existencias y productos' },
+              { key: 'actions', label: 'Mis acciones', detail: 'Pendientes de Bodega' },
             ],
           },
           sustainability: {
@@ -553,8 +553,8 @@ export const dictionaries = {
               { label: 'Calidad Producción', detail: '{n} fuentes HOLD', unavailable: 'Fuente de Producción no disponible' },
             ],
             shortcuts: [
-              { key: 'executiveCenter', label: 'Centro Ejecutivo', detail: 'Top decisiones, causa raíz y escalaciones' },
-              { key: 'dataHealth', label: 'Data Health', detail: 'Confianza y frescura por dominio' },
+              { key: 'executiveCenter', label: 'Resumen', detail: 'Decisiones y problemas principales' },
+              { key: 'dataHealth', label: 'Calidad de datos', detail: 'Datos disponibles y faltantes' },
               { key: 'actions', label: 'Mis acciones', detail: 'Tareas y escalaciones visibles para Gerencia' },
             ],
           },
@@ -570,25 +570,25 @@ export const dictionaries = {
             ],
             shortcuts: [
               { key: 'actions', label: 'Mis acciones', detail: 'Tareas visibles para tu cargo' },
-              { key: 'production', label: 'Producción', detail: 'Operación y cobertura canónica' },
+              { key: 'production', label: 'Producción', detail: 'Estado y datos disponibles' },
               { key: 'maintenance', label: 'Mantención', detail: 'OT y activos' },
-              { key: 'warehouse', label: 'Bodega', detail: 'Stock y trazabilidad' },
+              { key: 'warehouse', label: 'Bodega', detail: 'Stock y movimientos' },
             ],
           },
         },
         priorities: {
           ariaLabel: 'Prioridades y cambios del Intelligence Core',
           casesTitle: 'Qué requiere atención',
-          casesSubtitle: 'Máximo tres casos priorizados por evidencia explícita y permisos reales. No ejecutan cambios por sí solos.',
+          casesSubtitle: 'Máximo tres casos importantes. MOTIL no cambia nada por sí solo.',
           viewCases: 'Ver casos',
-          revalidated: 'Revalidado',
-          pendingRevalidation: 'Pendiente de revalidación',
+          revalidated: 'Revisado de nuevo',
+          pendingRevalidation: 'Pendiente de revisar',
           whyItMatters: 'Por qué importa:',
           missingLabel: 'Falta:',
           nextAction: 'Siguiente acción:',
           openContext: 'Abrir contexto',
           changesTitle: 'Cambió desde ayer',
-          changesFootnote: 'Derivado sólo del lifecycle explícito de Decision Cases; no implica impacto, causalidad ni prioridad adicional.',
+          changesFootnote: 'Muestra cambios registrados. No significa que tengan mayor impacto o prioridad.',
           domains: {
             maintenance: 'Mantención',
             geology: 'Geología',
@@ -601,7 +601,7 @@ export const dictionaries = {
           changeKinds: {
             appeared: 'Apareció',
             acknowledged: 'Revisado',
-            revalidated: 'Revalidado',
+            revalidated: 'Revisado de nuevo',
             resolved: 'Resuelto',
             changed: 'Cambió',
           },
@@ -610,7 +610,7 @@ export const dictionaries = {
       actions: {
         fallbackCargo: 'Trabajo por cargo',
         title: 'Mis acciones',
-        subtitle: 'Sólo decisiones y tareas que corresponden a tu cargo, agrupadas por familia operacional. Busca por equipo, OT, incidente o evidencia y combina la búsqueda con los filtros rápidos.',
+        subtitle: 'Sólo tus tareas y decisiones. Busca por equipo, OT o incidente y usa los filtros si lo necesitas.',
         refresh: 'Actualizar',
         summary: {
           owners: 'Acciones propias',
@@ -630,10 +630,10 @@ export const dictionaries = {
           owner: 'Sólo propias',
         },
         showing: 'Mostrando {visible} de {total} acciones visibles.',
-        inboxError: 'No se pudo cargar la bandeja operacional.',
+        inboxError: 'No se pudieron cargar tus acciones.',
         loading: 'Cargando trabajo del cargo…',
-        degradedTitle: 'Bandeja temporalmente limitada',
-        degradedDescription: 'Los indicadores disponibles siguen visibles, pero el detalle de tareas no se pudo cargar dentro del tiempo seguro. Reintenta para recuperar el detalle; MOTIL no mostrará un estado sin pendientes mientras la fuente esté degradada.',
+        degradedTitle: 'Faltan algunos datos',
+        degradedDescription: 'Parte de la información no cargó. Reintenta para ver todos los pendientes.',
         empty: {
           title: 'Operación al día',
           description: 'No tienes tareas ni escalaciones operacionales visibles en este momento.',
@@ -690,8 +690,8 @@ export const dictionaries = {
         contextsAria: 'Contextos de Gestión diaria',
         items: {
           review: 'Revisión diaria',
-          actions: 'Acciones del cargo',
-          calendar: 'Calendario operacional',
+          actions: 'Mis acciones',
+          calendar: 'Calendario',
         },
       },
       docsNav: {
@@ -703,12 +703,12 @@ export const dictionaries = {
         },
       },
       attentionNav: {
-        label: 'Atención operacional',
+        label: 'Atención',
         contextsAria: 'Contextos de Atención operacional',
         items: {
           planning: 'Planificación',
           assistant: 'Asistente Ariel',
-          assistantData: 'Data de Ariel',
+          assistantData: 'Datos de Ariel',
           alerts: 'Alertas',
           andon: 'Problemas',
         },
@@ -718,15 +718,15 @@ export const dictionaries = {
         label: 'Gerencia',
         navAria: 'Navegación gerencial',
         items: {
-          executive: 'Centro ejecutivo',
+          executive: 'Resumen',
           performance: 'Desempeño',
-          dataHealth: 'Data Health',
+          dataHealth: 'Calidad de datos',
         },
       },
       calendar: {
         eyebrow: 'Gestión diaria · compromisos con fecha',
-        title: 'Calendario operacional',
-        description: 'Compromisos abiertos con fecha de mantenimiento, cumplimiento y abastecimiento. Para decisiones asignadas directamente a tu cargo usa Acciones del cargo.',
+        title: 'Calendario',
+        description: 'Trabajos y compromisos con fecha. Para tus tareas usa Mis acciones.',
         refresh: 'Actualizar',
         createWorkOrder: 'Crear OT',
         summary: {
@@ -768,7 +768,7 @@ export const dictionaries = {
       dailyReview: {
         eyebrow: 'Control y mejora',
         title: 'Revisión diaria',
-        description: 'Problemas, compromisos y estado de la operación reunidos para comenzar el día con responsables y próximos pasos claros.',
+        description: 'Problemas, pendientes y próximos pasos para comenzar el día.',
         badge: {
           partial: 'Información parcial',
           loading: 'Actualizando',
@@ -781,7 +781,7 @@ export const dictionaries = {
         },
         indicators: {
           aria: 'Indicadores diarios',
-          sourceUnavailable: 'Fuente no disponible',
+          sourceUnavailable: 'Sin datos',
           noRecord: 'Sin registro',
           production: {
             label: 'Producción',
@@ -795,7 +795,7 @@ export const dictionaries = {
           },
           criticalAlerts: {
             label: 'Alertas críticas',
-            partialCoverage: 'Cobertura parcial de señales',
+            partialCoverage: 'Faltan algunos datos',
             actionRequired: '{n} requieren acción',
           },
           lowStock: {
@@ -810,7 +810,7 @@ export const dictionaries = {
           safety: {
             label: 'Cumplimiento de seguridad',
             findings: '{n} hallazgos abiertos · {m} acciones vencidas',
-            noEvidence: 'Sin evidencia HSE disponible',
+            noEvidence: 'Sin datos de seguridad',
           },
         },
         commitments: {
@@ -827,8 +827,8 @@ export const dictionaries = {
           open: 'Abrir',
         },
         meeting: {
-          title: 'Orden de la reunión',
-          description: 'Una revisión breve que debe terminar con acciones asignadas.',
+          title: 'Reunión diaria',
+          description: 'Revisión breve para dejar responsables y próximos pasos.',
           agenda: [
             { title: 'Seguridad', description: 'Incidentes, hallazgos y acciones vencidas' },
             { title: 'Producción', description: 'Resultado y disponibilidad más recientes' },
@@ -838,8 +838,8 @@ export const dictionaries = {
           ],
         },
         calendarFooter: {
-          title: 'Calendario de compromisos',
-          description: 'Revisa la carga de la semana y del mes.',
+          title: 'Calendario',
+          description: 'Revisa la semana y el mes.',
           cta: 'Abrir calendario',
         },
       },
@@ -2028,7 +2028,7 @@ export const dictionaries = {
         items: {
           executive: 'Executive center',
           performance: 'Performance',
-          dataHealth: 'Data Health',
+          dataHealth: 'Calidad de datos',
         },
       },
       calendar: {
