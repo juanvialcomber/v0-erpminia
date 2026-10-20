@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { AlertTriangle, CheckCircle2, Clock3, Gauge, Maximize2, RefreshCw, Wrench } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  Gauge,
+  Maximize2,
+  RefreshCw,
+  Wrench,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -31,35 +40,159 @@ type ControlCenterResponse = {
   actions?: ActionItem[];
 };
 
-const fetcher = async (url: string): Promise<ControlCenterResponse> => {
+type EquipmentRow = {
+  id: string;
+  code: string | null;
+  name: string;
+  status: string | null;
+  criticality: string | null;
+  specs?: {
+    location?: string | null;
+    source_file?: string | null;
+    updated_at?: string | null;
+  } | null;
+  operational?: {
+    openWorkOrders?: number;
+    operationalBlockers?: number;
+    overduePreventives?: number;
+    nextPreventiveTask?: string | null;
+    nextPreventiveRemainingHours?: number | null;
+    latestMeterHours?: number | null;
+    runtimeReadingCount?: number;
+  } | null;
+};
+
+type PreventiveTask = {
+  schedule_id: string;
+  canonical_asset_id: string | null;
+  asset_code: string | null;
+  asset_name: string | null;
+  task_name: string | null;
+  remaining_hours: number | string | null;
+  effective_current_meter: number | string | null;
+  hour_status: string | null;
+  alert_due: boolean | null;
+  generated_work_order_id: string | null;
+  meter_evidence_source?: string | null;
+  source_reference?: string | null;
+};
+
+type WorkOrder = {
+  id: string;
+  work_order_number: string | null;
+  title: string | null;
+  status: string | null;
+  priority: string | null;
+  assigned_to_name: string | null;
+  scheduled_date: string | null;
+  asset_name: string | null;
+  asset_code: string | null;
+  work_type: string | null;
+  record_scope?: string | null;
+};
+
+type RuntimeReading = {
+  id: string;
+  canonical_asset_id: string;
+  meter_hours: number | string | null;
+  recorded_at: string | null;
+  source_type: string | null;
+  source_reference: string | null;
+};
+
+type RuntimeAsset = { id: string; asset_code: string | null; name: string | null };
+
+type SourceImport = {
+  id: string;
+  source_file: string | null;
+  source_owner: string | null;
+  source_role: string | null;
+  source_sheet: string | null;
+  imported_at: string | null;
+  status: string | null;
+};
+
+type CostAsset = {
+  id: string;
+  assetName: string;
+  assetCode: string | null;
+  totalCost: number;
+  rows?: number;
+  lastDate?: string | null;
+};
+
+type TowerData = {
+  control: ControlCenterResponse;
+  equipment: { equipment?: EquipmentRow[]; total?: number; summary?: Record<string, number> };
+  preventive: { tasks?: PreventiveTask[]; summary?: Record<string, number> };
+  workOrders: { workOrders?: WorkOrder[] };
+  runtime: { readings?: RuntimeReading[]; assets?: RuntimeAsset[]; reconciliationQueue?: unknown[] };
+  sources: { data?: SourceImport[]; summary?: Record<string, number> };
+  costs: { summary?: { totalCost?: number; assets?: number }; assetCosts?: CostAsset[] };
+};
+
+const loadJson = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la torre de control');
-  return payload;
+  if (!response.ok) throw new Error(payload?.error || `No se pudo cargar ${url}`);
+  return payload as T;
+};
+
+const fetchTower = async (): Promise<TowerData> => {
+  const [control, equipment, preventive, workOrders, runtime, sources, costs] = await Promise.all([
+    loadJson<ControlCenterResponse>('/api/maintenance/control-center'),
+    loadJson<TowerData['equipment']>('/api/maintenance/equipment'),
+    loadJson<TowerData['preventive']>('/api/maintenance/preventive-hours'),
+    loadJson<TowerData['workOrders']>('/api/maintenance/work-orders?scope=operational&limit=100'),
+    loadJson<TowerData['runtime']>('/api/maintenance/runtime-readings'),
+    loadJson<TowerData['sources']>('/api/maintenance/sources'),
+    loadJson<TowerData['costs']>('/api/maintenance/equipment-costs'),
+  ]);
+  return { control, equipment, preventive, workOrders, runtime, sources, costs };
 };
 
 const VIEWS = [
-  { key: 'attention', title: 'Atención ahora', subtitle: 'Lo que requiere decisión o destrabe' },
-  { key: 'orders', title: 'Órdenes en curso', subtitle: 'Trabajo activo y asignaciones pendientes' },
-  { key: 'planning', title: 'Próximos trabajos', subtitle: 'Preventivos y trabajo por preparar' },
-  { key: 'closure', title: 'Cierres', subtitle: 'OT listas o con pasos pendientes' },
-  { key: 'meters', title: 'Horómetros', subtitle: 'Lecturas que requieren revisión' },
-  { key: 'reliability', title: 'Repeticiones', subtitle: 'Señales que conviene revisar' },
+  { key: 'fleet', title: 'Estado de equipos', subtitle: 'Equipo, faena, estado, lectura y próximo trabajo' },
+  { key: 'planning', title: 'Planificación', subtitle: 'Preventivos, saldo y evidencia de lectura' },
+  { key: 'orders', title: 'Órdenes de trabajo', subtitle: 'Trabajo, responsable, fecha y estado' },
+  { key: 'meters', title: 'Lecturas y cambios', subtitle: 'Últimos horómetros y su fuente' },
+  { key: 'costs', title: 'Costos por equipo', subtitle: 'Movimientos registrados por activo' },
+  { key: 'sources', title: 'Fuentes de información', subtitle: 'Archivos recibidos, fecha y estado de revisión' },
 ] as const;
 
-function actionMatches(view: string, action: ActionItem) {
-  if (action.kind === 'operational_review') return false;
-  if (view === 'attention') return ['operational_blocker','assignment_needed','approval_needed'].includes(action.kind);
-  if (view === 'orders') return ['assignment_needed','plan_step','closure_evidence'].includes(action.kind);
-  if (view === 'planning') return action.kind === 'preventive_overdue';
-  if (view === 'closure') return ['ready_to_close','approval_needed','closure_evidence','plan_step'].includes(action.kind);
-  if (view === 'meters') return action.kind === 'meter_review';
-  if (view === 'reliability') return action.kind === 'reliability';
-  return false;
+const statusLabel = (status?: string | null) => {
+  const value = String(status || '').toLowerCase();
+  if (value === 'in_progress') return 'En curso';
+  if (value === 'planned' || value === 'open') return 'Programada';
+  if (value === 'completed' || value === 'closed') return 'Terminada';
+  if (value === 'cancelled' || value === 'canceled') return 'Anulada';
+  if (value === 'overdue') return 'Vencido';
+  if (value === 'needs_review') return 'Revisar';
+  if (value === 'pending') return 'Pendiente';
+  return status || 'Sin estado';
+};
+
+const compactDate = (value?: string | null) => {
+  if (!value) return 'Sin fecha';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
+};
+
+const money = (value: number) => new Intl.NumberFormat('es-CL', {
+  style: 'currency',
+  currency: 'CLP',
+  maximumFractionDigits: 0,
+}).format(Number(value || 0));
+
+function priorityScore(row: EquipmentRow) {
+  return Number(row.operational?.operationalBlockers || 0) * 100
+    + Number(row.operational?.overduePreventives || 0) * 20
+    + Number(row.operational?.openWorkOrders || 0) * 5;
 }
 
 export function MaintenanceControlTower() {
-  const { data, error, isLoading, mutate } = useSWR<ControlCenterResponse>('/api/maintenance/control-center', fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<TowerData>('maintenance-control-tower-v2', fetchTower, {
     refreshInterval: 60_000,
     revalidateOnFocus: false,
   });
@@ -80,48 +213,54 @@ export function MaintenanceControlTower() {
   }, []);
 
   const current = VIEWS[viewIndex];
-  const actions = useMemo(() => (data?.actions || []).filter((action) => actionMatches(current.key, action)), [data?.actions, current.key]);
-  const summary = data?.summary;
-
-  const metrics = {
-    attention: [
-      ['Bloqueos', summary?.operationallyBlocked ?? '—'],
-      ['Sin responsable', summary?.unassignedOpenWorkOrders ?? '—'],
-      ['Por aprobar', summary?.pendingApprovals ?? '—'],
-    ],
-    orders: [
-      ['OT abiertas', summary?.openWorkOrders ?? '—'],
-      ['Sin responsable', summary?.unassignedOpenWorkOrders ?? '—'],
-      ['Pasos pendientes', summary?.pendingPlanSteps ?? '—'],
-    ],
-    planning: [
-      ['Preventivos pendientes', summary?.unplannedOverdueHourSchedules ?? '—'],
-      ['OT abiertas', summary?.openWorkOrders ?? '—'],
-      ['Bloqueos', summary?.operationallyBlocked ?? '—'],
-    ],
-    closure: [
-      ['Listas para cerrar', summary?.readyToClose ?? '—'],
-      ['Por aprobar', summary?.pendingApprovals ?? '—'],
-      ['Pasos pendientes', summary?.pendingPlanSteps ?? '—'],
-    ],
-    meters: [
-      ['Lecturas por revisar', summary?.pendingMeterReviews ?? '—'],
-      ['Preventivos pendientes', summary?.unplannedOverdueHourSchedules ?? '—'],
-      ['OT abiertas', summary?.openWorkOrders ?? '—'],
-    ],
-    reliability: [
-      ['Repeticiones', summary?.recurringReliabilityAssets ?? '—'],
-      ['Bloqueos', summary?.operationallyBlocked ?? '—'],
-      ['OT abiertas', summary?.openWorkOrders ?? '—'],
-    ],
-  } as Record<string, Array<[string, string | number]>>;
+  const actions = useMemo(
+    () => (data?.control.actions || [])
+      .filter((action) => action.kind !== 'operational_review')
+      .slice(0, 4),
+    [data?.control.actions],
+  );
+  const equipment = useMemo(
+    () => [...(data?.equipment.equipment || [])].sort((a, b) => priorityScore(b) - priorityScore(a) || a.name.localeCompare(b.name, 'es')).slice(0, 10),
+    [data?.equipment.equipment],
+  );
+  const preventive = useMemo(
+    () => (data?.preventive.tasks || [])
+      .filter((row) => row.hour_status !== 'ok' || row.alert_due)
+      .sort((a, b) => Number(Boolean(b.alert_due)) - Number(Boolean(a.alert_due)) || Number(a.remaining_hours ?? 999999) - Number(b.remaining_hours ?? 999999))
+      .slice(0, 10),
+    [data?.preventive.tasks],
+  );
+  const workOrders = useMemo(
+    () => (data?.workOrders.workOrders || [])
+      .filter((row) => !['completed','closed','cancelled','canceled'].includes(String(row.status || '').toLowerCase()))
+      .sort((a, b) => String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999')))
+      .slice(0, 10),
+    [data?.workOrders.workOrders],
+  );
+  const runtimeAssetMap = useMemo(
+    () => new Map((data?.runtime.assets || []).map((row) => [row.id, row])),
+    [data?.runtime.assets],
+  );
+  const readings = useMemo(
+    () => (data?.runtime.readings || []).slice(0, 10),
+    [data?.runtime.readings],
+  );
+  const costs = useMemo(
+    () => (data?.costs.assetCosts || []).slice(0, 10),
+    [data?.costs.assetCosts],
+  );
+  const sources = useMemo(
+    () => (data?.sources.data || []).slice(0, 10),
+    [data?.sources.data],
+  );
+  const summary = data?.control.summary;
 
   return <div className="min-h-[calc(100vh-7rem)] bg-background p-4 lg:p-6">
     <header className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mantenimiento</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">Torre de control</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Sólo información · cambia cada 30 segundos</p>
+        <p className="mt-1 text-sm text-muted-foreground">Información para la oficina · actualización automática</p>
       </div>
       <div className="flex items-center gap-3">
         <Badge variant="outline">{viewIndex + 1} / {VIEWS.length}</Badge>
@@ -134,15 +273,28 @@ export function MaintenanceControlTower() {
     {error ? <div className="mt-8 rounded-lg border border-destructive/40 p-6 text-destructive">{error.message}</div> : null}
     {isLoading ? <div className="mt-8 grid gap-4 lg:grid-cols-3">{Array.from({length:6}).map((_,i)=><div key={i} className="h-36 animate-pulse rounded-lg bg-muted" />)}</div> : null}
 
-    {!isLoading && !error ? <>
-      <section className="mt-6 grid gap-3 sm:grid-cols-3">
-        {(metrics[current.key] || []).map(([label, value]) => <div key={label} className="rounded-lg border bg-card p-5">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-2 text-4xl font-semibold tabular-nums">{value}</p>
-        </div>)}
+    {!isLoading && !error && data ? <>
+      <section className="mt-5 rounded-xl border bg-card">
+        <div className="flex items-center justify-between border-b px-5 py-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Atención ahora</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Sólo lo que requiere decisión, revisión o destrabe</p>
+          </div>
+          <div className="flex gap-2 text-xs">
+            <Badge variant="outline">{summary?.operationallyBlocked ?? 0} bloqueos</Badge>
+            <Badge variant="outline">{summary?.pendingApprovals ?? 0} por aprobar</Badge>
+            <Badge variant="outline">{summary?.unassignedOpenWorkOrders ?? 0} sin responsable</Badge>
+          </div>
+        </div>
+        <div className="grid divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          {actions.length === 0 ? <div className="col-span-2 flex min-h-24 items-center gap-3 px-5 py-4"><CheckCircle2 className="h-5 w-5 text-muted-foreground" /><span className="font-medium">Sin acciones críticas pendientes.</span></div> : actions.map((action) => <div key={action.id} className="flex min-w-0 items-start gap-3 px-5 py-4">
+            <div className="mt-0.5 rounded-md border p-2">{action.kind === 'operational_blocker' ? <AlertTriangle className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}</div>
+            <div className="min-w-0"><p className="font-medium">{action.title}</p><p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{action.evidence}</p></div>
+          </div>)}
+        </div>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-5">
         <div className="mb-4 flex items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold">{current.title}</h2>
@@ -153,22 +305,93 @@ export function MaintenanceControlTower() {
           </div>
         </div>
 
-        {actions.length === 0 ? <div className="flex min-h-[46vh] items-center justify-center rounded-xl border bg-card">
-          <div className="text-center"><CheckCircle2 className="mx-auto h-10 w-10 text-muted-foreground" /><p className="mt-4 text-xl font-medium">Sin pendientes en esta vista</p><p className="mt-1 text-sm text-muted-foreground">No hay acciones que mostrar ahora.</p></div>
-        </div> : <div className="grid gap-3">
-          {actions.slice(0, 8).map((action, index) => <div key={action.id} className="grid gap-4 rounded-xl border bg-card p-5 lg:grid-cols-[52px_1fr_auto] lg:items-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-muted/30">
-              {action.kind === 'meter_review' ? <Gauge className="h-5 w-5" /> : action.kind === 'preventive_overdue' ? <Clock3 className="h-5 w-5" /> : action.kind === 'ready_to_close' ? <CheckCircle2 className="h-5 w-5" /> : action.kind === 'operational_blocker' ? <AlertTriangle className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">#{index + 1}</p>
-              <p className="mt-1 text-lg font-semibold">{action.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{action.description}</p>
-            </div>
-            <p className="max-w-md text-sm text-muted-foreground lg:text-right">{action.evidence}</p>
+        {current.key === 'fleet' ? <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <span>Equipo</span><span>Faena</span><span>Estado</span><span>Lectura</span><span>Próximo</span><span>OT</span>
+          </div>
+          {equipment.map((row) => <div key={row.id} className="grid grid-cols-[minmax(220px,1.6fr)_1fr_120px_130px_1.2fr_110px] gap-3 border-b px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.name}</p><p className="truncate text-xs text-muted-foreground">{row.code || 'Sin código'} · {row.criticality || 'Sin criticidad'}</p></div>
+            <span className="truncate">{row.specs?.location || 'Sin ubicación'}</span>
+            <span>{statusLabel(row.status)}</span>
+            <span className="tabular-nums">{row.operational?.latestMeterHours != null ? `${Number(row.operational.latestMeterHours).toLocaleString('es-CL')} h` : 'Sin lectura'}</span>
+            <div className="min-w-0"><p className="truncate">{row.operational?.nextPreventiveTask || (row.operational?.operationalBlockers ? 'Resolver bloqueo' : 'Sin preventivo próximo')}</p><p className="text-xs text-muted-foreground">{row.operational?.nextPreventiveRemainingHours != null ? `${Number(row.operational.nextPreventiveRemainingHours).toLocaleString('es-CL')} h de saldo` : row.specs?.updated_at ? `Actualizado ${compactDate(row.specs.updated_at)}` : 'Sin saldo disponible'}</p></div>
+            <span className="tabular-nums">{row.operational?.openWorkOrders || 0}{row.operational?.operationalBlockers ? ` · ${row.operational.operationalBlockers} bloqueo` : ''}</span>
           </div>)}
-        </div>}
+        </div> : null}
+
+        {current.key === 'planning' ? <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <span>Equipo</span><span>Trabajo</span><span>Saldo</span><span>Estado</span><span>Fuente</span>
+          </div>
+          {preventive.length === 0 ? <div className="p-8 text-center text-muted-foreground">Sin preventivos que requieran atención.</div> : preventive.map((row) => <div key={row.schedule_id} className="grid grid-cols-[minmax(220px,1.5fr)_1.4fr_120px_130px_1.2fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.asset_name || row.asset_code || 'Equipo'}</p><p className="text-xs text-muted-foreground">{row.asset_code || 'Sin código'}</p></div>
+            <span className="truncate">{row.task_name || 'Preventivo'}</span>
+            <span className="tabular-nums">{row.remaining_hours != null ? `${Number(row.remaining_hours).toLocaleString('es-CL')} h` : 'Sin saldo'}</span>
+            <span>{statusLabel(row.hour_status)}</span>
+            <div className="min-w-0"><p className="truncate">{row.meter_evidence_source || 'Sin fuente'}</p><p className="truncate text-xs text-muted-foreground">{row.source_reference || (row.generated_work_order_id ? 'OT ya creada' : 'Sin referencia')}</p></div>
+          </div>)}
+        </div> : null}
+
+        {current.key === 'orders' ? <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <span>OT</span><span>Trabajo</span><span>Equipo</span><span>Responsable</span><span>Fecha</span><span>Estado</span>
+          </div>
+          {workOrders.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay OT operacionales abiertas.</div> : workOrders.map((row) => <div key={row.id} className="grid grid-cols-[120px_minmax(240px,1.6fr)_1fr_1fr_120px_120px] gap-3 border-b px-4 py-3 text-sm last:border-b-0">
+            <span className="font-mono text-xs">{row.work_order_number || 'OT'}</span>
+            <div className="min-w-0"><p className="truncate font-medium">{row.title || 'Sin nombre'}</p><p className="text-xs text-muted-foreground">{row.work_type === 'general' ? 'Trabajo general' : row.priority ? `Prioridad ${row.priority}` : 'Sin prioridad'}</p></div>
+            <span className="truncate">{row.asset_name || (row.work_type === 'general' ? 'Trabajo general' : 'Sin equipo')}</span>
+            <span className="truncate">{row.assigned_to_name || 'Sin responsable'}</span>
+            <span>{row.scheduled_date ? row.scheduled_date.slice(0,10) : 'Sin fecha'}</span>
+            <span>{statusLabel(row.status)}</span>
+          </div>)}
+        </div> : null}
+
+        {current.key === 'meters' ? <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <span>Equipo</span><span>Lectura</span><span>Fecha</span><span>Canal</span><span>Referencia</span>
+          </div>
+          {readings.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay lecturas registradas.</div> : readings.map((row) => {
+            const asset = runtimeAssetMap.get(row.canonical_asset_id);
+            return <div key={row.id} className="grid grid-cols-[minmax(240px,1.5fr)_150px_160px_1fr_1.2fr] gap-3 border-b px-4 py-3 text-sm last:border-b-0">
+              <div className="min-w-0"><p className="truncate font-medium">{asset?.name || asset?.asset_code || 'Equipo'}</p><p className="text-xs text-muted-foreground">{asset?.asset_code || 'Sin código'}</p></div>
+              <span className="tabular-nums">{row.meter_hours != null ? `${Number(row.meter_hours).toLocaleString('es-CL')} h` : 'Sin lectura'}</span>
+              <span>{compactDate(row.recorded_at)}</span>
+              <span>{row.source_type === 'manual' ? 'Manual' : row.source_type === 'telemetry' ? 'Telemetría' : row.source_type === 'import' ? 'Importación' : row.source_type || 'Sin canal'}</span>
+              <span className="truncate">{row.source_reference || 'Sin referencia'}</span>
+            </div>;
+          })}
+        </div> : null}
+
+        {current.key === 'costs' ? <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Costo registrado</p><p className="mt-1 text-2xl font-semibold">{money(Number(data.costs.summary?.totalCost || 0))}</p></div>
+            <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Equipos con costo</p><p className="mt-1 text-2xl font-semibold">{data.costs.summary?.assets ?? 0}</p></div>
+            <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Fuente</p><p className="mt-1 text-base font-medium">Movimientos por equipo</p></div>
+          </div>
+          <div className="overflow-hidden rounded-xl border bg-card">
+            <div className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground"><span>Equipo</span><span>Costo</span><span>Registros</span><span>Último movimiento</span></div>
+            {costs.map((row) => <div key={row.id} className="grid grid-cols-[minmax(260px,1.6fr)_160px_120px_160px] gap-3 border-b px-4 py-3 text-sm last:border-b-0"><div><p className="font-medium">{row.assetName}</p><p className="text-xs text-muted-foreground">{row.assetCode || 'Sin código'}</p></div><span className="font-medium tabular-nums">{money(row.totalCost)}</span><span>{row.rows ?? '—'}</span><span>{row.lastDate ? row.lastDate.slice(0,10) : 'Sin fecha'}</span></div>)}
+          </div>
+        </div> : null}
+
+        {current.key === 'sources' ? <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b bg-muted/30 px-4 py-3 text-xs font-medium text-muted-foreground">
+            <span>Archivo</span><span>Hoja</span><span>Responsable</span><span>Recibido</span><span>Estado</span>
+          </div>
+          {sources.length === 0 ? <div className="p-8 text-center text-muted-foreground">No hay fuentes de planificación registradas.</div> : sources.map((row) => <div key={row.id} className="grid grid-cols-[minmax(280px,1.8fr)_1fr_1fr_160px_130px] gap-3 border-b px-4 py-3 text-sm last:border-b-0">
+            <div className="min-w-0"><p className="truncate font-medium">{row.source_file || 'Archivo'}</p><p className="text-xs text-muted-foreground">Se conserva como evidencia de origen</p></div>
+            <span className="truncate">{row.source_sheet || 'Sin hoja'}</span>
+            <span className="truncate">{row.source_owner || row.source_role || 'Sin responsable'}</span>
+            <span>{compactDate(row.imported_at)}</span>
+            <span>{row.status === 'accepted' || row.status === 'canonical' ? 'Aceptada' : row.status === 'review_required' ? 'Revisar' : statusLabel(row.status)}</span>
+          </div>)}
+        </div> : null}
       </section>
+
+      <footer className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
+        <span>Datos reales de MOTIL · Sondaje fuera del alcance de esta pantalla</span>
+        <span>Última actualización de pantalla: {new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit' }).format(new Date())}</span>
+      </footer>
     </> : null}
   </div>;
 }
