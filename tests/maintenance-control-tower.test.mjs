@@ -210,8 +210,8 @@ test('preventive status uses explicit source labels without cross-unit proximity
   assert.match(api, /revisar fecha/i);
   assert.match(api, /pr\[oó\]xim/i);
   assert.doesNotMatch(api, /remainingMeter > 0 && row\.remainingMeter <= 100/);
-  assert.match(page, /Revisar fecha/);
-  assert.match(page, /Estado MP/);
+  assert.match(page, /Fecha por revisar/);
+  assert.match(page, /Estado preventivo/);
 });
 
 
