@@ -93,8 +93,8 @@ test('critical suggestion never silently pauses work; changing active OT require
   assert.doesNotMatch(home, /\/timer/);
 });
 
-test('calendar opens on the current work week, not the previous ten days', () => {
+test('calendar opens one week back and one week ahead around today', () => {
   const calendar = read('components/operational-calendar/comfortable-operational-calendar.tsx');
-  assert.match(calendar, /startOfChileanWorkWeek\(today\)/);
-  assert.doesNotMatch(calendar, /anchorDate \|\| addDays\(today, -10\)/);
+  assert.match(calendar, /anchorDate \|\| addDays\(today, -7\)/);
+  assert.match(calendar, /days: 15/);
 });
