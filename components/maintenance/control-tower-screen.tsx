@@ -543,7 +543,7 @@ function AssigneeLoadChart({ rows }: { rows: any[] }) {
           <div key={row.assignee}>
             <div className="mb-1.5 flex items-end justify-between gap-4">
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold">{row.assignee}</p>
+                <p className="whitespace-normal break-words text-base font-semibold">{row.assignee}</p>
                 <p className="mt-0.5 text-sm text-[var(--tower-ink-muted)]">
                   {overdue} vencidas · {row.dueToday || 0} hoy · {row.dueTomorrow || 0} mañana · {highCritical} alta/crítica
                 </p>
