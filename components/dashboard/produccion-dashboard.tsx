@@ -8,6 +8,7 @@ import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription
 import { StatePanel } from '@/components/ui/state-panel';
 import { useModuleAccess } from '@/hooks/use-module-access';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
+import { ProductionSourceSnapshot } from '@/components/production/production-source-snapshot';
 
 type Overview = {
   counts: { materialMovements:number; plantShifts:number; metallurgyResults:number; concentrateShipments:number; drillingReports:number; drillingHoles:number };
@@ -68,6 +69,7 @@ export function ProduccionDashboard(){
     </PageHeader>
 
     <WhatsappOperationalUpdates mode="overview"/>
+    <ProductionSourceSnapshot/>
     <div className="flex justify-end"><Link className="text-xs text-muted-foreground underline underline-offset-2" href="/dashboard/produccion/despachos">Ver coordinación informada de despachos</Link></div>
 
     <section className="rounded-lg border bg-card">
