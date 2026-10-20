@@ -89,3 +89,33 @@ test('wallboard never truncates operational names or table values', () => {
   assert.match(source, /break-words/);
   assert.match(source, /columnTemplate="1\.45fr \.8fr 1\.1fr 1\.5fr \.7fr 1\.25fr"/);
 });
+
+
+test('wallboard translates internal maintenance priority codes into human language', () => {
+  assert.match(source, /P1'\) return 'Crítica'/);
+  assert.match(source, /P2'\) return 'Alta'/);
+  assert.match(source, /P3'\) return 'Media'/);
+  assert.match(source, /P4'\) return 'Baja'/);
+  assert.match(source, /P5'\) return 'Programable'/);
+  assert.match(source, /Urgencia y seguimiento/);
+  assert.doesNotMatch(source, /label: priority/);
+});
+
+test('wallboard avoids technical abbreviations in visible maintenance labels', () => {
+  assert.match(source, /Preventivas vencidas/);
+  assert.match(source, /Próxima mantención/);
+  assert.match(source, /Estado preventivo/);
+  assert.match(source, /Horas planificadas cerradas/);
+  assert.match(source, /Horas reales cerradas/);
+  assert.match(source, /Productos de Bodega vinculados/);
+  assert.doesNotMatch(source, /label="MP vencidas"/);
+  assert.doesNotMatch(source, /label="HH /);
+  assert.doesNotMatch(source, /label="SKUs /);
+});
+
+test('wallboard charts use MOTIL corporate accents instead of generic chart colors', () => {
+  assert.match(source, /bg-\[var\(--tower-copper\)\]/);
+  assert.match(source, /bg-\[var\(--tower-green\)\]/);
+  assert.doesNotMatch(source, /bg-primary\/75/);
+  assert.doesNotMatch(source, /bg-emerald-500\/70/);
+});
