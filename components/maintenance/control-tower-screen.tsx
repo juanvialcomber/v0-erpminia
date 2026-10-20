@@ -166,14 +166,14 @@ export default function MaintenanceControlTowerPage() {
     <div className="motil-control-tower fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-[var(--tower-canvas)] p-5 text-[var(--tower-ink)] 2xl:p-6">
       <header className="grid shrink-0 gap-4 border-b border-[var(--tower-border)] pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--tower-ink-muted)]">
+          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
             <Monitor className="h-4 w-4" />
             Compañía Minera La Patagua · Mantenimiento
-            <span className="rounded-full bg-[var(--tower-copper-soft)] px-3 py-1 text-xs font-semibold normal-case tracking-normal text-[var(--tower-copper)]">Solo lectura</span>
+            <span className="rounded-full bg-[var(--tower-copper-soft)] px-3 py-1 text-sm font-semibold normal-case tracking-normal text-[var(--tower-copper)]">Solo lectura</span>
           </div>
           <div className="mt-1 flex items-center gap-3">
             <SlideIcon className="h-7 w-7 text-[var(--tower-copper)]" />
-            <h1 className="text-4xl font-semibold tracking-tight 2xl:text-5xl">{slide.label}</h1>
+            <h1 className="font-heading text-4xl font-semibold tracking-[-0.025em] 2xl:text-5xl">{slide.label}</h1>
             <span className="rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] px-3 py-1 text-sm font-medium text-[var(--tower-ink-muted)]">Vista {slideIndex + 1} de {slides.length}</span>
           </div>
           <p className="mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
@@ -570,7 +570,7 @@ function WorkMixChart({ preventive, corrective }: { preventive: number; correcti
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-[var(--tower-ink-muted)]">Tipo de trabajo terminado</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums">{total} órdenes cerradas clasificadas</p>
+          <p className="mt-1 font-heading text-2xl font-semibold tracking-[-0.015em] tabular-nums">{total} órdenes cerradas clasificadas</p>
         </div>
       </div>
       <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-[var(--tower-border)]">
@@ -587,7 +587,7 @@ function WorkMixChart({ preventive, corrective }: { preventive: number; correcti
 
 function BasisRow({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="flex items-center justify-between rounded-md border bg-muted/10 px-3 py-2 text-xs">
+    <div className="flex items-center justify-between rounded-md border bg-muted/10 px-3 py-2 text-sm">
       <span className="font-medium">{label}</span>
       <span className="text-lg font-semibold tabular-nums">{number(value, 0)}</span>
     </div>
@@ -597,14 +597,14 @@ function BasisRow({ label, value }: { label: string; value: unknown }) {
 function SourceHealth({ label, inputAt, publishedAt, pending }: { label: string; inputAt: unknown; publishedAt: unknown; pending: unknown }) {
   const pendingCount = Number(pending || 0);
   return (
-    <div className="grid gap-1 rounded-md border bg-muted/10 px-3 py-2 text-xs">
+    <div className="grid gap-1 rounded-md border bg-muted/10 px-3 py-2 text-sm">
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold">{label}</span>
         <Badge variant={pendingCount > 0 ? 'secondary' : 'outline'}>
           {pendingCount > 0 ? `${pendingCount} por revisar` : 'al día'}
         </Badge>
       </div>
-      <div className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-3 text-sm text-muted-foreground">
         <span>Entrada: {dateTime(inputAt)}</span>
         <span>Vinculado: {dateTime(publishedAt)}</span>
       </div>
@@ -649,7 +649,7 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
   return (
     <section className="min-h-0 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]">
       <div className="border-b border-[var(--tower-border)] bg-[var(--tower-surface-muted)] px-5 py-3.5">
-        <p className="text-xl font-semibold 2xl:text-2xl">{title}</p>
+        <p className="font-heading text-xl font-semibold tracking-[-0.015em] 2xl:text-2xl">{title}</p>
         {subtitle ? <p className="mt-1 text-base text-[var(--tower-ink-muted)]">{subtitle}</p> : null}
       </div>
       <div className="p-5">{children}</div>
@@ -692,7 +692,7 @@ function Insight({ tone, title, value, text }: { tone: 'critical' | 'warning' | 
         <p className="text-sm font-semibold">{title}</p>
         <p className="text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">{text}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
     </div>
   );
 }
@@ -700,9 +700,9 @@ function Insight({ tone, title, value, text }: { tone: 'critical' | 'warning' | 
 function ManagementMetric({ label, value, detail }: { label: string; value: React.ReactNode; detail: string }) {
   return (
     <div className="rounded-md border bg-muted/10 p-4">
-      <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</p>
       <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+      <p className="mt-1 text-sm leading-snug text-muted-foreground">{detail}</p>
     </div>
   );
 }
@@ -711,8 +711,8 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   return (
     <div className="flex min-h-40 items-center justify-center rounded-md border border-dashed p-8 text-center">
       <div>
-        <p className="text-sm font-semibold">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{text}</p>
+        <p className="text-base font-semibold">{title}</p>
+        <p className="mt-1 text-sm leading-snug text-muted-foreground">{text}</p>
       </div>
     </div>
   );
@@ -731,7 +731,7 @@ function DataTable({
   return (
     <div className="overflow-hidden rounded-md border border-[var(--tower-border)]">
       <div
-        className="grid bg-[var(--tower-surface-muted)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--tower-ink-muted)]"
+        className="grid bg-[var(--tower-surface-muted)] text-sm font-semibold uppercase tracking-[0.04em] text-[var(--tower-ink-muted)]"
         style={{ gridTemplateColumns: template }}
       >
         {headers.map((header) => (
@@ -812,7 +812,7 @@ function WorkOrderProgress({ completed, open }: { completed: number; open: numbe
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-sm font-semibold text-[var(--tower-ink-muted)]">Estado de órdenes registradas</p>
-          <p className="mt-1 text-3xl font-semibold tabular-nums">{completed} de {total} cerradas</p>
+          <p className="mt-1 font-heading text-3xl font-semibold tracking-[-0.02em] tabular-nums">{completed} de {total} cerradas</p>
         </div>
         <p className="text-2xl font-semibold tabular-nums text-[var(--tower-green)]">{number(completedPct, 0)}%</p>
       </div>
@@ -876,7 +876,7 @@ function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
     <div className="space-y-3">
       {rows.map((row) => (
         <div key={row.label}>
-          <div className="mb-1 flex items-center justify-between text-xs">
+          <div className="mb-1 flex items-center justify-between text-sm">
             <span className="font-medium">{row.label}</span>
             <span className="tabular-nums text-muted-foreground">{row.value}</span>
           </div>
@@ -899,7 +899,7 @@ function DonutLike({ primary, secondary, primaryLabel, secondaryLabel }: { prima
         style={{ background: `conic-gradient(hsl(var(--primary)) 0 ${primaryPct}%, hsl(var(--muted)) ${primaryPct}% 100%)` }}
       >
         <div className="grid h-28 w-28 place-items-center rounded-full bg-background text-center">
-          <div><p className="text-3xl font-semibold">{primary + secondary}</p><p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground">OT</p></div>
+          <div><p className="text-3xl font-semibold tabular-nums">{primary + secondary}</p><p className="text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">Órdenes</p></div>
         </div>
       </div>
       <div className="space-y-3 text-sm">
