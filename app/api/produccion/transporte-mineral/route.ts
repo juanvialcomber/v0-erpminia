@@ -34,16 +34,49 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const latest = await context.supabase
-    .from('production_material_movements')
-    .select('movement_date')
-    .eq('organization_id', context.organizationId)
-    .order('movement_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [latest, stockDoc] = await Promise.all([
+    context.supabase
+      .from('production_material_movements')
+      .select('movement_date')
+      .eq('organization_id', context.organizationId)
+      .order('movement_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    context.supabase
+      .from('production_source_documents')
+      .select('source_file,source_file_sha256,period_end')
+      .eq('organization_id', context.organizationId)
+      .eq('canonical_role','canonical')
+      .ilike('source_file','Nueva stock %.xlsx')
+      .order('period_end',{ascending:false})
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
-  if (latest.error) return NextResponse.json({ error: latest.error.message }, { status: 500 });
-  if (!latest.data?.movement_date) return NextResponse.json({ period: null, rows: [], daily: [], routes: [], carriers: [], vehicles: [] });
+  if (latest.error || stockDoc.error) return NextResponse.json({ error: latest.error?.message || stockDoc.error?.message }, { status: 500 });
+
+  const sourceReportedResult = stockDoc.data
+    ? await context.supabase
+        .from('production_source_normalized_records')
+        .select('normalized_values')
+        .eq('organization_id',context.organizationId)
+        .eq('source_file',stockDoc.data.source_file)
+        .eq('source_file_sha256',stockDoc.data.source_file_sha256)
+        .eq('record_type','stock_week_transport_total')
+        .eq('semantic_status','source_reported')
+        .maybeSingle()
+    : { data:null, error:null };
+  if (sourceReportedResult.error) return NextResponse.json({ error: sourceReportedResult.error.message }, { status:500 });
+  const reportedValues=(sourceReportedResult.data?.normalized_values||{}) as Record<string,unknown>;
+  const reportedValue=typeof reportedValues.value==='number'&&Number.isFinite(reportedValues.value)?reportedValues.value:null;
+  const reported={
+    source:stockDoc.data?.source_file||null,
+    cutoff:stockDoc.data?.period_end||null,
+    tons:reportedValue,
+    daily:(reportedValues.daily_actual_through_cutoff||{}) as Record<string,number>,
+  };
+
+  if (!latest.data?.movement_date) return NextResponse.json({ period: null, reported, rows: [], daily: [], routes: [], carriers: [], vehicles: [] });
 
   const through = latest.data.movement_date;
   const date = new Date(`${through}T12:00:00Z`);
@@ -93,6 +126,7 @@ export async function GET(request: NextRequest) {
   const normalizedRows = rows.filter((row) => row.normalization_status === 'normalized' || Number(row.normalized_metric_tons || 0) > 0).length;
 
   return NextResponse.json({
+    reported,
     period: {
       start: periodStart,
       through,
