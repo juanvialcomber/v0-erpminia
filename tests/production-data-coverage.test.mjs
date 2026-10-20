@@ -41,12 +41,12 @@ test('production overview preserves the dashboard contract for data and no-data 
 test('production dashboard distinguishes operational, partial and missing-source areas without making coverage the landing focus', async () => {
   const dashboard = await readFile(dashboardUrl, 'utf8');
 
-  assert.match(dashboard, /label:'Operativo'/);
-  assert.match(dashboard, /label:'Parcial'/);
-  assert.match(dashboard, /label:'Sin fuente'/);
-  assert.match(dashboard, /Estado de fuentes/);
-  assert.match(dashboard, /Detalle secundario de cobertura/);
-  assert.match(dashboard, /sin fuente nunca se representa como cero/i);
+  assert.match(dashboard, /label:'Completo'/);
+  assert.match(dashboard, /label:'Incompleto'/);
+  assert.match(dashboard, /label:'Sin datos'/);
+  assert.match(dashboard, /Datos disponibles/);
+  assert.match(dashboard, /Muestra qué datos existen/);
+  assert.match(dashboard, /Si falta una fuente, no mostramos cero/i);
   assert.doesNotMatch(dashboard, /Cobertura real por área/);
   assert.doesNotMatch(dashboard, /Siguiente capa para evidencia analítica/);
 });
