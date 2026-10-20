@@ -133,9 +133,9 @@ test('tenant-scoped read-only API and UI never mutate operational modules',()=>{
   assert.match(api,/p_limit:251/);
   assert.doesNotMatch(api,/\.update\(|\.insert\(|\.upsert\(|\.delete\(/);
   assert.doesNotMatch(api,/maintenance_work_orders|production_metallurgy_results|production_plant_shifts/);
-  assert.match(ui,/Todos los mensajes/);
-  assert.match(ui,/Textos sin hallazgo/);
-  assert.match(ui,/No hay mensajes que coincidan con los filtros/);
+  assert.match(ui,/>Todos<\/option>/);
+  assert.match(ui,/Sin actividad extraída/);
+  assert.match(ui,/Sin coincidencias\./);
   assert.match(ui,/clasificación provisional/i);
   assert.match(admin,/WhatsappTriageInbox/);
 });
