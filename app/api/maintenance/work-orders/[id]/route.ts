@@ -298,6 +298,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
     if (error) throw error;
+    const changedFields = ['title','description','work_type','priority','scheduled_date','status']
+      .filter((key) => updateData[key] !== undefined);
+    if (changedFields.length > 0) {
+      const { error: eventError } = await context.supabase.from('work_order_events').insert({
+        organization_id: context.organizationId,
+        work_order_id: id,
+        canonical_asset_id: data.canonical_asset_id || null,
+        event_type: body.status === 'cancelled' ? 'work_order_cancelled' : 'work_order_updated',
+        event_at: new Date().toISOString(),
+        actor_id: context.authUserId,
+        source_table: 'maintenance_work_orders',
+        source_record_id: id,
+        summary: body.status === 'cancelled' ? 'Orden anulada por usuario autorizado' : 'Orden actualizada por usuario autorizado',
+        payload: { changed_fields: changedFields },
+      });
+      if (eventError) throw eventError;
+    }
     const [asset, costSummary] = await Promise.all([loadCanonicalAsset(context, data.canonical_asset_id || null), loadCostSummary(context, id)]);
     return NextResponse.json({ data: mapWorkOrder(data, asset, costSummary) });
   } catch (error) {
