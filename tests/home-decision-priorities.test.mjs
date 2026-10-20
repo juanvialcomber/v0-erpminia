@@ -18,7 +18,7 @@ test('Inicio surfaces prioritized Decision Cases without creating another module
 
 test('home priorities remain advisory and route back to authorized operational context', () => {
   assert.match(priorities, /Advisory/);
-  assert.match(dict, /No ejecutan cambios por sí solos/);
+  assert.match(dict, /MOTIL no cambia nada por sí solo/);
   assert.match(priorities, /maintenance: '\/dashboard\/mantenimiento'/);
   assert.match(priorities, /geology: '\/dashboard\/produccion\/geologia'/);
   assert.match(priorities, /hse: '\/dashboard\/sostenibilidad'/);
