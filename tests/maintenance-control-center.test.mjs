@@ -116,3 +116,15 @@ test('control tower follows Ariel six-screen structure without illustrative valu
   assert.match(tower,/Los equipos sin estado explícito no se presentan como detenidos/);
   assert.match(tower,/No se inventan vencimientos cuando la fuente no entrega una pauta activa/);
 });
+
+
+test('control tower uses MOTIL brandbook colors only',()=>{
+  const tower = fs.readFileSync('components/maintenance/maintenance-control-tower.tsx','utf8');
+  assert.doesNotMatch(tower,/(?:bg|text|border)-(?:blue|purple|violet|pink|sky|cyan|emerald|amber|orange|red|slate|gray|zinc|stone|neutral)-/);
+  assert.doesNotMatch(tower,/bg-\[/);
+  assert.match(tower,/bg-background/);
+  assert.match(tower,/bg-card/);
+  assert.match(tower,/text-primary/);
+  assert.match(tower,/text-secondary/);
+  assert.match(tower,/text-destructive/);
+});
