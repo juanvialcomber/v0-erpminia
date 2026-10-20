@@ -68,3 +68,12 @@ test('in-progress work orders allow text corrections but block structural replan
   assert.match(detail, /La OT está en curso\. Puedes corregir el nombre o la descripción/);
   assert.match(detail, /workOrder\.status === 'in_progress' \? \{/);
 });
+
+
+test('planner work-order detail exposes a one-click edit action', async () => {
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+  assert.match(detail, /<Pencil className="mr-2 h-4 w-4" \/>Editar/);
+  assert.match(detail, /id="edit-work-order"/);
+  assert.match(detail, /setEditOpen\(true\)/);
+  assert.match(detail, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+});
