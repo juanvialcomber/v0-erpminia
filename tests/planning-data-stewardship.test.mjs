@@ -38,7 +38,7 @@ test('workspace shows only unresolved decisions without redundant user labeling'
   assert.match(page, /Buscar otro activo/);
   assert.doesNotMatch(page, /Pregunta para Ariel/);
   assert.doesNotMatch(page, /Necesitan a Ariel/);
-  assert.match(dict, /assistantData: 'Data de Ariel'/);
+  assert.match(dict, /assistantData: 'Datos de Ariel'/);
 });
 
 test('missing asset classifications stay separate from canonical asset mutation', () => {
