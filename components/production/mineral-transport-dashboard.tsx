@@ -8,6 +8,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 
 type TransportData = {
+  reported?: { source:string|null; cutoff:string|null; tons:number|null; daily:Record<string,number> };
   period: null | { start:string; through:string; movements:number; tons:number; avgTonsPerMovement:number; mines:number; sectors:number; carriers:number; vehicles:number; normalizedCoveragePct:number; validatedCoveragePct:number };
   daily: Array<{ date:string; rows:number; tons:number }>;
   routes: Array<{ mine:string; sector:string; rows:number; tons:number }>;
@@ -31,10 +32,13 @@ function pct(value:number){ return `${value.toLocaleString('es-CL',{maximumFract
 export function MineralTransportDashboard(){
   const { data,error,isLoading,mutate } = useSWR('/api/produccion/transporte-mineral',fetcher);
   const p = data?.period;
+  const reported=data?.reported;
+  const currentCutoff=reported?.cutoff||p?.through||null;
+  const currentTons=reported?.tons??p?.tons??null;
   const maxDaily = Math.max(...(data?.daily.map((d)=>d.tons) || [0]),1);
 
   return <div className="space-y-6">
-    <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Transporte</PageHeaderEyebrow><PageHeaderTitle>Transporte de Mineral</PageHeaderTitle><PageHeaderDescription>{p ? `Movimiento mina → planta con datos hasta ${date(p.through)}.` : 'Trazabilidad operacional de movimientos mina → planta.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
+    <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Transporte</PageHeaderEyebrow><PageHeaderTitle>Transporte de Mineral</PageHeaderTitle><PageHeaderDescription>{currentCutoff ? `Transporte canónico informado hasta ${date(currentCutoff)}.` : 'Trazabilidad operacional de movimientos mina → planta.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
 
     <WhatsappOperationalUpdates mode="dispatch"/>
 
@@ -43,9 +47,9 @@ export function MineralTransportDashboard(){
 
     <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3" aria-label="Resumen de transporte">
       {[
-        {label:'Transportado',value:p?tons(p.tons):'—',detail:p?`${p.movements} movimientos`:'',icon:Scale},
-        {label:'Movimientos',value:p?p.movements.toLocaleString('es-CL'):'—',detail:p?`${p.vehicles} vehículos`:'',icon:Truck},
-        {label:'Último corte',value:p?date(p.through):'—',detail:p?`Desde ${date(p.start)}`:'',icon:CalendarDays},
+        {label:'Transportado informado',value:currentTons==null?'—':tons(currentTons),detail:reported?.source?'Fuente semanal canónica':'Detalle de movimientos',icon:Scale},
+        {label:'Detalle de viajes',value:p?p.movements.toLocaleString('es-CL'):'—',detail:p?`Disponible hasta ${date(p.through)}`:'Sin detalle individual',icon:Truck},
+        {label:'Último corte',value:currentCutoff?date(currentCutoff):'—',detail:reported?.cutoff?'Fuente canónica más reciente':p?`Desde ${date(p.start)}`:'',icon:CalendarDays},
       ].map((metric)=>{ const Icon=metric.icon; return <div key={metric.label} className="bg-card px-5 py-4"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{metric.label}</p><Icon className="h-4 w-4 text-muted-foreground"/></div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading?'—':metric.value}</p><p className="mt-1 text-xs text-muted-foreground">{metric.detail}</p></div>; })}
     </section>
 
