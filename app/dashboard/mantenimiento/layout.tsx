@@ -27,16 +27,17 @@ const supportItems: NavItem[] = [
   { href: '/dashboard/mantenimiento/personal', label: 'Personal' },
   { href: '/dashboard/mantenimiento/indicadores', label: 'Indicadores' },
   { href: '/dashboard/mantenimiento/fuentes', label: 'Fuentes' },
+  { href: '/dashboard/mantenimiento/whatsapp-ia', label: 'WhatsApp IA' },
 ];
 
 const roleNavigation: Record<ViewerMode, { flow: string[]; support: string[] }> = {
   leadership: {
     flow: ['Planificar', 'Órdenes', 'Cierre'],
-    support: ['Resumen', 'Torre', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes'],
+    support: ['Resumen', 'Torre', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes', 'WhatsApp IA'],
   },
   planning: {
     flow: ['Planificar', 'Órdenes'],
-    support: ['Resumen', 'Torre', 'Activos', 'Fuentes'],
+    support: ['Resumen', 'Torre', 'Activos', 'Fuentes', 'WhatsApp IA'],
   },
   execution: {
     flow: ['Órdenes', 'Cierre'],
@@ -44,7 +45,7 @@ const roleNavigation: Record<ViewerMode, { flow: string[]; support: string[] }> 
   },
   general: {
     flow: ['Planificar', 'Órdenes', 'Cierre'],
-    support: ['Resumen', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes'],
+    support: ['Resumen', 'Imputación', 'Activos', 'Maestranza', 'Personal', 'Indicadores', 'Fuentes', 'WhatsApp IA'],
   },
 };
 
