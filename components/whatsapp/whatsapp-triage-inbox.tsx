@@ -49,8 +49,8 @@ const stageLabel:Record<string,string>={
   media_pending:'Sin texto utilizable',
 };
 const reviewLabel:Record<string,string>={
-  pending:'Por corroborar',confirmed:'Contenido corroborado',
-  needs_more_info:'Falta evidencia',dismissed:'Descartado',
+  pending:'Por revisar',auto_published:'Por revisar',confirmed:'Aprobado',
+  needs_more_info:'Falta evidencia',dismissed:'Rechazado',
 };
 const priority:Record<string,number>={not_extracted:0,referenced:1,media_pending:2};
 const formatWhen=(value?:string)=>{
