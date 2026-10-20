@@ -49,6 +49,5 @@ test('each wallboard view states one dominant operational question', () => {
     '¿Qué trabajo está atrasado o debe ejecutarse ahora?',
     '¿Dónde está concentrada la atención de la flota?',
     '¿Cómo está respondiendo el área de mantenimiento?',
-  ]) assert.match(source, new RegExp(question.replace(/[.*+?^${}()|[\\]\\]/g, '\\  assert.match(source, /Próxima vista en \{secondsToNext\} s/);
-});')));
+  ]) assert.equal(source.includes(question), true);
 });
