@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { WorkOrderExecutionPanel } from '@/components/maintenance/work-order-execution-panel';
 import { WorkOrderExecutionReadiness } from '@/components/maintenance/work-order-execution-readiness';
 import { WorkOrderMaterialCoverage } from '@/components/maintenance/work-order-material-coverage';
@@ -51,6 +53,7 @@ function statusLabel(status: string | null | undefined, t: WorkOrderDetailT) {
   if (status === 'in_progress') return t.status.inProgress;
   if (status === 'open') return t.status.open;
   if (status === 'planned') return t.status.planned;
+  if (status === 'cancelled' || status === 'canceled') return 'Anulada';
   return status || t.status.none;
 }
 
@@ -68,6 +71,7 @@ function typeLabel(type: string | null | undefined, t: WorkOrderDetailT) {
     predictive: t.workType.predictive,
     predictivo: t.workType.predictive,
     inspection: t.workType.inspection,
+    general: 'Trabajo general',
   };
   return labels[type || ''] || type || t.workType.none;
 }
@@ -108,6 +112,26 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
     return <Card className="shadow-none"><CardContent className="p-10 text-center"><p className="font-medium">{error ? t.loadFailed : t.notAvailable}</p><Button asChild variant="outline" className="mt-4"><Link href="/dashboard/mantenimiento/ordenes-trabajo">{t.backToOrders}</Link></Button></CardContent></Card>;
   }
 
+  if ((workOrder.status === 'cancelled' || workOrder.status === 'canceled') && !isHistorical) {
+    return (
+      <div className="mx-auto max-w-5xl space-y-5 py-4">
+        <header className="border-b pb-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm text-muted-foreground">{formatWorkOrderNumber(workOrder.work_order_number, locale)}</span>
+            <Badge variant="outline">Anulada</Badge>
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{workOrder.title || t.untitled}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || (workOrder.work_type === 'general' ? 'Trabajo general del taller' : t.noAsset)}</p>
+        </header>
+        <p className="text-sm text-muted-foreground">Esta OT se conserva en el historial y ya no puede ejecutarse.</p>
+        <details className="rounded-lg border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Historial de la OT</summary>
+          <div className="border-t p-4"><EntityTimeline entity="work_order" id={id} limit={50} /></div>
+        </details>
+      </div>
+    );
+  }
+
   if (workOrder.status === 'completed' && !isHistorical) {
     return (
       <div className="mx-auto max-w-5xl space-y-5 py-4">
@@ -118,7 +142,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
               <Badge variant="outline">Completada</Badge>
             </div>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{workOrder.title || t.untitled}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || t.noAsset}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || (workOrder.work_type === 'general' ? 'Trabajo general del taller' : t.noAsset)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {(workOrder.canonical_asset_id || workOrder.asset_id) ? <Button asChild variant="outline"><Link href={`/dashboard/mantenimiento/equipos/${workOrder.canonical_asset_id || workOrder.asset_id}`}>Ficha 360</Link></Button> : null}
@@ -196,7 +220,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
               <p className="text-3xl font-semibold tracking-tight tabular-nums">{durationLabel(workOrder.actual_duration_hours)}</p>
             </div>
           ) : null}
-        <Button asChild variant="outline"><Link href={`/dashboard/mantenimiento/equipos/${workOrder.canonical_asset_id || workOrder.asset_id}`}>Ficha 360</Link></Button>
+        {(workOrder.canonical_asset_id || workOrder.asset_id) ? <Button asChild variant="outline"><Link href={`/dashboard/mantenimiento/equipos/${workOrder.canonical_asset_id || workOrder.asset_id}`}>Ficha 360</Link></Button> : null}
         </div>
       </section>
 
@@ -228,6 +252,36 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       </Card>
 
       ) : null}
+      {canEdit ? <details className="rounded-lg border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Editar OT</summary>
+        <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          void patchOrder({
+            title: String(form.get('title') || ''),
+            description: String(form.get('description') || ''),
+            work_type: String(form.get('work_type') || ''),
+            priority: String(form.get('priority') || ''),
+            scheduled_date: String(form.get('scheduled_date') || '') || null,
+          });
+        }}>
+          <div className="space-y-2"><Label htmlFor="edit-title">Trabajo</Label><Input id="edit-title" name="title" defaultValue={workOrder.title || ''} required /></div>
+          <div className="space-y-2"><Label htmlFor="edit-description">Descripción</Label><Textarea id="edit-description" name="description" defaultValue={workOrder.description || ''} rows={3} /></div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2"><Label htmlFor="edit-work-type">Tipo</Label><select id="edit-work-type" name="work_type" defaultValue={workOrder.work_type || 'corrective'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="corrective">Correctivo</option><option value="preventive">Preventivo</option><option value="inspection">Inspección</option>{workOrder.work_type === 'general' ? <option value="general">Trabajo general</option> : null}</select></div>
+            <div className="space-y-2"><Label htmlFor="edit-priority">Prioridad</Label><select id="edit-priority" name="priority" defaultValue={workOrder.priority || 'medium'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></div>
+            <div className="space-y-2"><Label htmlFor="edit-date">Fecha</Label><Input id="edit-date" name="scheduled_date" type="date" defaultValue={workOrder.scheduled_date?.slice(0,10) || ''} /></div>
+          </div>
+          <div className="flex flex-wrap gap-2"><Button type="submit">Guardar cambios</Button></div>
+        </form>
+        <div className="border-t p-4">
+          <details>
+            <summary className="cursor-pointer text-sm text-muted-foreground">Anular OT</summary>
+            <div className="mt-3 flex items-center justify-between gap-4 rounded-md border p-3"><p className="text-sm text-muted-foreground">La OT quedará en el historial y no podrá ejecutarse.</p><Button type="button" variant="destructive" onClick={() => void patchOrder({ status: 'cancelled' })}>Confirmar anulación</Button></div>
+          </details>
+        </div>
+      </details> : null}
+
       <Card className="shadow-none">
         <CardHeader className="pb-3"><CardTitle className="text-base">Preparación</CardTitle></CardHeader>
         <CardContent className="grid gap-5 lg:grid-cols-2">
