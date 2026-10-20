@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { inferMachineFamilyFromText } from '@/lib/maintenance/cost-center-machines';
+import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 import type { DerivedCostCenterMachine } from '@/lib/maintenance/cost-center-machines';
 
 const fetcher = (url: string) => fetch(url, { credentials: 'include' }).then((res) => res.json());
@@ -590,7 +591,7 @@ export function MaintenanceMobilePanel() {
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                   <span>{order.asset_name || 'Sin equipo'}</span>
-                  {order.scheduled_date ? <span>{new Date(order.scheduled_date).toLocaleDateString('es-CL')}</span> : null}
+                  {order.scheduled_date ? <span>{formatWorkOrderDate(order.scheduled_date) || 'Sin fecha programada'}</span> : null}
                 </div>
               </div>
             ))

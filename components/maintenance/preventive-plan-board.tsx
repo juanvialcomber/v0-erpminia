@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatePanel } from '@/components/ui/state-panel';
 import { TechnicalGuidelineLibrary } from '@/components/maintenance/technical-guideline-library';
+import { daysUntilWorkOrderDate, formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 type Asset = { id: string; asset_code: string; asset_name: string; asset_type?: string | null; location?: string | null };
 type Schedule = { id: string; asset_id: string; canonical_asset_id?: string | null; task_name: string; description?: string | null; frequency_days?: number | null; frequency_hours?: number | null; next_scheduled_date?: string | null; estimated_duration_hours?: number | null; priority?: string | null; enabled: boolean; generated_work_order_id?: string | null; asset?: Asset | null };
@@ -23,7 +24,15 @@ type HourSignal = { schedule_id: string; canonical_asset_id: string; asset_code:
 type Response = { schedules: Schedule[]; assets: Asset[]; summary: { total: number; overdue: number; dueSoon: number; disabled: number; generated: number }; operationCandidates: OperationCandidate[]; hourSignals: HourSignal[]; intelligenceSummary: { operationCandidates: number; attentionCandidates: number; hourAlerts: number; hourEvidenceWarnings: number } };
 
 const fetcher = async (url: string): Promise<Response> => { const response = await apiFetch(url); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la planificación preventiva.'); return payload as Response; };
-function dueState(date?: string | null) { if (!date) return { label: 'Sin fecha', tone: 'secondary' as const }; const today = new Date(); today.setHours(0, 0, 0, 0); const due = new Date(`${date}T00:00:00`); const days = Math.ceil((due.getTime() - today.getTime()) / 86400000); if (days < 0) return { label: `Vencida hace ${Math.abs(days)} días`, tone: 'destructive' as const }; if (days === 0) return { label: 'Vence hoy', tone: 'destructive' as const }; if (days <= 30) return { label: `Vence en ${days} días`, tone: 'default' as const }; return { label: date, tone: 'secondary' as const }; }
+function dueState(date?: string | null) {
+  if (!date) return { label: 'Sin fecha', tone: 'secondary' as const };
+  const days = daysUntilWorkOrderDate(date);
+  if (days === null) return { label: 'Sin fecha válida', tone: 'secondary' as const };
+  if (days < 0) return { label: `Vencida hace ${Math.abs(days)} ${days === -1 ? 'día' : 'días'}`, tone: 'destructive' as const };
+  if (days === 0) return { label: 'Vence hoy', tone: 'destructive' as const };
+  if (days <= 30) return { label: `Vence en ${days} ${days === 1 ? 'día' : 'días'}`, tone: 'default' as const };
+  return { label: formatWorkOrderDate(date), tone: 'secondary' as const };
+}
 const numberOrDash = (value?: number | null) => value == null ? '—' : Number(value).toLocaleString('es-CL', { maximumFractionDigits: 1 });
 
 export function PreventivePlanBoard() {
