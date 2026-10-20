@@ -79,6 +79,6 @@ export function MineralTransportDashboard(){
       </div>
     </details>
 
-    {data?.lineage ? <div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><p className="text-muted-foreground">{data.lineage.note}</p></div> : null}
+    {data?.lineage ? <details className="rounded-lg border bg-card"><summary className="cursor-pointer px-4 py-3 text-sm font-medium">Fuente y trazabilidad</summary><p className="border-t px-4 py-3 text-xs text-muted-foreground">{data.lineage.note}</p></details> : null}
   </div>;
 }
