@@ -127,11 +127,11 @@ export default function MaintenanceControlTowerPage() {
   }, []);
 
   if (isLoading) {
-    return <StatePanel tone="loading" title="Cargando Torre de Control" className="min-h-[88vh]" />;
+    return <StatePanel tone="loading" title="Cargando Torre de Control" className="fixed inset-0 z-[100] min-h-screen bg-background" />;
   }
 
   if (error) {
-    return <StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="min-h-[88vh]" />;
+    return <StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="fixed inset-0 z-[100] min-h-screen bg-background" />;
   }
 
   const slide = slides[slideIndex];
