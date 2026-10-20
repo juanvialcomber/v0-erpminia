@@ -163,8 +163,8 @@ export default function MaintenanceControlTowerPage() {
   const SlideIcon = slide.icon;
 
   return createPortal(
-    <div className="motil-control-tower fixed inset-0 z-[9999] flex h-[100dvh] min-h-0 w-screen flex-col gap-3 overflow-hidden bg-[var(--tower-canvas)] p-5 text-[var(--tower-ink)] 2xl:p-6">
-      <header className="grid shrink-0 gap-4 border-b border-[var(--tower-border)] pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
+    <div className="motil-control-tower fixed inset-0 z-[9999] flex h-[100dvh] min-h-0 w-screen flex-col gap-2 overflow-hidden bg-[var(--tower-canvas)] p-3 text-[var(--tower-ink)] 2xl:p-4">
+      <header className="grid shrink-0 gap-3 border-b border-[var(--tower-border)] pb-2 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
             <Monitor className="h-4 w-4" />
@@ -202,7 +202,7 @@ export default function MaintenanceControlTowerPage() {
       <main
         key={slide.key}
         className={cn(
-          'min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]',
+          'min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]',
           !reduceMotion && 'animate-in fade-in duration-300',
         )}
       >
