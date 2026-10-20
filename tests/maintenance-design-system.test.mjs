@@ -19,7 +19,7 @@ test('maintenance workspaces simplify progressively down the role chain', () => 
 
 test('maintenance planning queue stays focused on decisions that make work executable', () => {
   assert.match(page, /planningKinds = new Set\(\[[^\]]*'plan_step'[^\]]*'ready_to_close'[^\]]*'closure_evidence'[^\]]*\]\)/s);
-  assert.match(dict, /Cola de planificación/);
+  assert.match(dict, /Pendientes para planificar/);
   assert.match(dict, /Por asignar/);
   assert.match(dict, /Asignar trabajo/);
   assert.match(dict, /Qué debo dejar listo hoy/);
@@ -30,8 +30,8 @@ test('maintenance planning queue stays focused on decisions that make work execu
 test('maintenance leadership queue prioritizes actions that unblock and finish work', () => {
   assert.match(page, /leadershipKinds = new Set\(\[[^\]]*'plan_step'[^\]]*'ready_to_close'[^\]]*'closure_evidence'[^\]]*\]\)/s);
   assert.match(page, /rawActions\.filter\(\(action\) => leadershipKinds\.has\(action\.kind\)\)/);
-  assert.match(dict, /Qué debo decidir o destrabar/);
-  assert.match(dict, /Decisiones de jefatura/);
+  assert.match(dict, /Qué debo decidir hoy/);
+  assert.match(dict, /Decisiones pendientes/);
   assert.match(page, /approval_needed/);
   assert.match(page, /supervisorInboxMode/);
   assert.match(dict, /Atender prioridad/);
@@ -39,9 +39,9 @@ test('maintenance leadership queue prioritizes actions that unblock and finish w
 
 test('maintenance transversal oversight is read-focused and does not inherit operational ownership', () => {
   assert.match(page, /oversightKinds = new Set\(\['operational_review', 'operational_blocker', 'reliability'\]\)/);
-  assert.match(dict, /Impacto operativo de mantenimiento/);
+  assert.match(dict, /Equipos y trabajos a seguir/);
   assert.match(dict, /Revisar impacto/);
-  assert.match(dict, /Esta vista no asigna, ejecuta ni cierra trabajo/);
+  assert.match(dict, /Sólo casos que pueden afectar otras áreas/);
   assert.match(page, /const showOwnedFlow = mode === 'planning' \|\| mode === 'leadership'/);
 });
 
