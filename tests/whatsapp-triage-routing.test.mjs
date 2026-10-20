@@ -126,7 +126,7 @@ test('tenant-scoped read-only API and UI never mutate operational modules',()=>{
   const api=read('app/api/admin/whatsapp/triage/route.ts');
   const ui=read('components/whatsapp/whatsapp-triage-inbox.tsx');
   const admin=read('app/dashboard/admin/whatsapp/page.tsx');
-  assert.match(api,/requireAdmin\(request\)/);
+  assert.match(api,/requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
   assert.match(api,/\.eq\('organization_id',auth\.organizationId\)/);
   assert.match(api,/motil_whatsapp_daily_evidence/);
   assert.match(api,/p_organization_id:auth\.organizationId/);
