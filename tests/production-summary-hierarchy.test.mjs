@@ -5,16 +5,16 @@ import test from 'node:test';
 const dashboardUrl = new URL('../components/dashboard/produccion-dashboard.tsx', import.meta.url);
 const routeUrl = new URL('../app/api/produccion/canonical-overview/route.ts', import.meta.url);
 
-test('production summary puts current operation before source coverage', async () => {
+test('production summary puts accredited metallurgy before source coverage', async () => {
   const dashboard = await readFile(dashboardUrl, 'utf8');
 
-  const currentIndex = dashboard.indexOf('aria-label="Operación actual"');
+  const currentIndex = dashboard.indexOf('aria-label="Serie metalúrgica acreditada"');
   const coverageIndex = dashboard.indexOf('<CoverageOverview data={data}/>');
-  assert.ok(currentIndex >= 0, 'current operation section must exist');
-  assert.ok(coverageIndex > currentIndex, 'source coverage must follow current operation');
+  assert.ok(currentIndex >= 0, 'accredited metallurgy section must exist');
+  assert.ok(coverageIndex > currentIndex, 'source coverage must follow accredited metallurgy');
 
-  assert.match(dashboard, /Ahora/);
-  assert.match(dashboard, /Ejecución del período/);
+  assert.match(dashboard, /Serie acreditada/);
+  assert.match(dashboard, /Metalurgia ·/);
   assert.match(dashboard, /Qué requiere atención/);
   assert.match(dashboard, /Estado de fuentes/);
   assert.match(dashboard, /Detalle secundario de cobertura/);
