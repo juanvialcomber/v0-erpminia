@@ -54,13 +54,14 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     '/api/produccion/whatsapp-activity?mode='+encodeURIComponent(mode),
     fetcher,{refreshInterval:60000,revalidateOnFocus:true,revalidateOnReconnect:true,
       revalidateIfStale:true,refreshWhenHidden:false,dedupingInterval:15000});
-  const updates=expanded?data?.updates||[]:(data?.updates||[]).slice(0,5);
-  const groupedUpdates=Array.from(updates.reduce((groups,item)=>{
+  const allUpdates=data?.updates||[];
+  const allGroupedUpdates=Array.from(allUpdates.reduce((groups,item)=>{
     const key=[item.sourceMessageId,item.groupName,item.reportedAt].join('|');
     const existing=groups.get(key);
     if(existing)existing.push(item);else groups.set(key,[item]);
     return groups;
-  },new Map<string,typeof updates>()).values());
+  },new Map<string,typeof allUpdates>()).values());
+  const groupedUpdates=expanded?allGroupedUpdates:allGroupedUpdates.slice(0,4);
   return <section aria-label={titles[mode]} className="space-y-3 rounded-lg border bg-card p-4 sm:p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
@@ -149,9 +150,9 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
         </article>;
       })}
     </div>:null}
-    {data&&(data.updates.length>5)?<Button variant="outline" size="sm"
+    {allGroupedUpdates.length>4?<Button variant="outline" size="sm"
       onClick={()=>setExpanded(v=>!v)}>
-      {expanded?'Mostrar menos': 'Ver '+data.updates.length+' novedades'}
+      {expanded?'Mostrar menos':'Ver '+allGroupedUpdates.length+' reportes'}
     </Button>:null}
     {data?.unassignedVideos?.length?<details className="rounded-md border px-3 py-2">
       <summary className="cursor-pointer text-sm font-medium">
