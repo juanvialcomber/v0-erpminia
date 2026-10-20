@@ -146,35 +146,36 @@ export default function MaintenanceControlTowerPage() {
   const SlideIcon = slide.icon;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-background p-5 text-foreground 2xl:p-6">
-      <header className="grid shrink-0 gap-4 border-b-2 border-border pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
+    <div className="motil-control-tower fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-[var(--tower-canvas)] p-5 text-[var(--tower-ink)] 2xl:p-6">
+      <header className="grid shrink-0 gap-4 border-b border-[var(--tower-border)] pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.14em] text-[var(--tower-ink-muted)]">
             <Monitor className="h-4 w-4" />
             Compañía Minera La Patagua · Mantenimiento
-            <Badge variant="outline">Solo lectura</Badge>
+            <span className="rounded-full bg-[var(--tower-copper-soft)] px-3 py-1 text-xs font-semibold normal-case tracking-normal text-[var(--tower-copper)]">Solo lectura</span>
           </div>
           <div className="mt-1 flex items-center gap-3">
-            <SlideIcon className="h-7 w-7 text-primary" />
+            <SlideIcon className="h-7 w-7 text-[var(--tower-copper)]" />
             <h1 className="text-4xl font-semibold tracking-tight 2xl:text-5xl">{slide.label}</h1>
-            <span className="rounded-full border px-3 py-1 text-sm font-medium text-muted-foreground">Vista {slideIndex + 1} de {slides.length}</span>
+            <span className="rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] px-3 py-1 text-sm font-medium text-[var(--tower-ink-muted)]">Vista {slideIndex + 1} de {slides.length}</span>
           </div>
-          <p className="mt-2 text-lg font-medium text-muted-foreground 2xl:text-xl">{slide.question}</p>
+          <p className="mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
         </div>
-        <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-muted-foreground">
-          <span>Hora local</span><strong className="text-xl font-semibold tabular-nums text-foreground">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+        <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-[var(--tower-ink-muted)]">
+          <span>Hora local</span><strong className="text-xl font-semibold tabular-nums text-[var(--tower-ink)]">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
           <span>Correo mantención</span><span>{dateTime(data?.freshness?.latestEmailAt)}</span>
           <span>WhatsApp vinculado</span><span>{dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
           <span>Actualización pantalla</span><span>{dateTime(data?.generatedAt)}</span>
         </div>
       </header>
 
-      <section className="grid shrink-0 gap-px overflow-hidden border-y bg-border md:grid-cols-5">
-        <TopMetric icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
-        <TopMetric icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
-        <TopMetric icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
-        <TopMetric icon={TimerReset} label="MP vencidas" value={data?.summary?.preventiveOverdue} />
+      <section className="grid shrink-0 gap-px overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-border)] md:grid-cols-5">
+        <TopMetric tone="copper" icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
+        <TopMetric tone="ink" icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
+        <TopMetric tone="green" icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
+        <TopMetric tone="copper" icon={TimerReset} label="MP vencidas" value={data?.summary?.preventiveOverdue} />
         <TopMetric
+          tone="green"
           icon={Radio}
           label="Entradas por revisar"
           value={Number(data?.summary?.pendingEmailMatches || 0) + Number(data?.summary?.pendingWhatsAppInputs || 0)}
@@ -184,7 +185,7 @@ export default function MaintenanceControlTowerPage() {
       <main
         key={slide.key}
         className={cn(
-          'min-h-0 flex-1 overflow-hidden border-y bg-card',
+          'min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]',
           !reduceMotion && 'animate-in fade-in duration-300',
         )}
       >
@@ -196,8 +197,8 @@ export default function MaintenanceControlTowerPage() {
         {slide.key === 'management' ? <ManagementSlide data={data} /> : null}
       </main>
 
-      <footer className="shrink-0 border-t pt-2">
-        <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
+      <footer className="shrink-0 border-t border-[var(--tower-border)] pt-2">
+        <div className="flex items-center justify-between gap-4 text-sm text-[var(--tower-ink-muted)]">
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4" />
             Próxima vista en {secondsToNext} s · datos cada {data?.refreshSeconds || 60} s
@@ -206,7 +207,7 @@ export default function MaintenanceControlTowerPage() {
             {slides.map((item, index) => (
               <span
                 key={item.key}
-                className={cn('h-1.5 rounded-full transition-[width] duration-300', index === slideIndex ? 'w-8 bg-primary' : 'w-3 bg-muted-foreground/25')}
+                className={cn('h-1.5 rounded-full transition-[width] duration-300', index === slideIndex ? 'w-8 bg-[var(--tower-copper)]' : 'w-3 bg-[var(--tower-border)]')}
               />
             ))}
           </div>
@@ -221,69 +222,48 @@ export default function MaintenanceControlTowerPage() {
 function AnalysisSlide({ data }: { data: any }) {
   const attention = Array.isArray(data?.attentionRows) ? data.attentionRows : [];
   const signals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
-  const blockers =
-    Number(data?.coordination?.blockers?.partsPendingAssets || 0) +
-    Number(data?.coordination?.blockers?.unresolvedEmailInputs || 0) +
-    Number(data?.coordination?.blockers?.unresolvedWhatsAppInputs || 0);
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.2fr_.8fr]">
-      <Panel title="Prioridades de coordinación" subtitle="Qué debe ordenar, destrabar o confirmar Planificación">
-        <div className="grid gap-3 md:grid-cols-2">
-          <Insight tone="critical" title="Equipos detenidos" value={data?.summary?.stoppedAssets} text="Condición vigente reportada o validada; priorizar impacto y recurso." />
-          <Insight tone="warning" title="OT vencidas" value={data?.summary?.overdueOpenWorkOrders} text="Trabajo programado antes de hoy que continúa abierto." />
-          <Insight tone="warning" title="Programadas mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} text="Carga inmediata a confirmar con responsables y recursos." />
-          <Insight
-            tone="neutral"
-            title="Bloqueos / revisión"
-            value={blockers + Number(data?.coordination?.blockers?.openOrdersWithoutSupplyEvidence || 0)}
-            text="Incluye repuestos, entradas por revisar y OT sin evidencia de Bodega."
-          />
-        </div>
-        <div className="mt-4 divide-y rounded-md border">
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.05fr_.95fr]">
+      <Panel title="Prioridades activas" subtitle="Lo que requiere seguimiento inmediato.">
+        <div className="divide-y divide-[var(--tower-border)]">
           {attention.slice(0, 5).map((row: any) => (
-            <div key={row.canonicalAssetId} className="grid gap-2 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
-              <div>
-                <p className="text-lg font-semibold">{row.assetName}</p>
-                <p className="mt-1 line-clamp-1 text-base text-muted-foreground">{signalText(row)}</p>
+            <div key={row.canonicalAssetId} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="min-w-0">
+                <p className="truncate text-xl font-semibold">{row.assetName}</p>
+                <p className="mt-1 line-clamp-1 text-base text-[var(--tower-ink-muted)]">{signalText(row)}</p>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Badge variant={row.reportedStopped ? 'destructive' : row.priorityRank <= 2 ? 'secondary' : 'outline'}>
-                  {row.reportedStopped ? 'Detenido' : row.planningPriority || 'Atención'}
-                </Badge>
-                <span className="text-muted-foreground">{row.site} · {sourceLabel(row.latestSignalSource)} · {ageLabel(row.latestSignalAgeHours)}</span>
+              <div className="flex items-center gap-3">
+                <PriorityPill
+                  label={row.reportedStopped ? 'Alta' : row.priorityRank <= 2 ? 'Alta' : row.planningPriority || 'Atención'}
+                  critical={Boolean(row.reportedStopped || row.priorityRank <= 2)}
+                />
+                <span className="hidden text-sm text-[var(--tower-ink-muted)] 2xl:inline">
+                  {row.site} · {sourceLabel(row.latestSignalSource)} · {ageLabel(row.latestSignalAgeHours)}
+                </span>
               </div>
             </div>
           ))}
+          {attention.length === 0 ? <EmptyState title="Sin prioridades activas" text="No hay equipos que requieran atención inmediata con evidencia vigente." /> : null}
         </div>
       </Panel>
 
-      <Panel title="Fuentes y cambios recientes" subtitle="Entrada viva separada de evidencia ya vinculada">
-        <div className="mb-3 grid gap-2">
-          <SourceHealth
-            label="Correo @lapatagua.cl"
-            inputAt={data?.liveInputs?.email?.latestAt}
-            publishedAt={data?.liveInputs?.email?.latestAt}
-            pending={data?.summary?.pendingEmailMatches}
-          />
-          <SourceHealth
-            label="WhatsApp · Grupo 2"
-            inputAt={data?.liveInputs?.whatsapp?.latestAt}
-            publishedAt={data?.liveInputs?.whatsapp?.latestPublishedAt}
-            pending={data?.liveInputs?.whatsapp?.pendingCount}
-          />
-        </div>
-        <div className="divide-y border-t">
+      <Panel title="Señales recientes" subtitle="Últimas actualizaciones operacionales con origen identificado.">
+        <div className="divide-y divide-[var(--tower-border)]">
           {signals.slice(0, 5).map((signal: any) => (
-            <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="space-y-1 py-3 first:pt-0">
-              <div className="flex items-center justify-between gap-3">
-                <p className="truncate text-sm font-semibold">{signal.assetName}</p>
-                <Badge variant="outline">{sourceLabel(signal.source)}</Badge>
+            <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[180px_1fr] md:items-start">
+              <div className="flex items-center gap-2 text-base font-semibold">
+                <SourceMark source={signal.source} />
+                <span>{sourceLabel(signal.source)}</span>
+                <span className="font-normal text-[var(--tower-ink-muted)]">· {dateTime(signal.at).split(',').at(-1)?.trim()}</span>
               </div>
-              <p className="line-clamp-2 text-sm">{signal.text || 'Actualización registrada'}</p>
-              <p className="text-xs text-muted-foreground">{signal.site || 'Sin faena'} · {dateTime(signal.at)}</p>
+              <div>
+                <p className="line-clamp-2 text-base font-medium">{signal.text || 'Actualización registrada'}</p>
+                <p className="mt-1 text-sm text-[var(--tower-ink-muted)]">{signal.assetName} · {signal.site || 'Sin faena'}</p>
+              </div>
             </div>
           ))}
+          {signals.length === 0 ? <EmptyState title="Sin señales recientes" text="No hay nuevas actualizaciones operacionales en la ventana vigente." /> : null}
         </div>
       </Panel>
     </div>
@@ -559,23 +539,47 @@ function SourceHealth({ label, inputAt, publishedAt, pending }: { label: string;
   );
 }
 
+
+function PriorityPill({ label, critical }: { label: string; critical: boolean }) {
+  return (
+    <span className={cn(
+      'rounded-md px-3 py-1.5 text-sm font-semibold',
+      critical
+        ? 'bg-[var(--tower-copper-soft)] text-[var(--tower-copper)]'
+        : 'bg-[var(--tower-green-soft)] text-[var(--tower-green)]',
+    )}>
+      {label}
+    </span>
+  );
+}
+
+function SourceMark({ source }: { source: unknown }) {
+  const isGreen = source === 'whatsapp' || source === 'canonical_status';
+  return <span className={cn('h-2.5 w-2.5 rounded-full', isGreen ? 'bg-[var(--tower-green)]' : 'bg-[var(--tower-copper)]')} aria-hidden="true" />;
+}
+
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="min-h-0 overflow-hidden border bg-background/20">
-      <div className="border-b bg-muted/25 px-5 py-3.5">
+    <section className="min-h-0 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]">
+      <div className="border-b border-[var(--tower-border)] bg-[var(--tower-surface-muted)] px-5 py-3.5">
         <p className="text-xl font-semibold 2xl:text-2xl">{title}</p>
-        {subtitle ? <p className="mt-1 text-base text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-1 text-base text-[var(--tower-ink-muted)]">{subtitle}</p> : null}
       </div>
       <div className="p-5">{children}</div>
     </section>
   );
 }
 
-function TopMetric({ icon: Icon, label, value }: { icon: any; label: string; value: unknown }) {
+function TopMetric({ icon: Icon, label, value, tone = 'ink' }: { icon: any; label: string; value: unknown; tone?: 'copper' | 'green' | 'ink' }) {
+  const toneClass = tone === 'copper'
+    ? 'text-[var(--tower-copper)]'
+    : tone === 'green'
+      ? 'text-[var(--tower-green)]'
+      : 'text-[var(--tower-ink)]';
   return (
-    <div className="bg-card px-5 py-4">
-      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Icon className="h-5 w-5" />{label}</div>
-      <p className="mt-1 text-4xl font-semibold tabular-nums 2xl:text-5xl">{value == null ? '—' : number(value, 0)}</p>
+    <div className="bg-[var(--tower-surface)] px-5 py-4">
+      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--tower-ink)]"><Icon className={cn('h-5 w-5', toneClass)} />{label}</div>
+      <p className={cn('mt-1 text-4xl font-semibold tabular-nums 2xl:text-5xl', toneClass)}>{value == null ? '—' : number(value, 0)}</p>
     </div>
   );
 }
