@@ -51,3 +51,24 @@ test('each wallboard view states one dominant operational question', () => {
     '¿Cómo está respondiendo el área de mantenimiento?',
   ]) assert.equal(source.includes(question), true);
 });
+
+
+test('wallboard uses scoped MOTIL corporate palette and restrained hierarchy', () => {
+  const globals = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+  assert.match(source, /motil-control-tower/);
+  assert.match(globals, /--tower-copper/);
+  assert.match(globals, /--tower-green/);
+  assert.match(globals, /--tower-canvas/);
+  assert.match(source, /bg-\[var\(--tower-canvas\)\]/);
+  assert.match(source, /text-\[var\(--tower-copper\)\]/);
+  assert.match(source, /text-\[var\(--tower-green\)\]/);
+});
+
+test('analysis view keeps the approved simple information architecture', () => {
+  assert.match(source, /Prioridades activas/);
+  assert.match(source, /Señales recientes/);
+  assert.match(source, /attention\.slice\(0, 5\)/);
+  assert.match(source, /signals\.slice\(0, 5\)/);
+  assert.doesNotMatch(source, /Prioridades de coordinación/);
+  assert.doesNotMatch(source, /Fuentes y cambios recientes/);
+});
