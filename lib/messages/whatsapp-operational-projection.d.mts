@@ -1,4 +1,4 @@
-export type WhatsappActivityMode='overview'|'plant'|'mine'|'dispatch'|'drilling';
+export type WhatsappActivityMode='overview'|'plant'|'mine'|'dispatch'|'drilling'|'maintenance';
 export type WhatsappSourceGroup={id:string;display_name:string;chat_id:string;enabled:boolean};
 export type WhatsappSourceMessage={
   id:number;organization_id?:string;group_id:string;sender_chat_id:string|null;
