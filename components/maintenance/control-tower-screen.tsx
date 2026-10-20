@@ -241,10 +241,10 @@ function AnalysisSlide({ data }: { data: any }) {
   const signals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
 
   return (
-    <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] xl:items-start">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] xl:items-start">
       <Panel title="Prioridades activas" subtitle="Lo que requiere seguimiento inmediato.">
         <div className="divide-y divide-[var(--tower-border)]">
-          {attention.slice(0, 5).map((row: any) => (
+          {attention.slice(0, 4).map((row: any) => (
             <div key={row.canonicalAssetId} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[1fr_auto] md:items-center">
               <div className="min-w-0">
                 <p className="text-xl font-semibold leading-tight text-balance">{row.assetName}</p>
@@ -267,7 +267,7 @@ function AnalysisSlide({ data }: { data: any }) {
 
       <Panel title="Señales recientes" subtitle="Últimas actualizaciones operacionales con origen identificado.">
         <div className="divide-y divide-[var(--tower-border)]">
-          {signals.slice(0, 5).map((signal: any) => (
+          {signals.slice(0, 4).map((signal: any) => (
             <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[180px_1fr] md:items-start">
               <div className="flex items-center gap-2 text-base font-semibold">
                 <SourceMark source={signal.source} />
@@ -305,7 +305,7 @@ function StoppedSlide({ data }: { data: any }) {
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
             columnTemplate="1.8fr .75fr 1.15fr 1.45fr .65fr 1.2fr"
-            rows={rows.slice(0, 5).map((row: any) => [
+            rows={rows.slice(0, 4).map((row: any) => [
               row.assetName,
               row.site,
               row.canonicalStatus || 'Sin confirmación registrada',
@@ -338,7 +338,7 @@ function PreventiveSlide({ data }: { data: any }) {
   ];
 
   return (
-    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.35fr_.65fr]">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.35fr_.65fr] xl:[&>section]:min-h-0">
       <Panel title="Mantenciones preventivas" subtitle="Control por horas o kilómetros con información vigente">
         <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
           <SmallMetric label="Vencidas" value={data?.summary?.preventiveOverdue} />
@@ -346,11 +346,11 @@ function PreventiveSlide({ data }: { data: any }) {
           <SmallMetric label="Revisar fecha" value={data?.summary?.preventiveDateReview} />
           <SmallMetric label="Equipos con base" value={data?.summary?.preventiveTracked} />
         </div>
-        <div className="mt-4">
+        <div className="mt-2">
           <DataTable
             headers={['Equipo', 'Faena', 'Control por', 'Lectura', 'Próxima mantención', 'Estado preventivo']}
             columnTemplate="1.5fr .9fr .65fr .8fr .85fr 1.25fr"
-            rows={rows.slice(0, 5).map((row: any) => [
+            rows={rows.slice(0, 4).map((row: any) => [
               row.assetName,
               row.site,
               row.meterUnit || '—',
@@ -364,13 +364,13 @@ function PreventiveSlide({ data }: { data: any }) {
 
       <Panel title="Estado de las preventivas" subtitle="Distribución real de los equipos con seguimiento vigente">
         <StatusBars rows={preventiveStatusRows} total={rows.length} />
-        <div className="mt-5 grid gap-2">
+        <div className="mt-2 grid gap-1">
           <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
           <BasisRow label="Kilómetros" value={data?.lifecycle?.preventiveBasis?.km || 0} />
           <BasisRow label="Anual" value={data?.lifecycle?.preventiveBasis?.annual || 0} />
           <BasisRow label="Otro tipo de control" value={data?.lifecycle?.preventiveBasis?.other || 0} />
         </div>
-        <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
+        <div className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
           <p className="text-base font-semibold">Plan preventivo vigente</p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {data?.lifecycle?.approvedPreventiveSchedules || 0} planes activos · {String(data?.lifecycle?.approvedPreventiveSchedulesBasis || 'Sin información suficiente').replace('Sin base canónica', 'Sin información suficiente')}
@@ -408,7 +408,7 @@ function ScheduleSlide({ data }: { data: any }) {
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
           columnTemplate=".8fr .7fr 1.55fr 1.35fr 1.45fr .8fr 1.25fr"
-          rows={open.slice(0, 5).map((row: any) => [
+          rows={open.slice(0, 4).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
@@ -447,19 +447,19 @@ function FleetSlide({ data }: { data: any }) {
   }, [rows]);
 
   return (
-    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.15fr_.85fr]">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.15fr_.85fr] xl:[&>section]:min-h-0">
       <Panel title="Disponibilidad de equipos por mina" subtitle="Estado reportado con evidencia · no equivale a disponibilidad horaria">
         {sites.length === 0 ? <EmptyState title="Sin equipos clasificados por mina" text="No hay registros con fuente suficiente." /> : null}
-        <div className="space-y-3">
-          {sites.slice(0, 5).map((site) => {
+        <div className="space-y-2">
+          {sites.slice(0, 4).map((site) => {
             const classified = site.operational + site.stopped;
             const pct = classified > 0 ? Math.round(site.operational / classified * 100) : null;
-            return <div key={site.label} className="rounded-md border border-border/60 p-3">
+            return <div key={site.label} className="rounded-md border border-border/60 p-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0"><div className="text-base font-semibold">{site.label}</div><div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div></div>
                 <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-sm text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
               </div>
-              <div className="mt-3 flex h-3 overflow-hidden rounded bg-muted">
+              <div className="mt-2 flex h-3 overflow-hidden rounded bg-muted">
                 <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? site.operational / site.total * 100 : 0}%` }} />
                 <div className="bg-destructive/80" style={{ width: `${site.total ? site.stopped / site.total * 100 : 0}%` }} />
               </div>
@@ -470,7 +470,7 @@ function FleetSlide({ data }: { data: any }) {
       </Panel>
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
         <DataTable headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']} columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
-          rows={(data?.attentionRows || []).slice(0, 5).map((row: any) => [
+          rows={(data?.attentionRows || []).slice(0, 4).map((row: any) => [
             row.assetName, row.site, row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
             row.openWorkOrders || '—', row.partsPending ? 'Pendiente' : '—', sourceLabel(row.latestSignalSource),
           ])} />
@@ -498,7 +498,7 @@ function ManagementSlide({ data }: { data: any }) {
           <ManagementMetric label="En ejecución" value={data?.summary?.inProgressOpenWorkOrders ?? '—'} detail="Abiertas iniciadas o pausadas" />
           <ManagementMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders ?? '—'} detail="Órdenes abiertas" />
         </div>
-        <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <div className="mt-2 grid gap-2 xl:grid-cols-[1.1fr_.9fr]">
           <WorkOrderProgress completed={completed} open={open} />
           <HoursComparison planned={management.plannedHoursCompleted} actual={management.actualHoursCompleted} />
         </div>
@@ -506,7 +506,7 @@ function ManagementSlide({ data }: { data: any }) {
 
       <Panel title="Coordinación del equipo" subtitle="Carga abierta real por responsable">
         <AssigneeLoadChart rows={coordination.slice(0, 4)} />
-        <div className="mt-4">
+        <div className="mt-2">
           <WorkMixChart preventive={preventive} corrective={corrective} />
         </div>
       </Panel>
@@ -518,7 +518,7 @@ function AssigneeLoadChart({ rows }: { rows: any[] }) {
   if (!rows.length) return <EmptyState title="Sin carga abierta" text="No hay órdenes abiertas asignadas para graficar." />;
   const maxOpen = Math.max(...rows.map((row) => Number(row.open || 0)), 1);
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {rows.map((row) => {
         const open = Number(row.open || 0);
         const overdue = Number(row.overdue || 0);
@@ -760,7 +760,7 @@ function StatusBars({
 }) {
   if (!total) return <EmptyState title="Sin base vigente" text="No hay preventivas con información actual suficiente para graficar." />;
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {rows.map((row) => {
         const pct = total > 0 ? (row.value / total) * 100 : 0;
         const barClass = row.tone === 'critical'
@@ -857,7 +857,7 @@ function MetricBar({ label, value, max, tone }: { label: string; value: number; 
 function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
   const max = Math.max(1, ...rows.map((row) => row.value));
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {rows.map((row) => (
         <div key={row.label}>
           <div className="mb-1 flex items-center justify-between text-sm">
