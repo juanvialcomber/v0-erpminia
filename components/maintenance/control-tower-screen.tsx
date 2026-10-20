@@ -304,7 +304,7 @@ function StoppedSlide({ data }: { data: any }) {
         ) : (
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
-            columnTemplate="1.45fr .8fr 1.1fr 1.5fr .7fr 1.25fr"
+            columnTemplate="1.8fr .75fr 1.15fr 1.45fr .65fr 1.2fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
@@ -753,7 +753,7 @@ function DataTable({
               <div
                 key={cellIndex}
                 className={cn(
-                  'min-w-0 break-words px-4 py-3.5 text-base leading-snug whitespace-normal 2xl:text-lg',
+                  'min-w-0 overflow-visible text-clip [overflow-wrap:anywhere] px-4 py-3.5 text-base leading-snug whitespace-normal 2xl:text-lg',
                   cellIndex === 0 && 'font-semibold text-[var(--tower-ink)]',
                 )}
               >
