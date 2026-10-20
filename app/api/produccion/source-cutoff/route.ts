@@ -67,6 +67,8 @@ export async function GET(request:NextRequest){
   const planJaime=value(stat.get('extraction_plan_don_jaime'));
   const monthTotal=monthPeumo===null||monthJaime===null?null:monthPeumo+monthJaime;
   const monthPlan=planPeumo===null||planJaime===null?null:planPeumo+planJaime;
+  const forecastEndMonth=value(stat.get('forecast_end_month_reported'));
+  const fineExtracted=value(stat.get('fine_extracted_reported'));
 
   const sto=new Map(stock.filter(r=>values(r).cutoff===stockDoc?.period_end)
     .map(r=>[r.record_type,r]));
@@ -94,11 +96,13 @@ export async function GET(request:NextRequest){
       periodStart:stats.find(r=>r.record_type==='extraction_actual_peumo')?.period_start||null,
       peumoExtractedTons:monthPeumo,donJaimeExtractedTons:monthJaime,
       totalExtractedTons:monthTotal,plannedToDateTons:monthPlan,
+      forecastEndMonthTons:forecastEndMonth,fineExtractedTons:fineExtracted,
     },
     stock:{
       cutoff:stockDoc?.period_end||null,source:stockDoc?.source_file||null,
       plantStockTons:value(findStockRole('snapshot_balance')),
       totalMineralStockTons:value(findStockRole('snapshot_total')),
+      transportedWeekTons:value(sto.get('stock_week_transport_total')),
       daily,
     },
     coverage:'partial_source_reported',
