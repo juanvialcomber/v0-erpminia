@@ -48,7 +48,8 @@ test('personal calendar surfaces actionable maintenance decisions, not only assi
   assert.match(route, /getMaintenanceWorkOrderCreationCapability/);
   assert.match(route, /'Programar OT'/);
   assert.match(route, /kind: 'Revisar cierre'/);
-  assert.match(route, /kind: 'Revisar señal'/);
+  assert.doesNotMatch(route, /kind: 'Revisar señal'/);
+  assert.doesNotMatch(route, /drilling_maintenance_review_queue_v1/);
   assert.match(route, /Completar centro de costo/);
   assert.match(calendar, /const needsMyAction = Boolean\(item\.actionable_for_me\)/);
   assert.match(calendar, /Qué hacer/);
