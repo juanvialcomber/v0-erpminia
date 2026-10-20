@@ -56,6 +56,11 @@ function normalizeRole(role?: string | null) {
   return String(role || '').trim().toLowerCase();
 }
 
+export function hasMaintenanceWriteRole(roleValue?: string | null): boolean {
+  const role = normalizeRole(roleValue);
+  return maintenanceWriteRoles.has(role);
+}
+
 function isMutation(request: NextRequest, prefix: string) {
   return (
     request.nextUrl.pathname.startsWith(prefix) &&
@@ -121,7 +126,7 @@ export async function getOrganizationContext(
     isMutation(request, '/api/maintenance/') &&
     !isMaintenanceSelfServiceMutation(request) &&
     !isAssignedWorkOrderExecutionMutation(request) &&
-    !maintenanceWriteRoles.has(role)
+    !hasMaintenanceWriteRole(role)
   ) {
     return {
       ok: false,
