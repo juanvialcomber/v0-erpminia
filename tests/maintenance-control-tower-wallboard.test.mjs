@@ -131,3 +131,14 @@ test('wallboard charts are grounded in real operational counts', () => {
   assert.doesNotMatch(source, /priorityGroups/);
   assert.doesNotMatch(source, /BarList rows=\{pCounts\}/);
 });
+
+
+test('wallboard turns coordination and fleet into TV-legible real-data charts', () => {
+  assert.match(source, /Carga abierta real por responsable/);
+  assert.match(source, /AssigneeLoadChart rows=\{coordination\.slice\(0, 6\)\}/);
+  assert.match(source, /Tipo de trabajo terminado/);
+  assert.match(source, /WorkMixChart preventive=\{preventive\} corrective=\{corrective\}/);
+  assert.match(source, /text-lg font-semibold/);
+  assert.match(source, /equipos · \{site\.attention\} atención · \{site\.stopped\} detenidos/);
+  assert.doesNotMatch(source, /truncate text-base font-semibold/);
+});
