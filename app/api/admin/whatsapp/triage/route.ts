@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api/guard';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { GREEN_NO_STORE, greenDb } from '@/lib/messages/greenapi';
 import { prepareWhatsappTriage } from '@/lib/messages/whatsapp-triage.mjs';
 import { whatsappOperationalReviewEnabled } from '@/lib/messages/whatsapp-operational-feature.mjs';
@@ -10,7 +10,7 @@ import { redactDisallowedWhatsappReports, isExcludedMotilWhatsappGroup } from '@
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!auth.authorized || !auth.organizationId) {
     return auth.response || NextResponse.json({
       error:'Acceso denegado a clasificación de mensajes',
