@@ -13,11 +13,11 @@ test('production summary puts accredited metallurgy before source coverage', asy
   assert.ok(currentIndex >= 0, 'accredited metallurgy section must exist');
   assert.ok(coverageIndex > currentIndex, 'source coverage must follow accredited metallurgy');
 
-  assert.match(dashboard, /Serie acreditada/);
+  assert.match(dashboard, /Histórico confirmado/);
   assert.match(dashboard, /Metalurgia ·/);
   assert.match(dashboard, /Qué requiere atención/);
-  assert.match(dashboard, /Estado de fuentes/);
-  assert.match(dashboard, /Detalle secundario de cobertura/);
+  assert.match(dashboard, /Datos disponibles/);
+  assert.match(dashboard, /Muestra qué datos existen/);
   assert.doesNotMatch(dashboard, /Cobertura real por área/);
   assert.doesNotMatch(dashboard, /Trabajo pendiente sobre datos/);
   assert.doesNotMatch(dashboard, /min-h-52/);
@@ -26,11 +26,11 @@ test('production summary puts accredited metallurgy before source coverage', asy
 test('production source review remains compact and does not fabricate a combined backlog', async () => {
   const dashboard = await readFile(dashboardUrl, 'utf8');
 
-  assert.match(dashboard, /Revisiones de datos/);
-  assert.match(dashboard, /Las colas pueden solaparse y no se suman como un único total/);
-  assert.match(dashboard, /Calidad de datos/);
-  assert.match(dashboard, /Sin fuente/);
-  assert.match(dashboard, /sin fuente nunca se representa como cero/i);
+  assert.match(dashboard, /Datos por revisar/);
+  assert.match(dashboard, /Un mismo dato puede aparecer en más de una revisión/);
+  assert.match(dashboard, /Control de datos/);
+  assert.match(dashboard, /Sin datos/);
+  assert.match(dashboard, /Si falta una fuente, no mostramos cero/i);
 });
 
 test('canonical overview remains tenant scoped and read only for the summary composition', async () => {
