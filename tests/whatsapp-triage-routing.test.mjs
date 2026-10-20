@@ -221,7 +221,7 @@ test('mixed plant shift bulletin separates completed text from PENDIENTE source 
 test('full-message detail is tenant/date/group authorization scoped and lazy',()=>{
   const api=read('app/api/admin/whatsapp/triage/message/route.ts');
   const ui=read('components/whatsapp/whatsapp-triage-inbox.tsx');
-  assert.match(api,/requireAdmin\(request\)/);
+  assert.match(api,/requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
   assert.match(api,/\.eq\('organization_id',auth\.organizationId\)/);
   assert.match(api,/localDay\(new Date\(message\.occurred_at\)\)!==date/);
   assert.match(api,/\.eq\('enabled',true\)/);
