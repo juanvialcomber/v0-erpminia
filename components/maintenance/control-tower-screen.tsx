@@ -95,7 +95,7 @@ const statusLabel = (value: unknown) => {
 const sourceLabel = (source: unknown) => {
   if (source === 'email') return 'Correo';
   if (source === 'whatsapp') return 'WhatsApp';
-  if (source === 'canonical_status') return 'Estado validado';
+  if (source === 'canonical_status') return 'Estado confirmado';
   if (source === 'work_order') return 'OT';
   if (source === 'planning_master') return 'Planificación';
   return 'Maestro';
@@ -303,12 +303,12 @@ function StoppedSlide({ data }: { data: any }) {
           <EmptyState title="Sin equipos detenidos con evidencia vigente" text="No se arrastran estados históricos como detención actual." />
         ) : (
           <DataTable
-            headers={['Equipo', 'Faena', 'Estado validado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
+            headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
             columnTemplate="1.45fr .8fr 1.1fr 1.5fr .7fr 1.25fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
-              row.canonicalStatus || 'Sin estado validado',
+              row.canonicalStatus || 'Sin confirmación registrada',
               row.currentReportedStatus || signalText(row),
               ageLabel(row.latestSignalAgeHours),
               `${row.openWorkOrderNumbers?.join(', ') || 'Sin OT'}${row.partsPending ? ' · Repuesto pendiente' : ''}`,
