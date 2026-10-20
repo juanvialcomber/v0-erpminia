@@ -61,7 +61,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     if(existing)existing.push(item);else groups.set(key,[item]);
     return groups;
   },new Map<string,typeof allUpdates>()).values());
-  const groupedUpdates=expanded?allGroupedUpdates:allGroupedUpdates.slice(0,4);
+  const groupedUpdates=expanded?allGroupedUpdates:allGroupedUpdates.slice(0,3);
   return <section aria-label={titles[mode]} className="space-y-3 rounded-lg border bg-card p-4 sm:p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
@@ -93,6 +93,8 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
         const evidence=Array.from(new Map(
           group.flatMap(item=>item.sourceEvidence).map(file=>[file.id,file])
         ).values());
+        const destinations=new Set(group.map(item=>item.destination));
+        const singleDestination=destinations.size===1?first.destination:null;
         return <article key={[first.sourceMessageId,first.groupName,first.reportedAt].join('|')}
           className="rounded-xl border bg-background/60 p-3 shadow-sm sm:p-4">
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -100,6 +102,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
               <p className="text-sm font-semibold leading-none">{first.groupName}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 WhatsApp · Mensaje #{first.sourceMessageId}
+                {singleDestination?' · '+singleDestination:''}
                 {group.length>1?' · '+group.length+' novedades':''}
               </p>
             </div>
@@ -111,7 +114,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
           <div className="overflow-hidden rounded-lg border bg-card">
             {group.map((item,index)=><div key={item.id}
               className={index?'border-t px-3 py-3 sm:px-4':'px-3 py-3 sm:px-4'}>
-              {group.length>1?<p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              {group.length>1&&!singleDestination?<p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {item.destination}
               </p>:null}
               {item.text.length>480?<details className="space-y-2">
@@ -150,7 +153,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
         </article>;
       })}
     </div>:null}
-    {allGroupedUpdates.length>4?<Button variant="outline" size="sm"
+    {allGroupedUpdates.length>3?<Button variant="outline" size="sm"
       onClick={()=>setExpanded(v=>!v)}>
       {expanded?'Mostrar menos':'Ver '+allGroupedUpdates.length+' reportes'}
     </Button>:null}
