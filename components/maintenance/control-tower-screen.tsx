@@ -43,11 +43,13 @@ const number = (value: unknown, digits = 1) => {
   return new Intl.NumberFormat('es-CL', { maximumFractionDigits: digits }).format(parsed);
 };
 
+const SANTIAGO_TIME_ZONE = 'America/Santiago';
+
 const dateTime = (value: unknown) => {
   if (!value) return 'Sin actualización';
   const parsed = new Date(String(value));
   if (Number.isNaN(parsed.getTime())) return 'Sin actualización';
-  return parsed.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+  return parsed.toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', timeZone: SANTIAGO_TIME_ZONE });
 };
 
 const shortDate = (value: unknown) => {
@@ -55,7 +57,7 @@ const shortDate = (value: unknown) => {
   const text = String(value).slice(0, 10);
   const parsed = new Date(`${text}T12:00:00`);
   if (Number.isNaN(parsed.getTime())) return '—';
-  return parsed.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+  return parsed.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', timeZone: SANTIAGO_TIME_ZONE });
 };
 
 const ageLabel = (hours: unknown) => {
@@ -162,7 +164,7 @@ export default function MaintenanceControlTowerPage() {
           <p className="mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
         </div>
         <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-[var(--tower-ink-muted)]">
-          <span>Hora local</span><strong className="text-xl font-semibold tabular-nums text-[var(--tower-ink)]">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+          <span>Hora Santiago</span><strong className="text-xl font-semibold tabular-nums text-[var(--tower-ink)]">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: SANTIAGO_TIME_ZONE })}</strong>
           <span>Correo mantención</span><span>{dateTime(data?.freshness?.latestEmailAt)}</span>
           <span>WhatsApp vinculado</span><span>{dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
           <span>Actualización pantalla</span><span>{dateTime(data?.generatedAt)}</span>
