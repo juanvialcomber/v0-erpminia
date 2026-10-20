@@ -34,7 +34,7 @@ test('stopped equipment separates validated state from latest reported signal', 
 });
 
 test('wallboard exposes source freshness, live time and rotation countdown', () => {
-  assert.match(source, /Hora local/);
+  assert.match(source, /Hora Santiago/);
   assert.match(source, /Correo mantención/);
   assert.match(source, /WhatsApp vinculado/);
   assert.match(source, /Actualización pantalla/);
