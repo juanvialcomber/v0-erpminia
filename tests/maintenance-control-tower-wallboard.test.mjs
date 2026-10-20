@@ -139,7 +139,9 @@ test('wallboard turns coordination and fleet into TV-legible real-data charts', 
   assert.match(source, /Tipo de trabajo terminado/);
   assert.match(source, /WorkMixChart preventive=\{preventive\} corrective=\{corrective\}/);
   assert.match(source, /text-lg font-semibold/);
-  assert.match(source, /equipos · \{site\.attention\} atención · \{site\.stopped\} detenidos/);
+  assert.match(source, /site\.total\} equipos registrados/);
+  assert.match(source, /site\.stopped\} detenidos/);
+  assert.match(source, /site\.unknown\} sin estado confirmado/);
   assert.doesNotMatch(source, /truncate text-base font-semibold/);
 });
 
