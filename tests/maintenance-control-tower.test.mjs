@@ -189,10 +189,11 @@ test('preventive slide separates hour and kilometer bases and reports active sch
   assert.match(page, /Plan preventivo vigente/);
 });
 
-test('fleet slide shows source coverage and freshness by site', () => {
-  assert.match(page, /Correo \{site\.email\}/);
-  assert.match(page, /WhatsApp \{site\.whatsapp\}/);
-  assert.match(page, /dateTime\(site\.latestAt\)/);
+test('fleet slide separates known equipment states and unknown status by mine', () => {
+  assert.match(page, /Disponibilidad de equipos por mina/);
+  assert.match(page, /site\.operational \+ site\.stopped/);
+  assert.match(page, /site\.unknown/);
+  assert.match(page, /Sobre \{classified\} con estado conocido/);
 });
 
 
