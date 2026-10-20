@@ -136,7 +136,7 @@ test('operational sections surface the matching WhatsApp feed before domain deta
  assert.match(feedUi,/refreshInterval:60000/);
  assert.match(feedUi,/refreshWhenHidden:false/);
  assert.match(feedUi,/revalidateOnReconnect:true/);
- assert.match(feedUi,/Se actualiza automáticamente cada 60 s/);
+ assert.match(feedUi,/actualización automática cada 60 s/);
 });
 
 test('long shift reports preserve content and label videos as evidence of the whole report',()=>{
