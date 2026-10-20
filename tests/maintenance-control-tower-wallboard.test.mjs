@@ -135,7 +135,7 @@ test('wallboard charts are grounded in real operational counts', () => {
 
 test('wallboard turns coordination and fleet into TV-legible real-data charts', () => {
   assert.match(source, /Carga abierta real por responsable/);
-  assert.match(source, /AssigneeLoadChart rows=\{coordination\.slice\(0, 6\)\}/);
+  assert.match(source, /AssigneeLoadChart rows=\{coordination\.slice\(0, 4\)\}/);
   assert.match(source, /Tipo de trabajo terminado/);
   assert.match(source, /WorkMixChart preventive=\{preventive\} corrective=\{corrective\}/);
   assert.match(source, /text-lg font-semibold/);
@@ -167,4 +167,12 @@ test('wallboard uses plain language for confirmed equipment state', () => {
 test('wallboard routes dashboard entry to standalone monitor', async () => {
   const route = readFileSync(new URL('../app/dashboard/mantenimiento/torre-control/page.tsx', import.meta.url), 'utf8');
   assert.match(route, /redirect\('\/monitor\/mantenimiento'\)/);
+});
+
+
+test('wallboard fits viewport and disables internal scrolling', () => {
+  assert.match(source, /fixed inset-0 z-\[9999\]/);
+  assert.match(source, /h-\[100dvh\]/);
+  assert.match(source, /min-h-0 flex-1 overflow-hidden rounded-lg/);
+  assert.doesNotMatch(source, /overflow-y-auto overscroll-contain/);
 });
