@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
 
 test('maintenance control tower is a true passive full-screen wallboard', () => {
-  assert.match(source, /fixed inset-0 z-\\[9999\\]/);
+  assert.match(source, /fixed inset-0 z-\[9999\]/);
   assert.match(source, /Solo lectura/);
   assert.match(source, /createPortal/);
   assert.match(source, /document\.body/);
@@ -39,4 +39,16 @@ test('wallboard exposes source freshness, live time and rotation countdown', () 
   assert.match(source, /WhatsApp vinculado/);
   assert.match(source, /Actualización pantalla/);
   assert.match(source, /Próxima vista en \{secondsToNext\} s/);
+});
+
+test('each wallboard view states one dominant operational question', () => {
+  for (const question of [
+    '¿Qué requiere atención ahora?',
+    '¿Qué equipos están detenidos y qué los bloquea?',
+    '¿Qué mantenciones están vencidas o próximas?',
+    '¿Qué trabajo está atrasado o debe ejecutarse ahora?',
+    '¿Dónde está concentrada la atención de la flota?',
+    '¿Cómo está respondiendo el área de mantenimiento?',
+  ]) assert.match(source, new RegExp(question.replace(/[.*+?^${}()|[\\]\\]/g, '\\  assert.match(source, /Próxima vista en \{secondsToNext\} s/);
+});')));
 });
