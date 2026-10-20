@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return NextResponse.json({ error: 'Revisión de Sondaje no encontrada' }, { status: 404 });
+    if (!data || data.review_status === 'dismissed') return NextResponse.json({ error: 'Revisión de Sondaje no disponible' }, { status: 404 });
 
     return NextResponse.json({ review: data, canonical: true });
   } catch (error) {
