@@ -142,3 +142,13 @@ test('wallboard turns coordination and fleet into TV-legible real-data charts', 
   assert.match(source, /equipos · \{site\.attention\} atención · \{site\.stopped\} detenidos/);
   assert.doesNotMatch(source, /truncate text-base font-semibold/);
 });
+
+
+test('wallboard typography follows MOTIL corporate hierarchy', () => {
+  assert.match(source, /font-heading text-4xl font-semibold/);
+  assert.match(source, /font-heading text-xl font-semibold/);
+  assert.match(source, /font-heading text-2xl font-semibold/);
+  assert.doesNotMatch(source, /text-\[10px\]/);
+  assert.doesNotMatch(source, /text-\[11px\]/);
+  assert.doesNotMatch(source, /text-xs/);
+});
