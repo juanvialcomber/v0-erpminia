@@ -23,6 +23,7 @@ test('scope is group-authorized, excludes former maintenance even if its name is
  assert.equal(groupPermittedForMode({...disabled,enabled:true},'overview'),false);
  assert.equal(groupPermittedForMode(mine,'plant'),false);
  assert.equal(groupPermittedForMode(dispatch,'dispatch'),true);
+ assert.equal(groupPermittedForMode(mine,'maintenance'),true);
  assert.equal(whatsappSourceArea('Grupo 2'),'mine');
 });
 
@@ -71,7 +72,25 @@ test('route mine reports into production overview and drilling view without inve
  assert.ok(overview.updates.every(x=>x.sourceMessageId!==10));
  assert.equal(projectWhatsappActivity({...input,mode:'dispatch'}).updates.length,1);
  assert.ok(projectWhatsappActivity({...input,mode:'drilling'}).updates.length>=1);
+ assert.equal(projectWhatsappActivity({...input,mode:'maintenance'}).updates.length,0);
  assert.equal(projectWhatsappActivity({...input,mode:'plant'}).updates.length,0);
+});
+
+
+test('mine, drilling and maintenance feeds split mixed Grupo 2 content by destination',()=>{
+ const messages=[
+   message(21,'m','a','Viajes a planta:\n3 viajes programados','2026-10-19T10:00:00Z'),
+   message(22,'m','a','Sondaje MDS 141\nMetros: 12.3','2026-10-19T10:01:00Z'),
+   message(23,'m','a','Reporte de equipos\nScoop 1000 fuera de servicio','2026-10-19T10:02:00Z'),
+ ];
+ const input={groups:[mine],messages,attachments:[]};
+ const mineFeed=projectWhatsappActivity({...input,mode:'mine'});
+ const drillingFeed=projectWhatsappActivity({...input,mode:'drilling'});
+ const maintenanceFeed=projectWhatsappActivity({...input,mode:'maintenance'});
+ assert.ok(mineFeed.updates.some(x=>x.destinationId==='mine_movements'));
+ assert.ok(mineFeed.updates.every(x=>x.destinationId!=='mine_drilling'&&x.destinationId!=='mine_equipment'));
+ assert.ok(drillingFeed.updates.length>0&&drillingFeed.updates.every(x=>x.destinationId==='mine_drilling'));
+ assert.ok(maintenanceFeed.updates.length>0&&maintenanceFeed.updates.every(x=>x.destinationId==='mine_equipment'));
 });
 
 test('protected read routes preserve tenant boundaries and do not modify certified sources',()=>{
@@ -100,21 +119,24 @@ test('operational sections surface the matching WhatsApp feed before domain deta
  const drillingUi=file('app/dashboard/produccion/sondaje/page.tsx');
  const transportUi=file('components/production/mineral-transport-dashboard.tsx');
  const plantUi=file('components/production/plant-metallurgy-dashboard.tsx');
+ const maintenanceUi=file('components/dashboard/maintenance-home.tsx');
  const feedUi=file('components/production/whatsapp-operational-updates.tsx');
  assert.match(overview,/<WhatsappOperationalUpdates mode="overview"\/>/);
  assert.match(mineUi,/<WhatsappOperationalUpdates mode="mine"\/>/);
  assert.match(drillingUi,/<WhatsappOperationalUpdates mode="drilling"\/>/);
  assert.match(transportUi,/<WhatsappOperationalUpdates mode="dispatch"\/>/);
  assert.match(plantUi,/<WhatsappOperationalUpdates mode="plant"\/>/);
+ assert.match(maintenanceUi,/<WhatsappOperationalUpdates mode="maintenance"\/>/);
  assert.ok(mineUi.indexOf('<WhatsappOperationalUpdates mode="mine"/>')<
    mineUi.indexOf('Minas alerta'));
  assert.ok(transportUi.indexOf('<WhatsappOperationalUpdates mode="dispatch"/>')<
    transportUi.indexOf('Toneladas transportadas'));
  assert.ok(plantUi.indexOf('<WhatsappOperationalUpdates mode="plant"/>')<
    plantUi.indexOf('<PlantSourceCutoff/>'));
- assert.match(feedUi,/refreshInterval:30000/);
+ assert.match(feedUi,/refreshInterval:60000/);
+ assert.match(feedUi,/refreshWhenHidden:false/);
  assert.match(feedUi,/revalidateOnReconnect:true/);
- assert.match(feedUi,/Se actualiza automáticamente cada 30 s/);
+ assert.match(feedUi,/Se actualiza automáticamente cada 60 s/);
 });
 
 test('long shift reports preserve content and label videos as evidence of the whole report',()=>{
