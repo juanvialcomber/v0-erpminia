@@ -15,9 +15,9 @@ test('maintenance control center exposes the canonical operational loop', () => 
 });
 
 test('cross-module handoffs are explicit without duplicating ownership', () => {
-  assert.match(dict, /Producción aporta uso y señales/);
+  assert.match(dict, /Producción informa uso y estado/);
   assert.match(dict, /Bodega confirma stock/);
-  assert.match(dict, /Compras cubre brechas/);
-  assert.match(dict, /Finanzas consume costos reales/);
-  assert.match(dict, /Cada etapa usa su fuente canónica/);
+  assert.match(dict, /Compras consigue lo pendiente/);
+  assert.match(dict, /Finanzas registra costos/);
+  assert.match(dict, /Bodega y Compras preparan recursos/);
 });
