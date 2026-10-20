@@ -7,7 +7,10 @@ import { whatsappOperationalReviewEnabled } from '@/lib/messages/whatsapp-operat
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (!access.authorized || !access.organizationId) return access.response;
+  if (!access.authorized) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible.' }, { status: 403, headers: GREEN_NO_STORE });
+  }
 
   const db = greenDb();
   const { data, error } = await db
