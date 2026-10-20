@@ -5,8 +5,10 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
 
 test('maintenance control tower is a true passive full-screen wallboard', () => {
-  assert.match(source, /fixed inset-0 z-\[100\]/);
+  assert.match(source, /fixed inset-0 z-\\[9999\\]/);
   assert.match(source, /Solo lectura/);
+  assert.match(source, /createPortal/);
+  assert.match(source, /document\.body/);
   assert.doesNotMatch(source, /<Button|<Input|<Select|<form|onClick=/);
 });
 
