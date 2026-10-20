@@ -68,6 +68,21 @@ const ageLabel = (hours: unknown) => {
   return `hace ${Math.floor(value / 24)} d`;
 };
 
+const priorityLabel = (value: unknown) => {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!raw) return 'Sin prioridad';
+  if (raw.startsWith('P1')) return 'Crítica';
+  if (raw.startsWith('P2')) return 'Alta';
+  if (raw.startsWith('P3')) return 'Media';
+  if (raw.startsWith('P4')) return 'Baja';
+  if (raw.startsWith('P5')) return 'Programable';
+  if (raw === 'CRITICAL' || raw === 'CRITICA' || raw === 'CRÍTICA') return 'Crítica';
+  if (raw === 'HIGH' || raw === 'ALTA') return 'Alta';
+  if (raw === 'MEDIUM' || raw === 'MEDIA') return 'Media';
+  if (raw === 'LOW' || raw === 'BAJA') return 'Baja';
+  return String(value);
+};
+
 const statusLabel = (value: unknown) => {
   const status = String(value || '').toLowerCase();
   if (status === 'completed' || status === 'closed') return 'Terminada';
@@ -175,7 +190,7 @@ export default function MaintenanceControlTowerPage() {
         <TopMetric tone="copper" icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
         <TopMetric tone="ink" icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
         <TopMetric tone="green" icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
-        <TopMetric tone="copper" icon={TimerReset} label="MP vencidas" value={data?.summary?.preventiveOverdue} />
+        <TopMetric tone="copper" icon={TimerReset} label="Preventivas vencidas" value={data?.summary?.preventiveOverdue} />
         <TopMetric
           tone="green"
           icon={Radio}
@@ -237,7 +252,7 @@ function AnalysisSlide({ data }: { data: any }) {
               </div>
               <div className="flex items-center gap-3">
                 <PriorityPill
-                  label={row.reportedStopped ? 'Alta' : row.priorityRank <= 2 ? 'Alta' : row.planningPriority || 'Atención'}
+                  label={row.reportedStopped ? 'Crítica' : row.priorityRank <= 2 ? 'Alta' : priorityLabel(row.planningPriority || 'Atención')}
                   critical={Boolean(row.reportedStopped || row.priorityRank <= 2)}
                 />
                 <span className="hidden text-sm text-[var(--tower-ink-muted)] 2xl:inline">
@@ -307,9 +322,16 @@ function StoppedSlide({ data }: { data: any }) {
 
 function PreventiveSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.preventiveRows) ? data.preventiveRows : [];
-  const pCounts = ['P1', 'P2', 'P3', 'P4', 'P5'].map((priority) => ({
-    label: priority,
-    value: rows.filter((row: any) => String(row.planningPriority || '').toUpperCase().startsWith(priority)).length,
+  const priorityGroups = [
+    { code: 'P1', label: 'Crítica' },
+    { code: 'P2', label: 'Alta' },
+    { code: 'P3', label: 'Media' },
+    { code: 'P4', label: 'Baja' },
+    { code: 'P5', label: 'Programable' },
+  ];
+  const pCounts = priorityGroups.map(({ code, label }) => ({
+    label,
+    value: rows.filter((row: any) => String(row.planningPriority || '').toUpperCase().startsWith(code)).length,
   }));
 
   return (
@@ -323,7 +345,7 @@ function PreventiveSlide({ data }: { data: any }) {
         </div>
         <div className="mt-4">
           <DataTable
-            headers={['Equipo', 'Faena', 'Base', 'Lectura', 'Próx. MP', 'Estado MP']}
+            headers={['Equipo', 'Faena', 'Control por', 'Lectura', 'Próxima mantención', 'Estado preventivo']}
             columnTemplate="1.5fr .9fr .65fr .8fr .85fr 1.25fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
@@ -331,13 +353,13 @@ function PreventiveSlide({ data }: { data: any }) {
               row.meterUnit || '—',
               row.currentMeter == null ? '—' : number(row.currentMeter),
               row.nextDueMeter == null ? '—' : number(row.nextDueMeter),
-              row.reportedMpStatus || row.planningPriority || 'Sin estado',
+              row.reportedMpStatus || priorityLabel(row.planningPriority) || 'Sin estado',
             ])}
           />
         </div>
       </Panel>
 
-      <Panel title="Prioridad y base de control" subtitle="Horas, kilómetros y vigencia del plan no se mezclan">
+      <Panel title="Urgencia y seguimiento" subtitle="Prioridad de atención y forma de controlar cada mantención">
         <BarList rows={pCounts} />
         <div className="mt-5 grid gap-2">
           <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
@@ -389,15 +411,15 @@ function ScheduleSlide({ data }: { data: any }) {
             row.assetName,
             row.assignedTo || 'Sin responsable',
             `${row.overdue ? 'Vencida · ' : row.scheduledDate === today ? 'Hoy · ' : row.scheduledDate === tomorrow ? 'Mañana · ' : ''}${row.lifecycleStage || statusLabel(row.status)}`,
-            row.priority || '—',
+            priorityLabel(row.priority),
             row.executionReadiness || 'Por confirmar',
           ])}
         />
       </Panel>
       <div className="grid gap-2 md:grid-cols-3">
-        <BasisRow label="SKUs Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
-        <BasisRow label="SKUs con stock usable" value={data?.inventory?.positiveStockSkus || 0} />
-        <BasisRow label="SKUs en conciliación" value={data?.inventory?.conflictedSkus || 0} />
+        <BasisRow label="Productos de Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
+        <BasisRow label="Productos con stock disponible" value={data?.inventory?.positiveStockSkus || 0} />
+        <BasisRow label="Productos por revisar" value={data?.inventory?.conflictedSkus || 0} />
       </div>
       {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="No hay trabajo activo pendiente de coordinación." /> : null}
     </div>
@@ -434,8 +456,8 @@ function FleetSlide({ data }: { data: any }) {
               </div>
               <div className="mb-1 text-[10px] text-muted-foreground">Correo {site.email} · WhatsApp {site.whatsapp}</div>
               <div className="flex h-4 overflow-hidden rounded bg-muted">
-                <div className="bg-emerald-500/70" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
-                <div className="bg-amber-500/70" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
+                <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
+                <div className="bg-[var(--tower-copper)]" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
                 <div className="bg-destructive/80" style={{ width: `${site.total ? (site.stopped / site.total) * 100 : 0}%` }} />
               </div>
             </div>
@@ -450,7 +472,7 @@ function FleetSlide({ data }: { data: any }) {
           rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
             row.assetName,
             row.site,
-            row.reportedStopped ? 'DETENIDO' : row.planningPriority || 'Atención',
+            row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
             row.openWorkOrders || '—',
             row.partsPending ? 'Pendiente' : '—',
             sourceLabel(row.latestSignalSource),
@@ -478,8 +500,8 @@ function ManagementSlide({ data }: { data: any }) {
         <div className="grid gap-3 md:grid-cols-2">
           <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin base'} />
           <ManagementMetric label="Backlog abierto" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin OT abiertas'} />
-          <ManagementMetric label="HH planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
-          <ManagementMetric label="HH reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
+          <ManagementMetric label="Horas planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
+          <ManagementMetric label="Horas reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
           <ManagementMetric
             label="OT críticas abiertas"
             value={data?.summary?.criticalOpenWorkOrders ?? '—'}
@@ -698,7 +720,7 @@ function BarList({ rows }: { rows: Array<{ label: string; value: number }> }) {
             <span className="tabular-nums text-muted-foreground">{row.value}</span>
           </div>
           <div className="h-3 overflow-hidden rounded bg-muted">
-            <div className="h-full bg-primary/75" style={{ width: `${(row.value / max) * 100}%` }} />
+            <div className="h-full bg-[var(--tower-copper)]" style={{ width: `${(row.value / max) * 100}%` }} />
           </div>
         </div>
       ))}
