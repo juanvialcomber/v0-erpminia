@@ -16,7 +16,7 @@ const fetcher = async (url: string): Promise<Response> => {
 };
 
 export default function WhatsappIaPage() {
-  const { data, error, isLoading, mutate } = useSWR<Response>('/api/admin/whatsapp', fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<Response>('/api/maintenance/whatsapp-ia', fetcher, {
     revalidateOnFocus: false,
   });
 
