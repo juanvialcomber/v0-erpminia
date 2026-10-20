@@ -70,35 +70,39 @@ export function ProduccionDashboard(){
     <WhatsappOperationalUpdates mode="overview"/>
     <div className="flex justify-end"><Link className="text-xs text-muted-foreground underline underline-offset-2" href="/dashboard/produccion/despachos">Ver coordinación informada de despachos</Link></div>
 
-    <section aria-label="Operación actual" className="space-y-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ahora</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Ejecución del período</h2></div>
-      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6">
-        <Metric icon={Factory} label="Tratado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} del plan de mineral a planta`:'Sin plan activo'}/>
-        <Metric icon={Target} label="Ritmo mensual" value={paceLabel} detail={plan?`Índice ${pct(plan.paceIndexPct)} · calendario ${pct(p?.calendarProgressPct)}`:'Sin comparación'}/>
-        <Metric icon={Gauge} label="Ley cabeza Cu" value={pct(p?.avgHeadGradePct,3)} detail={plan?.targetCuGradePct!=null?`Objetivo ${pct(plan.targetCuGradePct,2)}`:'Sin objetivo'}/>
-        <Metric icon={Activity} label="Recuperación" value={pct(p?.avgRecoveryPct,2)} detail={p?`${p.deterministicShifts}/${p.plantShifts} turnos determinísticos`:'—'}/>
-        <Metric icon={Beaker} label="Cu fino recuperado" value={p?tons(p.recoveredFineCuTons,3):'—'} detail={p?`${tons(p.containedCuTons,3)} Cu contenido`:'—'}/>
-        <Metric icon={PackageCheck} label="Concentrado despachado" value={p?tons(p.dispatch.wetMetricTons,2):'—'} detail={p?`${p.dispatch.validShipmentRows} válidos · ${p.dispatch.reviewShipmentRows} revisión`:'—'}/>
-      </div>
+    <section className="rounded-lg border bg-card">
+      <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo excepciones que cambian una decisión.</p></div>
+      <div className="divide-y">{data.intelligence.length?data.intelligence.slice(0,3).map(signal=><div key={signal.code} className="flex gap-3 px-5 py-4"><SignalIcon level={signal.level}/><div><p className="text-sm font-medium">{signal.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p></div></div>):<div className="px-5 py-5 text-sm text-muted-foreground">Sin señales para el período.</div>}</div>
     </section>
 
-    <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-5 py-4"><div className="flex items-center justify-between gap-4"><div><h2 className="font-medium">Plan vs ejecución</h2><p className="mt-1 text-xs text-muted-foreground">Tratamiento contra plan mensual.</p></div>{plan?<span className="text-xs text-muted-foreground">{plan.code}</span>:null}</div></div>
+    <section aria-label="Operación actual" className="space-y-3">
+      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ahora</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Ejecución del período</h2></div>
+      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <Metric icon={Factory} label="Tratado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} del plan`:'Sin plan activo'}/>
+        <Metric icon={Target} label="Ritmo mensual" value={paceLabel} detail={plan?`Calendario ${pct(p?.calendarProgressPct)}`:'Sin comparación'}/>
+        <Metric icon={Gauge} label="Ley cabeza Cu" value={pct(p?.avgHeadGradePct,3)} detail={plan?.targetCuGradePct!=null?`Objetivo ${pct(plan.targetCuGradePct,2)}`:'Sin objetivo'}/>
+        <Metric icon={Activity} label="Recuperación" value={pct(p?.avgRecoveryPct,2)} detail={p?`${p.deterministicShifts}/${p.plantShifts} turnos`:'—'}/>
+      </div>
+      <details className="rounded-lg border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver resultado metalúrgico y despachos</summary>
+        <div className="grid gap-px border-t bg-border sm:grid-cols-2">
+          <Mini label="Cu fino recuperado" value={p?tons(p.recoveredFineCuTons,3):'—'} detail={p?`${tons(p.containedCuTons,3)} Cu contenido`:'—'}/>
+          <Mini label="Concentrado despachado" value={p?tons(p.dispatch.wetMetricTons,2):'—'} detail={p?`${p.dispatch.validShipmentRows} válidos · ${p.dispatch.reviewShipmentRows} revisión`:'—'}/>
+        </div>
+      </details>
+    </section>
+
+    <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Ver plan vs ejecución</summary>
+      <div className="border-t">
         <div className="grid gap-px bg-border md:grid-cols-4">
           <Mini label="Plan mineral a planta" value={plan?tons(plan.mineralToPlantTons):'—'} detail="Mes completo"/>
           <Mini label="Tratado acumulado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} ejecutado`:'—'}/>
           <Mini label="Proyección simple" value={plan?.projectedTreatmentTons!=null?tons(plan.projectedTreatmentTons,0):'—'} detail={plan?.projectedPlanPct!=null?`${pct(plan.projectedPlanPct)} del plan`:'—'}/>
           <Mini label="Avance calendario" value={p?pct(p.calendarProgressPct):'—'} detail={p?`${p.elapsedDays}/${p.daysInMonth} días`:'—'}/>
         </div>
-        {p&&plan?<div className="px-5 py-4"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground" style={{width:`${Math.min(100,Math.max(0,plan.treatmentProgressPct||0))}%`}}/></div><div className="mt-2 flex justify-between text-xs text-muted-foreground"><span>0%</span><span>Tratamiento {pct(plan.treatmentProgressPct)}</span><span>100%</span></div></div>:null}
       </div>
-
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Excepciones que requieren revisión.</p></div>
-        <div className="divide-y">{data.intelligence.length?data.intelligence.map(signal=><div key={signal.code} className="flex gap-3 px-5 py-4"><SignalIcon level={signal.level}/><div><p className="text-sm font-medium">{signal.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p></div></div>):<div className="px-5 py-5 text-sm text-muted-foreground">Sin señales para el período.</div>}</div>
-      </div>
-    </section>
+    </details>
 
     <section className="rounded-lg border bg-card">
       <div className="border-b px-5 py-4"><h2 className="font-medium">Transporte comparable</h2><p className="mt-1 text-xs text-muted-foreground">Misma ventana de evidencia para transporte y tratamiento.</p></div>
