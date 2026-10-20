@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 const norm=(value:string|null|undefined)=>(value||'').trim().toLocaleLowerCase('es-CL').replace(/\s+/g,' ');
+const entityKey=(value:string|null|undefined)=>norm(value).replace(/^mina\s+/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
 const num=(value:unknown)=>Number(value||0);
 
 type Attention='alert'|'watch'|'ok'|'no_comparison';
@@ -156,14 +157,14 @@ export async function GET(request:NextRequest){
   }
 
   if(statsThrough){
-    const mineByName=new Map((mines.data||[]).map(m=>[norm(m.name),m]));
+    const mineByName=new Map((mines.data||[]).flatMap(m=>[[norm(m.name),m],[norm(m.name).replace(/^mina\s+/,''),m]]));
     for(const row of (sourceStats.data||[]).filter((item:any)=>item.record_type==='sector_monthly_actual_plan_source')){
       const values=(row.normalized_values||{}) as Record<string,unknown>;
       const sourceMine=typeof values.mine==='string'?values.mine:'';
       const actual=typeof values.actual_to_cutoff_t==='number'&&Number.isFinite(values.actual_to_cutoff_t)?values.actual_to_cutoff_t:null;
       if(actual===null||!row.entity_label)continue;
       const mine=mineByName.get(norm(sourceMine));
-      const sector=(sectors.data||[]).find(s=>(!mine||s.mine_source_id===mine.id)&&norm(s.normalized_name||s.name)===norm(row.entity_label));
+      const sector=(sectors.data||[]).find(s=>(!mine||s.mine_source_id===mine.id)&&entityKey(s.normalized_name||s.name)===entityKey(row.entity_label));
       const item=ensureSector(mine?.id||null,sector?.id||null,mine?.name||sourceMine,sector?.name||row.entity_label);
       item.actualTons=actual;
       item.movements=0;
