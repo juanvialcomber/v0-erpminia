@@ -80,3 +80,12 @@ test('wallboard pins all displayed timestamps to Santiago time', () => {
   assert.match(source, /timeZone: SANTIAGO_TIME_ZONE/);
   assert.match(source, /hour12: false/);
 });
+
+
+test('wallboard never truncates operational names or table values', () => {
+  assert.doesNotMatch(source, /truncate text-xl font-semibold/);
+  assert.doesNotMatch(source, /min-w-0 truncate px-4 py-4/);
+  assert.match(source, /whitespace-normal/);
+  assert.match(source, /break-words/);
+  assert.match(source, /columnTemplate="1\.45fr \.8fr 1\.1fr 1\.5fr \.7fr 1\.25fr"/);
+});
