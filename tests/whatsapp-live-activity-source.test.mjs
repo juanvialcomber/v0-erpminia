@@ -93,6 +93,30 @@ test('protected read routes preserve tenant boundaries and do not modify certifi
  }
 });
 
+
+test('operational sections surface the matching WhatsApp feed before domain detail',()=>{
+ const overview=file('components/dashboard/produccion-dashboard.tsx');
+ const mineUi=file('components/production/mine-sector-intelligence.tsx');
+ const drillingUi=file('app/dashboard/produccion/sondaje/page.tsx');
+ const transportUi=file('components/production/mineral-transport-dashboard.tsx');
+ const plantUi=file('components/production/plant-metallurgy-dashboard.tsx');
+ const feedUi=file('components/production/whatsapp-operational-updates.tsx');
+ assert.match(overview,/<WhatsappOperationalUpdates mode="overview"\/>/);
+ assert.match(mineUi,/<WhatsappOperationalUpdates mode="mine"\/>/);
+ assert.match(drillingUi,/<WhatsappOperationalUpdates mode="drilling"\/>/);
+ assert.match(transportUi,/<WhatsappOperationalUpdates mode="dispatch"\/>/);
+ assert.match(plantUi,/<WhatsappOperationalUpdates mode="plant"\/>/);
+ assert.ok(mineUi.indexOf('<WhatsappOperationalUpdates mode="mine"/>')<
+   mineUi.indexOf('Minas alerta'));
+ assert.ok(transportUi.indexOf('<WhatsappOperationalUpdates mode="dispatch"/>')<
+   transportUi.indexOf('Toneladas transportadas'));
+ assert.ok(plantUi.indexOf('<WhatsappOperationalUpdates mode="plant"/>')<
+   plantUi.indexOf('<PlantSourceCutoff/>'));
+ assert.match(feedUi,/refreshInterval:30000/);
+ assert.match(feedUi,/revalidateOnReconnect:true/);
+ assert.match(feedUi,/Se actualiza automáticamente cada 30 s/);
+});
+
 test('long shift reports preserve content and label videos as evidence of the whole report',()=>{
  const detail='Limpieza y revisión de mallas. '+('Inspección operacional con observaciones. '.repeat(15));
  const feed=projectWhatsappActivity({groups:[plant],messages:[
