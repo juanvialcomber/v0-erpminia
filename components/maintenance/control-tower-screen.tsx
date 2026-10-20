@@ -457,7 +457,7 @@ function FleetSlide({ data }: { data: any }) {
             return <div key={site.label} className="rounded-md border border-border/60 p-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0"><div className="text-base font-semibold">{site.label}</div><div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div></div>
-                <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-xs text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
+                <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-sm text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
               </div>
               <div className="mt-3 flex h-3 overflow-hidden rounded bg-muted">
                 <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? site.operational / site.total * 100 : 0}%` }} />
