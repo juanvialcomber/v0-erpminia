@@ -1,5 +1,3 @@
-import { MaintenanceControlTower } from '@/components/maintenance/maintenance-control-tower';
+import MaintenanceControlTowerPage from '@/components/maintenance/control-tower-screen';
 
-export default function MaintenanceControlTowerPage() {
-  return <MaintenanceControlTower />;
-}
+export default MaintenanceControlTowerPage;
