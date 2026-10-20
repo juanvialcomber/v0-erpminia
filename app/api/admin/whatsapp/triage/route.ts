@@ -61,6 +61,33 @@ export async function GET(request: NextRequest) {
   const routed=prepareWhatsappTriage(messages,
     !scopedReport.source_scope_stale && Array.isArray(scopedReport.findings)
       ? scopedReport.findings : [],{limit:250});
+
+  const {data:reviewRows,error:reviewError}=await db
+    .from('motil_whatsapp_operational_activities')
+    .select('message_id,item_index,review_status,reviewed_at')
+    .eq('organization_id',auth.organizationId)
+    .eq('operation_date',date)
+    .limit(1000);
+  if(reviewError)return NextResponse.json({error:'No se pudo consultar la revisión humana'},
+    {status:503,headers:GREEN_NO_STORE});
+
+  const reviewsByFinding=new Map<number,Array<{status:string;reviewedAt:string|null}>>();
+  for(const row of reviewRows||[]){
+    const index=Number(row.item_index);
+    if(!Number.isSafeInteger(index)||index<0)continue;
+    const rows=reviewsByFinding.get(index)||[];
+    rows.push({status:String(row.review_status||''),reviewedAt:row.reviewed_at||null});
+    reviewsByFinding.set(index,rows);
+  }
+  const findings=routed.findings.map((finding:any)=>{
+    const reviews=reviewsByFinding.get(finding.index)||[];
+    if(!reviews.length)return finding;
+    const statuses=[...new Set(reviews.map(row=>row.status))];
+    const reviewStatus=statuses.length===1?statuses[0]:'needs_more_info';
+    const reviewedAt=reviews.map(row=>row.reviewedAt).filter(Boolean).sort().at(-1)||null;
+    return {...finding,reviewStatus,reviewedAt};
+  });
+
   return NextResponse.json({
     reportDate:date,reportStatus:scopedReport.status,
     scopeStale:scopedReport.source_scope_stale,
@@ -70,5 +97,6 @@ export async function GET(request: NextRequest) {
       scopedReport.message_count!==messages.length,
     truncated:truncated||Boolean(report.truncated),
     ...routed,
+    findings,
   },{headers:GREEN_NO_STORE});
 }
