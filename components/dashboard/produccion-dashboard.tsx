@@ -51,7 +51,7 @@ export function ProduccionDashboard(){
   const {data,error,isLoading,mutate}=useSWR<Overview>('/api/produccion/canonical-overview',fetcher);
   const { canEdit, ready } = useModuleAccess();
   if(error) return <StatePanel tone="error" title="No fue posible cargar Producción" description={error.message} actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>}/>;
-  if(isLoading||!data) return <StatePanel tone="neutral" title="Cargando Producción" description="Leyendo KPI desde la capa canónica."/>;
+  if(isLoading||!data) return <StatePanel tone="neutral" title="Cargando Producción" description="Leyendo los datos más recientes."/>;
 
   const p=data.currentPeriod;
   const plan=p?.plan;
@@ -63,22 +63,22 @@ export function ProduccionDashboard(){
       <PageHeaderContent>
         <PageHeaderEyebrow>Producción</PageHeaderEyebrow>
         <PageHeaderTitle>Producción</PageHeaderTitle>
-        <PageHeaderDescription>{p?'El corte canónico más reciente se muestra primero. Las métricas metalúrgicas mantienen explícitamente su propia ventana histórica.':'Sin período operacional disponible.'}</PageHeaderDescription>
+        <PageHeaderDescription>{p?'Primero mostramos el dato más reciente. El histórico de planta queda separado por fecha.':'Sin período operacional disponible.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>{ready && canEdit('prod_operaciones') ? <Button asChild variant="outline"><Link href="/dashboard/produccion/ingreso-datos"><Upload className="h-4 w-4"/>Ingresar datos</Link></Button> : null}</PageHeaderActions>
     </PageHeader>
 
     <WhatsappOperationalUpdates mode="overview"/>
     <ProductionSourceSnapshot/>
-    <div className="flex justify-end"><Link className="text-xs text-muted-foreground underline underline-offset-2" href="/dashboard/produccion/despachos">Ver coordinación informada de despachos</Link></div>
+    <div className="flex justify-end"><Link className="text-xs text-muted-foreground underline underline-offset-2" href="/dashboard/produccion/despachos">Ver despachos informados</Link></div>
 
     <section className="rounded-lg border bg-card">
-      <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención en la serie acreditada</h2><p className="mt-1 text-xs text-muted-foreground">Excepciones de la ventana histórica disponible; no sustituyen el corte canónico superior.</p></div>
+      <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Alertas del histórico disponible. No cambian el dato más reciente.</p></div>
       <div className="divide-y">{data.intelligence.length?data.intelligence.slice(0,3).map(signal=><div key={signal.code} className="flex gap-3 px-5 py-4"><SignalIcon level={signal.level}/><div><p className="text-sm font-medium">{signal.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p></div></div>):<div className="px-5 py-5 text-sm text-muted-foreground">Sin señales para el período.</div>}</div>
     </section>
 
     <section aria-label="Serie metalúrgica acreditada" className="space-y-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Serie acreditada</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Metalurgia · {period(p?.periodStart)}</h2><p className="mt-1 text-xs text-muted-foreground">Datos hasta {date(p?.dataThrough)}; se mantienen separados del corte operativo más reciente.</p></div>
+      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Histórico confirmado</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Metalurgia · {period(p?.periodStart)}</h2><p className="mt-1 text-xs text-muted-foreground">Datos hasta {date(p?.dataThrough)}. Este bloque es histórico.</p></div>
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Factory} label="Tratado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} del plan`:'Sin plan activo'}/>
         <Metric icon={Target} label="Ritmo mensual" value={paceLabel} detail={plan?`Calendario ${pct(p?.calendarProgressPct)}`:'Sin comparación'}/>
@@ -86,34 +86,34 @@ export function ProduccionDashboard(){
         <Metric icon={Activity} label="Recuperación" value={pct(p?.avgRecoveryPct,2)} detail={p?`${p.deterministicShifts}/${p.plantShifts} turnos`:'—'}/>
       </div>
       <details className="rounded-lg border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver resultado metalúrgico y despachos</summary>
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver resultados y despachos</summary>
         <div className="grid gap-px border-t bg-border sm:grid-cols-2">
-          <Mini label="Cu fino recuperado" value={p?tons(p.recoveredFineCuTons,3):'—'} detail={p?`${tons(p.containedCuTons,3)} Cu contenido`:'—'}/>
-          <Mini label="Concentrado despachado" value={p?tons(p.dispatch.wetMetricTons,2):'—'} detail={p?`${p.dispatch.validShipmentRows} válidos · ${p.dispatch.reviewShipmentRows} revisión`:'—'}/>
+          <Mini label="Cobre fino recuperado" value={p?tons(p.recoveredFineCuTons,3):'—'} detail={p?`${tons(p.containedCuTons,3)} Cobre contenido`:'—'}/>
+          <Mini label="Concentrado enviado" value={p?tons(p.dispatch.wetMetricTons,2):'—'} detail={p?`${p.dispatch.validShipmentRows} válidos · ${p.dispatch.reviewShipmentRows} revisión`:'—'}/>
         </div>
       </details>
     </section>
 
     <details className="rounded-lg border bg-card">
-      <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Ver plan vs ejecución</summary>
+      <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Ver plan y avance</summary>
       <div className="border-t">
         <div className="grid gap-px bg-border md:grid-cols-4">
           <Mini label="Plan mineral a planta" value={plan?tons(plan.mineralToPlantTons):'—'} detail="Mes completo"/>
           <Mini label="Tratado acumulado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} ejecutado`:'—'}/>
-          <Mini label="Proyección simple" value={plan?.projectedTreatmentTons!=null?tons(plan.projectedTreatmentTons,0):'—'} detail={plan?.projectedPlanPct!=null?`${pct(plan.projectedPlanPct)} del plan`:'—'}/>
+          <Mini label="Proyección" value={plan?.projectedTreatmentTons!=null?tons(plan.projectedTreatmentTons,0):'—'} detail={plan?.projectedPlanPct!=null?`${pct(plan.projectedPlanPct)} del plan`:'—'}/>
           <Mini label="Avance calendario" value={p?pct(p.calendarProgressPct):'—'} detail={p?`${p.elapsedDays}/${p.daysInMonth} días`:'—'}/>
         </div>
       </div>
     </details>
 
     <section className="rounded-lg border bg-card">
-      <div className="border-b px-5 py-4"><h2 className="font-medium">Transporte comparable</h2><p className="mt-1 text-xs text-muted-foreground">Misma ventana de evidencia para transporte y tratamiento.</p></div>
-      <div className="grid gap-px bg-border sm:grid-cols-3"><Mini label="Transportado" value={p?tons(p.transportComparable.transportedTons,1):'—'} detail={`Hasta ${date(p?.transportComparable.sourceThrough)}`}/><Mini label="Tratado comparable" value={p?tons(p.transportComparable.treatedTons,1):'—'} detail="Misma ventana"/><Mini label="Brecha comparable" value={p?tons(p.transportComparable.deltaTons,1):'—'} detail="No equivale a pérdida"/></div>
+      <div className="border-b px-5 py-4"><h2 className="font-medium">Transporte y planta</h2><p className="mt-1 text-xs text-muted-foreground">Comparación usando el mismo período.</p></div>
+      <div className="grid gap-px bg-border sm:grid-cols-3"><Mini label="Transportado" value={p?tons(p.transportComparable.transportedTons,1):'—'} detail={`Hasta ${date(p?.transportComparable.sourceThrough)}`}/><Mini label="Tratado en el mismo período" value={p?tons(p.transportComparable.treatedTons,1):'—'} detail="Misma ventana"/><Mini label="Diferencia" value={p?tons(p.transportComparable.deltaTons,1):'—'} detail="No significa pérdida"/></div>
     </section>
 
     <CoverageOverview data={data}/>
 
-    <details className="border-t pt-4 text-xs text-muted-foreground"><summary className="cursor-pointer font-medium text-foreground">Cómo leer estos datos</summary><p className="mt-2 max-w-4xl leading-5">{data.semantics.planVsActual} {data.semantics.concentrate} {data.semantics.sourceAbsence}</p></details>
+    <details className="border-t pt-4 text-xs text-muted-foreground"><summary className="cursor-pointer font-medium text-foreground">Cómo leer esta vista</summary><p className="mt-2 max-w-4xl leading-5">{data.semantics.planVsActual} {data.semantics.concentrate} {data.semantics.sourceAbsence}</p></details>
   </div>;
 }
 
@@ -132,9 +132,9 @@ function CoverageOverview({data}:{data:Overview}){
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fuentes</p>
-        <h2 id="production-coverage-title" className="mt-1 text-lg font-semibold tracking-tight">Estado de fuentes</h2>
+        <h2 id="production-coverage-title" className="mt-1 text-lg font-semibold tracking-tight">Datos disponibles</h2>
       </div>
-      <p className="max-w-xl text-xs leading-5 text-muted-foreground">Detalle secundario de cobertura. Sin fuente nunca se representa como cero.</p>
+      <p className="max-w-xl text-xs leading-5 text-muted-foreground">Muestra qué datos existen. Si falta una fuente, no mostramos cero.</p>
     </div>
 
     <div className="overflow-hidden rounded-lg border bg-card divide-y">
@@ -146,22 +146,22 @@ function CoverageOverview({data}:{data:Overview}){
         return <Link key={domain.key} href={domain.href} aria-label={`Abrir ${domain.title}: ${meta.label}`} className="group grid gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(170px,.8fr)_minmax(180px,1fr)_auto] sm:items-center">
           <div className="flex items-center gap-3"><Icon className="size-4 shrink-0 text-muted-foreground"/><div><p className="text-sm font-medium">{domain.title}</p><p className="text-xs text-muted-foreground">{n(coverage.evidenceCount)} {domain.unit}{coverage.dataThrough?` · corte ${date(coverage.dataThrough)}`:''}</p></div></div>
           <p className="text-xs leading-5 text-muted-foreground line-clamp-2">{coverage.note}</p>
-          <div className="flex items-center gap-3 sm:justify-end"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}><StatusIcon className="size-3"/>{meta.label}</span><span className="text-xs text-muted-foreground">{coverage.reviewCount>0?`${n(coverage.reviewCount)} revisión`:'Sin revisión'}</span><ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"/></div>
+          <div className="flex items-center gap-3 sm:justify-end"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}><StatusIcon className="size-3"/>{meta.label}</span><span className="text-xs text-muted-foreground">{coverage.reviewCount>0?`${n(coverage.reviewCount)} revisión`:'Sin pendientes'}</span><ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"/></div>
         </Link>;
       })}
     </div>
 
     <div className="grid gap-3 lg:grid-cols-[0.8fr_1.2fr]">
-      <div className="rounded-lg border bg-card px-4 py-3"><div className="flex items-center gap-3">{qualityOk?<CheckCircle2 className="h-4 w-4"/>:<AlertTriangle className="h-4 w-4"/>}<div><p className="text-sm font-medium">Calidad de datos · {data.quality.pass} PASS · {data.quality.hold} HOLD</p><p className="mt-1 text-xs text-muted-foreground">{n(data.quality.sourceFiles)} archivos fuente · {n(data.quality.sourceSheets)} hojas registradas · {n(data.quality.sourceAnomalies)} anomalías fuente</p></div></div></div>
-      <div className="rounded-lg border bg-card px-4 py-3"><p className="text-sm font-medium">Revisiones de datos</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{reviewItems.join(' · ')}. Las colas pueden solaparse y no se suman como un único total.</p></div>
+      <div className="rounded-lg border bg-card px-4 py-3"><div className="flex items-center gap-3">{qualityOk?<CheckCircle2 className="h-4 w-4"/>:<AlertTriangle className="h-4 w-4"/>}<div><p className="text-sm font-medium">Control de datos · {data.quality.pass} bien · {data.quality.hold} por revisar</p><p className="mt-1 text-xs text-muted-foreground">{n(data.quality.sourceFiles)} archivos · {n(data.quality.sourceSheets)} hojas · {n(data.quality.sourceAnomalies)} alertas</p></div></div></div>
+      <div className="rounded-lg border bg-card px-4 py-3"><p className="text-sm font-medium">Datos por revisar</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{reviewItems.join(' · ')}. Un mismo dato puede aparecer en más de una revisión.</p></div>
     </div>
   </section>;
 }
 
 function coverageStatus(status:'operational'|'partial'|'awaiting_source'){
-  if(status==='operational') return {label:'Operativo',icon:CheckCircle2,className:'border-secondary/35 bg-secondary/10 text-secondary'};
-  if(status==='partial') return {label:'Parcial',icon:AlertTriangle,className:'border-primary/35 bg-primary/10 text-primary'};
-  return {label:'Sin fuente',icon:CircleDashed,className:'border-border bg-muted/40 text-muted-foreground'};
+  if(status==='operational') return {label:'Completo',icon:CheckCircle2,className:'border-secondary/35 bg-secondary/10 text-secondary'};
+  if(status==='partial') return {label:'Incompleto',icon:AlertTriangle,className:'border-primary/35 bg-primary/10 text-primary'};
+  return {label:'Sin datos',icon:CircleDashed,className:'border-border bg-muted/40 text-muted-foreground'};
 }
 
 function Metric({icon:Icon,label,value,detail}:{icon:any;label:string;value:string;detail:string}){return <div className="bg-card px-5 py-4"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{label}</p><Icon className="h-4 w-4 text-muted-foreground"/></div><p className="mt-2 text-xl font-semibold tracking-tight">{value}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p></div>}
