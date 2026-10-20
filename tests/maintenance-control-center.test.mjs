@@ -77,3 +77,19 @@ test('Autopilot prepares actions but preserves human authority',()=>{
   assert.match(page,/MOTIL prepara:/);
   assert.match(page,/Debe decidir:/);
 });
+
+
+test('maintenance control tower rotates six read-only views and is in navigation',()=>{
+  const tower = fs.readFileSync('components/maintenance/maintenance-control-tower.tsx','utf8');
+  const layout = fs.readFileSync('app/dashboard/mantenimiento/layout.tsx','utf8');
+  const page = fs.readFileSync('app/dashboard/mantenimiento/torre-control/page.tsx','utf8');
+  assert.match(tower,/Torre de control/);
+  assert.match(tower,/cambia cada 30 segundos/);
+  assert.match(tower,/const VIEWS = \[/);
+  assert.match(tower,/setViewIndex\(\(index\) => \(index \+ 1\) % VIEWS\.length\)/);
+  assert.match(tower,/requestFullscreen/);
+  assert.match(tower,/action\.kind === 'operational_review'\) return false/);
+  assert.match(layout,/\/dashboard\/mantenimiento\/torre-control/);
+  assert.match(layout,/Torre de control/);
+  assert.match(page,/MaintenanceControlTower/);
+});
