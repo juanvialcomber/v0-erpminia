@@ -186,6 +186,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!hasModuleWrite && !executionAccess.ok) return executionAccess.response;
 
     const body = (await request.json()) as WorkOrderPatchPayload;
+    const { data: currentOrderState, error: currentOrderStateError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('status')
+      .eq('id', id)
+      .eq('organization_id', context.organizationId)
+      .single();
+    if (currentOrderStateError) throw currentOrderStateError;
+    const currentStatus = String(currentOrderState?.status || '').toLowerCase();
+    if (['completed', 'closed', 'cancelled', 'canceled'].includes(currentStatus)) {
+      return NextResponse.json({ error: 'La OT ya está cerrada o anulada y no se puede modificar.' }, { status: 409 });
+    }
+    if (currentStatus === 'in_progress' && hasModuleWrite) {
+      const structuralFields = ['work_type', 'priority', 'scheduled_date', 'assigned_person_id', 'cost_center_id']
+        .filter((key) => (body as Record<string, unknown>)[key] !== undefined);
+      if (structuralFields.length > 0) {
+        return NextResponse.json({ error: 'Una OT en curso permite corregir el nombre o la descripción, pero no cambiar su planificación.' }, { status: 409 });
+      }
+    }
     const workshopScope = await resolveWorkshopHeadScope(context);
     if (!hasModuleWrite) {
       const mutationKeys = Object.entries(body)
