@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 type ActionItem = {
   id: string;
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
       context.supabase.from('work_order_close_readiness_v2').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_reliability_by_asset_v1').select('canonical_asset_id,asset_code,asset_name,audited_closures,recurring_cause_count,max_same_cause_occurrences,has_recurring_root_cause').eq('organization_id', context.organizationId),
-      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
+      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id,assigned_to_name,status,priority,scheduled_date,timer_status,total_timer_seconds,actual_duration_hours').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
       context.supabase.from('drilling_maintenance_review_queue_v1').select('review_id,canonical_asset_id,asset_code,asset_name,operation_date,review_reason,equipment_status_raw,machine_observations,review_status,linked_work_order_id,has_linked_work_order').eq('organization_id', context.organizationId).eq('review_status', 'pending').eq('has_linked_work_order', false).order('operation_date', { ascending: true }).limit(50),
       context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,completion_date,assigned_to_name').eq('organization_id', context.organizationId).not('created_by', 'is', null).eq('status', 'completed').order('completion_date', { ascending: false, nullsFirst: false }).limit(100),
       context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status').eq('organization_id', context.organizationId),
@@ -76,6 +77,22 @@ export async function GET(request: NextRequest) {
     const operationalOrderRows = operationalOrdersResult.data || [];
     const operationalWorkOrderIds = new Set(operationalOrderRows.map((row:any) => String(row.id)));
     const unassignedOperationalOrders = operationalOrderRows.filter((row:any) => !row.assigned_person_id);
+    const today = chileTodayDateKey();
+    const overdueUnstartedOrders = operationalOrderRows.filter((row:any) => {
+      const scheduledDate = String(row.scheduled_date || '');
+      const status = String(row.status || '').toLowerCase();
+      const timerStatus = String(row.timer_status || 'idle').toLowerCase();
+      const timerSeconds = Number(row.total_timer_seconds || 0);
+      const actualHours = Number(row.actual_duration_hours || 0);
+      return Boolean(row.assigned_person_id)
+        && scheduledDate.length >= 10
+        && scheduledDate.slice(0, 10) < today
+        && ['open', 'assigned', 'pending', 'planned'].includes(status)
+        && timerStatus === 'idle'
+        && timerSeconds <= 0
+        && actualHours <= 0;
+    });
+    const overdueUnstartedIds = new Set(overdueUnstartedOrders.map((row:any) => String(row.id)));
     const allCloseRows = closeResult.data || [];
     const closeRows = allCloseRows.filter((row:any) => operationalWorkOrderIds.has(String(row.work_order_id)));
     const preventiveRows = preventiveResult.data || [];
@@ -128,6 +145,19 @@ export async function GET(request: NextRequest) {
         title: `Aprobar cierre · ${row.work_order_number || 'OT'}`,
         description: `${row.title || 'Orden de trabajo terminada'}${row.assigned_to_name ? ` · ${row.assigned_to_name}` : ''}`,
         evidence: row.completion_date ? `Terminada ${new Date(row.completion_date).toLocaleString('es-CL')}` : 'OT terminada pendiente de revisión',
+        href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
+        assetHref: assetHref(row.canonical_asset_id),
+      });
+    }
+
+    for (const row of overdueUnstartedOrders) {
+      actions.push({
+        id: `execution-due:${row.id}`,
+        kind: 'execution_due',
+        priority: 11,
+        title: `Revisar OT vencida · ${row.work_order_number || 'OT'}`,
+        description: `${row.title || 'Orden de trabajo'}${row.assigned_to_name ? ` · ${row.assigned_to_name}` : ''}`,
+        evidence: `Programada ${String(row.scheduled_date).slice(0, 10)} · aún no registra inicio de ejecución.`,
         href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
         assetHref: assetHref(row.canonical_asset_id),
       });
@@ -190,6 +220,7 @@ export async function GET(request: NextRequest) {
     }
 
     for (const row of closeRows) {
+      if (overdueUnstartedIds.has(String(row.work_order_id))) continue;
       const number = row.work_order_number || 'OT';
       const href = `/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${row.work_order_id}`;
       const common = { assetHref: assetHref(row.canonical_asset_id) };
@@ -223,6 +254,7 @@ export async function GET(request: NextRequest) {
       summary: {
         openWorkOrders: closeRows.length,
         unassignedOpenWorkOrders: unassignedOperationalOrders.length,
+        overdueUnstartedWorkOrders: overdueUnstartedOrders.length,
         historicalOpenWorkOrders: Math.max(0, allCloseRows.length - closeRows.length),
         overdueHourSchedules: preventiveRows.filter((row:any) => row.hour_status === 'overdue').length,
         unplannedOverdueHourSchedules: preventiveRows.filter((row:any) => row.hour_status === 'overdue' && !row.generated_work_order_id).length,

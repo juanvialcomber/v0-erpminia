@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const route = await readFile(new URL('../app/api/maintenance/control-center/route.ts', import.meta.url), 'utf8');
 
 test('planning derives assignment work from canonical open operational orders', () => {
-  assert.match(route, /select\('id,work_order_number,title,canonical_asset_id,assigned_person_id'\)/);
+  assert.match(route, /select\('id,work_order_number,title,canonical_asset_id,assigned_person_id,[^']*scheduled_date[^']*timer_status[^']*total_timer_seconds[^']*actual_duration_hours[^']*'\)/);
   assert.match(route, /unassignedOperationalOrders = operationalOrderRows\.filter\(\(row:any\) => !row\.assigned_person_id\)/);
   assert.match(route, /kind: 'assignment_needed'/);
   assert.match(route, /Asignar responsable/);
