@@ -14,6 +14,6 @@ test('home keeps priorities and temporal changes as separate surfaces', () => {
 });
 
 test('temporal home copy does not promote changes into impact or priority', () => {
-  assert.match(dict, /no implica impacto, causalidad ni prioridad adicional/);
+  assert.match(dict, /No significa que tengan mayor impacto o prioridad/);
   assert.doesNotMatch(home, /attention.*change/i);
 });
