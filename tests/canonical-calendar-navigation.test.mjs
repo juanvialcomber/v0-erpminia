@@ -40,3 +40,17 @@ test('personal calendar includes work assigned to the viewer and work planned by
   assert.match(calendar, /const plannedByMe = Boolean\(item\.created_by_me\)/);
   assert.match(calendar, /if \(!assignedToMe && !plannedByMe\) return false/);
 });
+
+
+test('personal calendar surfaces actionable maintenance decisions, not only assignments', () => {
+  const route = readFileSync('app/api/calendar/operational/route.ts', 'utf8');
+  const calendar = readFileSync('components/operational-calendar/comfortable-operational-calendar.tsx', 'utf8');
+  assert.match(route, /getMaintenanceWorkOrderCreationCapability/);
+  assert.match(route, /action_label: 'Programar OT'/);
+  assert.match(route, /kind: 'Revisar cierre'/);
+  assert.match(route, /kind: 'Revisar señal'/);
+  assert.match(route, /Completar centro de costo/);
+  assert.match(calendar, /const needsMyAction = Boolean\(item\.actionable_for_me\)/);
+  assert.match(calendar, /Qué hacer/);
+  assert.match(calendar, /Mis OT y las acciones que tengo que revisar, programar o destrabar/);
+});
