@@ -257,7 +257,10 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          void patchOrder({
+          void patchOrder(workOrder.status === 'in_progress' ? {
+            title: String(form.get('title') || ''),
+            description: String(form.get('description') || ''),
+          } : {
             title: String(form.get('title') || ''),
             description: String(form.get('description') || ''),
             work_type: String(form.get('work_type') || ''),
@@ -265,13 +268,14 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
             scheduled_date: String(form.get('scheduled_date') || '') || null,
           });
         }}>
+          {workOrder.status === 'in_progress' ? <p className="text-sm text-muted-foreground">La OT está en curso. Puedes corregir el nombre o la descripción sin alterar la planificación.</p> : null}
           <div className="space-y-2"><Label htmlFor="edit-title">Trabajo</Label><Input id="edit-title" name="title" defaultValue={workOrder.title || ''} required /></div>
           <div className="space-y-2"><Label htmlFor="edit-description">Descripción</Label><Textarea id="edit-description" name="description" defaultValue={workOrder.description || ''} rows={3} /></div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          {workOrder.status !== 'in_progress' ? <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2"><Label htmlFor="edit-work-type">Tipo</Label><select id="edit-work-type" name="work_type" defaultValue={workOrder.work_type || 'corrective'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="corrective">Correctivo</option><option value="preventive">Preventivo</option><option value="inspection">Inspección</option>{workOrder.work_type === 'general' ? <option value="general">Trabajo general</option> : null}</select></div>
             <div className="space-y-2"><Label htmlFor="edit-priority">Prioridad</Label><select id="edit-priority" name="priority" defaultValue={workOrder.priority || 'medium'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></div>
             <div className="space-y-2"><Label htmlFor="edit-date">Fecha</Label><Input id="edit-date" name="scheduled_date" type="date" defaultValue={workOrder.scheduled_date?.slice(0,10) || ''} /></div>
-          </div>
+          </div> : null}
           <div className="flex flex-wrap gap-2"><Button type="submit">Guardar cambios</Button></div>
         </form>
         <div className="border-t p-4">
