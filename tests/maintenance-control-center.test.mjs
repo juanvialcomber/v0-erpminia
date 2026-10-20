@@ -53,14 +53,14 @@ test('control center excludes historical work orders from operational actions',(
 
 test('maintenance home stays role-aware while preserving direct factual routes',()=>{
   assert.match(dict,/Qué debo dejar listo hoy/);
-  assert.match(dict,/Qué debo decidir o destrabar/);
-  assert.match(dict,/Impacto operativo de mantenimiento/);
-  assert.match(dict,/Estado de mantenimiento/);
+  assert.match(dict,/Qué debo decidir hoy/);
+  assert.match(dict,/Equipos y trabajos a seguir/);
+  assert.match(dict,/Mantenimiento/);
   assert.match(dict,/Fuera de servicio/);
   assert.match(dict,/equipo\(s\) fuera de servicio requieren revisión humana/);
   assert.match(dict,/Preventivos pendientes/);
   assert.match(dict,/OT abiertas/);
-  assert.match(dict,/Decision Intelligence/);
+  assert.match(dict,/Decisiones/);
   assert.match(page,/preventivo-horas/);
   assert.match(page,/ordenes-trabajo\/cierre/);
   assert.match(page,/horometros/);
@@ -74,6 +74,6 @@ test('Autopilot prepares actions but preserves human authority',()=>{
   assert.match(api,/Supervisor valida la señal y decide si crea la OT/);
   assert.match(api,/Planificador confirma ventana, alcance y recursos/);
   assert.match(api,/Responsable autorizado revisa y ejecuta el cierre/);
-  assert.match(page,/Autopilot prepara:/);
-  assert.match(page,/Decisión humana:/);
+  assert.match(page,/MOTIL prepara:/);
+  assert.match(page,/Debe decidir:/);
 });
