@@ -96,3 +96,10 @@ test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas
 function queueWithAllFilter() {
   return read('components/maintenance/work-orders-queue.tsx');
 }
+
+
+test('overdue active work orders remain visible in current operational calendar', () => {
+  const calendar = read('components/operational-calendar/comfortable-operational-calendar.tsx');
+  assert.match(calendar, /item\.overdue\s*\? today\s*: item\.date/);
+  assert.match(calendar, /const rawEnd = item\.historical[\s\S]*item\.overdue[\s\S]*\? today/);
+});

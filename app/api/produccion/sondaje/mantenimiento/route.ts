@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     .from('operational_maintenance_reviews')
     .select('id,source_report_id,canonical_asset_id,review_reason,status,linked_work_order_id,decision_note,created_at')
     .eq('organization_id', context.organizationId)
+    .neq('status', 'dismissed')
     .order('created_at', { ascending: false })
     .limit(40);
 

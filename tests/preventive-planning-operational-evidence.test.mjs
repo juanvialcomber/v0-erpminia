@@ -51,3 +51,12 @@ test('horometer UI asks for observed evidence and preserves unknown values', () 
   assert.match(runtimeUi, /value == null \? '—'/);
   assert.doesNotMatch(runtimeUi, /format\(Number\(value \|\| 0\)\)/);
 });
+
+
+test('operational maintenance suggestions require the latest accepted evidence cutoff', () => {
+  assert.match(api, /motil_email_equipment_meter_stage/);
+  assert.match(api, /motil_whatsapp_asset_360_latest_v1/);
+  assert.match(api, /latestOperationalEvidenceDate/);
+  assert.match(api, /String\(candidate\.last_observed_at \|\| ''\) >= latestOperationalEvidenceDate/);
+  assert.match(api, /evidenceCutoff: latestOperationalEvidenceDate/);
+});
