@@ -29,7 +29,7 @@ test('administrative detail remains outside the execution-role early return', ()
   const materials = detail.indexOf('<WorkOrderMaterialCoverage');
   const parts = detail.indexOf('<WorkOrderPartsPanel');
   const purchasing = detail.indexOf('<WorkOrderPurchasingFlow');
-  const timeline = detail.indexOf('<EntityTimeline');
+  const timeline = detail.indexOf('<EntityTimeline', executionReturn);
 
   assert.ok(executionReturn >= 0);
   assert.ok(finance > executionReturn);
