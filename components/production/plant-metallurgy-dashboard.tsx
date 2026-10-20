@@ -33,6 +33,10 @@ export function PlantMetallurgyDashboard(){
     {label:'Ley cabeza Cu',value:pct(p?.headGradePct,3),detail:'Ley promedio',icon:Gauge},
     {label:'Recuperación',value:pct(p?.recoveryPct,2),detail:'Balance metalúrgico',icon:Activity},
   ];
+  const secondaryMetrics=[
+    {label:'Fino Cu real',value:p?tons(p.recoveredFineCuTons,3):'—',detail:'Sólo turnos con ensayo'},
+    {label:'Cobertura analítica',value:pct(p?.assayCoveragePct,1),detail:p?.fineCoverageState==='complete'?'Completa':'Con brechas'},
+  ];
   const attention=[
     p?.movementCoverageState==='partial_source_window'
       ? {title:'Transporte con cobertura parcial',detail:`Fuente histórica hasta ${date(p.movementSourceCutoff)}`} : null,
@@ -59,8 +63,7 @@ export function PlantMetallurgyDashboard(){
     <details className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver fino y cobertura</summary>
       <div className="grid gap-px border-t bg-border sm:grid-cols-2">
-        <div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Fino Cu real</p><p className="mt-1 text-lg font-semibold">{p?tons(p.recoveredFineCuTons,3):'—'}</p><p className="mt-1 text-xs text-muted-foreground">Sólo turnos con ensayo</p></div>
-        <div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Cobertura analítica</p><p className="mt-1 text-lg font-semibold">{pct(p?.assayCoveragePct,1)}</p><p className="mt-1 text-xs text-muted-foreground">{p?.fineCoverageState==='complete'?'Completa':'Con brechas'}</p></div>
+        {secondaryMetrics.map(metric=><div key={metric.label} className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">{metric.label}</p><p className="mt-1 text-lg font-semibold">{metric.value}</p><p className="mt-1 text-xs text-muted-foreground">{metric.detail}</p></div>)}
       </div>
     </details>
     <details className="rounded-lg border bg-card">
