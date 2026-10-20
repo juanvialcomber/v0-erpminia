@@ -48,6 +48,14 @@ export function PlantMetallurgyDashboard(){
     <WhatsappOperationalUpdates mode="plant"/>
     {error?<StatePanel tone="error" title="No fue posible cargar Producción fino" description={error.message} actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>}/>:null}
     <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3" aria-label="Indicadores de producción fino">{metrics.map(m=>{const Icon=m.icon;return <div key={m.label} className="bg-card px-5 py-4"><div className="flex items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{m.label}</p><Icon className="h-4 w-4 text-muted-foreground"/></div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading?'—':m.value}</p><p className="mt-1 text-xs text-muted-foreground">{m.detail}</p></div>})}</section>
+    <section className="overflow-hidden rounded-lg border bg-card">
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo condiciones que cambian la lectura.</p></div>
+        <span className="text-sm font-medium">{attention.length}</span>
+      </div>
+      {attention.length?<div className="divide-y">{attention.slice(0,3).map(item=><div key={item.title} className="flex gap-3 px-4 py-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.detail}</p></div></div>)}</div>:<div className="px-4 py-4 text-sm text-muted-foreground">Sin excepciones relevantes.</div>}
+    </section>
+
     <details className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver fino y cobertura</summary>
       <div className="grid gap-px border-t bg-border sm:grid-cols-2">
@@ -65,14 +73,6 @@ export function PlantMetallurgyDashboard(){
         <PlantSourceCutoff/>
       </div>
     </details>
-    <section className="overflow-hidden rounded-lg border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo condiciones que cambian la lectura.</p></div>
-        <span className="text-sm font-medium">{attention.length}</span>
-      </div>
-      {attention.length?<div className="divide-y">{attention.slice(0,3).map(item=><div key={item.title} className="flex gap-3 px-4 py-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.detail}</p></div></div>)}</div>:<div className="px-4 py-4 text-sm text-muted-foreground">Sin excepciones relevantes.</div>}
-    </section>
-
     <details className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver histórico y trazabilidad</summary>
       <div className="space-y-4 border-t p-4">
