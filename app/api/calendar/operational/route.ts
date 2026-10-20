@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getUserModuleAccess, isAdminRole, MODULE_KEYS } from '@/lib/api/module-access';
+import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
 
 type CalendarSource = 'maintenance' | 'hse' | 'legal' | 'procurement' | 'finance' | 'people';
 type CalendarPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -33,6 +34,9 @@ type OperationalCalendarItem = {
   overdue: boolean;
   days_until: number;
   created_by_me?: boolean;
+  actionable_for_me?: boolean;
+  action_label?: string | null;
+  action_note?: string | null;
 };
 
 const CLOSED_STATUSES = new Set([
@@ -210,10 +214,12 @@ export async function GET(request: NextRequest) {
   const endDate = scope === 'historical' ? today : addDays(today, days);
 
   try {
-    const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult] = await Promise.all([
+    const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
+    const canApproveMaintenance = creationCapability.accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(String(creationCapability.personName || ''));
+    const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult, approvalCandidatesResult, drillingReviewResult] = await Promise.all([
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,canonical_asset_id,created_by')
+        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,assigned_person_id,cost_center_id,canonical_asset_id,created_by')
         .eq('organization_id', context.organizationId)
         .not('scheduled_date', 'is', null)
         .gte('scheduled_date', startDate)
@@ -221,7 +227,7 @@ export async function GET(request: NextRequest) {
         .limit(1000),
       context.supabase
         .from('preventive_maintenance_schedules')
-        .select('id,task_name,description,next_scheduled_date,priority,enabled,generated_work_order_id')
+        .select('id,task_name,description,next_scheduled_date,priority,enabled,generated_work_order_id,canonical_asset_id,asset_id')
         .eq('organization_id', context.organizationId)
         .not('next_scheduled_date', 'is', null)
         .gte('next_scheduled_date', startDate)
@@ -292,6 +298,20 @@ export async function GET(request: NextRequest) {
         .gte('due_at', startDate)
         .lte('due_at', endDate)
         .limit(1000),
+      canApproveMaintenance ? context.supabase
+        .from('maintenance_work_orders')
+        .select('id,work_order_number,title,description,priority,closed_at,completion_date,assigned_to_name,canonical_asset_id')
+        .eq('organization_id', context.organizationId)
+        .eq('status', 'completed')
+        .order('closed_at', { ascending: false, nullsFirst: false })
+        .limit(100) : Promise.resolve({ data: [], error: null }),
+      creationCapability.canCreate ? context.supabase
+        .from('drilling_maintenance_review_queue_v1')
+        .select('source_report_id,review_id,canonical_asset_id,asset_name,operation_date,review_reason,machine_observations,review_status,linked_work_order_id')
+        .eq('organization_id', context.organizationId)
+        .in('review_status', ['pending', 'needs_review'])
+        .is('linked_work_order_id', null)
+        .limit(100) : Promise.resolve({ data: [], error: null }),
     ]);
 
     const warnings: string[] = [];
@@ -305,6 +325,8 @@ export async function GET(request: NextRequest) {
     if (payablesResult.error) warnings.push('No se pudieron cargar los vencimientos financieros.');
     if (credentialsResult.error) warnings.push('No se pudieron cargar los vencimientos de credenciales de Personas.');
     if (legalCasesResult.error) warnings.push('No se pudieron cargar los casos legales con plazo.');
+    if (approvalCandidatesResult.error) warnings.push('No se pudieron cargar los cierres pendientes de revisión.');
+    if (drillingReviewResult.error) warnings.push('No se pudieron cargar las revisiones de Sondaje.');
 
     // Resolve evidence only for orders already scoped to the viewer's organization.
     const orderIds = (workOrdersResult.data || []).map((order) => order.id);
@@ -377,6 +399,17 @@ export async function GET(request: NextRequest) {
         asset_code: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.asset_code || null : null,
         asset_cost_center: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.cost_center_code || null : null,
         created_by_me: Boolean(row.created_by && row.created_by === context.userId),
+        actionable_for_me: Boolean(row.created_by && row.created_by === context.userId),
+        action_label: row.created_by && row.created_by === context.userId
+          ? !row.assigned_person_id ? 'Asignar responsable'
+            : !row.cost_center_id ? 'Completar centro de costo'
+              : 'Supervisar OT'
+          : null,
+        action_note: row.created_by && row.created_by === context.userId
+          ? !row.assigned_person_id ? 'Esta OT todavía no tiene responsable.'
+            : !row.cost_center_id ? 'Falta centro de costo antes de dejarla lista para ejecutar.'
+              : 'OT programada por ti.'
+          : null,
       }, today));
     }
 
@@ -398,9 +431,90 @@ export async function GET(request: NextRequest) {
           priority,
           owner: null,
           location: null,
-          href: '/dashboard/mantenimiento/planificacion',
+          href: `/dashboard/mantenimiento/ordenes-trabajo/create?${new URLSearchParams({
+            ...(row.canonical_asset_id || row.asset_id ? { assetId: String(row.canonical_asset_id || row.asset_id) } : {}),
+            title: String(row.task_name || ''),
+            scheduledDate: String(row.next_scheduled_date || ''),
+            workType: 'preventive',
+          }).toString()}`,
           historical: false,
           completed_at: null,
+          actionable_for_me: creationCapability.canCreate,
+          action_label: creationCapability.canCreate ? 'Programar OT' : null,
+          action_note: creationCapability.canCreate ? 'Plan preventivo todavía sin OT.' : null,
+        }, today));
+      }
+    }
+
+    if (canApproveMaintenance && !approvalCandidatesResult.error) {
+      const candidateIds = (approvalCandidatesResult.data || []).map((row) => row.id);
+      const approvedIds = new Set<string>();
+      if (candidateIds.length) {
+        const { data: reviewRows, error: reviewError } = await context.supabase
+          .from('work_order_supervisor_reviews')
+          .select('work_order_id,status')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', candidateIds);
+        if (reviewError) warnings.push('No se pudo verificar qué cierres ya fueron aprobados.');
+        for (const review of reviewRows || []) if (review.status === 'approved') approvedIds.add(review.work_order_id);
+      }
+      for (const row of approvalCandidatesResult.data || []) {
+        if (approvedIds.has(row.id)) continue;
+        const priority = normalizePriority(row.priority);
+        items.push(buildItem({
+          id: `maintenance-approval:${row.id}`,
+          source: 'maintenance',
+          source_label: 'Mantenimiento',
+          kind: 'Revisar cierre',
+          date: today,
+          title: `Revisar cierre · ${row.work_order_number || 'OT'}`,
+          subtitle: normalizeText(row.title || row.description),
+          reference: normalizeText(row.work_order_number),
+          status: 'action_required',
+          status_label: 'Revisar hoy',
+          priority,
+          owner: creationCapability.personName,
+          location: null,
+          href: `/dashboard/mantenimiento/ordenes-trabajo/${row.id}`,
+          historical: false,
+          completed_at: null,
+          actionable_for_me: true,
+          action_label: 'Revisar cierre',
+          action_note: 'La ejecución terminó y falta tu revisión.',
+        }, today));
+      }
+    }
+
+    if (creationCapability.canCreate) {
+      for (const row of drillingReviewResult.data || []) {
+        const reviewId = row.review_id || row.source_report_id;
+        if (!reviewId) continue;
+        const params = new URLSearchParams({
+          reviewId: String(reviewId),
+          workType: 'corrective',
+          priority: 'high',
+          ...(row.canonical_asset_id ? { assetId: String(row.canonical_asset_id) } : {}),
+        });
+        items.push(buildItem({
+          id: `drilling-review:${reviewId}`,
+          source: 'maintenance',
+          source_label: 'Mantenimiento',
+          kind: 'Revisar señal',
+          date: today,
+          title: row.asset_name ? `Revisar señal · ${row.asset_name}` : 'Revisar señal de Sondaje',
+          subtitle: normalizeText(row.machine_observations || row.review_reason),
+          reference: null,
+          status: 'action_required',
+          status_label: 'Revisar hoy',
+          priority: 'high',
+          owner: creationCapability.personName,
+          location: null,
+          href: `/dashboard/mantenimiento/ordenes-trabajo/create?${params.toString()}`,
+          historical: false,
+          completed_at: null,
+          actionable_for_me: true,
+          action_label: 'Revisar y decidir',
+          action_note: 'Puede requerir crear una OT.',
         }, today));
       }
     }
