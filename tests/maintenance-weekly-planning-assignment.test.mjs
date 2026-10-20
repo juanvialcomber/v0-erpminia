@@ -14,16 +14,17 @@ test('Ariel planner cargo has explicit creation capability with ED permission an
   assert.match(context, /creationCapability\.canCreate/);
 });
 
-test('manual work-order creation requires a canonical assignee, asset and selected calendar date', () => {
+test('manual work-order creation requires assignee and date, with equipment or explicit general workshop work', () => {
   const form = read('components/maintenance/create-work-order.tsx');
   const api = read('app/api/maintenance/work-orders/route.ts');
   const assignees = read('app/api/maintenance/assignees/route.ts');
   assert.match(form, /if \(!assignedPersonId\)/);
-  assert.match(form, /if \(!canonicalAssetId\)/);
+  assert.match(form, /if \(!generalWork && !canonicalAssetId\)/);
   assert.match(form, /if \(!scheduledDate\)/);
   assert.match(form, /<Input id="scheduled-date" type="date"/);
-  assert.match(form, /assignedPersonId,\s*canonicalAssetId,/);
+  assert.match(form, /assignedPersonId,[\s\S]*canonicalAssetId: generalWork \? null : canonicalAssetId/);
   assert.match(form, /scheduledDate,\s*plannedDurationHours/);
+  assert.match(api, /if \(!canonicalAssetId && !isGeneralWork\)/);
   assert.match(api, /getMaintenanceWorkOrderCreationCapability\(context\)/);
   assert.match(api, /if \(!creationCapability\.canCreate\)/);
   assert.match(api, /assigned_person_id: assignedPersonId/);
