@@ -157,10 +157,10 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
     }finally{setSourceLoading(null)}
   }
   if(!dates.length)return null;
-  return <section className="space-y-4 border-t pt-5" aria-label="WhatsApp operativo">
+  return <section className="space-y-4 border-t pt-5" aria-label="WhatsApp IA">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">WhatsApp operativo</h2>
+        <h2 className="text-lg font-semibold">WhatsApp IA</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Mensajes operacionales de los grupos autorizados, ordenados para revisión.
           La IA clasifica y relaciona evidencia sin modificar datos canónicos.
