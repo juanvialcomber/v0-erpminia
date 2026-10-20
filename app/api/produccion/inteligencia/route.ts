@@ -150,7 +150,7 @@ export async function GET(request:NextRequest){
 
   for(const line of activeLines.filter(l=>l.line_type==='development'||l.line_type==='radial_drilling')){
     const mine=line.mine_source_id?mineById.get(line.mine_source_id):null;
-    const sector=(sectors.data||[]).find(s=>s.mine_source_id===line.mine_source_id&&norm(s.normalized_name||s.name)===norm(line.sector_raw));
+    const sector=(sectors.data||[]).find(s=>s.mine_source_id===line.mine_source_id&&entityKey(s.normalized_name||s.name)===entityKey(line.sector_raw));
     const item=ensureSector(line.mine_source_id,sector?.id||null,mine?.name||line.mine_name_raw||'',sector?.name||line.sector_raw||line.section_raw||'');
     item.plannedAdvanceM+=num(line.planned_advance_m);
     item.plannedDrillingM+=num(line.planned_drilling_m);
