@@ -51,7 +51,8 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
   const [expanded,setExpanded]=useState(false);
   const {data,error,isLoading,mutate}=useSWR<Payload>(
     '/api/produccion/whatsapp-activity?mode='+encodeURIComponent(mode),
-    fetcher,{refreshInterval:60000,revalidateOnFocus:true});
+    fetcher,{refreshInterval:30000,revalidateOnFocus:true,revalidateOnReconnect:true,
+      revalidateIfStale:true,dedupingInterval:10000});
   const updates=expanded?data?.updates||[]:(data?.updates||[]).slice(0,5);
   const groupedUpdates=Array.from(updates.reduce((groups,item)=>{
     const key=[item.sourceMessageId,item.groupName,item.reportedAt].join('|');
@@ -69,8 +70,9 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Novedades recibidas, no verificaciones en terreno. Se conservan separado el corte de
-          los indicadores certificados y las órdenes de mantenimiento.
+          Se actualiza automáticamente cada 30 s desde las fuentes autorizadas de esta sección.
+          Novedades recibidas, no verificaciones en terreno; no modifican indicadores certificados
+          ni órdenes de mantenimiento.
         </p>
       </div>
       <Button variant="outline" size="sm" disabled={isLoading}
