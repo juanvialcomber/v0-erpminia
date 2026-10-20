@@ -336,7 +336,7 @@ function PreventiveSlide({ data }: { data: any }) {
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.35fr_.65fr]">
-      <Panel title="Mantenciones preventivas" subtitle="Base horaria / kilométrica con evidencia vigente">
+      <Panel title="Mantenciones preventivas" subtitle="Control por horas o kilómetros con información vigente">
         <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
           <SmallMetric label="Vencidas" value={data?.summary?.preventiveOverdue} />
           <SmallMetric label="Próximas" value={data?.summary?.preventiveDueSoon} />
@@ -365,7 +365,7 @@ function PreventiveSlide({ data }: { data: any }) {
           <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
           <BasisRow label="Kilómetros" value={data?.lifecycle?.preventiveBasis?.km || 0} />
           <BasisRow label="Anual" value={data?.lifecycle?.preventiveBasis?.annual || 0} />
-          <BasisRow label="Otra / sin unidad" value={data?.lifecycle?.preventiveBasis?.other || 0} />
+          <BasisRow label="Otro tipo de control" value={data?.lifecycle?.preventiveBasis?.other || 0} />
         </div>
         <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
           <p className="text-sm font-semibold">Plan preventivo vigente</p>
@@ -446,15 +446,20 @@ function FleetSlide({ data }: { data: any }) {
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
-      <Panel title="Condición por unidad operacional" subtitle="Cobertura del maestro vivo">
-        <div className="space-y-3">
+      <Panel title="Condición por unidad operacional" subtitle="Estado de los equipos con información actual">
+        <div className="mb-4 flex flex-wrap items-center gap-5 text-sm text-[var(--tower-ink-muted)]">
+          <ChartLegend tone="green" label="Sin alertas" />
+          <ChartLegend tone="copper" label="Requiere atención" />
+          <ChartLegend tone="critical" label="Detenido" />
+        </div>
+        <div className="space-y-4">
           {sites.slice(0, 8).map((site) => (
             <div key={site.label}>
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="font-medium">{site.label}</span>
-                <span className="text-muted-foreground">{site.total} equipos · {site.attention} atención · {site.stopped} detenidos · {dateTime(site.latestAt)}</span>
+                <span className="text-muted-foreground">{site.total} equipos · {site.attention} requieren atención · {site.stopped} detenidos · {dateTime(site.latestAt)}</span>
               </div>
-              <div className="mb-1 text-[10px] text-muted-foreground">Correo {site.email} · WhatsApp {site.whatsapp}</div>
+              <div className="mb-1 text-sm text-[var(--tower-ink-muted)]">Correo {site.email} · WhatsApp {site.whatsapp}</div>
               <div className="flex h-4 overflow-hidden rounded bg-muted">
                 <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
                 <div className="bg-[var(--tower-copper)]" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
@@ -498,7 +503,7 @@ function ManagementSlide({ data }: { data: any }) {
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
       <Panel title="Indicadores de gestión" subtitle="Sólo métricas con información suficiente">
         <div className="grid gap-3 md:grid-cols-2">
-          <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin base'} />
+          <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin información suficiente'} />
           <ManagementMetric label="Backlog abierto" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin OT abiertas'} />
           <ManagementMetric label="Horas planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
           <ManagementMetric label="Horas reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
@@ -528,12 +533,12 @@ function ManagementSlide({ data }: { data: any }) {
           <ManagementMetric
             label="Preventivas terminadas"
             value={workMixTotal ? preventive : '—'}
-            detail={workMixTotal ? `${number((preventive / workMixTotal) * 100, 0)}% del mix cerrado` : 'Sin base'}
+            detail={workMixTotal ? `${number((preventive / workMixTotal) * 100, 0)}% de las OT cerradas` : 'Sin información suficiente'}
           />
           <ManagementMetric
             label="Correctivas terminadas"
             value={workMixTotal ? corrective : '—'}
-            detail={workMixTotal ? `${number((corrective / workMixTotal) * 100, 0)}% del mix cerrado` : 'Sin base'}
+            detail={workMixTotal ? `${number((corrective / workMixTotal) * 100, 0)}% de las OT cerradas` : 'Sin información suficiente'}
           />
         </div>
       </Panel>
@@ -568,6 +573,20 @@ function SourceHealth({ label, inputAt, publishedAt, pending }: { label: string;
   );
 }
 
+
+function ChartLegend({ tone, label }: { tone: 'green' | 'copper' | 'critical'; label: string }) {
+  const dotClass = tone === 'green'
+    ? 'bg-[var(--tower-green)]'
+    : tone === 'copper'
+      ? 'bg-[var(--tower-copper)]'
+      : 'bg-destructive';
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className={cn('h-2.5 w-2.5 rounded-full', dotClass)} aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  );
+}
 
 function PriorityPill({ label, critical }: { label: string; critical: boolean }) {
   return (
