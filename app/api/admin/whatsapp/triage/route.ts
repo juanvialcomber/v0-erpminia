@@ -83,7 +83,9 @@ export async function GET(request: NextRequest) {
     const reviews=reviewsByFinding.get(finding.index)||[];
     if(!reviews.length)return finding;
     const statuses=[...new Set(reviews.map(row=>row.status))];
-    const reviewStatus=statuses.length===1?statuses[0]:'needs_more_info';
+    const normalized=statuses.map(status=>status==='auto_published'?'pending':status);
+    const unique=[...new Set(normalized)];
+    const reviewStatus=unique.length===1?unique[0]:'needs_more_info';
     const reviewedAt=reviews.map(row=>row.reviewedAt).filter(Boolean).sort().at(-1)||null;
     return {...finding,reviewStatus,reviewedAt};
   });
