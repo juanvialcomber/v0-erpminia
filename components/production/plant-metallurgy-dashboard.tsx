@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { Activity, AlertTriangle, Factory, Gauge, Layers3, Scale } from 'lucide-react';
+import { Activity, AlertTriangle, Factory, Gauge, Layers3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
