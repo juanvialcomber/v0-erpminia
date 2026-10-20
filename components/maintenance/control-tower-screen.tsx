@@ -97,6 +97,8 @@ export default function MaintenanceControlTowerPage() {
   });
   const [slideIndex, setSlideIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+  const [secondsToNext, setSecondsToNext] = useState(30);
   const rotationMs = 30_000;
 
   useEffect(() => {
@@ -108,10 +110,20 @@ export default function MaintenanceControlTowerPage() {
   }, []);
 
   useEffect(() => {
+    const startedAt = Date.now();
+    const clock = window.setInterval(() => {
+      const current = new Date();
+      setNow(current);
+      const elapsed = (Date.now() - startedAt) % rotationMs;
+      setSecondsToNext(Math.max(1, Math.ceil((rotationMs - elapsed) / 1000)));
+    }, 1000);
     const timer = window.setInterval(() => {
       setSlideIndex((current) => (current + 1) % slides.length);
     }, rotationMs);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(clock);
+      window.clearInterval(timer);
+    };
   }, []);
 
   if (isLoading) {
@@ -126,29 +138,29 @@ export default function MaintenanceControlTowerPage() {
   const SlideIcon = slide.icon;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[1920px] flex-col gap-4 overflow-hidden">
-      <header className="grid shrink-0 gap-3 border-b pb-3 lg:grid-cols-[1fr_auto] lg:items-end">
+    <div className="fixed inset-0 z-[100] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-background p-5 text-foreground 2xl:p-6">
+      <header className="grid shrink-0 gap-4 border-b-2 border-border pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <Monitor className="h-4 w-4" />
             Compañía Minera La Patagua · Mantenimiento
             <Badge variant="outline">Solo lectura</Badge>
           </div>
           <div className="mt-1 flex items-center gap-3">
             <SlideIcon className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-semibold tracking-tight">{slide.label}</h1>
-            <span className="text-sm text-muted-foreground">Vista {slideIndex + 1} de {slides.length}</span>
+            <h1 className="text-4xl font-semibold tracking-tight 2xl:text-5xl">{slide.label}</h1>
+            <span className="rounded-full border px-3 py-1 text-sm font-medium text-muted-foreground">Vista {slideIndex + 1} de {slides.length}</span>
           </div>
         </div>
-        <div className="grid gap-1 text-right text-[11px] text-muted-foreground">
-          <span>Correo mantención: {dateTime(data?.freshness?.latestEmailAt)}</span>
-          <span>WhatsApp entrada · Grupo 2: {dateTime(data?.freshness?.latestWhatsAppAt)}</span>
-          <span>WhatsApp vinculado a equipos: {dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
-          <span>Actualización pantalla: {dateTime(data?.generatedAt)}</span>
+        <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-muted-foreground">
+          <span>Hora local</span><strong className="text-xl font-semibold tabular-nums text-foreground">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
+          <span>Correo mantención</span><span>{dateTime(data?.freshness?.latestEmailAt)}</span>
+          <span>WhatsApp vinculado</span><span>{dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
+          <span>Actualización pantalla</span><span>{dateTime(data?.generatedAt)}</span>
         </div>
       </header>
 
-      <section className="grid shrink-0 gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-5">
+      <section className="grid shrink-0 gap-px overflow-hidden border-y bg-border md:grid-cols-5">
         <TopMetric icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
         <TopMetric icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
         <TopMetric icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
@@ -163,7 +175,7 @@ export default function MaintenanceControlTowerPage() {
       <main
         key={slide.key}
         className={cn(
-          'min-h-0 flex-1 overflow-hidden rounded-lg border bg-card',
+          'min-h-0 flex-1 overflow-hidden border-y bg-card',
           !reduceMotion && 'animate-in fade-in duration-300',
         )}
       >
@@ -179,7 +191,7 @@ export default function MaintenanceControlTowerPage() {
         <div className="flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
             <Clock3 className="h-3.5 w-3.5" />
-            Rotación automática cada 30 s · datos cada {data?.refreshSeconds || 60} s
+            Próxima vista en {secondsToNext} s · datos cada {data?.refreshSeconds || 60} s
           </div>
           <div className="flex items-center gap-1.5" aria-label="Progreso de vistas">
             {slides.map((item, index) => (
@@ -284,14 +296,14 @@ function StoppedSlide({ data }: { data: any }) {
           <EmptyState title="Sin equipos detenidos con evidencia vigente" text="No se arrastran estados históricos como detención actual." />
         ) : (
           <DataTable
-            headers={['Equipo', 'Faena', 'Estado / señal', 'Desde', 'OT', 'Repuestos']}
-            rows={rows.slice(0, 12).map((row: any) => [
+            headers={['Equipo', 'Faena', 'Estado validado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
+            rows={rows.slice(0, 10).map((row: any) => [
               row.assetName,
               row.site,
+              row.canonicalStatus || 'Sin estado validado',
               row.currentReportedStatus || signalText(row),
-              row.stoppedSince ? dateTime(row.stoppedSince) : '—',
-              row.openWorkOrderNumbers?.join(', ') || '—',
-              row.partsPending ? 'Pendiente' : 'Sin señal',
+              ageLabel(row.latestSignalAgeHours),
+              `${row.openWorkOrderNumbers?.join(', ') || 'Sin OT'}${row.partsPending ? ' · Repuesto pendiente' : ''}`,
             ])}
           />
         )}
@@ -539,30 +551,30 @@ function SourceHealth({ label, inputAt, publishedAt, pending }: { label: string;
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="min-h-0 overflow-hidden rounded-lg border bg-background/20">
-      <div className="border-b bg-muted/25 px-4 py-3">
-        <p className="text-sm font-semibold">{title}</p>
-        {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+    <section className="min-h-0 overflow-hidden border bg-background/20">
+      <div className="border-b bg-muted/25 px-5 py-3.5">
+        <p className="text-lg font-semibold">{title}</p>
+        {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
 
 function TopMetric({ icon: Icon, label, value }: { icon: any; label: string; value: unknown }) {
   return (
-    <div className="bg-card px-4 py-3">
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
+    <div className="bg-card px-5 py-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Icon className="h-5 w-5" />{label}</div>
+      <p className="mt-1 text-4xl font-semibold tabular-nums 2xl:text-5xl">{value == null ? '—' : number(value, 0)}</p>
     </div>
   );
 }
 
 function SmallMetric({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="bg-card px-4 py-3">
-      <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
+    <div className="bg-card px-5 py-4">
+      <p className="text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-4xl font-semibold tabular-nums">{value == null ? '—' : number(value, 0)}</p>
     </div>
   );
 }
@@ -608,8 +620,8 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<React.ReactNode>> }) {
   return (
     <div className="overflow-hidden rounded-md border">
-      <div className="grid bg-muted/40 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
-        {headers.map((header) => <div key={header} className="px-3 py-2">{header}</div>)}
+      <div className="grid bg-muted/40 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+        {headers.map((header) => <div key={header} className="px-4 py-3">{header}</div>)}
       </div>
       <div className="divide-y">
         {rows.length === 0 ? (
@@ -617,7 +629,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<Rea
         ) : rows.map((row, rowIndex) => (
           <div key={rowIndex} className="grid text-xs" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
             {row.map((cell, cellIndex) => (
-              <div key={cellIndex} className={cn('min-w-0 truncate px-3 py-2.5', cellIndex === 0 && 'font-medium text-foreground')}>
+              <div key={cellIndex} className={cn('min-w-0 truncate px-4 py-3.5 text-sm 2xl:text-base', cellIndex === 0 && 'font-semibold text-foreground')}>
                 {cell ?? '—'}
               </div>
             ))}
