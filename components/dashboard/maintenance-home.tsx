@@ -154,7 +154,7 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
   const showOwnedFlow = mode === 'planning' || mode === 'leadership';
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
-    <div className="mb-2 flex justify-end"><Link href="/dashboard/mantenimiento/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">Calendario de mantenimiento →</Link></div>
+    <div className="mb-2 flex justify-end"><Link href="/dashboard/mantenimiento/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">Calendario →</Link></div>
       <PageHeader>
       <PageHeaderContent>
         <PageHeaderEyebrow>{t.eyebrow}{viewer?.cargoName ? ` · ${viewer.cargoName}` : ` · ${t.transversalAccess}`}</PageHeaderEyebrow>
@@ -172,7 +172,7 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
       </PageHeaderActions>
     </PageHeader>
     <WhatsappOperationalUpdates mode="maintenance"/>
-    <p className="text-sm text-muted-foreground">Lo que requiere tu atención aparece primero. Abre una acción para continuar o consulta el contexto en Ver más.</p>
+    <p className="text-sm text-muted-foreground">Primero mostramos lo que necesita atención. Abre una acción para continuar.</p>
     <Card className="shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-4"><div><CardTitle className="text-lg">{t.queue.titles[mode as WorkMode]}</CardTitle><CardDescription>{t.queue.descriptions[mode as WorkMode]}</CardDescription></div>{!isLoading && !error ? <Badge variant="outline">{fill(t.queue.actionsBadge, { n: actions.length })}</Badge> : null}</CardHeader>
       <CardContent>
@@ -180,13 +180,13 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
           const kindKey = (action.kind in kindMeta ? action.kind : kindFallback) as KindKey;
           const meta = kindMeta[kindKey];
           const Icon = meta.icon;
-          return <div key={action.id} className="grid gap-3 p-4 md:grid-cols-[40px_1fr_auto] md:items-center"><div className="flex h-9 w-9 items-center justify-center rounded-md border bg-background"><Icon className="h-4 w-4" /></div><div className="min-w-0"><Link href={action.href} className="flex flex-wrap items-center gap-2 rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"><span className="text-xs tabular-nums text-muted-foreground">#{index + 1}</span><Badge variant={meta.variant}>{t.kinds[kindKey]}</Badge><p className="font-medium">{action.title}</p></Link><details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/80">Ver detalle</summary><div className="mt-2 space-y-1 border-l border-border pl-3"><p>{action.description}</p><p>{fill(t.evidenceLabel, { text: action.evidence })}</p>{action.autopilot ? <><p><span className="font-medium text-foreground">Autopilot prepara:</span> {action.autopilot.preparedAction}</p><p><span className="font-medium text-foreground">Decisión humana:</span> {action.autopilot.authority}</p></> : null}</div></details></div><Button asChild variant="ghost" size="icon-sm" aria-label={t.openActionAria}><Link href={action.href}><ArrowRight className="h-4 w-4" /></Link></Button></div>;
+          return <div key={action.id} className="grid gap-3 p-4 md:grid-cols-[40px_1fr_auto] md:items-center"><div className="flex h-9 w-9 items-center justify-center rounded-md border bg-background"><Icon className="h-4 w-4" /></div><div className="min-w-0"><Link href={action.href} className="flex flex-wrap items-center gap-2 rounded-sm outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"><span className="text-xs tabular-nums text-muted-foreground">#{index + 1}</span><Badge variant={meta.variant}>{t.kinds[kindKey]}</Badge><p className="font-medium">{action.title}</p></Link><details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/80">Ver detalle</summary><div className="mt-2 space-y-1 border-l border-border pl-3"><p>{action.description}</p><p>{fill(t.evidenceLabel, { text: action.evidence })}</p>{action.autopilot ? <><p><span className="font-medium text-foreground">MOTIL prepara:</span> {action.autopilot.preparedAction}</p><p><span className="font-medium text-foreground">Debe decidir:</span> {action.autopilot.authority}</p></> : null}</div></details></div><Button asChild variant="ghost" size="icon-sm" aria-label={t.openActionAria}><Link href={action.href}><ArrowRight className="h-4 w-4" /></Link></Button></div>;
         })}</div> : null}
       </CardContent>
     </Card>
 
     <details data-testid="maintenance-more-details" className="rounded-lg border bg-card">
-      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Ver más · Indicadores y herramientas</summary>
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Ver más</summary>
       <div className="space-y-6 border-t p-4">
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4" />{t.refresh}</Button>
 
