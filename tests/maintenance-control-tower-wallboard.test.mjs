@@ -67,8 +67,8 @@ test('wallboard uses scoped MOTIL corporate palette and restrained hierarchy', (
 test('analysis view keeps the approved simple information architecture', () => {
   assert.match(source, /Prioridades activas/);
   assert.match(source, /Señales recientes/);
-  assert.match(source, /attention\.slice\(0, 5\)/);
-  assert.match(source, /signals\.slice\(0, 5\)/);
+  assert.match(source, /attention\.slice\(0, 4\)/);
+  assert.match(source, /signals\.slice\(0, 4\)/);
   assert.doesNotMatch(source, /Prioridades de coordinación/);
   assert.doesNotMatch(source, /Fuentes y cambios recientes/);
 });
