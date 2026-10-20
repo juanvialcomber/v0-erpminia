@@ -72,9 +72,9 @@ test('wallboard preserves missing KPI truth instead of inventing availability', 
   assert.match(page, /Sólo cifras calculadas desde órdenes registradas/);
 });
 
-test('standalone maintenance monitor uses central authentication and has no dashboard chrome', () => {
-  const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8');
-  const login = readFileSync(new URL('../app/login/page.tsx', import.meta.url), 'utf8');
+test('standalone maintenance monitor uses central authentication and has no dashboard chrome', async () => {
+  const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8');
+  const login = await readFile(new URL('../app/login/page.tsx', import.meta.url), 'utf8');
   assert.match(proxy, /'\/monitor\/mantenimiento'/);
   assert.match(proxy, /isProtectedPath && !isAuthenticated/);
   assert.match(proxy, /loginUrl\.searchParams\.set\('redirect'/);
