@@ -66,7 +66,7 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
   const [triage,setTriage]=useState<Triage|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
-  const [view,setView]=useState<'findings'|'sources'>('findings');
+  const [view,setView]=useState<'findings'|'sources'>('sources');
   const [coverage,setCoverage]=useState('all');
   const [section,setSection]=useState('all');
   const [query,setQuery]=useState('');
@@ -157,13 +157,13 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
     }finally{setSourceLoading(null)}
   }
   if(!dates.length)return null;
-  return <section className="space-y-4 border-t pt-5" aria-label="Novedades de WhatsApp">
+  return <section className="space-y-4 border-t pt-5" aria-label="WhatsApp operativo">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold">Novedades de WhatsApp</h2>
+        <h2 className="text-lg font-semibold">WhatsApp operativo</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Lectura diaria de los grupos autorizados. Primero se muestran las novedades; la clasificación
-          y los mensajes originales quedan disponibles para revisión.
+          Mensajes operacionales de los grupos autorizados, ordenados para revisión.
+          La IA clasifica y relaciona evidencia sin modificar datos canónicos.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -186,7 +186,7 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
           <div>
             <p className="font-medium">{triage.reportDate}</p>
             <p className="text-xs text-muted-foreground">
-              {triage.totals.messages} mensajes · {triage.totals.findings} novedades detectadas
+              {triage.totals.messages} mensajes · {triage.totals.findings} actividades detectadas
               {triage.totals.mediaWithoutText ? ` · ${triage.totals.mediaWithoutText} sin texto` : ''}
             </p>
           </div>
@@ -235,7 +235,7 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
                 </Button>
               </div>
             </div>
-          ) : <p className="text-sm text-muted-foreground">No hay novedades extraídas para este día.</p>}
+          ) : <p className="text-sm text-muted-foreground">No hay actividades extraídas para este día.</p>}
         </div>
       </article>
       {decisionError?<p role="alert" className="rounded-md border p-3 text-sm text-destructive">
@@ -246,9 +246,9 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
         <summary className="cursor-pointer list-none px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium">Revisar clasificación y mensajes originales</p>
+              <p className="text-sm font-medium">Revisar mensajes y clasificación</p>
               <p className="text-xs text-muted-foreground">
-                Filtros, destinos sugeridos, mensajes sin hallazgo y adjuntos.
+                Mensajes originales, adjuntos y clasificación sugerida.
               </p>
             </div>
             <span className="text-xs text-muted-foreground">{triage.totals.messages} mensajes</span>
@@ -271,9 +271,9 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
 
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant={view==='findings'?'default':'outline'}
-              onClick={()=>{setView('findings');setLimit(20)}}>Novedades ({triage.findings.length})</Button>
+              onClick={()=>{setView('findings');setLimit(20)}}>Resumen ({triage.findings.length})</Button>
             <Button size="sm" variant={view==='sources'?'default':'outline'}
-              onClick={()=>{setView('sources');setLimit(20)}}>Mensajes originales ({triage.items.length})</Button>
+              onClick={()=>{setView('sources');setLimit(20)}}>Mensajes ({triage.items.length})</Button>
             <div className="min-w-[170px] flex-1">
               <Input aria-label="Buscar por mensaje o actividad" value={query}
                 onChange={event=>{setQuery(event.target.value);setLimit(20)}}
@@ -283,7 +283,7 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
               onChange={event=>{setCoverage(event.target.value);setLimit(20)}}
               className="h-9 rounded-md border bg-background px-2 text-sm">
               <option value="all">Todos</option>
-              <option value="not_extracted">Sin novedad extraída</option>
+              <option value="not_extracted">Sin actividad extraída</option>
               <option value="referenced">Incluidos en novedades</option>
               <option value="media_pending">Sin texto</option>
             </select>:null}
