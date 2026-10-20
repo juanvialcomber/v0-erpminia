@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api/guard';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { GREEN_NO_STORE, greenDb, localDay } from '@/lib/messages/greenapi';
 import { isExcludedMotilWhatsappGroup } from '@/lib/messages/greenapi-group-scope';
 import { whatsappOperationalReviewEnabled } from '@/lib/messages/whatsapp-operational-feature.mjs';
@@ -12,7 +12,7 @@ const ID = /^[1-9]\d{0,15}$/;
 // Source detail is fetched on demand; never return full multi-thousand-char
 // mine shift reports for every row in a 250-message list.
 export async function GET(request: NextRequest) {
-  const auth = await requireAdmin(request);
+  const auth = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!auth.authorized || !auth.organizationId) return auth.response ||
     NextResponse.json({error:'Sin acceso a los mensajes'},{
       status:403,headers:GREEN_NO_STORE,
