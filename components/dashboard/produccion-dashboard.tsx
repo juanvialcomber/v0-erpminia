@@ -63,7 +63,7 @@ export function ProduccionDashboard(){
       <PageHeaderContent>
         <PageHeaderEyebrow>Producción</PageHeaderEyebrow>
         <PageHeaderTitle>Producción</PageHeaderTitle>
-        <PageHeaderDescription>{p?`${period(p.periodStart)} · Planta hasta ${date(p.dataThrough)}. Transporte sólo hasta ${date(data.freshness.transportSourceThrough)}.`:'Sin período operacional disponible.'}</PageHeaderDescription>
+        <PageHeaderDescription>{p?'El corte canónico más reciente se muestra primero. Las métricas metalúrgicas mantienen explícitamente su propia ventana histórica.':'Sin período operacional disponible.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>{ready && canEdit('prod_operaciones') ? <Button asChild variant="outline"><Link href="/dashboard/produccion/ingreso-datos"><Upload className="h-4 w-4"/>Ingresar datos</Link></Button> : null}</PageHeaderActions>
     </PageHeader>
@@ -73,12 +73,12 @@ export function ProduccionDashboard(){
     <div className="flex justify-end"><Link className="text-xs text-muted-foreground underline underline-offset-2" href="/dashboard/produccion/despachos">Ver coordinación informada de despachos</Link></div>
 
     <section className="rounded-lg border bg-card">
-      <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo excepciones que cambian una decisión.</p></div>
+      <div className="border-b px-5 py-4"><h2 className="font-medium">Qué requiere atención en la serie acreditada</h2><p className="mt-1 text-xs text-muted-foreground">Excepciones de la ventana histórica disponible; no sustituyen el corte canónico superior.</p></div>
       <div className="divide-y">{data.intelligence.length?data.intelligence.slice(0,3).map(signal=><div key={signal.code} className="flex gap-3 px-5 py-4"><SignalIcon level={signal.level}/><div><p className="text-sm font-medium">{signal.title}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{signal.detail}</p></div></div>):<div className="px-5 py-5 text-sm text-muted-foreground">Sin señales para el período.</div>}</div>
     </section>
 
-    <section aria-label="Operación actual" className="space-y-3">
-      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ahora</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Ejecución del período</h2></div>
+    <section aria-label="Serie metalúrgica acreditada" className="space-y-3">
+      <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Serie acreditada</p><h2 className="mt-1 text-lg font-semibold tracking-tight">Metalurgia · {period(p?.periodStart)}</h2><p className="mt-1 text-xs text-muted-foreground">Datos hasta {date(p?.dataThrough)}; se mantienen separados del corte operativo más reciente.</p></div>
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={Factory} label="Tratado" value={p?tons(p.treatedTons,1):'—'} detail={plan?`${pct(plan.treatmentProgressPct)} del plan`:'Sin plan activo'}/>
         <Metric icon={Target} label="Ritmo mensual" value={paceLabel} detail={plan?`Calendario ${pct(p?.calendarProgressPct)}`:'Sin comparación'}/>
