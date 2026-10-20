@@ -69,10 +69,10 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
   const t = dictionary.app.maintenance;
   const { data: viewer, isLoading: viewerLoading } = useSWR<ViewerContext>('/api/maintenance/viewer-context', (url) => fetcher<ViewerContext>(url), { revalidateOnFocus: false });
   const mode: ViewerMode = viewer?.mode || 'general';
-  const { data, error, isLoading, mutate } = useSWR<Response>(viewer && mode !== 'execution' ? '/api/maintenance/control-center' : null, (url) => fetcher<Response>(url), { revalidateOnFocus: false });
+  const { data, error, isLoading, mutate } = useSWR<Response>(mode !== 'execution' ? '/api/maintenance/control-center' : null, (url) => fetcher<Response>(url), { revalidateOnFocus: false });
 
-  if (viewerLoading) {
-    return <StatePanel tone="loading" title={t.loading} className="min-h-64 border-0 bg-transparent" />;
+  if (viewerLoading && !data && !error) {
+    return <StatePanel tone="loading" title={t.loading} description="Cargando contexto y prioridades en paralelo…" className="min-h-40 border-0 bg-transparent" />;
   }
 
   if (mode === 'execution') {
