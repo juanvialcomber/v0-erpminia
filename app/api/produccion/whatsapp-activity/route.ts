@@ -15,7 +15,10 @@ export async function GET(request:NextRequest){
     {status:400,headers:noStore});
   const mode:WhatsappActivityMode=rawMode;
   const moduleKey=mode==='drilling'
-    ? MODULE_KEYS.PROD_SONDAJE_PRODUCCION : MODULE_KEYS.PROD_OPERACIONES;
+    ? MODULE_KEYS.PROD_SONDAJE_PRODUCCION
+    : mode==='maintenance'
+      ? MODULE_KEYS.MANT_OPERACIONES
+      : MODULE_KEYS.PROD_OPERACIONES;
   const auth=await requireModuleAccess(request,moduleKey);
   if(!auth.authorized)return auth.response;
   const ctx=await getOrganizationContext(request);
