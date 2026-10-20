@@ -72,3 +72,11 @@ test('analysis view keeps the approved simple information architecture', () => {
   assert.doesNotMatch(source, /Prioridades de coordinación/);
   assert.doesNotMatch(source, /Fuentes y cambios recientes/);
 });
+
+
+test('wallboard pins all displayed timestamps to Santiago time', () => {
+  assert.match(source, /America\/Santiago/);
+  assert.match(source, /Hora Santiago/);
+  assert.match(source, /timeZone: SANTIAGO_TIME_ZONE/);
+  assert.match(source, /hour12: false/);
+});
