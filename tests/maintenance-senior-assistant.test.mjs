@@ -67,7 +67,7 @@ test('global assistant exposes maintenance continuity without a local launcher',
     readFile(contextUrl, 'utf8'),
   ]);
   const dict = await readFile(dictUrl, 'utf8');
-  assert.match(dict, /Decision Intelligence/);
+  assert.match(dict, /Decisiones/);
   assert.doesNotMatch(page, /MaintenanceSeniorAssistant/);
   assert.match(widget, /\/api\/maintenance\/senior-assistant/);
   assert.match(body, /conversationId/);
