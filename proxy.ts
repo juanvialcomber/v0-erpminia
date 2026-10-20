@@ -326,7 +326,7 @@ async function proxyRequest(request: NextRequest) {
     return withSecurityHeaders(response);
   }
 
-  const protectedPaths = ['/dashboard', '/admin', '/setup'];
+  const protectedPaths = ['/dashboard', '/admin', '/setup', '/monitor/mantenimiento'];
   const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (isProtectedPath && !isAuthenticated) {
