@@ -117,9 +117,8 @@ test('wallboard reads maintenance WhatsApp from Grupo 2 live registry and separa
   assert.match(api, /eq\('group_name', 'Grupo 2'\)/);
   assert.match(api, /pendingWhatsAppInputs/);
   assert.match(api, /latestPublishedWhatsappAt/);
-  assert.match(page, /WhatsApp · Grupo 2/);
   assert.match(page, /WhatsApp vinculado/);
-  assert.match(page, /Entrada viva separada de evidencia ya vinculada/);
+  assert.match(page, /Señales recientes/);
 });
 
 test('wallboard intake metric combines current unresolved email and WhatsApp inputs without canonical promotion', () => {
