@@ -1,44 +1,78 @@
 name: HSE PDF and DOC extraction audit
 on:
   workflow_dispatch:
-    inputs:
-      stage_fragments:
-        description: 'Stage pending HSE text in canonical database (requires migration)'
-        type: boolean
-        default: false
   push:
     branches: [main]
     paths:
       - '.github/workflows/hse-pdf-doc-extraction.yml'
       - 'scripts/extract-hse-pdf-doc.mjs'
+      - 'scripts/tests/hse-extraction-audit.test.mjs'
+
+  pull_request:
+    paths:
+      - '.github/workflows/hse-pdf-doc-extraction.yml'
+      - 'scripts/extract-hse-pdf-doc.mjs'
+      - 'scripts/tests/hse-extraction-audit.test.mjs'
 
 permissions:
   contents: read
 
+concurrency:
+  group: motil-hse-document-audit
+  cancel-in-progress: false
+
 jobs:
-  extract:
+  regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/tests/hse-extraction-audit.test.mjs
+  extract:
+    if: github.event_name != 'pull_request'
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      HSE_STAGE_FRAGMENTS: '0'
+      # URL is public configuration, pinned to the single authorized project.
+      SUPABASE_URL: https://ttlptyheuqeotadtcbaw.supabase.co
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate configuration and read access before installing readers
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/extract-hse-pdf-doc.mjs --preflight
       - name: Install deterministic document readers
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq poppler-utils antiword libreoffice-writer tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Read-only extraction diagnostics
+        id: audit
         env:
-          HSE_STAGE_FRAGMENTS: "${{ ((github.event_name == 'push' && github.event.head_commit.message == 'feat(hse): stage canonical text fragments once') || inputs.stage_fragments == true) && '1' || '0' }}"
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
         run: |
+          umask 077
           node scripts/extract-hse-pdf-doc.mjs > hse-extraction-diagnostics.json
-          node -e "const x=require('./hse-extraction-diagnostics.json'); const counts={};for(const d of x.documents)counts[d.status]=(counts[d.status]||0)+1;console.log(JSON.stringify({source_count:x.source_count,statuses:counts}))"
+      - name: Summarize validated diagnostics
+        if: ${{ always() && steps.audit.outcome != 'skipped' }}
+        run: |
+          node -e "const fs=require('fs'); const x=JSON.parse(fs.readFileSync('hse-extraction-diagnostics.json','utf8')); if(x.mode!=='dry_run'||!Array.isArray(x.documents))process.exit(1); console.log(JSON.stringify({audit_status:x.audit_status,error_code:x.error_code,source_count:x.source_count,statuses:x.statuses})); fs.writeFileSync('hse-artifact-ready','ready')"
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && hashFiles('hse-artifact-ready') != '' }}
         with:
           name: hse-pdf-doc-diagnostics
           path: hse-extraction-diagnostics.json
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 1
