@@ -232,8 +232,8 @@ function AnalysisSlide({ data }: { data: any }) {
           {attention.slice(0, 5).map((row: any) => (
             <div key={row.canonicalAssetId} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[1fr_auto] md:items-center">
               <div className="min-w-0">
-                <p className="truncate text-xl font-semibold">{row.assetName}</p>
-                <p className="mt-1 line-clamp-1 text-base text-[var(--tower-ink-muted)]">{signalText(row)}</p>
+                <p className="text-xl font-semibold leading-tight text-balance">{row.assetName}</p>
+                <p className="mt-1 line-clamp-2 text-base leading-snug text-[var(--tower-ink-muted)]">{signalText(row)}</p>
               </div>
               <div className="flex items-center gap-3">
                 <PriorityPill
@@ -289,6 +289,7 @@ function StoppedSlide({ data }: { data: any }) {
         ) : (
           <DataTable
             headers={['Equipo', 'Faena', 'Estado validado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
+            columnTemplate="1.45fr .8fr 1.1fr 1.5fr .7fr 1.25fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
@@ -323,6 +324,7 @@ function PreventiveSlide({ data }: { data: any }) {
         <div className="mt-4">
           <DataTable
             headers={['Equipo', 'Faena', 'Base', 'Lectura', 'Próx. MP', 'Estado MP']}
+            columnTemplate="1.5fr .9fr .65fr .8fr .85fr 1.25fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
@@ -380,6 +382,7 @@ function ScheduleSlide({ data }: { data: any }) {
       >
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
+          columnTemplate=".8fr .7fr 1.55fr 1.35fr 1.45fr .8fr 1.25fr"
           rows={open.slice(0, 8).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
@@ -443,6 +446,7 @@ function FleetSlide({ data }: { data: any }) {
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
         <DataTable
           headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']}
+          columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
           rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
             row.assetName,
             row.site,
@@ -488,6 +492,7 @@ function ManagementSlide({ data }: { data: any }) {
       <Panel title="Coordinación del equipo" subtitle="Carga abierta por responsable; apoyo para planificar y destrabar">
         <DataTable
           headers={['Responsable', 'Abiertas', 'Vencidas', 'Hoy', 'Mañana', 'Alta/Crítica']}
+          columnTemplate="1.7fr .7fr .7fr .65fr .75fr 1fr"
           rows={coordination.slice(0, 6).map((row: any) => [
             row.assignee,
             row.open,
@@ -633,19 +638,45 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   );
 }
 
-function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<React.ReactNode>> }) {
+function DataTable({
+  headers,
+  rows,
+  columnTemplate,
+}: {
+  headers: string[];
+  rows: Array<Array<React.ReactNode>>;
+  columnTemplate?: string;
+}) {
+  const template = columnTemplate || `repeat(${headers.length}, minmax(0, 1fr))`;
   return (
-    <div className="overflow-hidden rounded-md border">
-      <div className="grid bg-muted/40 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
-        {headers.map((header) => <div key={header} className="px-4 py-3">{header}</div>)}
+    <div className="overflow-hidden rounded-md border border-[var(--tower-border)]">
+      <div
+        className="grid bg-[var(--tower-surface-muted)] text-sm font-semibold uppercase tracking-[0.06em] text-[var(--tower-ink-muted)]"
+        style={{ gridTemplateColumns: template }}
+      >
+        {headers.map((header) => (
+          <div key={header} className="min-w-0 px-4 py-3 leading-tight whitespace-normal">
+            {header}
+          </div>
+        ))}
       </div>
-      <div className="divide-y">
+      <div className="divide-y divide-[var(--tower-border)]">
         {rows.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-muted-foreground">Sin registros para esta vista.</div>
+          <div className="px-3 py-6 text-center text-sm text-[var(--tower-ink-muted)]">Sin registros para esta vista.</div>
         ) : rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="grid text-xs" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+          <div
+            key={rowIndex}
+            className="grid items-center"
+            style={{ gridTemplateColumns: template }}
+          >
             {row.map((cell, cellIndex) => (
-              <div key={cellIndex} className={cn('min-w-0 truncate px-4 py-4 text-base 2xl:text-lg', cellIndex === 0 && 'font-semibold text-foreground')}>
+              <div
+                key={cellIndex}
+                className={cn(
+                  'min-w-0 break-words px-4 py-3.5 text-base leading-snug whitespace-normal 2xl:text-lg',
+                  cellIndex === 0 && 'font-semibold text-[var(--tower-ink)]',
+                )}
+              >
                 {cell ?? '—'}
               </div>
             ))}
