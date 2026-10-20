@@ -54,14 +54,14 @@ export function PlantSourceCutoff(){
   return <section aria-label="Extracción minera y stock más recientes" className="rounded-lg border bg-card">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4">
       <div className="space-y-1">
-        <h2 className="font-semibold">Extracción y stock informados</h2>
+        <h2 className="font-semibold">Extracción y stock canónicos</h2>
         <p className="text-sm text-muted-foreground">
           Última actualización de corte: <strong className="font-medium text-foreground">
             {isLoading?'Consultando…':dmy(latestCutoff)}
           </strong>
         </p>
         <p className="max-w-3xl text-xs text-muted-foreground">
-          Información parcial del Excel de extracción y stock. No sustituye turnos de planta,
+          Fuente canónica de extracción y stock al corte. No sustituye turnos de planta,
           toneladas tratadas, análisis de ley ni recuperación metalúrgica.
         </p>
       </div>
