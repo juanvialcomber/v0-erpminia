@@ -1,3 +1,5 @@
-import MaintenanceControlTowerPage from '@/components/maintenance/control-tower-screen';
+import { redirect } from 'next/navigation';
 
-export default MaintenanceControlTowerPage;
+export default function MaintenanceControlTowerRoute() {
+  redirect('/monitor/mantenimiento');
+}
