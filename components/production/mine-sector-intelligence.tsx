@@ -68,19 +68,25 @@ export function MineSectorIntelligence(){
 
     <WhatsappOperationalUpdates mode="mine"/>
 
-    <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6">
-      <Metric icon={AlertTriangle} label="Minas alerta" value={n(data.attention.alert)} detail="<70% del esperado al corte"/>
-      <Metric icon={Activity} label="Minas vigilancia" value={n(data.attention.watch)} detail="70–90% del esperado"/>
-      <Metric icon={CheckCircle2} label="Minas en ritmo" value={n(data.attention.ok)} detail="≥90% del esperado"/>
-      <Metric icon={Truck} label="Cobertura TM" value={pct(data.sourceCoverage.transportPlanFraction*100)} detail={`${data.sourceCoverage.elapsedTransportDays}/${data.sourceCoverage.totalPlanDays} días del plan`}/>
-      <Metric icon={Factory} label="Tratado Planta" value={data.plantContext?`${n(data.plantContext.treatedTons,1)} t`:'—'} detail={`Hasta ${date(data.plantThrough)}`}/>
-      <Metric icon={Beaker} label="Cobertura ensayo" value={data.plantContext?pct(data.plantContext.assayCoveragePct):'—'} detail={data.plantContext?`${data.plantContext.assayed}/${data.plantContext.shifts} turnos`:'Sin datos'}/>
+    <section className="overflow-hidden rounded-lg border bg-card">
+      <div className="flex items-end justify-between gap-4 border-b px-4 py-3"><div><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo excepciones que cambian una decisión.</p></div><span className="text-sm font-medium">{executiveExceptions.length}</span></div>
+      {executiveExceptions.length===0?<div className="flex items-center gap-3 px-4 py-4"><CheckCircle2 className="h-5 w-5 text-muted-foreground"/><div><p className="text-sm font-medium">Sin excepciones</p><p className="text-xs text-muted-foreground">No hay condiciones que requieran escalamiento.</p></div></div>:<div className="divide-y">{executiveExceptions.slice(0,3).map(item=><div key={item.key} className="px-4 py-4"><div className="flex items-start gap-2"><ExceptionIcon severity={item.severity}/><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-sm text-muted-foreground">{item.action}</p></div></div></div>)}</div>}
     </section>
 
-    <section className="overflow-hidden rounded-lg border bg-card">
-      <div className="flex items-end justify-between gap-4 border-b px-4 py-3"><div><h2 className="font-medium">Excepciones ejecutivas</h2><p className="mt-1 text-xs text-muted-foreground">Sólo condiciones que cambian una decisión o limitan la lectura de los datos.</p></div><span className="text-sm font-medium">{executiveExceptions.length}</span></div>
-      {executiveExceptions.length===0?<div className="flex items-center gap-3 px-4 py-4"><CheckCircle2 className="h-5 w-5 text-muted-foreground"/><div><p className="text-sm font-medium">Sin excepciones ejecutivas</p><p className="text-xs text-muted-foreground">Las fuentes y el ritmo comparable no requieren escalamiento.</p></div></div>:<div className="divide-y">{executiveExceptions.map(item=><div key={item.key} className="grid gap-2 px-4 py-4 md:grid-cols-[180px_1fr_1fr]"><div className="flex items-start gap-2"><ExceptionIcon severity={item.severity}/><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.severity==='critical'?'Crítica':item.severity==='warning'?'Vigilancia':'Información'}</p></div></div><p className="text-sm text-muted-foreground">{item.evidence}</p><p className="text-sm"><span className="font-medium">Acción: </span>{item.action}</p></div>)}</div>}
+    <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
+      <Metric icon={AlertTriangle} label="Alerta" value={n(data.attention.alert)} detail="Requieren atención"/>
+      <Metric icon={Activity} label="Vigilancia" value={n(data.attention.watch)} detail="Seguir de cerca"/>
+      <Metric icon={CheckCircle2} label="En ritmo" value={n(data.attention.ok)} detail="Sin desvío relevante"/>
     </section>
+
+    <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver cobertura de fuentes</summary>
+      <div className="grid gap-px border-t bg-border sm:grid-cols-3">
+        <Metric icon={Truck} label="Cobertura TM" value={pct(data.sourceCoverage.transportPlanFraction*100)} detail={`${data.sourceCoverage.elapsedTransportDays}/${data.sourceCoverage.totalPlanDays} días`}/>
+        <Metric icon={Factory} label="Tratado Planta" value={data.plantContext?`${n(data.plantContext.treatedTons,1)} t`:'—'} detail={`Hasta ${date(data.plantThrough)}`}/>
+        <Metric icon={Beaker} label="Cobertura ensayo" value={data.plantContext?pct(data.plantContext.assayCoveragePct):'—'} detail={data.plantContext?`${data.plantContext.assayed}/${data.plantContext.shifts} turnos`:'Sin datos'}/>
+      </div>
+    </details>
 
     <section className="overflow-hidden rounded-lg border bg-card"><div className="border-b px-4 py-3"><h2 className="font-medium">Ritmo operacional por mina</h2><p className="mt-1 text-xs text-muted-foreground">Única comparación de tonelaje plan vs observado usada para priorización.</p></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-muted/30 text-xs text-muted-foreground"><tr><th className="px-4 py-3 text-left">Mina</th><th className="px-4 py-3 text-left">Estado</th><th className="px-4 py-3 text-right">Observado t</th><th className="px-4 py-3 text-right">Esperado al corte t</th><th className="px-4 py-3 text-right">Ritmo</th><th className="px-4 py-3 text-right">Plan mes t</th><th className="px-4 py-3 text-right">Ley plan</th></tr></thead><tbody className="divide-y">{data.mines.map(x=><tr key={x.key} className="hover:bg-muted/20"><td className="px-4 py-3 font-medium">{x.mineName}</td><td className="px-4 py-3">{attentionLabel(x.attention)}</td><td className="px-4 py-3 text-right">{n(x.actualTons,1)}</td><td className="px-4 py-3 text-right">{x.expectedTonsToCutoff?n(x.expectedTonsToCutoff,1):'—'}</td><td className="px-4 py-3 text-right">{pct(x.observedVsExpectedPct)}</td><td className="px-4 py-3 text-right">{x.plannedTons?n(x.plannedTons,1):'—'}</td><td className="px-4 py-3 text-right">{x.plannedGradePct===null?'—':`${n(x.plannedGradePct,3)}%`}</td></tr>)}</tbody></table></div></section>
 
