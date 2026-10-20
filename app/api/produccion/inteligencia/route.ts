@@ -15,7 +15,7 @@ export async function GET(request:NextRequest){
   const context=await getOrganizationContext(request);
   if(!context.ok) return context.response;
 
-  const [latestMovement,latestPlant,mines,sectors,plan,planLines,drillingSummary]=await Promise.all([
+  const [latestMovement,latestPlant,mines,sectors,plan,planLines,drillingSummary,latestStatsDoc]=await Promise.all([
     context.supabase.from('production_material_movements').select('movement_date').eq('organization_id',context.organizationId).eq('normalization_status','approved').order('movement_date',{ascending:false}).limit(1).maybeSingle(),
     context.supabase.from('production_metallurgy_deterministic_v2').select('operation_date').eq('organization_id',context.organizationId).order('operation_date',{ascending:false}).limit(1).maybeSingle(),
     context.supabase.from('production_mine_sources').select('id,code,name,normalized_name,status').eq('organization_id',context.organizationId).order('name'),
@@ -23,13 +23,19 @@ export async function GET(request:NextRequest){
     context.supabase.from('production_monthly_plans').select('id,plan_code,period_start,period_end,status,total_mineral_to_plant_tons,target_cu_grade_pct,planned_drilling_m,planned_advance_m').eq('organization_id',context.organizationId).eq('status','active').order('period_start',{ascending:false}).limit(1).maybeSingle(),
     context.supabase.from('production_monthly_plan_lines').select('id,plan_id,line_type,mine_source_id,mine_name_raw,sector_raw,level_raw,section_raw,planned_tons,planned_grade_pct,planned_advance_m,planned_drilling_m,priority,source_reference').eq('organization_id',context.organizationId).order('priority'),
     context.supabase.from('production_drilling_operational_summary_v1').select('min_date,max_date,report_rows,drilled_meters,holes,rigs,operators').eq('organization_id',context.organizationId).maybeSingle(),
+    context.supabase.from('production_source_documents').select('source_file,source_file_sha256,period_end')
+      .eq('organization_id',context.organizationId).eq('canonical_role','canonical')
+      .ilike('source_file','ESTADISTICAS DE PRODUCCION %.xlsx')
+      .order('period_end',{ascending:false}).limit(1).maybeSingle(),
   ]);
-  const baseError=latestMovement.error||latestPlant.error||mines.error||sectors.error||plan.error||planLines.error||drillingSummary.error;
+  const baseError=latestMovement.error||latestPlant.error||mines.error||sectors.error||plan.error||planLines.error||drillingSummary.error||latestStatsDoc.error;
   if(baseError) return NextResponse.json({error:baseError.message},{status:500});
 
   const plantThrough=latestPlant.data?.operation_date||null;
   const transportThrough=latestMovement.data?.movement_date||null;
-  const dataThrough=plantThrough||transportThrough;
+  const statsDoc=latestStatsDoc.data||null;
+  const statsThrough=statsDoc?.period_end||null;
+  const dataThrough=[plantThrough,transportThrough,statsThrough].filter((v):v is string=>Boolean(v)).sort().at(-1)||null;
   const activePlan=plan.data||null;
   if(!dataThrough) return NextResponse.json({dataThrough:null,transportThrough:null,plantThrough:null,plan:activePlan,mines:[],sectors:[],plantContext:null,drillingFreshness:drillingSummary.data||null});
 
@@ -42,13 +48,27 @@ export async function GET(request:NextRequest){
   const elapsedTransportDays=Math.max(1,Math.min(totalPlanDays,Math.round((cutoffDate.getTime()-planStartDate.getTime())/86400000)+1));
   const transportPlanFraction=elapsedTransportDays/totalPlanDays;
 
-  const [movements,metallurgy,drilling,drillingLineage]=await Promise.all([
+  const sourceStatsQuery=statsDoc
+    ? context.supabase.from('production_source_normalized_records')
+        .select('record_type,normalized_values')
+        .eq('organization_id',context.organizationId)
+        .eq('source_file',statsDoc.source_file)
+        .eq('source_file_sha256',statsDoc.source_file_sha256)
+        .eq('semantic_status','source_reported')
+        .in('record_type',[
+          'extraction_actual_peumo','extraction_actual_don_jaime',
+          'extraction_plan_peumo','extraction_plan_don_jaime',
+          'extraction_month_plan_peumo','extraction_month_plan_don_jaime',
+        ])
+    : Promise.resolve({data:[],error:null});
+  const [movements,metallurgy,drilling,drillingLineage,sourceStats]=await Promise.all([
     context.supabase.from('production_material_movements').select('movement_date,mine_source_id,mine_sector_id,mine_name_raw,sector_name_raw,normalized_metric_tons,normalization_status').eq('organization_id',context.organizationId).eq('normalization_status','approved').gte('movement_date',planStart).lte('movement_date',transportThrough||dataThrough),
     context.supabase.from('production_metallurgy_deterministic_v2').select('operation_date,treated_metric_tons,head_grade,recovery_reported,recovery_by_grades_pct,metallurgy_state').eq('organization_id',context.organizationId).gte('operation_date',planStart).lte('operation_date',plantThrough||dataThrough),
     context.supabase.from('production_drilling_source_reports').select('operation_date,drilled_meters,hole_code_raw,canonical_mine_source_id,canonical_mine_sector_id,canonical_drill_hole_id,reconciliation_status').eq('organization_id',context.organizationId),
     context.supabase.from('production_drilling_reconciliation_v1').select('lineage_state').eq('organization_id',context.organizationId),
+    sourceStatsQuery,
   ]);
-  const err=movements.error||metallurgy.error||drilling.error||drillingLineage.error;
+  const err=movements.error||metallurgy.error||drilling.error||drillingLineage.error||sourceStats.error;
   if(err) return NextResponse.json({error:err.message},{status:500});
 
   const mineById=new Map((mines.data||[]).map(m=>[m.id,m]));
@@ -75,6 +95,31 @@ export async function GET(request:NextRequest){
     item.plannedTons+=num(line.planned_tons);
     item.expectedTonsToCutoff+=num(line.planned_tons)*transportPlanFraction;
     if(line.planned_grade_pct!==null) item.plannedGradePct=num(line.planned_grade_pct);
+  }
+
+  const sourceValue=(recordType:string)=>{
+    const row=(sourceStats.data||[]).find((item:any)=>item.record_type===recordType);
+    const value=(row?.normalized_values as Record<string,unknown>|null)?.value;
+    return typeof value==='number'&&Number.isFinite(value)?value:null;
+  };
+  if(statsThrough){
+    const byName=new Map((mines.data||[]).map(m=>[norm(m.name),m]));
+    for(const source of [
+      {name:'Mina Peumo',actual:'extraction_actual_peumo',toCutoff:'extraction_plan_peumo',month:'extraction_month_plan_peumo'},
+      {name:'Mina Don Jaime',actual:'extraction_actual_don_jaime',toCutoff:'extraction_plan_don_jaime',month:'extraction_month_plan_don_jaime'},
+    ]){
+      const mine=byName.get(norm(source.name));
+      const item=ensureMine(mine?.id||null,mine?.name||source.name);
+      const actual=sourceValue(source.actual);
+      const expected=sourceValue(source.toCutoff);
+      const month=sourceValue(source.month);
+      if(actual!==null){
+        item.actualTons=actual;
+        item.movements=0;
+      }
+      if(expected!==null)item.expectedTonsToCutoff=expected;
+      if(month!==null)item.plannedTons=month;
+    }
   }
 
   const mineRows=[...mineAgg.values()].map(item=>{
@@ -135,12 +180,14 @@ export async function GET(request:NextRequest){
   const attentionCounts=mineRows.reduce<Record<string,number>>((acc,row)=>{acc[row.attention]=(acc[row.attention]||0)+1;return acc;},{});
 
   return NextResponse.json({
-    periodStart:planStart,dataThrough,plantThrough,transportThrough,plan:activePlan,mines:mineRows,sectors:sectorRows,
-    sourceCoverage:{transportPlanFraction,elapsedTransportDays,totalPlanDays,policy:'El ritmo compara transporte observado sólo contra líneas mine_total del plan mensual, prorrateadas hasta el corte real de TM. Líneas chamber, preparation y development no se suman porque son vistas solapadas del mismo plan.'},
+    periodStart:planStart,dataThrough,plantThrough,transportThrough,mineSourceCutoff:statsThrough,plan:activePlan,mines:mineRows,sectors:sectorRows,
+    sourceCoverage:{transportPlanFraction,elapsedTransportDays,totalPlanDays,policy:statsThrough
+      ? 'El ritmo por mina prioriza la estadística canónica de extracción al corte. TM detallado permanece como trazabilidad histórica y no reemplaza el acumulado canónico más reciente.'
+      : 'El ritmo compara transporte observado sólo contra líneas mine_total del plan mensual, prorrateadas hasta el corte real de TM. Líneas chamber, preparation y development no se suman porque son vistas solapadas del mismo plan.'},
     attention:{alert:attentionCounts.alert||0,watch:attentionCounts.watch||0,ok:attentionCounts.ok||0,noComparison:attentionCounts.no_comparison||0},
     plantContext:{scope:'global_plant_only',treatedTons,avgHeadGradePct:weighted('head_grade'),avgRecoveryPct:weighted('recovery'),shifts:met.length,assayed,assayCoveragePct:met.length?(assayed/met.length)*100:0,note:'Planta permanece como contexto global: no se atribuye ley ni recuperación a una mina o sector sin linaje directo de alimentación.'},
     drillingFreshness:drillingSummary.data||null,
     drillingReconciliation:{totalReports:drillingLineage.data?.length||0,fullyReconciled:lineageCounts.fully_reconciled||0,holeOnlyReview:lineageCounts.hole_only_review||0,unresolvedOrConflict:(drillingLineage.data?.length||0)-(lineageCounts.fully_reconciled||0)-(lineageCounts.hole_only_review||0),states:lineageCounts},
-    semantics:{transport:'TM aprobado observado hasta el corte disponible; registros not_required no se convierten ni cuentan como tonelaje.',plan:'Sólo mine_total se usa como meta comparable de tonelaje. Las demás líneas del plan se muestran como contexto de desarrollo/perforación.',drilling:'Sondaje es contexto histórico acreditado por linaje; no implica disponibilidad futura.',plant:'KPI metalúrgicos globales hasta que exista trazabilidad directa por alimentación.'},
+    semantics:{transport:'TM detallado conserva su propio corte. Cuando existe una estadística canónica de extracción más reciente, el ritmo por mina usa ese acumulado sin inventar movimientos individuales.',plan:'La estadística canónica aporta plan teórico al corte y plan mensual por mina. Las líneas de desarrollo/perforación permanecen como contexto separado.',drilling:'Sondaje es contexto histórico acreditado por linaje; no implica disponibilidad futura.',plant:'KPI metalúrgicos globales hasta que exista trazabilidad directa por alimentación.'},
   });
 }
