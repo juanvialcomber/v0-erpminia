@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import useSWR from 'swr';
 import {
   Activity,
@@ -97,9 +98,14 @@ export default function MaintenanceControlTowerPage() {
   });
   const [slideIndex, setSlideIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [secondsToNext, setSecondsToNext] = useState(30);
   const rotationMs = 30_000;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -126,19 +132,21 @@ export default function MaintenanceControlTowerPage() {
     };
   }, []);
 
+  if (!mounted) return null;
+
   if (isLoading) {
-    return <StatePanel tone="loading" title="Cargando Torre de Control" className="fixed inset-0 z-[100] min-h-screen bg-background" />;
+    return createPortal(<StatePanel tone="loading" title="Cargando Torre de Control" className="fixed inset-0 z-[9999] min-h-screen bg-background" />, document.body);
   }
 
   if (error) {
-    return <StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="fixed inset-0 z-[100] min-h-screen bg-background" />;
+    return createPortal(<StatePanel tone="error" title="No se pudo cargar la Torre de Control" description={error.message} className="fixed inset-0 z-[9999] min-h-screen bg-background" />, document.body);
   }
 
   const slide = slides[slideIndex];
   const SlideIcon = slide.icon;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-background p-5 text-foreground 2xl:p-6">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-background p-5 text-foreground 2xl:p-6">
       <header className="grid shrink-0 gap-4 border-b-2 border-border pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -204,7 +212,8 @@ export default function MaintenanceControlTowerPage() {
           <div>{data?.summary?.activeAssets || 0}/{data?.summary?.canonicalAssets || 0} equipos con señal actual · corte {data?.operationalCutoff || 'sin corte'}</div>
         </div>
       </footer>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -231,13 +240,13 @@ function AnalysisSlide({ data }: { data: any }) {
           />
         </div>
         <div className="mt-4 divide-y rounded-md border">
-          {attention.slice(0, 6).map((row: any) => (
+          {attention.slice(0, 5).map((row: any) => (
             <div key={row.canonicalAssetId} className="grid gap-2 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
               <div>
-                <p className="text-sm font-semibold">{row.assetName}</p>
-                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{signalText(row)}</p>
+                <p className="text-lg font-semibold">{row.assetName}</p>
+                <p className="mt-1 line-clamp-1 text-base text-muted-foreground">{signalText(row)}</p>
               </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-3 text-sm">
                 <Badge variant={row.reportedStopped ? 'destructive' : row.priorityRank <= 2 ? 'secondary' : 'outline'}>
                   {row.reportedStopped ? 'Detenido' : row.planningPriority || 'Atención'}
                 </Badge>
@@ -264,7 +273,7 @@ function AnalysisSlide({ data }: { data: any }) {
           />
         </div>
         <div className="divide-y border-t">
-          {signals.slice(0, 6).map((signal: any) => (
+          {signals.slice(0, 5).map((signal: any) => (
             <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="space-y-1 py-3 first:pt-0">
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-sm font-semibold">{signal.assetName}</p>
@@ -297,7 +306,7 @@ function StoppedSlide({ data }: { data: any }) {
         ) : (
           <DataTable
             headers={['Equipo', 'Faena', 'Estado validado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
-            rows={rows.slice(0, 10).map((row: any) => [
+            rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
               row.canonicalStatus || 'Sin estado validado',
@@ -331,7 +340,7 @@ function PreventiveSlide({ data }: { data: any }) {
         <div className="mt-4">
           <DataTable
             headers={['Equipo', 'Faena', 'Base', 'Lectura', 'Próx. MP', 'Estado MP']}
-            rows={rows.slice(0, 10).map((row: any) => [
+            rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
               row.meterUnit || '—',
@@ -388,7 +397,7 @@ function ScheduleSlide({ data }: { data: any }) {
       >
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
-          rows={open.slice(0, 12).map((row: any) => [
+          rows={open.slice(0, 8).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
@@ -451,7 +460,7 @@ function FleetSlide({ data }: { data: any }) {
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
         <DataTable
           headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']}
-          rows={(data?.attentionRows || []).slice(0, 10).map((row: any) => [
+          rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
             row.assetName,
             row.site,
             row.reportedStopped ? 'DETENIDO' : row.planningPriority || 'Atención',
@@ -496,7 +505,7 @@ function ManagementSlide({ data }: { data: any }) {
       <Panel title="Coordinación del equipo" subtitle="Carga abierta por responsable; apoyo para planificar y destrabar">
         <DataTable
           headers={['Responsable', 'Abiertas', 'Vencidas', 'Hoy', 'Mañana', 'Alta/Crítica']}
-          rows={coordination.slice(0, 7).map((row: any) => [
+          rows={coordination.slice(0, 6).map((row: any) => [
             row.assignee,
             row.open,
             row.overdue,
@@ -553,8 +562,8 @@ function Panel({ title, subtitle, children }: { title: string; subtitle?: string
   return (
     <section className="min-h-0 overflow-hidden border bg-background/20">
       <div className="border-b bg-muted/25 px-5 py-3.5">
-        <p className="text-lg font-semibold">{title}</p>
-        {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
+        <p className="text-xl font-semibold 2xl:text-2xl">{title}</p>
+        {subtitle ? <p className="mt-1 text-base text-muted-foreground">{subtitle}</p> : null}
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -620,7 +629,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<React.ReactNode>> }) {
   return (
     <div className="overflow-hidden rounded-md border">
-      <div className="grid bg-muted/40 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
+      <div className="grid bg-muted/40 text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
         {headers.map((header) => <div key={header} className="px-4 py-3">{header}</div>)}
       </div>
       <div className="divide-y">
@@ -629,7 +638,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<Rea
         ) : rows.map((row, rowIndex) => (
           <div key={rowIndex} className="grid text-xs" style={{ gridTemplateColumns: `repeat(${headers.length}, minmax(0, 1fr))` }}>
             {row.map((cell, cellIndex) => (
-              <div key={cellIndex} className={cn('min-w-0 truncate px-4 py-3.5 text-sm 2xl:text-base', cellIndex === 0 && 'font-semibold text-foreground')}>
+              <div key={cellIndex} className={cn('min-w-0 truncate px-4 py-4 text-base 2xl:text-lg', cellIndex === 0 && 'font-semibold text-foreground')}>
                 {cell ?? '—'}
               </div>
             ))}
