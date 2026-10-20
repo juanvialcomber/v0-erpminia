@@ -32,6 +32,7 @@ type OperationalCalendarItem = {
   asset_cost_center?: string | null;
   overdue: boolean;
   days_until: number;
+  created_by_me?: boolean;
 };
 
 const CLOSED_STATUSES = new Set([
@@ -212,7 +213,7 @@ export async function GET(request: NextRequest) {
     const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult] = await Promise.all([
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,canonical_asset_id')
+        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,canonical_asset_id,created_by')
         .eq('organization_id', context.organizationId)
         .not('scheduled_date', 'is', null)
         .gte('scheduled_date', startDate)
@@ -375,6 +376,7 @@ export async function GET(request: NextRequest) {
         asset_name: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.name || null : null,
         asset_code: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.asset_code || null : null,
         asset_cost_center: row.canonical_asset_id ? assetsById.get(row.canonical_asset_id)?.cost_center_code || null : null,
+        created_by_me: Boolean(row.created_by && row.created_by === context.userId),
       }, today));
     }
 
