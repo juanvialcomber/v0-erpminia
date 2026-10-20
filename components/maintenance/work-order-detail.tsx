@@ -291,6 +291,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       </Card>
 
       ) : null}
+      {saveMessage && (saveState === 'saved' || saveState === 'error') ? <div role="status" aria-live="polite" className={`fixed right-4 top-20 z-50 max-w-sm rounded-lg border px-5 py-4 text-sm font-semibold shadow-xl ${saveState === 'saved' ? 'border-emerald-500/50 bg-background text-foreground' : 'border-destructive/50 bg-background text-destructive'}`}>{saveState === 'saved' ? '✓ Cambios guardados correctamente' : saveMessage}<button type="button" onClick={() => { setSaveMessage(''); setSaveState('idle'); }} aria-label="Cerrar aviso" className="ml-4 text-muted-foreground">×</button></div> : null}
       {canEdit ? <details id="edit-work-order" open={editOpen} onToggle={(event) => setEditOpen(event.currentTarget.open)} className="scroll-mt-24 rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Editar OT</summary>
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
@@ -315,7 +316,8 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
             <div className="space-y-2"><Label htmlFor="edit-priority">Prioridad</Label><select id="edit-priority" name="priority" defaultValue={workOrder.priority || 'medium'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></div>
             <div className="space-y-2"><Label htmlFor="edit-date">Fecha</Label><Input id="edit-date" name="scheduled_date" type="date" defaultValue={workOrder.scheduled_date?.slice(0,10) || ''} /></div>
           </div> : null}
-          <div className="flex flex-wrap items-center gap-3"><Button type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? 'Guardando…' : 'Guardar cambios'}</Button>{saveMessage ? <p role="status" aria-live="polite" className={saveState === 'error' ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>{saveMessage}</p> : null}</div>
+          <div className="flex flex-wrap items-center gap-3"><Button type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? 'Guardando…' : 'Guardar cambios'}</Button></div>
+          {saveMessage ? <div role="status" aria-live="polite" className={saveState === 'error' ? 'rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive' : 'rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-foreground'}>{saveState === 'saved' ? '✓ ' : ''}{saveMessage}</div> : null}
         </form>
         <div className="border-t p-4">
           <details>
