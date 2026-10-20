@@ -220,7 +220,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (evidenceError) throw evidenceError;
       if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
 
-      const isGeneralWork = String(guard.row?.work_type || '').toLowerCase() === 'general';
+      const { data: completionOrder, error: completionOrderError } = await context.supabase
+        .from('maintenance_work_orders')
+        .select('work_type')
+        .eq('id', id)
+        .eq('organization_id', context.organizationId)
+        .single();
+      if (completionOrderError) throw completionOrderError;
+      const isGeneralWork = String(completionOrder?.work_type || '').toLowerCase() === 'general';
       const rootCause = String(body.root_cause || '').trim();
       const preventiveActions = String(body.preventive_actions || '').trim();
       const actualHours = Number(body.actual_duration_hours);
