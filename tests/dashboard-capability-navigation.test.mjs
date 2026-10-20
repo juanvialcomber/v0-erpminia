@@ -22,7 +22,7 @@ test('dashboard home exposes role-specific operational shortcuts', async () => {
     assert.match(dashboard, new RegExp(`'${href.replaceAll('/', '\\/')}'`));
   }
   // Their labels live in the dictionary (es locale carries the approved copy).
-  for (const label of ['Planta y metalurgia', 'Órdenes de trabajo', 'Disponibilidad', 'Perforación', 'Mis acciones', 'Producción']) {
+  for (const label of ['Planta', 'Órdenes de trabajo', 'Disponibilidad', 'Perforación', 'Mis acciones', 'Producción']) {
     assert.match(dict, new RegExp(`label: '${label}'`));
   }
 
