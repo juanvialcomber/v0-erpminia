@@ -105,8 +105,8 @@ test('wallboard avoids technical abbreviations in visible maintenance labels', (
   assert.match(source, /Preventivas vencidas/);
   assert.match(source, /Próxima mantención/);
   assert.match(source, /Estado preventivo/);
-  assert.match(source, /Horas planificadas cerradas/);
-  assert.match(source, /Horas reales cerradas/);
+  assert.match(source, /Horas de órdenes cerradas/);
+  assert.match(source, /MetricBar label="Reales"/);
   assert.match(source, /Productos de Bodega vinculados/);
   assert.doesNotMatch(source, /label="MP vencidas"/);
   assert.doesNotMatch(source, /label="HH /);
