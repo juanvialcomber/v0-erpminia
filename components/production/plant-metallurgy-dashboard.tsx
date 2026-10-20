@@ -48,7 +48,7 @@ export function PlantMetallurgyDashboard(){
       ? {title:'Plan de fino sin recuperación objetivo',detail:'No corresponde comparar fino real contra ese plan'} : null,
   ].filter(Boolean) as Array<{title:string;detail:string}>;
   return <div className="space-y-6">
-    <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Planta</PageHeaderEyebrow><PageHeaderTitle>Producción fino</PageHeaderTitle><PageHeaderDescription>{p?`Acumulado ${date(p.periodStart)} – ${date(p.dataThrough)}. Cada métrica respeta la cobertura real de su archivo fuente.`:'Transporte, tratamiento, ley, recuperación y cobre fino por turno.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
+    <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Planta</PageHeaderEyebrow><PageHeaderTitle>Producción fino</PageHeaderTitle><PageHeaderDescription>{p?`Serie metalúrgica acreditada hasta ${date(p.dataThrough)}. El corte operativo más reciente de extracción y stock se muestra por separado.`:'Transporte, tratamiento, ley, recuperación y cobre fino por turno.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
     <WhatsappOperationalUpdates mode="plant"/>
     <PlantSourceCutoff/>
     {error?<StatePanel tone="error" title="No fue posible cargar Producción fino" description={error.message} actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>}/>:null}
