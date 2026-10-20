@@ -3,7 +3,7 @@ import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { CheckCircle2, History, MoreHorizontal, Pencil, PlayCircle, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +86,9 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   const { data: viewer, isLoading: viewerLoading } = useSWR('/api/maintenance/viewer-context', fetcher);
   const workOrder = data?.data;
   const [editOpen, setEditOpen] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveMessage, setSaveMessage] = useState('');
+  const saveInFlight = useRef(false);
   const costCenters = data?.costCenters || [];
   const assignees = data?.assignees || [];
   const isHistorical = workOrder?.record_scope === 'historical' || data?.record_scope === 'historical';
@@ -104,6 +107,36 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
     const result = await response.json().catch(() => null);
     if (!response.ok) throw new Error(result?.error || 'request failed');
     await mutate();
+  };
+
+  const saveOrderEdits = async (payload: Record<string, unknown>) => {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    setSaveState('saving');
+    setSaveMessage('');
+    try {
+      await patchOrder(payload);
+      const response = await fetch('/api/maintenance/work-orders/' + id, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      const refreshed = await response.json().catch(() => null);
+      if (!response.ok || !refreshed?.data) throw new Error(refreshed?.error || 'No fue posible comprobar el guardado.');
+      const persisted = refreshed.data as Record<string, unknown>;
+      const mismatch = Object.entries(payload).some(([key, value]) =>
+        String(persisted[key] ?? '') !== String(value ?? '').trim()
+      );
+      await mutate(refreshed, false);
+      if (mismatch) throw new Error('La OT respondió, pero los cambios todavía no aparecen guardados. Revisa antes de volver a intentar.');
+      setSaveState('saved');
+      setSaveMessage('Cambios guardados y verificados.');
+    } catch (error) {
+      setSaveState('error');
+      setSaveMessage(error instanceof Error ? error.message : 'No se pudieron guardar los cambios.');
+    } finally {
+      saveInFlight.current = false;
+    }
   };
 
   if (isLoading || viewerLoading) {
@@ -263,7 +296,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          void patchOrder(workOrder.status === 'in_progress' ? {
+          void saveOrderEdits(workOrder.status === 'in_progress' ? {
             title: String(form.get('title') || ''),
             description: String(form.get('description') || ''),
           } : {
@@ -282,7 +315,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
             <div className="space-y-2"><Label htmlFor="edit-priority">Prioridad</Label><select id="edit-priority" name="priority" defaultValue={workOrder.priority || 'medium'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></div>
             <div className="space-y-2"><Label htmlFor="edit-date">Fecha</Label><Input id="edit-date" name="scheduled_date" type="date" defaultValue={workOrder.scheduled_date?.slice(0,10) || ''} /></div>
           </div> : null}
-          <div className="flex flex-wrap gap-2"><Button type="submit">Guardar cambios</Button></div>
+          <div className="flex flex-wrap items-center gap-3"><Button type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? 'Guardando…' : 'Guardar cambios'}</Button>{saveMessage ? <p role="status" aria-live="polite" className={saveState === 'error' ? 'text-sm text-destructive' : 'text-sm text-muted-foreground'}>{saveMessage}</p> : null}</div>
         </form>
         <div className="border-t p-4">
           <details>
