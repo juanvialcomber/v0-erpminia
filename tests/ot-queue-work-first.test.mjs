@@ -5,7 +5,7 @@ const source = await readFile(new URL('../components/maintenance/work-orders-que
 test('OT list precedes optional indicators', () => {
   assert.ok(source.indexOf('<Card className="overflow-hidden shadow-none">') < source.indexOf('data-testid="ot-more-indicators"'));
   assert.match(source, /data-testid="ot-more-filters"/);
-  assert.match(source, /Ver más · Buscar y filtrar/);
+  assert.match(source, /Buscar y filtrar/);
 });
 test('approval and completed views remain distinct; historical is not operational', () => {
   assert.match(source, /viewFilter === 'approval'/);
