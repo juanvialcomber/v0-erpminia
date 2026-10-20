@@ -34,9 +34,9 @@ test('performance remains available inside the management context', async () => 
   assert.match(managementNav, /href: '\/dashboard\/desempeno'/);
   assert.match(managementNav, /href: '\/dashboard\/decisiones'/);
   assert.match(managementNav, /href: '\/dashboard\/calidad-datos\/salud'/);
-  assert.match(dict, /executive: 'Centro ejecutivo'/);
+  assert.match(dict, /executive: 'Resumen'/);
   assert.match(dict, /performance: 'Desempeño'/);
-  assert.match(dict, /dataHealth: 'Data Health'/);
+  assert.match(dict, /dataHealth: 'Calidad de datos'/);
   assert.match(performanceLayout, /ManagementContextNav dictionary=\{dictionary\}/);
   assert.match(decisionLayout, /getDictionaryForRequest\(\)/);
   assert.match(dataHealthLayout, /getDictionaryForRequest\(\)/);
