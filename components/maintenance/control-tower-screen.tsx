@@ -28,12 +28,12 @@ const fetcher = async (url: string) => {
 };
 
 const slides = [
-  { key: 'analysis', label: 'Análisis operacional', icon: Activity },
-  { key: 'stopped', label: 'Equipos detenidos', icon: ShieldAlert },
-  { key: 'preventive', label: 'Mantenciones preventivas', icon: TimerReset },
-  { key: 'schedule', label: 'Programación de trabajos', icon: CalendarDays },
-  { key: 'fleet', label: 'Control general de flota', icon: Gauge },
-  { key: 'management', label: 'Indicadores de gestión', icon: BarChart3 },
+  { key: 'analysis', label: 'Análisis operacional', question: '¿Qué requiere atención ahora?', icon: Activity },
+  { key: 'stopped', label: 'Equipos detenidos', question: '¿Qué equipos están detenidos y qué los bloquea?', icon: ShieldAlert },
+  { key: 'preventive', label: 'Mantenciones preventivas', question: '¿Qué mantenciones están vencidas o próximas?', icon: TimerReset },
+  { key: 'schedule', label: 'Programación de trabajos', question: '¿Qué trabajo está atrasado o debe ejecutarse ahora?', icon: CalendarDays },
+  { key: 'fleet', label: 'Control general de flota', question: '¿Dónde está concentrada la atención de la flota?', icon: Gauge },
+  { key: 'management', label: 'Indicadores de gestión', question: '¿Cómo está respondiendo el área de mantenimiento?', icon: BarChart3 },
 ] as const;
 
 const number = (value: unknown, digits = 1) => {
@@ -155,10 +155,11 @@ export default function MaintenanceControlTowerPage() {
             <Badge variant="outline">Solo lectura</Badge>
           </div>
           <div className="mt-1 flex items-center gap-3">
-            <SlideIcon className="h-6 w-6 text-primary" />
+            <SlideIcon className="h-7 w-7 text-primary" />
             <h1 className="text-4xl font-semibold tracking-tight 2xl:text-5xl">{slide.label}</h1>
             <span className="rounded-full border px-3 py-1 text-sm font-medium text-muted-foreground">Vista {slideIndex + 1} de {slides.length}</span>
           </div>
+          <p className="mt-2 text-lg font-medium text-muted-foreground 2xl:text-xl">{slide.question}</p>
         </div>
         <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-muted-foreground">
           <span>Hora local</span><strong className="text-xl font-semibold tabular-nums text-foreground">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong>
@@ -196,9 +197,9 @@ export default function MaintenanceControlTowerPage() {
       </main>
 
       <footer className="shrink-0 border-t pt-2">
-        <div className="flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Clock3 className="h-3.5 w-3.5" />
+            <Clock3 className="h-4 w-4" />
             Próxima vista en {secondsToNext} s · datos cada {data?.refreshSeconds || 60} s
           </div>
           <div className="flex items-center gap-1.5" aria-label="Progreso de vistas">
