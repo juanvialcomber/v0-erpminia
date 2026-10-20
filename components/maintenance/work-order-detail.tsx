@@ -3,8 +3,9 @@ import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, History, MoreHorizontal, PlayCircle, RotateCcw } from 'lucide-react';
+import { CheckCircle2, History, MoreHorizontal, Pencil, PlayCircle, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,6 +85,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   const { data, error, isLoading, mutate } = useSWR(id ? `/api/maintenance/work-orders/${id}` : null, fetcher);
   const { data: viewer, isLoading: viewerLoading } = useSWR('/api/maintenance/viewer-context', fetcher);
   const workOrder = data?.data;
+  const [editOpen, setEditOpen] = useState(false);
   const costCenters = data?.costCenters || [];
   const assignees = data?.assignees || [];
   const isHistorical = workOrder?.record_scope === 'historical' || data?.record_scope === 'historical';
@@ -213,7 +215,11 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">{workOrder.title || t.untitled}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || t.noAsset}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {canEdit && !isCompleted ? <Button type="button" variant="outline" onClick={() => {
+            setEditOpen(true);
+            requestAnimationFrame(() => document.getElementById('edit-work-order')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+          }}><Pencil className="mr-2 h-4 w-4" />Editar</Button> : null}
           {isCompleted ? (
             <div className="min-w-44 rounded-lg border px-5 py-3 text-right">
               <p className="text-xs text-muted-foreground">Tiempo ejecutado</p>
@@ -252,7 +258,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       </Card>
 
       ) : null}
-      {canEdit ? <details className="rounded-lg border bg-card">
+      {canEdit ? <details id="edit-work-order" open={editOpen} onToggle={(event) => setEditOpen(event.currentTarget.open)} className="scroll-mt-24 rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Editar OT</summary>
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
           event.preventDefault();
