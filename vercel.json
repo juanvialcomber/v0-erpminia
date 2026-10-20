@@ -19,7 +19,7 @@
     },
     {
       "path": "/api/cron/whatsapp-history",
-      "schedule": "7,37 * * * *"
+      "schedule": "7,22,37,52 * * * *"
     },
     {
       "path": "/api/cron/whatsapp-media",
