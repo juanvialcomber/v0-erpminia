@@ -371,8 +371,8 @@ function PreventiveSlide({ data }: { data: any }) {
           <BasisRow label="Otro tipo de control" value={data?.lifecycle?.preventiveBasis?.other || 0} />
         </div>
         <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
-          <p className="text-sm font-semibold">Plan preventivo vigente</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          <p className="text-base font-semibold">Plan preventivo vigente</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {data?.lifecycle?.approvedPreventiveSchedules || 0} planes activos · {String(data?.lifecycle?.approvedPreventiveSchedulesBasis || 'Sin información suficiente').replace('Sin base canónica', 'Sin información suficiente')}
           </p>
         </div>
@@ -458,12 +458,16 @@ function FleetSlide({ data }: { data: any }) {
         <div className="space-y-4">
           {sites.slice(0, 8).map((site) => (
             <div key={site.label}>
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="font-medium">{site.label}</span>
-                <span className="text-muted-foreground">{site.total} equipos · {site.attention} requieren atención · {site.stopped} detenidos · {dateTime(site.latestAt)}</span>
+              <div className="mb-2 flex items-end justify-between gap-5">
+                <div>
+                  <span className="text-lg font-semibold">{site.label}</span>
+                  <div className="mt-1 text-sm text-[var(--tower-ink-muted)]">Última señal {dateTime(site.latestAt)} · Correo {site.email} · WhatsApp {site.whatsapp}</div>
+                </div>
+                <div className="text-right text-sm tabular-nums text-[var(--tower-ink-muted)]">
+                  <strong className="text-lg text-[var(--tower-ink)]">{site.total}</strong> equipos · {site.attention} atención · {site.stopped} detenidos
+                </div>
               </div>
-              <div className="mb-1 text-sm text-[var(--tower-ink-muted)]">Correo {site.email} · WhatsApp {site.whatsapp}</div>
-              <div className="flex h-4 overflow-hidden rounded bg-muted">
+              <div className="flex h-5 overflow-hidden rounded bg-muted">
                 <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
                 <div className="bg-[var(--tower-copper)]" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
                 <div className="bg-destructive/80" style={{ width: `${site.total ? (site.stopped / site.total) * 100 : 0}%` }} />
@@ -516,32 +520,67 @@ function ManagementSlide({ data }: { data: any }) {
         </div>
       </Panel>
 
-      <Panel title="Coordinación del equipo" subtitle="Carga abierta por responsable; apoyo para planificar y destrabar">
-        <DataTable
-          headers={['Responsable', 'Abiertas', 'Vencidas', 'Hoy', 'Mañana', 'Alta/Crítica']}
-          columnTemplate="1.7fr .7fr .7fr .65fr .75fr 1fr"
-          rows={coordination.slice(0, 6).map((row: any) => [
-            row.assignee,
-            row.open,
-            row.overdue,
-            row.dueToday,
-            row.dueTomorrow,
-            row.highCritical,
-          ])}
-        />
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <ManagementMetric
-            label="Preventivas terminadas"
-            value={workMixTotal ? preventive : '—'}
-            detail={workMixTotal ? `${number((preventive / workMixTotal) * 100, 0)}% de las OT cerradas` : 'Sin información suficiente'}
-          />
-          <ManagementMetric
-            label="Correctivas terminadas"
-            value={workMixTotal ? corrective : '—'}
-            detail={workMixTotal ? `${number((corrective / workMixTotal) * 100, 0)}% de las OT cerradas` : 'Sin información suficiente'}
-          />
+      <Panel title="Coordinación del equipo" subtitle="Carga abierta real por responsable">
+        <AssigneeLoadChart rows={coordination.slice(0, 6)} />
+        <div className="mt-4">
+          <WorkMixChart preventive={preventive} corrective={corrective} />
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function AssigneeLoadChart({ rows }: { rows: any[] }) {
+  if (!rows.length) return <EmptyState title="Sin carga abierta" text="No hay órdenes abiertas asignadas para graficar." />;
+  const maxOpen = Math.max(...rows.map((row) => Number(row.open || 0)), 1);
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => {
+        const open = Number(row.open || 0);
+        const overdue = Number(row.overdue || 0);
+        const highCritical = Number(row.highCritical || 0);
+        return (
+          <div key={row.assignee}>
+            <div className="mb-1.5 flex items-end justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{row.assignee}</p>
+                <p className="mt-0.5 text-sm text-[var(--tower-ink-muted)]">
+                  {overdue} vencidas · {row.dueToday || 0} hoy · {row.dueTomorrow || 0} mañana · {highCritical} alta/crítica
+                </p>
+              </div>
+              <span className="text-2xl font-semibold tabular-nums">{open}</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[var(--tower-surface-muted)]">
+              <div className="h-full rounded-full bg-[var(--tower-copper)]" style={{ width: `${(open / maxOpen) * 100}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkMixChart({ preventive, corrective }: { preventive: number; corrective: number }) {
+  const total = preventive + corrective;
+  if (!total) return <EmptyState title="Sin mezcla de trabajo suficiente" text="Se mostrará cuando existan órdenes cerradas clasificadas como preventivas o correctivas." />;
+  const preventivePct = (preventive / total) * 100;
+  const correctivePct = (corrective / total) * 100;
+  return (
+    <div className="rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[var(--tower-ink-muted)]">Tipo de trabajo terminado</p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{total} órdenes cerradas clasificadas</p>
+        </div>
+      </div>
+      <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-[var(--tower-border)]">
+        <div className="bg-[var(--tower-green)]" style={{ width: `${preventivePct}%` }} />
+        <div className="bg-[var(--tower-copper)]" style={{ width: `${correctivePct}%` }} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[var(--tower-ink-muted)]">
+        <ChartLegend tone="green" label={`${preventive} preventivas · ${number(preventivePct, 0)}%`} />
+        <ChartLegend tone="copper" label={`${corrective} correctivas · ${number(correctivePct, 0)}%`} />
+      </div>
     </div>
   );
 }
