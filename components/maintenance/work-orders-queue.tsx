@@ -50,6 +50,7 @@ function normalizeText(value: string | null | undefined) {
 function getStatusLabel(status: string | null | undefined, t: WorkOrdersT) {
   const value = normalizeText(status);
   if (['completed', 'completado'].includes(value)) return t.status.completed;
+  if (['cancelled', 'canceled', 'cancelada', 'anulada'].includes(value)) return 'Anulada';
   if (['in_progress', 'en_progreso'].includes(value)) return t.status.inProgress;
   if (['open', 'abierta', 'pending', 'pendiente'].includes(value)) return t.status.open;
   return status || t.status.none;
@@ -113,6 +114,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
     return workOrders.filter((order) => {
       const status = normalizeText(order.status);
       const completed = ['completed', 'completado'].includes(status);
+      const cancelled = ['cancelled', 'canceled', 'cancelada', 'anulada'].includes(status);
       const operational = order.record_scope !== 'historical';
       const matchesView = missingAssetOnly
         ? operational
@@ -124,7 +126,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
             ? operational && completed && normalizeText(order.approval_status) !== 'approved'
             : viewFilter === 'completed'
               ? operational && completed
-              : operational && !completed;
+              : operational && !completed && !cancelled;
       const matchesDataHealth = !missingAssetOnly || !order.asset_name;
       const matchesSearch = !query || [order.work_order_number, formatWorkOrderNumber(order.work_order_number, locale), order.title, order.asset_name, order.assigned_to_name].some((value) => normalizeText(value).includes(query));
       const matchesStatus = statusFilter === 'all' || normalizeText(order.status) === statusFilter;
