@@ -10,6 +10,11 @@ import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maint
 
 type WorkOrderPatchPayload = {
   status?: string;
+  title?: string;
+  description?: string | null;
+  work_type?: string;
+  priority?: string;
+  scheduled_date?: string | null;
   assigned_person_id?: string | null;
   actual_duration_hours?: number | string | null;
   root_cause?: string | null;
@@ -215,18 +220,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (evidenceError) throw evidenceError;
       if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
 
+      const isGeneralWork = String(guard.row?.work_type || '').toLowerCase() === 'general';
       const rootCause = String(body.root_cause || '').trim();
       const preventiveActions = String(body.preventive_actions || '').trim();
       const actualHours = Number(body.actual_duration_hours);
-      if (!rootCause) return NextResponse.json({ error: 'Registra la causa principal antes de completar la orden.' }, { status: 400 });
-      if (!preventiveActions) return NextResponse.json({ error: 'Registra la acción preventiva antes de completar la orden.' }, { status: 400 });
+      if (!isGeneralWork && !rootCause) return NextResponse.json({ error: 'Registra la causa principal antes de completar la orden.' }, { status: 400 });
+      if (!isGeneralWork && !preventiveActions) return NextResponse.json({ error: 'Registra la acción preventiva antes de completar la orden.' }, { status: 400 });
       if (!Number.isFinite(actualHours) || actualHours <= 0) return NextResponse.json({ error: 'Registra las horas reales utilizadas antes de completar la orden.' }, { status: 400 });
       const costSummary = await loadCostSummary(context, id);
       const blockers: string[] = [];
       if (costSummary.pendingParts > 0) blockers.push(`${costSummary.pendingParts} repuesto${costSummary.pendingParts === 1 ? '' : 's'} pendiente${costSummary.pendingParts === 1 ? '' : 's'} de instalar o devolver`);
       if (costSummary.openLaborEntries > 0) blockers.push(`${costSummary.openLaborEntries} registro${costSummary.openLaborEntries === 1 ? '' : 's'} de trabajo aún abierto${costSummary.openLaborEntries === 1 ? '' : 's'}`);
       if (blockers.length > 0) return NextResponse.json({ error: `No se puede completar la orden: ${blockers.join(' y ')}.`, blockers, costSummary }, { status: 409 });
-      const closureData: Record<string, unknown> = { root_cause: rootCause, preventive_actions: preventiveActions, actual_duration_hours: actualHours, updated_at: new Date().toISOString() };
+      const closureData: Record<string, unknown> = { actual_duration_hours: actualHours, updated_at: new Date().toISOString() };
+      if (!isGeneralWork) {
+        closureData.root_cause = rootCause;
+        closureData.preventive_actions = preventiveActions;
+      }
       if (body.meter_reading !== undefined) closureData.meter_reading = body.meter_reading;
       if (body.meter_unit !== undefined) closureData.meter_unit = body.meter_unit;
       const { error: detailError } = await context.supabase.from('maintenance_work_orders').update(closureData).eq('id', id).eq('organization_id', context.organizationId);
@@ -241,6 +251,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (body.status) updateData.status = body.status;
+    if (hasModuleWrite && body.title !== undefined) {
+      const title = String(body.title || '').trim();
+      if (!title) return NextResponse.json({ error: 'El trabajo debe tener un nombre.' }, { status: 400 });
+      updateData.title = title;
+    }
+    if (hasModuleWrite && body.description !== undefined) updateData.description = body.description ? String(body.description).trim() : null;
+    if (hasModuleWrite && body.work_type !== undefined) updateData.work_type = String(body.work_type || '').trim() || null;
+    if (hasModuleWrite && body.priority !== undefined) updateData.priority = String(body.priority || '').trim() || null;
+    if (hasModuleWrite && body.scheduled_date !== undefined) updateData.scheduled_date = body.scheduled_date || null;
     if (body.assigned_person_id !== undefined) {
       if (body.assigned_person_id) {
         const assignee = await resolveAssignee(context, body.assigned_person_id);
