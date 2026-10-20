@@ -133,8 +133,9 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
             </div>)}
           </div>
           {group.some(item=>item.partial)?<p className="mt-2 text-[11px] text-muted-foreground">
-            El mensaje contiene varias actividades; los adjuntos no certifican cada una por separado.
+            Reporte con varias actividades.
           </p>:null}
+          <p className="mt-2 text-[11px] text-muted-foreground">Fuente #{first.sourceMessageId}</p>
           {evidence.length>0?<div className="mt-3">
             <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Evidencia adjunta
@@ -150,10 +151,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
             <div className="grid gap-1 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium">{singleDestination||first.destination}</p>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {first.groupName} · Mensaje #{first.sourceMessageId}
-                  {group.length>1?' · '+group.length+' novedades':''}
-                </p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{first.groupName}</p>
                 {stateSummary?<p className="mt-1 text-xs text-muted-foreground">{stateSummary}</p>:null}
               </div>
               <time dateTime={first.reportedAt} className="text-[11px] tabular-nums text-muted-foreground">
@@ -167,12 +165,8 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
           className="rounded-xl border bg-background/60 p-3 shadow-sm sm:p-4">
           <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-none">{first.groupName}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                WhatsApp · Mensaje #{first.sourceMessageId}
-                {singleDestination?' · '+singleDestination:''}
-                {group.length>1?' · '+group.length+' novedades':''}
-              </p>
+              <p className="text-sm font-semibold leading-none">{singleDestination||first.destination}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{first.groupName}</p>
               {stateSummary?<p className="mt-1 text-xs font-medium text-foreground/80">{stateSummary}</p>:null}
             </div>
             <time dateTime={first.reportedAt}
