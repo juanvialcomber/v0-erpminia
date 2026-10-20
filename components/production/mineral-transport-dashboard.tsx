@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarDays, Route, Scale, Truck, UsersRound } from 'lu
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
+import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 
 type TransportData = {
   period: null | { start:string; through:string; movements:number; tons:number; avgTonsPerMovement:number; mines:number; sectors:number; carriers:number; vehicles:number; normalizedCoveragePct:number; validatedCoveragePct:number };
@@ -34,6 +35,8 @@ export function MineralTransportDashboard(){
 
   return <div className="space-y-6">
     <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Transporte</PageHeaderEyebrow><PageHeaderTitle>Transporte de Mineral</PageHeaderTitle><PageHeaderDescription>{p ? `Movimiento mina → planta con datos hasta ${date(p.through)}.` : 'Trazabilidad operacional de movimientos mina → planta.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
+
+    <WhatsappOperationalUpdates mode="dispatch"/>
 
     {error ? <StatePanel tone="error" title="No fue posible cargar Transporte" description="Reintenta la consulta." actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>} className="min-h-0 py-5"/> : null}
     {!error && !isLoading && !p ? <StatePanel tone="neutral" title="Sin movimientos cargados" description="No existe información canónica de transporte para mostrar."/> : null}
