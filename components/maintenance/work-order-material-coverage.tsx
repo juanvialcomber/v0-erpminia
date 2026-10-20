@@ -31,6 +31,10 @@ type MaterialRow = {
   quantity_required?: number | string | null;
   quantity_available?: number | string | null;
   quantity_shortage?: number | string | null;
+  informed_available?: number | string | null;
+  informed_updated_at?: string | null;
+  informed_status?: 'usable' | 'conflict' | 'missing' | null;
+  informed_source?: string | null;
 };
 
 type CatalogRow = {
@@ -39,8 +43,13 @@ type CatalogRow = {
   productName: string | null;
   family: string | null;
   unit: string | null;
-  quantityAvailable: number;
-  warehouses: string[];
+  informedQuantity: number | null;
+  informedUpdatedAt: string | null;
+  informedStatus: 'usable' | 'conflict' | 'missing';
+  reservableQuantity: number;
+  reservableUpdatedAt: string | null;
+  stockSignalSource: string | null;
+  reservationSource: string;
 };
 
 type SupplyStatus = {
@@ -56,6 +65,12 @@ const issued = (row: MaterialRow) => Number(row.issued ?? 0);
 const reserved = (row: MaterialRow) => Number(row.reserved ?? Math.max(available(row) - issued(row), 0));
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
+const informedAvailable = (row: MaterialRow) => row.informed_available == null ? null : Number(row.informed_available);
+const informedCanCover = (row: MaterialRow) => {
+  if (row.informed_status === 'conflict') return false;
+  const informed = informedAvailable(row);
+  return informed != null && Number.isFinite(informed) && informed >= shortage(row);
+};
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
 
 export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string }) {
@@ -77,6 +92,8 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const issuedTotal = rows.reduce((sum, row) => sum + issued(row), 0);
   const requiredTotal = rows.reduce((sum, row) => sum + required(row), 0);
   const shortageTotal = rows.reduce((sum, row) => sum + shortage(row), 0);
+  const shortageRows = rows.filter((row) => shortage(row) > 0);
+  const informedCoveragePending = shortageRows.length > 0 && shortageRows.every(informedCanCover);
   const procurementTotal = rows.reduce((sum, row) => sum + inProcurement(row), 0);
   const alreadySent = Boolean(status.procurement_request_id) || ['sent_to_procurement', 'partially_covered', 'covered'].includes(status.supply_status || '');
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
@@ -159,8 +176,10 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
     ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
     : reservedTotal > 0
       ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
-      : shortageTotal > 0 && !alreadySent
-        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
+      : shortageTotal > 0 && informedCoveragePending
+        ? { title: 'Confirmar Bodega antes de Compras', detail: 'El stock informado podría cubrir el faltante, pero todavía no está reservado para esta OT.', action: 'confirm_stock' as const }
+        : shortageTotal > 0 && !alreadySent
+          ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada, entregada ni señal suficiente en Bodega.`, action: 'procure' as const }
         : shortageTotal > 0
           ? { title: 'Compras está gestionando los faltantes', detail: `${procurementTotal || shortageTotal} unidad(es) están registradas en el flujo de abastecimiento.`, action: 'waiting' as const }
           : { title: 'Materiales listos para ejecución', detail: `${issuedTotal} de ${requiredTotal} unidad(es) requeridas ya fueron entregadas.`, action: 'ready' as const };
@@ -182,6 +201,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
             {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
             {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
+            {primaryAction.action === 'confirm_stock' ? <Badge variant="secondary"><PackageSearch className="mr-1 h-3.5 w-3.5" />Confirmar Bodega</Badge> : null}
             {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
             {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
@@ -205,9 +225,16 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <div className="space-y-2"><p className="text-xs font-medium">Cantidad</p><Input type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
             <Button onClick={addMaterial} disabled={!selected || saving || Number(quantity) <= 0}>{saving ? 'Guardando…' : 'Agregar'}</Button>
           </div>
-          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm"><p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p><p className="mt-1 text-xs text-muted-foreground">Stock libre informado: {selected.quantityAvailable} {selected.unit || 'unid.'} · {selected.warehouses.length ? selected.warehouses.join(', ') : 'sin bodega informada'}</p></div> : null}
+          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm">
+            <p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p>
+            <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+              <p>Stock informado: {selected.informedStatus === 'conflict' ? 'En conciliación' : selected.informedQuantity == null ? 'Sin señal reciente' : `${selected.informedQuantity} ${selected.unit || 'unid.'}`}</p>
+              <p>Reservable ahora: {selected.reservableQuantity} {selected.unit || 'unid.'}</p>
+              <p>La reserva real se confirma sólo al agregar el material a la OT.</p>
+            </div>
+          </div> : null}
           {!selected && query.trim().length >= 2 ? <div className="mt-3 max-h-56 overflow-auto rounded-md border bg-card">
-            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">Stock libre {item.quantityAvailable} {item.unit || 'unid.'}{item.family ? ` · ${item.family}` : ''}</p></button>)}
+            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.family ? `${item.family} · ` : ''}Informado {item.informedStatus === 'conflict' ? 'En conciliación' : item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}</p></button>)}
           </div> : null}
         </div> : null}
 
@@ -227,6 +254,11 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
               <div><p className="text-xs text-muted-foreground">Entregado</p><p className="font-medium tabular-nums">{issuedQty}</p></div>
               <div><p className="text-xs text-muted-foreground">Faltante</p><p className={missing > 0 ? 'font-semibold tabular-nums text-destructive' : 'font-medium tabular-nums'}>{missing}</p></div>
               <div><p className="text-xs text-muted-foreground">En Compras</p><p className="font-medium tabular-nums">{purchasingQty}</p></div>
+              {row.informed_status === 'conflict'
+                ? <div className="col-span-2 sm:col-span-5 text-xs text-destructive">Stock informado Bodega: En conciliación · no usar para cubrir, comprar o ejecutar hasta resolver la fuente.</div>
+                : informedAvailable(row) != null
+                  ? <div className="col-span-2 sm:col-span-5 text-xs text-muted-foreground">Stock informado Bodega: {informedAvailable(row)} · confirmar antes de comprar o ejecutar.</div>
+                  : null}
             </div>
           </div>;
         })}</div> : null}

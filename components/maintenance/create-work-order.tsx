@@ -51,8 +51,13 @@ type MaterialCatalogItem = {
   productName: string | null;
   family: string | null;
   unit: string | null;
-  quantityAvailable: number;
-  warehouses: string[];
+  informedQuantity: number | null;
+  informedUpdatedAt: string | null;
+  informedStatus: 'usable' | 'conflict' | 'missing';
+  reservableQuantity: number;
+  reservableUpdatedAt: string | null;
+  stockSignalSource: string | null;
+  reservationSource: string;
 };
 
 type PlannedMaterial = MaterialCatalogItem & {
@@ -440,7 +445,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
           <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-4 border-t px-5 py-5">
-          <p className="text-sm text-muted-foreground">Selecciona lo que debería estar disponible para ejecutar la OT. No descuenta stock todavía.</p>
+          <p className="text-sm text-muted-foreground">Selecciona los materiales requeridos. El stock informado orienta la planificación; al crear la OT, la reserva se intenta contra Bodega canónica.</p>
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_100px]">
             <div className="space-y-2">
               <Label htmlFor="material-search">Buscar insumo</Label>
@@ -458,10 +463,12 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName || 'Producto'}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.warehouses.length ? item.warehouses.join(', ') : 'Sin bodega informada'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {item.informedStatus === 'conflict' ? 'Informado: En conciliación' : `Informado ${item.informedQuantity == null ? '—' : item.informedQuantity}`} · Reservable {item.reservableQuantity} {item.unit || 'unid.'}
+                      </p>
                     </div>
-                    <span className={item.quantityAvailable > 0 ? 'shrink-0 text-xs text-muted-foreground' : 'shrink-0 text-xs text-destructive'}>
-                      {item.quantityAvailable > 0 ? `${item.quantityAvailable} disponibles` : 'Sin stock'}
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {item.reservableQuantity > 0 ? 'Con reserva posible' : 'Sin reserva disponible'}
                     </span>
                   </div>
                 </button>
@@ -475,7 +482,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName || 'Producto'}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Requerido: {item.quantityRequired} {item.unit || 'unid.'} · Stock libre: {item.quantityAvailable}
+                      Requerido: {item.quantityRequired} {item.unit || 'unid.'} · Informado: {item.informedStatus === 'conflict' ? 'En conciliación' : item.informedQuantity == null ? '—' : item.informedQuantity} · Reservable: {item.reservableQuantity}
                     </p>
                   </div>
                   <Button type="button" variant="ghost" size="icon-sm" aria-label="Quitar insumo" onClick={() => setPlannedMaterials((current) => current.filter((row) => row.productId !== item.productId))}>

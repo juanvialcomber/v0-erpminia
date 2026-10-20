@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getInventoryConflictEvidence } from '@/lib/inventory-trust';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (status) positionsQuery = positionsQuery.eq('stock_status', status);
     if (query) positionsQuery = positionsQuery.or(`product_code.ilike.%${query}%,product_name.ilike.%${query}%`);
 
-    const [overviewResult, positionsResult, dieselPositionResult, dieselReferenceResult] = await Promise.all([
+    const [overviewResult, positionsResult, dieselPositionResult, dieselReferenceResult, conflictEvidence] = await Promise.all([
       context.supabase.from('inventory_intelligence_overview_v1').select('*').eq('organization_id', organizationId).maybeSingle(),
       positionsQuery,
       context.supabase
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
         .eq('organization_id', organizationId)
         .eq('product_code', 'Combustible001')
         .maybeSingle(),
+      getInventoryConflictEvidence(context.supabase, organizationId),
     ]);
 
     const error = overviewResult.error || positionsResult.error || dieselPositionResult.error || dieselReferenceResult.error;
@@ -49,14 +51,7 @@ export async function GET(request: NextRequest) {
 
     const currentDiesel = dieselPositionResult.data?.[0] || null;
     const dieselReference = dieselReferenceResult.data || null;
-    const referenceQuantity = Number(dieselReference?.source_payload?.quantity_available ?? dieselReference?.source_payload?.quantity_on_hand ?? NaN);
-    const currentQuantity = Number(currentDiesel?.quantity_available ?? NaN);
-    const referenceUnitCost = Number(dieselReference?.source_payload?.unit_cost ?? dieselReference?.standard_cost ?? NaN);
-    const currentUnitCost = Number(currentDiesel?.unit_cost ?? NaN);
-    const hasDieselConflict = Boolean(currentDiesel && dieselReference) && (
-      (Number.isFinite(referenceQuantity) && Number.isFinite(currentQuantity) && referenceQuantity !== currentQuantity) ||
-      (Number.isFinite(referenceUnitCost) && Number.isFinite(currentUnitCost) && referenceUnitCost !== currentUnitCost)
-    );
+    const hasDieselConflict = conflictEvidence.conflictCodes.has('COMBUSTIBLE001');
 
     return NextResponse.json({
       overview: overviewResult.data || null,
