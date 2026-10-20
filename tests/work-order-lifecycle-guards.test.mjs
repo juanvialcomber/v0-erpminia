@@ -55,3 +55,16 @@ test('generic work-order completion already delegates to canonical RPC', async (
   assert.match(route, /if \(body\.status === 'completed'\)/);
   assert.match(route, /rpc\('close_work_order_safely'/);
 });
+
+
+test('in-progress work orders allow text corrections but block structural replanning', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+
+  assert.match(route, /currentStatus === 'in_progress'/);
+  assert.match(route, /\['work_type', 'priority', 'scheduled_date', 'assigned_person_id', 'cost_center_id'\]/);
+  assert.match(route, /permite corregir el nombre o la descripción/);
+  assert.match(route, /\['completed', 'closed', 'cancelled', 'canceled'\]\.includes\(currentStatus\)/);
+  assert.match(detail, /La OT está en curso\. Puedes corregir el nombre o la descripción/);
+  assert.match(detail, /workOrder\.status === 'in_progress' \? \{/);
+});
