@@ -176,3 +176,12 @@ test('wallboard fits viewport and disables internal scrolling', () => {
   assert.match(source, /min-h-0 flex-1 overflow-hidden rounded-lg/);
   assert.doesNotMatch(source, /overflow-y-auto overscroll-contain/);
 });
+
+
+test('fixed wallboard limits dense detail rows to avoid clipping at TV height', () => {
+  assert.match(source, /rows\.slice\(0, 4\)/);
+  assert.match(source, /open\.slice\(0, 4\)/);
+  assert.match(source, /sites\.slice\(0, 4\)/);
+  assert.match(source, /attention\.slice\(0, 4\)/);
+  assert.match(source, /signals\.slice\(0, 4\)/);
+});
