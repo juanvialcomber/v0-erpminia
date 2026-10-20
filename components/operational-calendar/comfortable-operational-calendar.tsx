@@ -57,6 +57,7 @@ type OperationalCalendarItem = {
   asset_name?: string | null;
   asset_code?: string | null;
   asset_cost_center?: string | null;
+  created_by_me?: boolean;
 };
 
 type CalendarResponse = {
@@ -245,7 +246,9 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
       if (ownerFilter !== 'all' && item.owner?.trim() !== ownerFilter) return false;
       if (perspective === 'mine') {
         const viewer = data?.viewerName?.trim().toLocaleLowerCase('es-CL');
-        if (!viewer || item.owner?.trim().toLocaleLowerCase('es-CL') !== viewer) return false;
+        const assignedToMe = Boolean(viewer && item.owner?.trim().toLocaleLowerCase('es-CL') === viewer);
+        const plannedByMe = Boolean(item.created_by_me);
+        if (!assignedToMe && !plannedByMe) return false;
       }
       if (term && ![item.title, item.reference, item.owner, item.kind, item.location]
         .some((value) => value?.toLocaleLowerCase('es-CL').includes(term))) return false;
@@ -335,7 +338,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
             <SelectItem value="finance" disabled={data?.allowedSources?.finance === false}>Finanzas ({summary.by_source.finance})</SelectItem>
             <SelectItem value="people" disabled={data?.allowedSources?.people === false}>Personas ({summary.by_source.people})</SelectItem>
           </SelectContent>
-        </Select> : <div className="flex items-center text-xs text-muted-foreground">{perspective === 'mine' ? 'Solo actividades asignadas a mí. Para ver las OT de otros responsables, selecciona Área u Organización.' : 'Todas las áreas autorizadas'}</div>}
+        </Select> : <div className="flex items-center text-xs text-muted-foreground">{perspective === 'mine' ? 'Mis OT asignadas y las OT que programé. Para ver todo el equipo, selecciona Área u Organización.' : 'Todas las áreas autorizadas'}</div>}
         <Select value={period} onValueChange={(value) => setPeriod(value as CalendarPeriod)}>
           <SelectTrigger aria-label="Escala temporal"><SelectValue /></SelectTrigger>
           <SelectContent>
