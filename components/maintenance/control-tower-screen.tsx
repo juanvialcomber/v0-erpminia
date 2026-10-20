@@ -344,7 +344,7 @@ function PreventiveSlide({ data }: { data: any }) {
         <div className="mt-4 rounded-md border border-amber-500/25 bg-amber-500/5 p-4">
           <p className="text-sm font-semibold">Plan preventivo vigente</p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {data?.lifecycle?.approvedPreventiveSchedules || 0} planes activos · {data?.lifecycle?.approvedPreventiveSchedulesBasis || 'Sin base canónica'}
+            {data?.lifecycle?.approvedPreventiveSchedules || 0} planes activos · {String(data?.lifecycle?.approvedPreventiveSchedulesBasis || 'Sin información suficiente').replace('Sin base canónica', 'Sin información suficiente')}
           </p>
         </div>
       </Panel>
@@ -374,7 +374,7 @@ function ScheduleSlide({ data }: { data: any }) {
       </div>
       <Panel
         title="Programa de ejecución"
-        subtitle={`Planificación + materiales · stock informado ${dateTime(data?.inventory?.latestAt)} · reserva canónica separada`}
+        subtitle={`Planificación + materiales · stock informado ${dateTime(data?.inventory?.latestAt)} · reservas de Bodega por separado`}
       >
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
@@ -468,7 +468,7 @@ function ManagementSlide({ data }: { data: any }) {
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
-      <Panel title="Indicadores de gestión" subtitle="Sólo métricas con base canónica suficiente">
+      <Panel title="Indicadores de gestión" subtitle="Sólo métricas con información suficiente">
         <div className="grid gap-3 md:grid-cols-2">
           <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin base'} />
           <ManagementMetric label="Backlog abierto" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin OT abiertas'} />
