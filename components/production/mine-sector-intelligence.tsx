@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Activity, AlertTriangle, Beaker, CheckCircle2, Clock3, Drill, Factory, Layers3, MapPinned, Target, Truck } from 'lucide-react';
 import { StatePanel } from '@/components/ui/state-panel';
+import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 
 type Attention='alert'|'watch'|'ok'|'no_comparison';
 type MineRow={key:string;mineName:string;actualTons:number;movements:number;plannedTons:number;expectedTonsToCutoff:number;plannedGradePct:number|null;observedVsExpectedPct:number|null;attention:Attention};
@@ -64,6 +65,8 @@ export function MineSectorIntelligence(){
 
   return <div className="space-y-6">
     <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Producción · Inteligencia integrada</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Ritmo por mina</h1><p className="mt-2 max-w-4xl text-sm text-muted-foreground">Transporte aprobado hasta {date(data.transportThrough)}; Planta hasta {date(data.plantThrough)}. El ritmo usa sólo las metas mensuales canónicas por mina y evita sumar líneas de plan que se solapan.</p></div>
+
+    <WhatsappOperationalUpdates mode="mine"/>
 
     <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6">
       <Metric icon={AlertTriangle} label="Minas alerta" value={n(data.attention.alert)} detail="<70% del esperado al corte"/>
