@@ -46,31 +46,30 @@ export function PlantSourceCutoff(){
       note:'Reporte de extracción a planta'},
     {label:'Extracción Mina Don Jaime',value:tons(stats?.donJaimeExtractedTons??null),
       note:'Reporte de extracción a planta'},
-    {label:'Plan de extracción a la fecha',value:tons(stats?.plannedToDateTons??null),
-      note:'Plan teórico al corte, no meta de tratamiento'},
-    {label:'Stock informado en planta',value:tons(stock?.plantStockTons??null),
-      note:'Saldo de stock, no toneladas tratadas'},
+    {label:'Plan a la fecha',value:tons(stats?.plannedToDateTons??null),
+      note:'Plan esperado a la fecha'},
+    {label:'Stock en planta',value:tons(stock?.plantStockTons??null),
+      note:'Stock informado'},
   ];
   return <section aria-label="Extracción minera y stock más recientes" className="rounded-lg border bg-card">
     <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-4">
       <div className="space-y-1">
-        <h2 className="font-semibold">Extracción y stock canónicos</h2>
+        <h2 className="font-semibold">Extracción y stock</h2>
         <p className="text-sm text-muted-foreground">
-          Última actualización de corte: <strong className="font-medium text-foreground">
+          Datos hasta: <strong className="font-medium text-foreground">
             {isLoading?'Consultando…':dmy(latestCutoff)}
           </strong>
         </p>
         <p className="max-w-3xl text-xs text-muted-foreground">
-          Fuente canónica de extracción y stock al corte. No sustituye turnos de planta,
-          toneladas tratadas, análisis de ley ni recuperación metalúrgica.
+          Este bloque muestra extracción y stock. Los datos de planta se muestran aparte.
         </p>
       </div>
       <Button size="sm" variant="outline" disabled={isLoading}
-        onClick={()=>void mutate()}>Actualizar fuentes</Button>
+        onClick={()=>void mutate()}>Actualizar</Button>
     </div>
     {error?<p role="alert" className="px-4 py-4 text-sm text-destructive">{error.message}</p>:null}
     {!error&&!isLoading&&!latestCutoff?<p className="px-4 py-4 text-sm text-muted-foreground">
-      Aún no hay registros normalizados de extracción o stock recientes.
+      Aún no hay datos recientes de extracción o stock.
     </p>:null}
     {data&&latestCutoff?<div className="divide-y">
       <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-5">
@@ -82,10 +81,10 @@ export function PlantSourceCutoff(){
       </div>
       <div className="px-4 py-4">
         <div className="mb-3 space-y-1">
-          <h3 className="text-sm font-medium">Movimientos diarios de stock informados</h3>
+          <h3 className="text-sm font-medium">Movimientos diarios</h3>
           <p className="text-xs text-muted-foreground">
             Fuente semanal: {stock?.source||'Sin planilla'} · corte {dmy(stock?.cutoff||null)}.
-            La salida por consumo conserva el signo negativo de la planilla.
+            Las salidas se muestran con signo negativo, igual que en la planilla.
           </p>
         </div>
         {stock?.daily?.length?<div className="overflow-x-auto rounded-md border">
@@ -108,13 +107,13 @@ export function PlantSourceCutoff(){
             </tr>)}</tbody>
           </table>
         </div>:<p className="text-sm text-muted-foreground">
-          El archivo actual no incluye movimientos diarios normalizados.
+          El archivo actual no incluye movimientos diarios.
         </p>}
       </div>
       <p className="px-4 py-3 text-xs text-muted-foreground">
         {stats?.source||'Estadística de extracción pendiente'} · corte {dmy(stats?.cutoff||null)}.
-        El tonelaje de extracción y el stock no acreditan producción fina recuperada.
-        Las tablas metalúrgicas históricas continúan debajo con su propia fecha de corte.
+        Extracción y stock no son lo mismo que producción de cobre fino.
+        El histórico de planta aparece más abajo con su propia fecha.
       </p>
     </div>:null}
   </section>;
