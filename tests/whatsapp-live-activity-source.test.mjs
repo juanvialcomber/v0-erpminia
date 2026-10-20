@@ -130,7 +130,7 @@ test('operational sections surface the matching WhatsApp feed before domain deta
  assert.ok(mineUi.indexOf('<WhatsappOperationalUpdates mode="mine"/>')<
    mineUi.indexOf('Qué requiere atención'));
  assert.ok(transportUi.indexOf('<WhatsappOperationalUpdates mode="dispatch"/>')<
-   transportUi.indexOf('Toneladas transportadas'));
+   transportUi.indexOf('Resumen de transporte'));
  assert.ok(plantUi.indexOf('<WhatsappOperationalUpdates mode="plant"/>')<
    plantUi.indexOf('<PlantSourceCutoff/>'));
  assert.match(feedUi,/refreshInterval:60000/);
