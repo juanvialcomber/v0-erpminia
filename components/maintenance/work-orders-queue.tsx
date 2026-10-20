@@ -190,7 +190,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
               ) : null}
             </div>
             <details className="rounded-md border bg-card" data-testid="ot-more-filters">
-              <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Ver más · Buscar y filtrar</summary>
+              <summary className="cursor-pointer px-3 py-2 text-sm font-medium">Buscar y filtrar</summary>
               <div className="border-t p-3">
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_160px_160px_auto]">
               <div className="relative">
@@ -256,7 +256,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
       </Card>
 
       <details data-testid="ot-more-indicators" className="rounded-lg border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver más · Indicadores</summary>
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver resumen</summary>
         <div className="border-t p-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {([[t.summary.open, open], [t.summary.inProgress, inProgress], [t.summary.critical, critical], [t.summary.overdue, overdue]] as const).map(([label, value]) => (
