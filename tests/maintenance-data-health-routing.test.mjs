@@ -16,6 +16,6 @@ test('work-order queue filters to operational orders without canonical assets wh
   assert.match(workOrdersQueue, /order\.record_scope !== 'historical'/);
   assert.match(workOrdersQueue, /!missingAssetOnly \|\| !order\.asset_name/);
   assert.match(dictionaries, /dataHealthBanner: \{/);
-  assert.match(dictionaries, /title: 'Data Health · OT operacional sin activo canónico'/);
+  assert.match(dictionaries, /title: 'OT sin equipo asociado'/);
   assert.match(dictionaries, /missingAssetBadge: 'Sin activo'/);
 });
