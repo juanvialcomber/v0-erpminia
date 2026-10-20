@@ -490,14 +490,14 @@ function ManagementSlide({ data }: { data: any }) {
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
       <Panel title="Indicadores de gestión" subtitle="Sólo métricas con base canónica suficiente">
         <div className="grid gap-3 md:grid-cols-2">
-          <ManagementMetric label="Cumplimiento OT registradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total}` : 'Sin base'} />
-          <ManagementMetric label="Disponibilidad operacional" value="—" detail={management.availabilityBasis || 'Sin base canónica'} />
+          <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin base'} />
+          <ManagementMetric label="Backlog abierto" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin OT abiertas'} />
           <ManagementMetric label="HH planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
           <ManagementMetric label="HH reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
           <ManagementMetric
-            label="OT sin evidencia Bodega"
-            value={data?.coordination?.blockers?.openOrdersWithoutSupplyEvidence ?? '—'}
-            detail="Ahora significa que la OT aún no declara productos/cantidades requeridas"
+            label="OT críticas abiertas"
+            value={data?.summary?.criticalOpenWorkOrders ?? '—'}
+            detail="Prioridad alta o crítica todavía abierta"
           />
           <ManagementMetric label="Horas detención registradas" value={number(management.recordedDowntimeHours)} detail={management.recordedDowntimeHours == null ? 'Sin base suficiente' : 'OT con dato explícito'} />
         </div>
