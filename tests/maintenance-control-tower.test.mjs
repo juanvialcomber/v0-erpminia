@@ -240,7 +240,7 @@ test('wallboard cross-checks declared OT materials against scoped bodega invento
 test('missing OT material declaration is not presented as stock coverage', () => {
   assert.match(api, /requirements\.length === 0/);
   assert.match(api, /Materiales no declarados/);
-  assert.match(page, /aún no declara productos\/cantidades requeridas/);
+  assert.match(page, /reservas de Bodega por separado/);
 });
 
 
