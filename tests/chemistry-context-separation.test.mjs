@@ -48,5 +48,5 @@ test('chemistry owns analytical control while Plant owns metallurgical performan
 
   assert.match(plant, /label:'Ley cabeza Cu'/);
   assert.match(plant, /label:'Recuperación'/);
-  assert.match(plant, /label:'Fino Cu real'/);
+  assert.match(plant, /label:'Cobre fino'/);
 });
