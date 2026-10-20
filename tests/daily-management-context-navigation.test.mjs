@@ -15,8 +15,8 @@ test('Gestión diaria exposes three distinct unnumbered contexts', async () => {
   assert.match(source, /href: '\/dashboard\/acciones'/);
   assert.match(source, /href: '\/dashboard\/tareas'/);
   assert.match(dict, /review: 'Revisión diaria'/);
-  assert.match(dict, /actions: 'Acciones del cargo'/);
-  assert.match(dict, /calendar: 'Calendario operacional'/);
+  assert.match(dict, /actions: 'Mis acciones'/);
+  assert.match(dict, /calendar: 'Calendario'/);
   assert.doesNotMatch(source, /step:/);
 });
 
@@ -30,8 +30,8 @@ test('calendar and cargo inbox remain semantically distinct', async () => {
   const actions = await readFile(actionsUrl, 'utf8');
   const dict = await readFile(new URL('../lib/i18n/dictionaries.ts', import.meta.url), 'utf8');
 
-  assert.match(dict, /title: 'Calendario operacional'/);
-  assert.match(dict, /Compromisos abiertos con fecha/);
+  assert.match(dict, /title: 'Calendario'/);
+  assert.match(dict, /Trabajos y compromisos con fecha/);
   assert.match(calendar, /\/api\/calendar\/operational/);
   assert.match(dict, /title: 'Mis acciones'/);
   assert.match(actions, /\/api\/actions\/inbox/);
