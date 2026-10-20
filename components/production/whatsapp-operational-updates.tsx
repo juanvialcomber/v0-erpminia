@@ -77,25 +77,49 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
     {data?.sourceLimitReached?<p className="text-xs text-muted-foreground">
       Vista reciente limitada; los mensajes originales permanecen almacenados.
     </p>:null}
-    {updates.length>0?<div className="divide-y rounded-md border">
-      {updates.map(item=><article key={item.id} className="space-y-2 px-3 py-3 text-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{item.groupName} · {item.destination}</span>
-          <time dateTime={item.reportedAt}>{when(item.reportedAt)}</time>
+    {updates.length>0?<div className="space-y-3">
+      {updates.map(item=><article key={item.id}
+        className="rounded-xl border bg-background/60 p-3 shadow-sm sm:p-4">
+        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-none">{item.groupName}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.destination}</p>
+          </div>
+          <time dateTime={item.reportedAt}
+            className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+            {when(item.reportedAt)}
+          </time>
         </div>
-        {item.text.length>480?<details className="space-y-2">
-          <summary className="cursor-pointer whitespace-pre-wrap break-words leading-relaxed">
-            {item.text.slice(0,280)}… <span className="underline underline-offset-2">Leer reporte completo</span>
-          </summary>
-          <p className="whitespace-pre-wrap break-words pt-2 leading-relaxed">{item.text}</p>
-        </details>:<p className="whitespace-pre-wrap break-words leading-relaxed">{item.text}</p>}
-        <p className="text-xs text-muted-foreground">
-          {reportedStateLabel[item.reportedState]||'Estado por corroborar'}
-          {' · '}Mensaje #{item.sourceMessageId}
-          {item.partial?' · Parte de un reporte con varias actividades; los adjuntos no certifican cada tarea':''}
-        </p>
-        {item.sourceEvidence.length>0?<div className="flex flex-wrap gap-2">
-          {item.sourceEvidence.map(file=><EvidenceLink key={file.id} file={file} mode={mode}/>)}
+        <div className="rounded-lg border bg-card px-3 py-3 sm:px-4">
+          {item.text.length>480?<details className="space-y-2">
+            <summary className="cursor-pointer list-none whitespace-pre-wrap break-words text-sm leading-relaxed">
+              {item.text.slice(0,280)}…
+              <span className="ml-1 text-xs font-medium underline underline-offset-2">
+                Ver mensaje completo
+              </span>
+            </summary>
+            <p className="whitespace-pre-wrap break-words border-t pt-3 text-sm leading-relaxed">
+              {item.text}
+            </p>
+          </details>:<p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{item.text}</p>}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span className={"inline-flex rounded-full border px-2 py-0.5 font-medium "+
+            (item.reportedState==='pending'?'border-destructive/30 text-destructive':
+             item.reportedState==='reported_done'?'border-border text-foreground':
+             'border-border')}>
+            {reportedStateLabel[item.reportedState]||'Estado por corroborar'}
+          </span>
+          <span>Mensaje #{item.sourceMessageId}</span>
+          {item.partial?<span>Reporte compuesto · adjuntos no certifican cada actividad</span>:null}
+        </div>
+        {item.sourceEvidence.length>0?<div className="mt-3">
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Evidencia adjunta
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {item.sourceEvidence.map(file=><EvidenceLink key={file.id} file={file} mode={mode}/>)}
+          </div>
         </div>:null}
       </article>)}
     </div>:null}
