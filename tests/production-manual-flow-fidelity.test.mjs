@@ -41,9 +41,9 @@ test('plant API reconciles historical coverage plus exact manual movement dates'
 });
 
 test('plant UI labels manual evidence without claiming broader TM coverage', () => {
-  assert.match(dashboard, /Los manuales no extienden esa ventana/);
-  assert.match(dashboard, /sólo los días con ingreso manual registrado muestran transporte comparable/);
-  assert.match(dashboard, /Los demás días permanecen “sin fuente”, nunca 0/);
+  assert.match(dashboard, /Los ingresos manuales no cambian esa fecha/);
+  assert.match(dashboard, /Los ingresos manuales sólo completan los días registrados/);
+  assert.match(dashboard, /Si falta información, mostramos “sin dato”, no cero/);
   assert.match(dashboard, /r\.movementSourceState\.includes\('manual'\)/);
 });
 
