@@ -136,7 +136,7 @@ test('wallboard is planning-centered for Ariel coordination role', () => {
   assert.match(api, /dueTomorrowOpenWorkOrders/);
   assert.match(api, /unassignedOpenWorkOrders/);
   assert.match(api, /byAssignee: assigneeCoordination/);
-  assert.match(page, /Prioridades de coordinación/);
+  assert.match(page, /Prioridades activas/);
   assert.match(page, /Programa de ejecución/);
   assert.match(page, /Coordinación del equipo/);
 });
