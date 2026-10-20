@@ -439,8 +439,8 @@ export function MaintenanceControlTower() {
 
         {false ? <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Costo registrado</p><p className="mt-1 text-2xl font-semibold">{money(Number(data.costs.summary?.totalCost || 0))}</p></div>
-            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Equipos con costo</p><p className="mt-1 text-2xl font-semibold">{data.costs.summary?.assets ?? 0}</p></div>
+            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Costo registrado</p><p className="mt-1 text-2xl font-semibold">{money(Number(data?.costs.summary?.totalCost || 0))}</p></div>
+            <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Equipos con costo</p><p className="mt-1 text-2xl font-semibold">{data?.costs.summary?.assets ?? 0}</p></div>
             <div className="rounded-xl border border-slate-700/70 bg-[#0a2232] p-4"><p className="text-xs text-slate-400">Fuente</p><p className="mt-1 text-base font-medium">Movimientos por equipo</p></div>
           </div>
           <div className="overflow-hidden rounded-xl border border-slate-700/70 bg-[#0a2232]">
