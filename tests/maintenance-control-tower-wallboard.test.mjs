@@ -119,3 +119,15 @@ test('wallboard charts use MOTIL corporate accents instead of generic chart colo
   assert.doesNotMatch(source, /bg-primary\/75/);
   assert.doesNotMatch(source, /bg-emerald-500\/70/);
 });
+
+
+test('wallboard charts are grounded in real operational counts', () => {
+  assert.match(source, /Estado de las preventivas/);
+  assert.match(source, /Distribución real de los equipos con seguimiento vigente/);
+  assert.match(source, /StatusBars rows=\{preventiveStatusRows\} total=\{rows\.length\}/);
+  assert.match(source, /Estado de órdenes registradas/);
+  assert.match(source, /Horas de órdenes cerradas/);
+  assert.match(source, /Diferencia registrada/);
+  assert.doesNotMatch(source, /priorityGroups/);
+  assert.doesNotMatch(source, /BarList rows=\{pCounts\}/);
+});
