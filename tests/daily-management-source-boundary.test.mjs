@@ -36,5 +36,5 @@ test('daily alert KPI respects the alert aggregator source coverage contract', a
 
   assert.match(source, /sourceStatus\?: \{ available: number; total: number; complete: boolean/);
   assert.match(source, /alertCoveragePartial = alerts\.data\?\.sourceStatus\?\.complete === false/);
-  assert.match(dict, /Cobertura parcial de señales/);
+  assert.match(dict, /Faltan algunos datos/);
 });
