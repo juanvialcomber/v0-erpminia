@@ -163,7 +163,7 @@ export default function MaintenanceControlTowerPage() {
   const SlideIcon = slide.icon;
 
   return createPortal(
-    <div className="motil-control-tower fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col gap-4 overflow-hidden bg-[var(--tower-canvas)] p-5 text-[var(--tower-ink)] 2xl:p-6">
+    <div className="motil-control-tower fixed inset-0 z-[9999] flex h-[100dvh] min-h-0 w-screen flex-col gap-3 overflow-hidden bg-[var(--tower-canvas)] p-5 text-[var(--tower-ink)] 2xl:p-6">
       <header className="grid shrink-0 gap-4 border-b border-[var(--tower-border)] pb-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
@@ -202,7 +202,7 @@ export default function MaintenanceControlTowerPage() {
       <main
         key={slide.key}
         className={cn(
-          'min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]',
+          'min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]',
           !reduceMotion && 'animate-in fade-in duration-300',
         )}
       >
@@ -214,8 +214,8 @@ export default function MaintenanceControlTowerPage() {
         {slide.key === 'management' ? <ManagementSlide data={data} /> : null}
       </main>
 
-      <footer className="shrink-0 border-t border-[var(--tower-border)] pt-2">
-        <div className="flex items-center justify-between gap-4 text-sm text-[var(--tower-ink-muted)]">
+      <footer className="z-10 shrink-0 border-t border-[var(--tower-border)] bg-[var(--tower-canvas)] pt-2 pb-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 text-sm text-[var(--tower-ink-muted)]">
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4" />
             Próxima vista en {secondsToNext} s · datos cada {data?.refreshSeconds || 60} s
@@ -241,7 +241,7 @@ function AnalysisSlide({ data }: { data: any }) {
   const signals = Array.isArray(data?.recentSignals) ? data.recentSignals : [];
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.05fr_.95fr]">
+    <div className="grid min-h-full gap-4 p-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] xl:items-start">
       <Panel title="Prioridades activas" subtitle="Lo que requiere seguimiento inmediato.">
         <div className="divide-y divide-[var(--tower-border)]">
           {attention.slice(0, 5).map((row: any) => (
@@ -647,7 +647,7 @@ function SourceMark({ source }: { source: unknown }) {
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="min-h-0 overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]">
+    <section className="min-w-0 rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface)]">
       <div className="border-b border-[var(--tower-border)] bg-[var(--tower-surface-muted)] px-5 py-3.5">
         <p className="font-heading text-xl font-semibold tracking-[-0.015em] 2xl:text-2xl">{title}</p>
         {subtitle ? <p className="mt-1 text-base text-[var(--tower-ink-muted)]">{subtitle}</p> : null}
