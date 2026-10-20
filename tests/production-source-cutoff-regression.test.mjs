@@ -25,15 +25,15 @@ test('October mineral extraction is an independent read-only, tenant-scoped sour
 test('source panel labels new extraction correctly, preserving old assay dates',()=>{
   const ui=read('components/production/plant-source-cutoff.tsx');
   const page=read('components/production/plant-metallurgy-dashboard.tsx');
-  assert.match(ui,/Última actualización de corte:/);
+  assert.match(ui,/Datos hasta:/);
   assert.match(ui,/Mineral extraído a planta/);
   assert.match(ui,/Extracción de mina, no mineral tratado/);
-  assert.match(ui,/No sustituye turnos de planta/);
-  assert.match(ui,/El tonelaje de extracción y el stock no acreditan producción fina recuperada/);
+  assert.match(ui,/Los datos de planta se muestran aparte/);
+  assert.match(ui,/Extracción y stock no son lo mismo que producción de cobre fino/);
   assert.match(page,/WhatsappOperationalUpdates mode="plant"/);
   assert.match(page,/PlantSourceCutoff/);
-  assert.match(page,/Producción diaria · histórico metalúrgico/);
-  assert.match(page,/Últimos turnos metalúrgicos registrados/);
+  assert.match(page,/Producción diaria · histórico de planta/);
+  assert.match(page,/Últimos turnos/);
   assert.match(page,/b\.operationDate\.localeCompare\(a\.operationDate\)/);
   assert.match(page,/data\.recent\.map/);
 });
