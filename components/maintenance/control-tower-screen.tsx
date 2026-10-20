@@ -291,7 +291,7 @@ function StoppedSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.stoppedRows) ? data.stoppedRows : [];
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
         <SmallMetric label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
         <SmallMetric label="Críticos con OT" value={data?.summary?.criticalOpenWorkOrders} />
@@ -305,7 +305,7 @@ function StoppedSlide({ data }: { data: any }) {
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
             columnTemplate="1.8fr .75fr 1.15fr 1.45fr .65fr 1.2fr"
-            rows={rows.slice(0, 8).map((row: any) => [
+            rows={rows.slice(0, 5).map((row: any) => [
               row.assetName,
               row.site,
               row.canonicalStatus || 'Sin confirmación registrada',
@@ -338,7 +338,7 @@ function PreventiveSlide({ data }: { data: any }) {
   ];
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.35fr_.65fr]">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.35fr_.65fr]">
       <Panel title="Mantenciones preventivas" subtitle="Control por horas o kilómetros con información vigente">
         <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-4">
           <SmallMetric label="Vencidas" value={data?.summary?.preventiveOverdue} />
@@ -350,7 +350,7 @@ function PreventiveSlide({ data }: { data: any }) {
           <DataTable
             headers={['Equipo', 'Faena', 'Control por', 'Lectura', 'Próxima mantención', 'Estado preventivo']}
             columnTemplate="1.5fr .9fr .65fr .8fr .85fr 1.25fr"
-            rows={rows.slice(0, 8).map((row: any) => [
+            rows={rows.slice(0, 5).map((row: any) => [
               row.assetName,
               row.site,
               row.meterUnit || '—',
@@ -393,7 +393,7 @@ function ScheduleSlide({ data }: { data: any }) {
     });
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-5">
         <SmallMetric label="Vencidas" value={data?.summary?.overdueOpenWorkOrders} />
         <SmallMetric label="Para hoy" value={data?.summary?.dueTodayOpenWorkOrders} />
@@ -408,7 +408,7 @@ function ScheduleSlide({ data }: { data: any }) {
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
           columnTemplate=".8fr .7fr 1.55fr 1.35fr 1.45fr .8fr 1.25fr"
-          rows={open.slice(0, 8).map((row: any) => [
+          rows={open.slice(0, 5).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
@@ -447,11 +447,11 @@ function FleetSlide({ data }: { data: any }) {
   }, [rows]);
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.15fr_.85fr]">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.15fr_.85fr]">
       <Panel title="Disponibilidad de equipos por mina" subtitle="Estado reportado con evidencia · no equivale a disponibilidad horaria">
         {sites.length === 0 ? <EmptyState title="Sin equipos clasificados por mina" text="No hay registros con fuente suficiente." /> : null}
         <div className="space-y-3">
-          {sites.slice(0, 8).map((site) => {
+          {sites.slice(0, 5).map((site) => {
             const classified = site.operational + site.stopped;
             const pct = classified > 0 ? Math.round(site.operational / classified * 100) : null;
             return <div key={site.label} className="rounded-md border border-border/60 p-3">
@@ -470,7 +470,7 @@ function FleetSlide({ data }: { data: any }) {
       </Panel>
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
         <DataTable headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']} columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
-          rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
+          rows={(data?.attentionRows || []).slice(0, 5).map((row: any) => [
             row.assetName, row.site, row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
             row.openWorkOrders || '—', row.partsPending ? 'Pendiente' : '—', sourceLabel(row.latestSignalSource),
           ])} />
@@ -490,7 +490,7 @@ function ManagementSlide({ data }: { data: any }) {
   const workMixTotal = preventive + corrective;
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
+    <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1fr_1fr]">
       <Panel title="Indicadores de gestión" subtitle="Sólo cifras calculadas desde órdenes registradas">
         <div className="grid gap-3 md:grid-cols-4">
           <ManagementMetric label="Órdenes abiertas" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin órdenes abiertas'} />
@@ -505,7 +505,7 @@ function ManagementSlide({ data }: { data: any }) {
       </Panel>
 
       <Panel title="Coordinación del equipo" subtitle="Carga abierta real por responsable">
-        <AssigneeLoadChart rows={coordination.slice(0, 6)} />
+        <AssigneeLoadChart rows={coordination.slice(0, 4)} />
         <div className="mt-4">
           <WorkMixChart preventive={preventive} corrective={corrective} />
         </div>
@@ -518,7 +518,7 @@ function AssigneeLoadChart({ rows }: { rows: any[] }) {
   if (!rows.length) return <EmptyState title="Sin carga abierta" text="No hay órdenes abiertas asignadas para graficar." />;
   const maxOpen = Math.max(...rows.map((row) => Number(row.open || 0)), 1);
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {rows.map((row) => {
         const open = Number(row.open || 0);
         const overdue = Number(row.overdue || 0);
@@ -719,7 +719,7 @@ function DataTable({
         style={{ gridTemplateColumns: template }}
       >
         {headers.map((header) => (
-          <div key={header} className="min-w-0 px-4 py-3 leading-tight whitespace-normal">
+          <div key={header} className="min-w-0 px-3 py-2 leading-tight whitespace-normal">
             {header}
           </div>
         ))}
@@ -737,7 +737,7 @@ function DataTable({
               <div
                 key={cellIndex}
                 className={cn(
-                  'min-w-0 overflow-visible text-clip [overflow-wrap:anywhere] px-4 py-3.5 text-base leading-snug whitespace-normal 2xl:text-lg',
+                  'min-w-0 overflow-visible text-clip [overflow-wrap:anywhere] px-3 py-2 text-base leading-snug whitespace-normal 2xl:text-lg',
                   cellIndex === 0 && 'font-semibold text-[var(--tower-ink)]',
                 )}
               >
@@ -760,7 +760,7 @@ function StatusBars({
 }) {
   if (!total) return <EmptyState title="Sin base vigente" text="No hay preventivas con información actual suficiente para graficar." />;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {rows.map((row) => {
         const pct = total > 0 ? (row.value / total) * 100 : 0;
         const barClass = row.tone === 'critical'
