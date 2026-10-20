@@ -31,6 +31,6 @@ test('daily work order workspace defaults to Motil operations and keeps history 
   assert.match(workOrdersPage, /historicalWorkOrders/);
   assert.match(workOrdersPage, /record_scope !== 'historical'/);
   assert.match(workOrdersPage, /viewFilter === 'historical'/);
-  assert.match(dictionaries, /scope: \{ operational: 'Operación Motil', historical: 'Histórico', all: 'Todo' \}/);
-  assert.match(dictionaries, /title: 'Próximas intervenciones · Operación Motil'/);
+  assert.match(dictionaries, /scope: \{ operational: 'Actuales', historical: 'Histórico', all: 'Todo' \}/);
+  assert.match(dictionaries, /title: 'Próximos trabajos'/);
 });
