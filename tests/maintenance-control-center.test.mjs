@@ -84,7 +84,7 @@ test('maintenance control tower rotates six read-only views and is in navigation
   const layout = fs.readFileSync('app/dashboard/mantenimiento/layout.tsx','utf8');
   const page = fs.readFileSync('app/dashboard/mantenimiento/torre-control/page.tsx','utf8');
   assert.match(tower,/Torre de control/);
-  assert.match(tower,/Información para la oficina · actualización automática/);
+  assert.match(tower,/Departamento de Mantenimiento Mecánica · Torre de control MOTIL/);
   assert.match(tower,/const VIEWS = \[/);
   assert.match(tower,/setViewIndex\(\(index\) => \(index \+ 1\) % VIEWS\.length\)/);
   assert.match(tower,/requestFullscreen/);
