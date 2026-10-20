@@ -164,6 +164,23 @@ export default function MaintenanceControlTowerPage() {
 
   return createPortal(
     <div className="motil-control-tower fixed inset-0 z-[9999] flex h-[100dvh] min-h-0 w-screen flex-col gap-2 overflow-hidden bg-[var(--tower-canvas)] p-3 text-[var(--tower-ink)] 2xl:p-4">
+      <style>{`
+        @media (max-height: 950px) {
+          .motil-control-tower .tower-detail-row:nth-child(n+6) { display: none; }
+          .motil-control-tower .tower-extra-row:nth-child(n+6) { display: none; }
+        }
+        @media (max-height: 820px) {
+          .motil-control-tower .tower-detail-row:nth-child(n+5) { display: none; }
+          .motil-control-tower .tower-extra-row:nth-child(n+5) { display: none; }
+          .motil-control-tower .tower-screen-heading { font-size: 1.75rem; line-height: 2rem; }
+        }
+        @media (max-height: 700px) {
+          .motil-control-tower .tower-detail-row:nth-child(n+4) { display: none; }
+          .motil-control-tower .tower-extra-row:nth-child(n+4) { display: none; }
+          .motil-control-tower .tower-screen-heading { font-size: 1.5rem; line-height: 1.75rem; }
+          .motil-control-tower .tower-topline { display: none; }
+        }
+      `}</style>
       <header className="grid shrink-0 gap-3 border-b border-[var(--tower-border)] pb-2 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
@@ -173,10 +190,10 @@ export default function MaintenanceControlTowerPage() {
           </div>
           <div className="mt-1 flex items-center gap-3">
             <SlideIcon className="h-7 w-7 text-[var(--tower-copper)]" />
-            <h1 className="font-heading text-4xl font-semibold tracking-[-0.025em] 2xl:text-5xl">{slide.label}</h1>
+            <h1 className="tower-screen-heading font-heading text-4xl font-semibold tracking-[-0.025em] 2xl:text-5xl">{slide.label}</h1>
             <span className="rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] px-3 py-1 text-sm font-medium text-[var(--tower-ink-muted)]">Vista {slideIndex + 1} de {slides.length}</span>
           </div>
-          <p className="mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
+          <p className="tower-topline mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
         </div>
         <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-[var(--tower-ink-muted)]">
           <span>Hora Santiago</span><strong className="text-xl font-semibold tabular-nums text-[var(--tower-ink)]">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: SANTIAGO_TIME_ZONE })}</strong>
@@ -244,7 +261,7 @@ function AnalysisSlide({ data }: { data: any }) {
     <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] xl:items-start">
       <Panel title="Prioridades activas" subtitle="Lo que requiere seguimiento inmediato.">
         <div className="divide-y divide-[var(--tower-border)]">
-          {attention.slice(0, 4).map((row: any) => (
+          {attention.slice(0, 6).map((row: any) => (
             <div key={row.canonicalAssetId} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[1fr_auto] md:items-center">
               <div className="min-w-0">
                 <p className="text-xl font-semibold leading-tight text-balance">{row.assetName}</p>
@@ -267,7 +284,7 @@ function AnalysisSlide({ data }: { data: any }) {
 
       <Panel title="Señales recientes" subtitle="Últimas actualizaciones operacionales con origen identificado.">
         <div className="divide-y divide-[var(--tower-border)]">
-          {signals.slice(0, 4).map((signal: any) => (
+          {signals.slice(0, 6).map((signal: any) => (
             <div key={`${signal.canonicalAssetId}-${signal.at}-${signal.source}`} className="grid gap-3 py-4 first:pt-0 md:grid-cols-[180px_1fr] md:items-start">
               <div className="flex items-center gap-2 text-base font-semibold">
                 <SourceMark source={signal.source} />
@@ -305,7 +322,7 @@ function StoppedSlide({ data }: { data: any }) {
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
             columnTemplate="1.8fr .75fr 1.15fr 1.45fr .65fr 1.2fr"
-            rows={rows.slice(0, 4).map((row: any) => [
+            rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
               row.canonicalStatus || 'Sin confirmación registrada',
@@ -350,7 +367,7 @@ function PreventiveSlide({ data }: { data: any }) {
           <DataTable
             headers={['Equipo', 'Faena', 'Control por', 'Lectura', 'Próxima mantención', 'Estado preventivo']}
             columnTemplate="1.5fr .9fr .65fr .8fr .85fr 1.25fr"
-            rows={rows.slice(0, 4).map((row: any) => [
+            rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
               row.meterUnit || '—',
@@ -408,7 +425,7 @@ function ScheduleSlide({ data }: { data: any }) {
         <DataTable
           headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
           columnTemplate=".8fr .7fr 1.55fr 1.35fr 1.45fr .8fr 1.25fr"
-          rows={open.slice(0, 4).map((row: any) => [
+          rows={open.slice(0, 8).map((row: any) => [
             row.workOrderNumber,
             shortDate(row.scheduledDate),
             row.assetName,
@@ -451,10 +468,10 @@ function FleetSlide({ data }: { data: any }) {
       <Panel title="Disponibilidad de equipos por mina" subtitle="Estado reportado con evidencia · no equivale a disponibilidad horaria">
         {sites.length === 0 ? <EmptyState title="Sin equipos clasificados por mina" text="No hay registros con fuente suficiente." /> : null}
         <div className="space-y-2">
-          {sites.slice(0, 4).map((site) => {
+          {sites.slice(0, 8).map((site) => {
             const classified = site.operational + site.stopped;
             const pct = classified > 0 ? Math.round(site.operational / classified * 100) : null;
-            return <div key={site.label} className="rounded-md border border-border/60 p-2">
+            return <div key={site.label} className="tower-detail-row rounded-md border border-border/60 p-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0"><div className="text-base font-semibold">{site.label}</div><div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div></div>
                 <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-sm text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
@@ -470,7 +487,7 @@ function FleetSlide({ data }: { data: any }) {
       </Panel>
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
         <DataTable headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']} columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
-          rows={(data?.attentionRows || []).slice(0, 4).map((row: any) => [
+          rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
             row.assetName, row.site, row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
             row.openWorkOrders || '—', row.partsPending ? 'Pendiente' : '—', sourceLabel(row.latestSignalSource),
           ])} />
@@ -730,7 +747,7 @@ function DataTable({
         ) : rows.map((row, rowIndex) => (
           <div
             key={rowIndex}
-            className="grid items-center"
+            className="tower-detail-row grid items-center"
             style={{ gridTemplateColumns: template }}
           >
             {row.map((cell, cellIndex) => (
