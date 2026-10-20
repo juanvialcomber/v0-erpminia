@@ -50,7 +50,7 @@ export async function GET(request:NextRequest){
 
   const sourceStatsQuery=statsDoc
     ? context.supabase.from('production_source_normalized_records')
-        .select('record_type,normalized_values')
+        .select('record_type,entity_label,normalized_values')
         .eq('organization_id',context.organizationId)
         .eq('source_file',statsDoc.source_file)
         .eq('source_file_sha256',statsDoc.source_file_sha256)
@@ -59,6 +59,7 @@ export async function GET(request:NextRequest){
           'extraction_actual_peumo','extraction_actual_don_jaime',
           'extraction_plan_peumo','extraction_plan_don_jaime',
           'extraction_month_plan_peumo','extraction_month_plan_don_jaime',
+          'sector_monthly_actual_plan_source',
         ])
     : Promise.resolve({data:[],error:null});
   const [movements,metallurgy,drilling,drillingLineage,sourceStats]=await Promise.all([
@@ -152,6 +153,21 @@ export async function GET(request:NextRequest){
     const item=ensureSector(line.mine_source_id,sector?.id||null,mine?.name||line.mine_name_raw||'',sector?.name||line.sector_raw||line.section_raw||'');
     item.plannedAdvanceM+=num(line.planned_advance_m);
     item.plannedDrillingM+=num(line.planned_drilling_m);
+  }
+
+  if(statsThrough){
+    const mineByName=new Map((mines.data||[]).map(m=>[norm(m.name),m]));
+    for(const row of (sourceStats.data||[]).filter((item:any)=>item.record_type==='sector_monthly_actual_plan_source')){
+      const values=(row.normalized_values||{}) as Record<string,unknown>;
+      const sourceMine=typeof values.mine==='string'?values.mine:'';
+      const actual=typeof values.actual_to_cutoff_t==='number'&&Number.isFinite(values.actual_to_cutoff_t)?values.actual_to_cutoff_t:null;
+      if(actual===null||!row.entity_label)continue;
+      const mine=mineByName.get(norm(sourceMine));
+      const sector=(sectors.data||[]).find(s=>(!mine||s.mine_source_id===mine.id)&&norm(s.normalized_name||s.name)===norm(row.entity_label));
+      const item=ensureSector(mine?.id||null,sector?.id||null,mine?.name||sourceMine,sector?.name||row.entity_label);
+      item.actualTons=actual;
+      item.movements=0;
+    }
   }
 
   for(const row of drilling.data||[]){
