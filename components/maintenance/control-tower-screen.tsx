@@ -189,7 +189,7 @@ export default function MaintenanceControlTowerPage() {
       <section className="grid shrink-0 gap-px overflow-hidden rounded-lg border border-[var(--tower-border)] bg-[var(--tower-border)] md:grid-cols-5">
         <TopMetric tone="copper" icon={AlertTriangle} label="Atención" value={data?.summary?.attentionAssets} />
         <TopMetric tone="ink" icon={ShieldAlert} label="Detenidos reportados" value={data?.summary?.stoppedAssets} />
-        <TopMetric tone="green" icon={Wrench} label="OT abiertas" value={data?.summary?.openWorkOrders} />
+        <TopMetric tone="green" icon={Wrench} label="Órdenes abiertas" value={data?.summary?.openWorkOrders} />
         <TopMetric tone="copper" icon={TimerReset} label="Preventivas vencidas" value={data?.summary?.preventiveOverdue} />
         <TopMetric
           tone="green"
@@ -322,17 +322,20 @@ function StoppedSlide({ data }: { data: any }) {
 
 function PreventiveSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.preventiveRows) ? data.preventiveRows : [];
-  const priorityGroups = [
-    { code: 'P1', label: 'Crítica' },
-    { code: 'P2', label: 'Alta' },
-    { code: 'P3', label: 'Media' },
-    { code: 'P4', label: 'Baja' },
-    { code: 'P5', label: 'Programable' },
+  const statusCounts = rows.reduce((acc: { overdue: number; dueSoon: number; review: number; monitored: number }, row: any) => {
+    const status = String(row.reportedMpStatus || '');
+    if (/vencid/i.test(status) || (row.remainingMeter != null && Number(row.remainingMeter) <= 0)) acc.overdue += 1;
+    else if (/pr[oó]xim/i.test(status)) acc.dueSoon += 1;
+    else if (/revisar fecha/i.test(status)) acc.review += 1;
+    else acc.monitored += 1;
+    return acc;
+  }, { overdue: 0, dueSoon: 0, review: 0, monitored: 0 });
+  const preventiveStatusRows = [
+    { label: 'Vencidas', value: statusCounts.overdue, tone: 'critical' as const },
+    { label: 'Próximas', value: statusCounts.dueSoon, tone: 'copper' as const },
+    { label: 'Fecha por revisar', value: statusCounts.review, tone: 'ink' as const },
+    { label: 'En seguimiento', value: statusCounts.monitored, tone: 'green' as const },
   ];
-  const pCounts = priorityGroups.map(({ code, label }) => ({
-    label,
-    value: rows.filter((row: any) => String(row.planningPriority || '').toUpperCase().startsWith(code)).length,
-  }));
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.35fr_.65fr]">
@@ -359,8 +362,8 @@ function PreventiveSlide({ data }: { data: any }) {
         </div>
       </Panel>
 
-      <Panel title="Urgencia y seguimiento" subtitle="Prioridad de atención y forma de controlar cada mantención">
-        <BarList rows={pCounts} />
+      <Panel title="Estado de las preventivas" subtitle="Distribución real de los equipos con seguimiento vigente">
+        <StatusBars rows={preventiveStatusRows} total={rows.length} />
         <div className="mt-5 grid gap-2">
           <BasisRow label="Horas" value={data?.lifecycle?.preventiveBasis?.hours || 0} />
           <BasisRow label="Kilómetros" value={data?.lifecycle?.preventiveBasis?.km || 0} />
@@ -494,25 +497,22 @@ function ManagementSlide({ data }: { data: any }) {
   const completed = Number(data?.summary?.completedWorkOrders || 0);
   const open = Number(data?.summary?.openWorkOrders || 0);
   const total = completed + open;
-  const completionPct = total > 0 ? (completed / total) * 100 : null;
   const preventive = Number(management.preventiveCompleted || 0);
   const corrective = Number(management.correctiveCompleted || 0);
   const workMixTotal = preventive + corrective;
 
   return (
     <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
-      <Panel title="Indicadores de gestión" subtitle="Sólo métricas con información suficiente">
-        <div className="grid gap-3 md:grid-cols-2">
-          <ManagementMetric label="OT registradas cerradas" value={completionPct == null ? '—' : `${number(completionPct, 0)}%`} detail={total ? `${completed} terminadas de ${total} registradas` : 'Sin información suficiente'} />
-          <ManagementMetric label="Backlog abierto" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin OT abiertas'} />
-          <ManagementMetric label="Horas planificadas cerradas" value={number(management.plannedHoursCompleted)} detail="OT terminadas" />
-          <ManagementMetric label="Horas reales cerradas" value={number(management.actualHoursCompleted)} detail="OT terminadas" />
-          <ManagementMetric
-            label="OT críticas abiertas"
-            value={data?.summary?.criticalOpenWorkOrders ?? '—'}
-            detail="Prioridad alta o crítica todavía abierta"
-          />
-          <ManagementMetric label="Horas detención registradas" value={number(management.recordedDowntimeHours)} detail={management.recordedDowntimeHours == null ? 'Sin base suficiente' : 'OT con dato explícito'} />
+      <Panel title="Indicadores de gestión" subtitle="Sólo cifras calculadas desde órdenes registradas">
+        <div className="grid gap-3 md:grid-cols-4">
+          <ManagementMetric label="Órdenes abiertas" value={open || '—'} detail={open ? `${data?.summary?.overdueOpenWorkOrders || 0} vencidas` : 'Sin órdenes abiertas'} />
+          <ManagementMetric label="Órdenes cerradas" value={completed || '—'} detail={total ? `${total} registradas en total` : 'Sin información suficiente'} />
+          <ManagementMetric label="En ejecución" value={data?.summary?.inProgressOpenWorkOrders ?? '—'} detail="Abiertas iniciadas o pausadas" />
+          <ManagementMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders ?? '—'} detail="Órdenes abiertas" />
+        </div>
+        <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+          <WorkOrderProgress completed={completed} open={open} />
+          <HoursComparison planned={management.plannedHoursCompleted} actual={management.actualHoursCompleted} />
         </div>
       </Panel>
 
@@ -723,6 +723,109 @@ function DataTable({
             ))}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function StatusBars({
+  rows,
+  total,
+}: {
+  rows: Array<{ label: string; value: number; tone: 'critical' | 'copper' | 'green' | 'ink' }>;
+  total: number;
+}) {
+  if (!total) return <EmptyState title="Sin base vigente" text="No hay preventivas con información actual suficiente para graficar." />;
+  return (
+    <div className="space-y-4">
+      {rows.map((row) => {
+        const pct = total > 0 ? (row.value / total) * 100 : 0;
+        const barClass = row.tone === 'critical'
+          ? 'bg-destructive'
+          : row.tone === 'copper'
+            ? 'bg-[var(--tower-copper)]'
+            : row.tone === 'green'
+              ? 'bg-[var(--tower-green)]'
+              : 'bg-[var(--tower-ink-muted)]';
+        return (
+          <div key={row.label}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-4">
+              <span className="text-base font-medium">{row.label}</span>
+              <span className="text-base font-semibold tabular-nums">{row.value} <span className="font-normal text-[var(--tower-ink-muted)]">· {number(pct, 0)}%</span></span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[var(--tower-surface-muted)]">
+              <div className={cn('h-full rounded-full', barClass)} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+      <p className="pt-1 text-sm text-[var(--tower-ink-muted)]">{total} equipos con seguimiento preventivo vigente en esta vista.</p>
+    </div>
+  );
+}
+
+function WorkOrderProgress({ completed, open }: { completed: number; open: number }) {
+  const total = completed + open;
+  if (!total) return <EmptyState title="Sin órdenes registradas" text="No existe información suficiente para mostrar avance." />;
+  const completedPct = (completed / total) * 100;
+  return (
+    <div className="rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[var(--tower-ink-muted)]">Estado de órdenes registradas</p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums">{completed} de {total} cerradas</p>
+        </div>
+        <p className="text-2xl font-semibold tabular-nums text-[var(--tower-green)]">{number(completedPct, 0)}%</p>
+      </div>
+      <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-[var(--tower-border)]">
+        <div className="bg-[var(--tower-green)]" style={{ width: `${completedPct}%` }} />
+        <div className="bg-[var(--tower-copper)]" style={{ width: `${100 - completedPct}%` }} />
+      </div>
+      <div className="mt-3 flex items-center gap-5 text-sm text-[var(--tower-ink-muted)]">
+        <ChartLegend tone="green" label={`${completed} cerradas`} />
+        <ChartLegend tone="copper" label={`${open} abiertas`} />
+      </div>
+    </div>
+  );
+}
+
+function HoursComparison({ planned, actual }: { planned: unknown; actual: unknown }) {
+  const plannedValue = Number(planned);
+  const actualValue = Number(actual);
+  const hasPlanned = Number.isFinite(plannedValue) && plannedValue > 0;
+  const hasActual = Number.isFinite(actualValue) && actualValue >= 0;
+  if (!hasPlanned || !hasActual) {
+    return <EmptyState title="Horas sin base suficiente" text="Se muestran cuando las órdenes cerradas tienen horas planificadas y reales registradas." />;
+  }
+  const max = Math.max(plannedValue, actualValue, 1);
+  const delta = actualValue - plannedValue;
+  return (
+    <div className="rounded-lg border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-5">
+      <p className="text-sm font-semibold text-[var(--tower-ink-muted)]">Horas de órdenes cerradas</p>
+      <div className="mt-4 space-y-4">
+        <MetricBar label="Planificadas" value={plannedValue} max={max} tone="copper" />
+        <MetricBar label="Reales" value={actualValue} max={max} tone="green" />
+      </div>
+      <p className="mt-4 text-sm text-[var(--tower-ink-muted)]">
+        Diferencia registrada: <span className="font-semibold text-[var(--tower-ink)]">{delta >= 0 ? '+' : ''}{number(delta, 1)} h</span>
+      </p>
+    </div>
+  );
+}
+
+function MetricBar({ label, value, max, tone }: { label: string; value: number; max: number; tone: 'copper' | 'green' }) {
+  const width = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-base">
+        <span>{label}</span>
+        <span className="font-semibold tabular-nums">{number(value, 1)} h</span>
+      </div>
+      <div className="h-3 overflow-hidden rounded-full bg-[var(--tower-border)]">
+        <div
+          className={cn('h-full rounded-full', tone === 'green' ? 'bg-[var(--tower-green)]' : 'bg-[var(--tower-copper)]')}
+          style={{ width: `${width}%` }}
+        />
       </div>
     </div>
   );
