@@ -9,7 +9,7 @@ import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-ope
 type Attention='alert'|'watch'|'ok'|'no_comparison';
 type MineRow={key:string;mineName:string;actualTons:number;movements:number;plannedTons:number;expectedTonsToCutoff:number;plannedGradePct:number|null;observedVsExpectedPct:number|null;attention:Attention};
 type SectorRow={key:string;mineName:string;sectorName:string;actualTons:number;movements:number;drillingMetersHistorical:number;drillingReportsHistorical:number;drillingHoles:number;drillingReconciliationPct:number|null;plannedAdvanceM:number;plannedDrillingM:number};
-type Data={periodStart:string|null;dataThrough:string|null;plantThrough:string|null;transportThrough:string|null;plan:any;mines:MineRow[];sectors:SectorRow[];sourceCoverage:{transportPlanFraction:number;elapsedTransportDays:number;totalPlanDays:number;policy:string};attention:{alert:number;watch:number;ok:number;noComparison:number};plantContext:null|{scope:string;treatedTons:number;avgHeadGradePct:number|null;avgRecoveryPct:number|null;shifts:number;assayed:number;assayCoveragePct:number;note:string};drillingFreshness:any;semantics:{transport:string;plan:string;drilling:string;plant:string}};
+type Data={periodStart:string|null;dataThrough:string|null;plantThrough:string|null;transportThrough:string|null;mineSourceCutoff?:string|null;plan:any;mines:MineRow[];sectors:SectorRow[];sourceCoverage:{transportPlanFraction:number;elapsedTransportDays:number;totalPlanDays:number;policy:string};attention:{alert:number;watch:number;ok:number;noComparison:number};plantContext:null|{scope:string;treatedTons:number;avgHeadGradePct:number|null;avgRecoveryPct:number|null;shifts:number;assayed:number;assayCoveragePct:number;note:string};drillingFreshness:any;semantics:{transport:string;plan:string;drilling:string;plant:string}};
 type ExecutiveException={key:string;severity:'critical'|'warning'|'info';title:string;evidence:string;action:string};
 const fetcher=async(url:string)=>{const r=await fetch(url,{credentials:'include'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Error');return j;};
 const n=(v:number,d=0)=>v.toLocaleString('es-CL',{maximumFractionDigits:d});
@@ -64,7 +64,7 @@ export function MineSectorIntelligence(){
   if(isLoading||!data)return <StatePanel tone="neutral" title="Cargando inteligencia operacional" description="Integrando plan, transporte, sondaje y Planta."/>;
 
   return <div className="space-y-6">
-    <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Producción · Inteligencia integrada</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Ritmo por mina</h1><p className="mt-2 max-w-4xl text-sm text-muted-foreground">Transporte aprobado hasta {date(data.transportThrough)}; Planta hasta {date(data.plantThrough)}. El ritmo usa sólo las metas mensuales canónicas por mina y evita sumar líneas de plan que se solapan.</p></div>
+    <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Producción · Inteligencia integrada</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">Ritmo por mina</h1><p className="mt-2 max-w-4xl text-sm text-muted-foreground">Extracción canónica hasta {date(data.mineSourceCutoff||data.dataThrough)}. TM detallado llega hasta {date(data.transportThrough)} y Planta metalúrgica hasta {date(data.plantThrough)}.</p></div>
 
     <WhatsappOperationalUpdates mode="mine"/>
 
