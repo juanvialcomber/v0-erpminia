@@ -14,6 +14,7 @@ const titles:Record<WhatsappActivityMode,string>={
   mine:'Novedades informadas desde mina',
   dispatch:'Coordinación de despachos informada',
   drilling:'Perforación y sondajes informados',
+  maintenance:'Estado de equipos informado desde WhatsApp',
 };
 const when=(date:string|null|undefined)=>{
   if(!date)return 'Sin fecha informada';
@@ -51,8 +52,8 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
   const [expanded,setExpanded]=useState(false);
   const {data,error,isLoading,mutate}=useSWR<Payload>(
     '/api/produccion/whatsapp-activity?mode='+encodeURIComponent(mode),
-    fetcher,{refreshInterval:30000,revalidateOnFocus:true,revalidateOnReconnect:true,
-      revalidateIfStale:true,dedupingInterval:10000});
+    fetcher,{refreshInterval:60000,revalidateOnFocus:true,revalidateOnReconnect:true,
+      revalidateIfStale:true,refreshWhenHidden:false,dedupingInterval:15000});
   const updates=expanded?data?.updates||[]:(data?.updates||[]).slice(0,5);
   const groupedUpdates=Array.from(updates.reduce((groups,item)=>{
     const key=[item.sourceMessageId,item.groupName,item.reportedAt].join('|');
@@ -70,7 +71,7 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Se actualiza automáticamente cada 30 s desde las fuentes autorizadas de esta sección.
+          Se actualiza automáticamente cada 60 s desde las fuentes autorizadas de esta sección.
           Novedades recibidas, no verificaciones en terreno; no modifican indicadores certificados
           ni órdenes de mantenimiento.
         </p>
