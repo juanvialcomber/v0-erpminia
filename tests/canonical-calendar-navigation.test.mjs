@@ -31,3 +31,12 @@ test('timeline defaults to one week back and one week ahead with subtle today cu
   assert.match(calendar, /border-orange-500\/25/);
   assert.doesNotMatch(calendar, /border-l-2 border-orange-500\/80/);
 });
+
+
+test('personal calendar includes work assigned to the viewer and work planned by the viewer', () => {
+  const route = readFileSync('app/api/calendar/operational/route.ts', 'utf8');
+  const calendar = readFileSync('components/operational-calendar/comfortable-operational-calendar.tsx', 'utf8');
+  assert.match(route, /created_by_me: Boolean\(row\.created_by && row\.created_by === context\.userId\)/);
+  assert.match(calendar, /const plannedByMe = Boolean\(item\.created_by_me\)/);
+  assert.match(calendar, /if \(!assignedToMe && !plannedByMe\) return false/);
+});
