@@ -67,8 +67,8 @@ test('wallboard uses scoped MOTIL corporate palette and restrained hierarchy', (
 test('analysis view keeps the approved simple information architecture', () => {
   assert.match(source, /Prioridades activas/);
   assert.match(source, /Señales recientes/);
-  assert.match(source, /attention\.slice\(0, 4\)/);
-  assert.match(source, /signals\.slice\(0, 4\)/);
+  assert.match(source, /attention\.slice\(0, 6\)/);
+  assert.match(source, /signals\.slice\(0, 6\)/);
   assert.doesNotMatch(source, /Prioridades de coordinación/);
   assert.doesNotMatch(source, /Fuentes y cambios recientes/);
 });
@@ -178,10 +178,12 @@ test('wallboard fits viewport and disables internal scrolling', () => {
 });
 
 
-test('fixed wallboard limits dense detail rows to avoid clipping at TV height', () => {
-  assert.match(source, /rows\.slice\(0, 4\)/);
-  assert.match(source, /open\.slice\(0, 4\)/);
-  assert.match(source, /sites\.slice\(0, 4\)/);
-  assert.match(source, /attention\.slice\(0, 4\)/);
-  assert.match(source, /signals\.slice\(0, 4\)/);
+test('fixed wallboard adapts row visibility automatically to viewport height', () => {
+  assert.match(source, /rows\.slice\(0, 8\)/);
+  assert.match(source, /open\.slice\(0, 8\)/);
+  assert.match(source, /sites\.slice\(0, 8\)/);
+  assert.match(source, /max-height: 820px/);
+  assert.match(source, /max-height: 700px/);
+  assert.match(source, /attention\.slice\(0, 6\)/);
+  assert.match(source, /signals\.slice\(0, 6\)/);
 });
