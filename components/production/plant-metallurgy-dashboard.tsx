@@ -33,6 +33,16 @@ export function PlantMetallurgyDashboard(){
     {label:'Ley cabeza Cu',value:pct(p?.headGradePct,3),detail:'Ley promedio',icon:Gauge},
     {label:'Recuperación',value:pct(p?.recoveryPct,2),detail:'Balance metalúrgico',icon:Activity},
   ];
+  const attention=[
+    p?.movementCoverageState==='partial_source_window'
+      ? {title:'Transporte con cobertura parcial',detail:`Fuente histórica hasta ${date(p.movementSourceCutoff)}`} : null,
+    p?.flowReconciliationState==='inventory_or_timing_required'
+      ? {title:'Brecha transporte / tratamiento',detail:`${signedTons(p.transportTreatmentDeltaTons,1)} por reconciliar`} : null,
+    p&&p.wetTonsWithoutFine>0
+      ? {title:'Falta ensayo para calcular fino',detail:`${tons(p.wetTonsWithoutFine,1)} sin fino calculable`} : null,
+    data?.plan?.recoveredFinePlanState==='missing_target_recovery'
+      ? {title:'Plan de fino sin recuperación objetivo',detail:'No corresponde comparar fino real contra ese plan'} : null,
+  ].filter(Boolean) as Array<{title:string;detail:string}>;
   return <div className="space-y-6">
     <PageHeader><PageHeaderContent><PageHeaderEyebrow>Producción · Planta</PageHeaderEyebrow><PageHeaderTitle>Producción fino</PageHeaderTitle><PageHeaderDescription>{p?`Acumulado ${date(p.periodStart)} – ${date(p.dataThrough)}. Cada métrica respeta la cobertura real de su archivo fuente.`:'Transporte, tratamiento, ley, recuperación y cobre fino por turno.'}</PageHeaderDescription></PageHeaderContent></PageHeader>
     <WhatsappOperationalUpdates mode="plant"/>
@@ -55,10 +65,14 @@ export function PlantMetallurgyDashboard(){
         <PlantSourceCutoff/>
       </div>
     </details>
-    {p&&p.movementCoverageState==='partial_source_window'?<div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="font-medium">La cobertura histórica de transporte termina el {date(p.movementSourceCutoff)}</p><p className="mt-1 text-muted-foreground">Después de esa fecha, sólo los días con ingreso manual registrado muestran transporte comparable. Los demás días permanecen “sin fuente”, nunca 0. La brecha de {signedTons(p.transportTreatmentDeltaTons,1)} usa únicamente evidencia comparable.</p></div></div>:null}
-    {p&&p.flowReconciliationState==='inventory_or_timing_required'?<div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="font-medium">Brecha física aún no reconciliada</p><p className="mt-1 text-muted-foreground">El período comparable muestra {signedTons(p.transportTreatmentDeltaTons,1)} entre transporte y tratamiento. Puede corresponder a stock inicial/final, acopio o desfase entre recepción y proceso.</p></div></div>:null}
-    {p&&p.wetTonsWithoutFine>0?<div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="font-medium">Producción fino incompleta por falta de ensayo</p><p className="mt-1 text-muted-foreground">Hay {tons(p.wetTonsWithoutFine,1)} tratadas sin ley/recuperación suficiente para calcular fino. El sistema no estima ni reemplaza esos valores por cero.</p></div></div>:null}
-    {data?.plan&&data.plan.recoveredFinePlanState==='missing_target_recovery'?<div className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="font-medium">Plan de fino recuperado aún no acreditado</p><p className="mt-1 text-muted-foreground">El programa de mina entrega Cu contenido pre-recuperación, aunque lo rotula “Cu Fino Mina”. No existe recuperación objetivo documentada para convertirlo en fino recuperado de planta.</p></div></div>:null}
+    <section className="overflow-hidden rounded-lg border bg-card">
+      <div className="flex items-center justify-between border-b px-4 py-3">
+        <div><h2 className="font-medium">Qué requiere atención</h2><p className="mt-1 text-xs text-muted-foreground">Sólo condiciones que cambian la lectura.</p></div>
+        <span className="text-sm font-medium">{attention.length}</span>
+      </div>
+      {attention.length?<div className="divide-y">{attention.slice(0,3).map(item=><div key={item.title} className="flex gap-3 px-4 py-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/><div><p className="text-sm font-medium">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.detail}</p></div></div>)}</div>:<div className="px-4 py-4 text-sm text-muted-foreground">Sin excepciones relevantes.</div>}
+    </section>
+
     <details className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver histórico y trazabilidad</summary>
       <div className="space-y-4 border-t p-4">
