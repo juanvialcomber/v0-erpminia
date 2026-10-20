@@ -184,6 +184,8 @@ export default function MaintenanceControlTowerPage() {
       <header className="grid shrink-0 gap-3 border-b border-[var(--tower-border)] pb-2 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
+            <img src="/brand/motil-wordmark.png" alt="MOTIL" width={2094} height={610} className="h-7 w-auto max-w-[140px] object-contain" />
+            <span className="h-5 w-px bg-[var(--tower-border)]" aria-hidden="true" />
             <Monitor className="h-4 w-4" />
             Compañía Minera La Patagua · Mantenimiento
             <span className="rounded-full bg-[var(--tower-copper-soft)] px-3 py-1 text-sm font-semibold normal-case tracking-normal text-[var(--tower-copper)]">Solo lectura</span>
