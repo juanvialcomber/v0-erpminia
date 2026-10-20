@@ -285,13 +285,16 @@ export async function POST(request: NextRequest) {
   if (!context.ok) return context.response;
   try {
     const body = (await request.json()) as WorkOrderPayload;
-    const canonicalAssetId = body.canonicalAssetId || body.canonical_asset_id;
+    const canonicalAssetId = body.canonicalAssetId || body.canonical_asset_id || null;
+    const workType = body.workType || body.work_type || 'corrective';
+    const isGeneralWork = workType === 'general';
     const reviewId = body.reviewId || body.review_id || null;
     const assignedPersonId = body.assignedPersonId || body.assigned_person_id || null;
     const requestedMaterials = body.requestedMaterials || body.requested_materials || null;
     const materials = body.materials || [];
     const creationRequestId = request.headers.get('idempotency-key')?.trim() || null;
-    if (!canonicalAssetId) return NextResponse.json({ error: 'Selecciona un activo canónico' }, { status: 400 });
+    if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
+    if (reviewId && !canonicalAssetId) return NextResponse.json({ error: 'Una revisión de equipo debe conservar su equipo asociado' }, { status: 400 });
     if (!body.title?.trim()) return NextResponse.json({ error: 'Describe brevemente el trabajo a realizar' }, { status: 400 });
     if (!context.authUserId) {
       return NextResponse.json(
@@ -335,24 +338,28 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: asset, error: assetError } = await context.supabase
-      .from('maintenance_canonical_assets_v1')
-      .select('id,asset_code,name,asset_type,is_active')
-      .eq('organization_id', context.organizationId)
-      .eq('id', canonicalAssetId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (assetError) throw assetError;
-    if (!asset) return NextResponse.json({ error: 'Activo canónico no encontrado o inactivo' }, { status: 404 });
-    if (workshopScope.isWorkshopHead) {
-      const { data: canonicalAsset, error: siteError } = await context.supabase.schema('canonical')
-        .from('assets').select('location')
+    let asset: CanonicalAssetRow | null = null;
+    if (canonicalAssetId) {
+      const { data: assetRow, error: assetError } = await context.supabase
+        .from('maintenance_canonical_assets_v1')
+        .select('id,asset_code,name,asset_type,is_active')
         .eq('organization_id', context.organizationId)
-        .eq('id', canonicalAssetId).maybeSingle();
-      if (siteError) throw siteError;
-      const assetSite = workshopSiteFromKnownLocation(canonicalAsset?.location);
-      if (assetSite && assetSite !== workshopScope.site) {
-        return NextResponse.json({ error: 'El equipo está registrado en otra mina.' }, { status: 403 });
+        .eq('id', canonicalAssetId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (assetError) throw assetError;
+      if (!assetRow) return NextResponse.json({ error: 'Equipo no encontrado o inactivo' }, { status: 404 });
+      asset = assetRow as CanonicalAssetRow;
+      if (workshopScope.isWorkshopHead) {
+        const { data: canonicalAsset, error: siteError } = await context.supabase.schema('canonical')
+          .from('assets').select('location')
+          .eq('organization_id', context.organizationId)
+          .eq('id', canonicalAssetId).maybeSingle();
+        if (siteError) throw siteError;
+        const assetSite = workshopSiteFromKnownLocation(canonicalAsset?.location);
+        if (assetSite && assetSite !== workshopScope.site) {
+          return NextResponse.json({ error: 'El equipo está registrado en otra mina.' }, { status: 403 });
+        }
       }
     }
 
@@ -377,7 +384,7 @@ export async function POST(request: NextRequest) {
         p_review_id: reviewId,
         p_created_by: context.authUserId,
         p_title: body.title.trim(),
-        p_work_type: body.workType || body.work_type || 'corrective',
+        p_work_type: workType,
         p_priority: body.priority || 'critical',
         p_scheduled_date: body.scheduledDate || body.scheduled_date || null,
         p_description: body.description?.trim() || null,
@@ -414,7 +421,7 @@ export async function POST(request: NextRequest) {
       await recordStructuredMaterials(context, assignedLinkedOrder.id, materials);
 
       return NextResponse.json({
-        data: mapWorkOrder(assignedLinkedOrder as WorkOrderRow, asset as CanonicalAssetRow),
+        data: mapWorkOrder(assignedLinkedOrder as WorkOrderRow, asset),
         review: {
           id: reviewId,
           status: result.review_status,
@@ -448,7 +455,7 @@ export async function POST(request: NextRequest) {
       await recordStructuredMaterials(context, replayedOrder.id, materials);
       return NextResponse.json(
         {
-          data: mapWorkOrder(replayedOrder, asset as CanonicalAssetRow),
+          data: mapWorkOrder(replayedOrder, asset),
           idempotentReplay: true,
         },
         { status: 200 },
@@ -490,7 +497,7 @@ export async function POST(request: NextRequest) {
           ...(workshopScope.isWorkshopHead ? { workshop_site: workshopScope.site } : {}),
           title: body.title.trim(),
           description: body.description?.trim() || null,
-          work_type: body.workType || body.work_type || 'preventive',
+          work_type: workType,
           status: 'open',
           priority: body.priority || 'medium',
           scheduled_date: body.scheduledDate || body.scheduled_date || null,
@@ -538,7 +545,7 @@ export async function POST(request: NextRequest) {
     await recordStructuredMaterials(context, createdOrder.id, materials);
     return NextResponse.json(
       {
-        data: mapWorkOrder(createdOrder, asset as CanonicalAssetRow),
+        data: mapWorkOrder(createdOrder, asset),
         idempotentReplay,
       },
       { status: idempotentReplay ? 200 : 201 },
