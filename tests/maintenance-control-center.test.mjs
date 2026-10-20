@@ -94,11 +94,25 @@ test('maintenance control tower rotates six read-only views and is in navigation
   assert.match(tower,/\/api\/maintenance\/runtime-readings/);
   assert.match(tower,/\/api\/maintenance\/equipment-costs/);
   assert.match(tower,/\/api\/maintenance\/sources/);
-  assert.match(tower,/Estado de equipos/);
-  assert.match(tower,/Costos por equipo/);
-  assert.match(tower,/Fuentes de información/);
+  assert.match(tower,/Control general de flota/);
+  assert.match(tower,/Indicadores de gestión/);
+  assert.match(tower,/Equipos detenidos/);
   assert.match(tower,/filter\(\(action\) => action\.kind !== 'operational_review'\)/);
   assert.match(layout,/\/dashboard\/mantenimiento\/torre-control/);
   assert.match(layout,/Torre de control/);
   assert.match(page,/MaintenanceControlTower/);
+});
+
+
+test('control tower follows Ariel six-screen structure without illustrative values',()=>{
+  const tower = fs.readFileSync('components/maintenance/maintenance-control-tower.tsx','utf8');
+  assert.match(tower,/Análisis operativo/);
+  assert.match(tower,/Indicadores de gestión/);
+  assert.match(tower,/Mantenimientos preventivos/);
+  assert.match(tower,/Programación de trabajos/);
+  assert.match(tower,/Control general de flota/);
+  assert.match(tower,/Equipos detenidos/);
+  assert.match(tower,/No hay equipos con detención validada en la fuente actual/);
+  assert.match(tower,/Los equipos sin estado explícito no se presentan como detenidos/);
+  assert.match(tower,/No se inventan vencimientos cuando la fuente no entrega una pauta activa/);
 });
