@@ -67,18 +67,16 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
       <div className="space-y-1">
         <h2 className="text-base font-semibold">{titles[mode]}</h2>
         <p className="text-sm text-muted-foreground">
-          Última actualización informada (WhatsApp): <span className="font-medium text-foreground">
+          Última novedad: <span className="font-medium text-foreground">
             {isLoading?'Consultando…':when(data?.latestReportedAt)}
           </span>
         </p>
         <p className="text-xs text-muted-foreground">
-          Se actualiza automáticamente cada 60 s desde las fuentes autorizadas de esta sección.
-          Novedades recibidas, no verificaciones en terreno; no modifican indicadores certificados
-          ni órdenes de mantenimiento.
+          Fuente WhatsApp autorizada · actualización automática cada 60 s · información reportada, no verificada.
         </p>
       </div>
       <Button variant="outline" size="sm" disabled={isLoading}
-        onClick={()=>void mutate()}>Actualizar novedades</Button>
+        onClick={()=>void mutate()}>Actualizar</Button>
     </div>
     {isLoading?<p role="status" className="text-sm text-muted-foreground">Leyendo fuentes de WhatsApp…</p>:null}
     {error?<p role="alert" className="text-sm text-destructive">{error.message}</p>:null}
