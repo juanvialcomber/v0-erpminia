@@ -1,5 +1,5 @@
-import { MaintenanceControlTower } from '@/components/maintenance/maintenance-control-tower';
+import { redirect } from 'next/navigation';
 
-export default function MaintenanceControlTowerPage() {
-  return <MaintenanceControlTower />;
+export default function MaintenanceControlTowerRoute() {
+  redirect('/monitor/mantenimiento');
 }

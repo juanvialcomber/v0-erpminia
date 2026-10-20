@@ -277,3 +277,35 @@
     background-color: var(--muted) !important;
   }
 }
+
+@layer utilities {
+  .motil-control-tower {
+    --tower-canvas: oklch(0.985 0.008 80);
+    --tower-surface: oklch(0.998 0.003 80);
+    --tower-surface-muted: oklch(0.965 0.010 80);
+    --tower-ink: oklch(0.20 0.018 245);
+    --tower-ink-muted: oklch(0.48 0.018 245);
+    --tower-border: oklch(0.88 0.010 75);
+    --tower-copper: oklch(0.52 0.11 45);
+    --tower-copper-soft: oklch(0.90 0.035 60);
+    --tower-green: oklch(0.39 0.075 165);
+    --tower-green-soft: oklch(0.91 0.025 165);
+    color-scheme: light;
+    background: var(--tower-canvas);
+    color: var(--tower-ink);
+  }
+
+  .dark .motil-control-tower {
+    --tower-canvas: oklch(0.16 0.012 245);
+    --tower-surface: oklch(0.20 0.012 245);
+    --tower-surface-muted: oklch(0.24 0.012 245);
+    --tower-ink: oklch(0.94 0.006 80);
+    --tower-ink-muted: oklch(0.72 0.012 80);
+    --tower-border: oklch(0.30 0.014 245);
+    --tower-copper: oklch(0.67 0.11 50);
+    --tower-copper-soft: oklch(0.29 0.035 50);
+    --tower-green: oklch(0.67 0.065 165);
+    --tower-green-soft: oklch(0.26 0.025 165);
+    color-scheme: dark;
+  }
+}
