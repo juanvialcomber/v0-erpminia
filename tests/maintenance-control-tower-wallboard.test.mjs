@@ -168,3 +168,11 @@ test('wallboard routes dashboard entry to standalone monitor', async () => {
   const route = readFileSync(new URL('../app/dashboard/mantenimiento/torre-control/page.tsx', import.meta.url), 'utf8');
   assert.match(route, /redirect\('\/monitor\/mantenimiento'\)/);
 });
+
+
+test('wallboard fits viewport and disables internal scrolling', () => {
+  assert.match(source, /fixed inset-0 z-\[9999\]/);
+  assert.match(source, /h-\[100dvh\]/);
+  assert.match(source, /min-h-0 flex-1 overflow-hidden rounded-lg/);
+  assert.doesNotMatch(source, /overflow-y-auto overscroll-contain/);
+});
