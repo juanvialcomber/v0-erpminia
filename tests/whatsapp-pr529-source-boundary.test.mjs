@@ -22,7 +22,7 @@ test('PR #531 exclusions remain in admin discovery, evidence and webhook after i
 
 test('direct triage endpoint strips stale reports and refuses unvalidated group allowlists',()=>{
   const api=file('app/api/admin/whatsapp/triage/route.ts');
-  assert.match(api,/requireAdmin\(request\)/);
+  assert.match(api,/requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
   assert.match(api,/\.select\('enabled,updated_at,chat_id'\)/);
   assert.match(api,/sourceGroups\.length >= 100/);
   assert.match(api,/group\.enabled && isExcludedMotilWhatsappGroup\(group.chat_id\)/);
@@ -46,7 +46,7 @@ test('direct review checks exact source authorization for both read and confirma
 test('full-message drilldown and operational-log reads exclude disabled groups',()=>{
   const source=file('app/api/admin/whatsapp/triage/message/route.ts');
   const log=file('app/api/admin/whatsapp/operational-log/route.ts');
-  assert.match(source,/requireAdmin\(request\)/);
+  assert.match(source,/requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
   assert.match(source,/localDay\(new Date\(message\.occurred_at\)\)!==date/);
   assert.match(source,/\.eq\('enabled',true\)\.maybeSingle\(\)/);
   assert.match(source,/isExcludedMotilWhatsappGroup\(group\.chat_id\)/);
