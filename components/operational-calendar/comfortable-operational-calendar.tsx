@@ -116,7 +116,7 @@ const BAR_HEIGHT = 42;
 
 const PERIOD_CONFIG: Record<CalendarPeriod, { label: string; days: number; dayWidth: number }> = {
   '7': { label: '7 días', days: 7, dayWidth: 112 },
-  '14': { label: '14 días', days: 14, dayWidth: 86 },
+  '14': { label: '7 días atrás + 7 adelante', days: 15, dayWidth: 72 },
   month: { label: 'Mes', days: 31, dayWidth: 48 },
 };
 
@@ -170,11 +170,6 @@ function addDays(dateKey: string, amount: number) {
   return toDateKey(date);
 }
 
-function startOfChileanWorkWeek(today: string) {
-  const weekday = new Date(today + 'T12:00:00Z').getUTCDay();
-  return addDays(today, -((weekday + 6) % 7));
-}
-
 function diffDays(from: string, to: string) {
   const a = new Date(`${from}T12:00:00Z`).getTime();
   const b = new Date(`${to}T12:00:00Z`).getTime();
@@ -219,8 +214,8 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
   );
 
   const today = data?.range.today || toDateKey(new Date());
-  // Open on Monday: the two-week view shows this week AND the coming work week.
-  const currentAnchor = anchorDate || startOfChileanWorkWeek(today);
+  // Default view keeps today centered: one week back and one week ahead.
+  const currentAnchor = anchorDate || addDays(today, -7);
   const periodConfig = PERIOD_CONFIG[period];
   const dates = useMemo(
     () => buildDates(currentAnchor, periodConfig.days),
@@ -281,9 +276,9 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
     <div className="space-y-3">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Calendario operativo continuo</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Calendario</h1>
           <p className="mt-0.5 max-w-3xl text-xs leading-5 text-muted-foreground">
-            Actividades de Mantenimiento, HSE, Legal, Abastecimiento, Finanzas y Personas en una sola línea de tiempo de la organización.
+            Muestra una semana hacia atrás y una hacia adelante. Los eventos pasados siguen visibles para revisarlos rápido.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -296,7 +291,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
           <Button variant="outline" size="sm" onClick={() => shiftPeriod(1)}>
             Siguiente <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setPerspective("area"); setSource("maintenance"); setScope("historical"); setPeriod("14"); setAnchorDate(addDays(today, -13)); }} disabled={data?.allowedSources?.maintenance === false}>
+          <Button variant="outline" size="sm" onClick={() => { setPerspective("area"); setSource("maintenance"); setScope("historical"); setPeriod("14"); setAnchorDate(addDays(today, -7)); }} disabled={data?.allowedSources?.maintenance === false}>
             <History className="mr-1 h-4 w-4" /> OT finalizadas
           </Button>
           <Button variant="outline" size="sm" onClick={() => void mutate()} disabled={isValidating}>
@@ -345,7 +340,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
           <SelectTrigger aria-label="Escala temporal"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="7">7 días</SelectItem>
-            <SelectItem value="14">14 días</SelectItem>
+            <SelectItem value="14">Semana anterior + próxima</SelectItem>
             <SelectItem value="month">Mes</SelectItem>
           </SelectContent>
         </Select>
