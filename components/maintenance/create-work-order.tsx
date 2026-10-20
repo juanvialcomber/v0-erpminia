@@ -135,6 +135,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [materialQuantity, setMaterialQuantity] = useState('1');
   const [plannedMaterials, setPlannedMaterials] = useState<PlannedMaterial[]>([]);
   const [workType, setWorkType] = useState(searchParams.get('workType') || 'corrective');
+  const [generalWork, setGeneralWork] = useState(searchParams.get('workType') === 'general');
   const [priority, setPriority] = useState(searchParams.get('priority') || 'medium');
   const [scheduledDate, setScheduledDate] = useState(searchParams.get('scheduledDate') || chileTodayDateKey());
   const [plannedHours, setPlannedHours] = useState(searchParams.get('plannedDurationHours') || '');
@@ -186,7 +187,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
 
   useEffect(() => {
     if (!selectedAsset || assetQuery) return;
-    setAssetQuery(`${selectedAsset.code} · ${selectedAsset.name}`);
+    setAssetQuery(selectedAsset.name);
   }, [selectedAsset, assetQuery]);
 
   useEffect(() => {
@@ -206,7 +207,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
 
   const validate = () => {
     if (!assignedPersonId) return 'Selecciona primero al responsable de la OT';
-    if (!canonicalAssetId) return t.validation.assetRequired;
+    if (!generalWork && !canonicalAssetId) return t.validation.assetRequired;
     if (review && review.canonical_asset_id !== canonicalAssetId) return t.validation.reviewAssetMismatch;
     if (!title.trim()) return t.validation.titleRequired;
     if (!scheduledDate) return t.validation.dateRequired;
@@ -218,7 +219,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
 
   const chooseAsset = (asset: Asset) => {
     setCanonicalAssetId(asset.id);
-    setAssetQuery(`${asset.code} · ${asset.name}`);
+    setAssetQuery(asset.name);
   };
 
   const addMaterial = (item: MaterialCatalogItem) => {
@@ -248,7 +249,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
 
     const requestPayload = {
       assignedPersonId,
-      canonicalAssetId,
+      canonicalAssetId: generalWork ? null : canonicalAssetId,
       reviewId: reviewId || null,
       title: title.trim(),
       description: description.trim() || null,
@@ -256,7 +257,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
         canonicalProductId: item.productId,
         quantityRequired: item.quantityRequired,
       })),
-      workType,
+      workType: generalWork ? 'general' : workType,
       priority,
       scheduledDate,
       plannedDurationHours: plannedHours ? Number(plannedHours) : 0,
@@ -357,11 +358,15 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       <Card className="shadow-none">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">2. Qué hay que hacer</CardTitle>
-          <CardDescription>Selecciona el equipo y describe el trabajo.</CardDescription>
+          <CardDescription>Puede ser un trabajo sobre un equipo o una tarea general del taller.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="asset-search">{t.fields.asset}</Label>
+          {!reviewId ? <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant={!generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(false); if (workType === 'general') setWorkType('corrective'); }}>En equipo</Button>
+            <Button type="button" variant={generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(true); setCanonicalAssetId(''); setAssetQuery(''); setWorkType('general'); }}>Trabajo general del taller</Button>
+          </div> : null}
+          {!generalWork ? <div className="space-y-2">
+            <Label htmlFor="asset-search">Equipo</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -376,13 +381,13 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                 disabled={isLoading || Boolean(error) || Boolean(reviewId)}
               />
             </div>
-            {!reviewId && assetQuery !== (selectedAsset ? `${selectedAsset.code} · ${selectedAsset.name}` : '') ? (
+            {!reviewId && assetQuery !== (selectedAsset ? selectedAsset.name : '') ? (
               <div className="max-h-56 overflow-y-auto rounded-md border bg-card">
                 {filteredAssets.length === 0 ? (
                   <p className="p-3 text-sm text-muted-foreground">No hay equipos con ese criterio.</p>
                 ) : filteredAssets.map((asset) => (
                   <button key={asset.id} type="button" onClick={() => chooseAsset(asset)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50">
-                    <p className="text-sm font-medium">{asset.code} · {asset.name}</p>
+                    <p className="text-sm font-medium">{asset.name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{asset.type}{asset.model ? ` · ${asset.model}` : ''}</p>
                   </button>
                 ))}
@@ -393,7 +398,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                 {selectedAsset.type}{selectedAsset.model ? ` · ${selectedAsset.model}` : ''} · {t.assetStatus[selectedAsset.status as keyof typeof t.assetStatus] || selectedAsset.status}
               </p>
             ) : null}
-          </div>
+          </div> : <div className="rounded-md border bg-muted/20 px-3 py-3 text-sm"><p className="font-medium">Trabajo general del taller</p><p className="mt-1 text-xs text-muted-foreground">No requiere asociar un equipo.</p></div>}
 
           <div className="space-y-2">
             <Label htmlFor="work-title">{t.fields.workTitle}</Label>
