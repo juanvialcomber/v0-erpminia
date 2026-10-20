@@ -88,29 +88,24 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
       Vista reciente limitada; los mensajes originales permanecen almacenados.
     </p>:null}
     {groupedUpdates.length>0?<div className="space-y-3">
-      {groupedUpdates.map(group=>{
+      {groupedUpdates.map((group,groupIndex)=>{
         const first=group[0];
         const evidence=Array.from(new Map(
           group.flatMap(item=>item.sourceEvidence).map(file=>[file.id,file])
         ).values());
         const destinations=new Set(group.map(item=>item.destination));
         const singleDestination=destinations.size===1?first.destination:null;
-        return <article key={[first.sourceMessageId,first.groupName,first.reportedAt].join('|')}
-          className="rounded-xl border bg-background/60 p-3 shadow-sm sm:p-4">
-          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-none">{first.groupName}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                WhatsApp · Mensaje #{first.sourceMessageId}
-                {singleDestination?' · '+singleDestination:''}
-                {group.length>1?' · '+group.length+' novedades':''}
-              </p>
-            </div>
-            <time dateTime={first.reportedAt}
-              className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-              {when(first.reportedAt)}
-            </time>
-          </div>
+        const stateCounts=group.reduce((acc,item)=>{
+          acc[item.reportedState]=(acc[item.reportedState]||0)+1;
+          return acc;
+        },{} as Record<string,number>);
+        const stateSummary=[
+          stateCounts.pending?stateCounts.pending+' pendiente'+(stateCounts.pending>1?'s':''):null,
+          stateCounts.reported_done?stateCounts.reported_done+' realizado'+(stateCounts.reported_done>1?'s':''):null,
+          stateCounts.planned?stateCounts.planned+' planificado'+(stateCounts.planned>1?'s':''):null,
+          stateCounts.unclear?stateCounts.unclear+' por corroborar':null,
+        ].filter(Boolean).join(' · ');
+        const reportBody=<>
           <div className="overflow-hidden rounded-lg border bg-card">
             {group.map((item,index)=><div key={item.id}
               className={index?'border-t px-3 py-3 sm:px-4':'px-3 py-3 sm:px-4'}>
@@ -150,6 +145,44 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
               {evidence.map(file=><EvidenceLink key={file.id} file={file} mode={mode}/>)}
             </div>
           </div>:null}
+        </>;
+        if(!expanded&&groupIndex>0) return <details key={[first.sourceMessageId,first.groupName,first.reportedAt].join('|')}
+          className="rounded-xl border bg-background/40">
+          <summary className="cursor-pointer list-none px-3 py-3 sm:px-4">
+            <div className="grid gap-1 sm:grid-cols-[1fr_auto] sm:items-start sm:gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{singleDestination||first.destination}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">
+                  {first.groupName} · Mensaje #{first.sourceMessageId}
+                  {group.length>1?' · '+group.length+' novedades':''}
+                </p>
+                {stateSummary?<p className="mt-1 text-xs text-muted-foreground">{stateSummary}</p>:null}
+              </div>
+              <time dateTime={first.reportedAt} className="text-[11px] tabular-nums text-muted-foreground">
+                {when(first.reportedAt)}
+              </time>
+            </div>
+          </summary>
+          <div className="border-t p-3 sm:p-4">{reportBody}</div>
+        </details>;
+        return <article key={[first.sourceMessageId,first.groupName,first.reportedAt].join('|')}
+          className="rounded-xl border bg-background/60 p-3 shadow-sm sm:p-4">
+          <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-none">{first.groupName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                WhatsApp · Mensaje #{first.sourceMessageId}
+                {singleDestination?' · '+singleDestination:''}
+                {group.length>1?' · '+group.length+' novedades':''}
+              </p>
+              {stateSummary?<p className="mt-1 text-xs font-medium text-foreground/80">{stateSummary}</p>:null}
+            </div>
+            <time dateTime={first.reportedAt}
+              className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {when(first.reportedAt)}
+            </time>
+          </div>
+          {reportBody}
         </article>;
       })}
     </div>:null}
