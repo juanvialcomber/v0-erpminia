@@ -432,64 +432,48 @@ function ScheduleSlide({ data }: { data: any }) {
 function FleetSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   const sites = useMemo(() => {
-    const map = new Map<string, { total: number; attention: number; stopped: number; latestAt: string | null; email: number; whatsapp: number }>();
-    rows.forEach((row: any) => {
+    const map = new Map<string, { total: number; stopped: number; operational: number; unknown: number; attention: number }>();
+    for (const row of rows) {
       const site = row.site || 'Sin faena';
-      const current = map.get(site) || { total: 0, attention: 0, stopped: 0, latestAt: null, email: 0, whatsapp: 0 };
-      current.total += 1;
-      if (row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending) current.attention += 1;
-      if (row.reportedStopped) current.stopped += 1;
-      if (row.emailCurrent) current.email += 1;
-      if (row.whatsappCurrent) current.whatsapp += 1;
-      if (row.latestSignalAt && (!current.latestAt || String(row.latestSignalAt) > current.latestAt)) current.latestAt = String(row.latestSignalAt);
-      map.set(site, current);
-    });
-    return [...map.entries()].map(([label, value]) => ({ label, ...value })).sort((a, b) => b.total - a.total);
+      const entry = map.get(site) || { total: 0, stopped: 0, operational: 0, unknown: 0, attention: 0 };
+      entry.total++;
+      if (row.reportedStopped) entry.stopped++;
+      else if (/^(operativ[oa]|en servicio|disponible|funcionando|working|running)$/i.test(String(row.currentReportedStatus || '').trim())) entry.operational++;
+      else entry.unknown++;
+      if (row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending) entry.attention++;
+      map.set(site, entry);
+    }
+    return [...map.entries()].map(([label, item]) => ({ label, ...item })).sort((a, b) => b.total - a.total);
   }, [rows]);
 
   return (
-    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1fr_1fr]">
-      <Panel title="Condición por unidad operacional" subtitle="Estado de los equipos con información actual">
-        <div className="mb-4 flex flex-wrap items-center gap-5 text-sm text-[var(--tower-ink-muted)]">
-          <ChartLegend tone="green" label="Sin alertas" />
-          <ChartLegend tone="copper" label="Requiere atención" />
-          <ChartLegend tone="critical" label="Detenido" />
-        </div>
-        <div className="space-y-4">
-          {sites.slice(0, 8).map((site) => (
-            <div key={site.label}>
-              <div className="mb-2 flex items-end justify-between gap-5">
-                <div>
-                  <span className="text-lg font-semibold">{site.label}</span>
-                  <div className="mt-1 text-sm text-[var(--tower-ink-muted)]">Última señal {dateTime(site.latestAt)} · Correo {site.email} · WhatsApp {site.whatsapp}</div>
-                </div>
-                <div className="text-right text-sm tabular-nums text-[var(--tower-ink-muted)]">
-                  <strong className="text-lg text-[var(--tower-ink)]">{site.total}</strong> equipos · {site.attention} atención · {site.stopped} detenidos
-                </div>
+    <div className="grid h-full gap-4 p-4 xl:grid-cols-[1.15fr_.85fr]">
+      <Panel title="Disponibilidad de equipos por mina" subtitle="Estado reportado con evidencia · no equivale a disponibilidad horaria">
+        {sites.length === 0 ? <EmptyState title="Sin equipos clasificados por mina" text="No hay registros con fuente suficiente." /> : null}
+        <div className="space-y-3">
+          {sites.slice(0, 8).map((site) => {
+            const classified = site.operational + site.stopped;
+            const pct = classified > 0 ? Math.round(site.operational / classified * 100) : null;
+            return <div key={site.label} className="rounded-md border border-border/60 p-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0"><div className="text-base font-semibold">{site.label}</div><div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div></div>
+                <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-sm text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
               </div>
-              <div className="flex h-5 overflow-hidden rounded bg-muted">
-                <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? ((site.total - site.attention) / site.total) * 100 : 0}%` }} />
-                <div className="bg-[var(--tower-copper)]" style={{ width: `${site.total ? ((site.attention - site.stopped) / site.total) * 100 : 0}%` }} />
-                <div className="bg-destructive/80" style={{ width: `${site.total ? (site.stopped / site.total) * 100 : 0}%` }} />
+              <div className="mt-3 flex h-3 overflow-hidden rounded bg-muted">
+                <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? site.operational / site.total * 100 : 0}%` }} />
+                <div className="bg-destructive/80" style={{ width: `${site.total ? site.stopped / site.total * 100 : 0}%` }} />
               </div>
-            </div>
-          ))}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--tower-ink-muted)]"><span>{site.operational} operativos reportados</span><span>{site.stopped} detenidos</span><span>{site.unknown} sin estado confirmado</span></div>
+            </div>;
+          })}
         </div>
       </Panel>
-
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
-        <DataTable
-          headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']}
-          columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
+        <DataTable headers={['Equipo', 'Faena', 'Prioridad', 'OT', 'Repuestos', 'Fuente']} columnTemplate="1.55fr .9fr .9fr .55fr 1fr .85fr"
           rows={(data?.attentionRows || []).slice(0, 8).map((row: any) => [
-            row.assetName,
-            row.site,
-            row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
-            row.openWorkOrders || '—',
-            row.partsPending ? 'Pendiente' : '—',
-            sourceLabel(row.latestSignalSource),
-          ])}
-        />
+            row.assetName, row.site, row.reportedStopped ? 'Detenido' : priorityLabel(row.planningPriority || 'Atención'),
+            row.openWorkOrders || '—', row.partsPending ? 'Pendiente' : '—', sourceLabel(row.latestSignalSource),
+          ])} />
       </Panel>
     </div>
   );
