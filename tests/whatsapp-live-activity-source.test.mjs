@@ -148,3 +148,10 @@ test('long shift reports preserve content and label videos as evidence of the wh
  assert.ok(feed.updates[0].text.length>350,'long source content not truncated to a teaser');
  assert.equal(feed.updates[0].sourceEvidence[0].association,'adjunto_de_reporte');
 });
+
+
+test('long messages stay compact on the first screen',()=>{
+ const ui=file('components/production/whatsapp-operational-updates.tsx');
+ assert.match(ui,/item\.text\.length>220/);
+ assert.match(ui,/item\.text\.slice\(0,150\)/);
+});
