@@ -228,7 +228,7 @@ test('full-message detail is tenant/date/group authorization scoped and lazy',()
   assert.match(api,/\.eq\('message_id',message\.id\)/);
   assert.match(api,/body\.slice\(0,20000\)/);
   assert.match(ui,/Ver mensaje completo y adjuntos/);
-  assert.match(ui,/Bloques encontrados en el mensaje/);
+  assert.match(ui,/Líneas \{block\.lineStart\}/);
   assert.match(ui,/block\.lineStart/);
   assert.match(ui,/needsNumericalReview/);
   assert.doesNotMatch(api,/\.update\(|\.upsert\(|\.insert\(|\.delete\(/);
