@@ -110,9 +110,9 @@ export function WhatsappOperationalUpdates({mode='overview'}:{mode?:WhatsappActi
               {group.length>1&&!singleDestination?<p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {item.destination}
               </p>:null}
-              {item.text.length>480?<details className="space-y-2">
+              {item.text.length>220?<details className="space-y-2">
                 <summary className="cursor-pointer list-none whitespace-pre-wrap break-words text-sm leading-relaxed">
-                  {item.text.slice(0,280)}…
+                  {item.text.slice(0,150)}…
                   <span className="ml-1 text-xs font-medium underline underline-offset-2">
                     Ver mensaje completo
                   </span>
