@@ -76,6 +76,8 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
   const [sourceLoading,setSourceLoading]=useState<number|null>(null);
   const [sourceError,setSourceError]=useState('');
   const [activeSource,setActiveSource]=useState<number|null>(null);
+  const [decisionBusy,setDecisionBusy]=useState<number|null>(null);
+  const [decisionError,setDecisionError]=useState('');
 
   useEffect(()=>{
     if(!day)return;
@@ -119,6 +121,27 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
   },[triage,coverage,section,query]);
 
   function resetFilters(){setSection('all');setCoverage('all');setQuery('');setLimit(20)}
+  async function decideFinding(index:number,decision:'approve'|'reject'){
+    setDecisionBusy(index);setDecisionError('');
+    try{
+      const response=await fetch('/api/admin/whatsapp/triage/review',{
+        method:'POST',credentials:'include',cache:'no-store',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({date:day,index,decision}),
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)throw new Error(result?.error||'No se pudo guardar la decisión.');
+      setTriage(current=>current?{
+        ...current,
+        findings:current.findings.map(item=>item.index===index?{
+          ...item,reviewStatus:result.reviewStatus,
+        }:item),
+      }:current);
+    }catch(cause){
+      setDecisionError(cause instanceof Error?cause.message:'No se pudo guardar la decisión.');
+    }finally{setDecisionBusy(null)}
+  }
+
   async function loadFullSource(messageId:number){
     setActiveSource(messageId);setSourceDetail(null);setSourceError('');setSourceLoading(messageId);
     try{
@@ -200,10 +223,24 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
                 {item.groups.join(' / ')||'Origen por confirmar'} · {item.sourceIds.length} mensaje{item.sourceIds.length===1?'':'s'} de origen
                 {!item.sourceComplete?' · Hay fuentes no recuperadas':''}
               </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" disabled={decisionBusy===item.index || item.reviewStatus==='confirmed'}
+                  onClick={()=>void decideFinding(item.index,'approve')}>
+                  {item.reviewStatus==='confirmed'?'Aprobado':'Aprobar'}
+                </Button>
+                <Button size="sm" variant="outline"
+                  disabled={decisionBusy===item.index || item.reviewStatus==='dismissed'}
+                  onClick={()=>void decideFinding(item.index,'reject')}>
+                  {item.reviewStatus==='dismissed'?'Rechazado':'Rechazar'}
+                </Button>
+              </div>
             </div>
           ) : <p className="text-sm text-muted-foreground">No hay novedades extraídas para este día.</p>}
         </div>
       </article>
+      {decisionError?<p role="alert" className="rounded-md border p-3 text-sm text-destructive">
+        {decisionError}
+      </p>:null}
 
       <details className="rounded-lg border">
         <summary className="cursor-pointer list-none px-4 py-3">
@@ -262,6 +299,17 @@ export function WhatsappTriageInbox({dates}:{dates:string[]}) {
                   {reviewLabel[item.reviewStatus]||item.reviewStatus} · {item.groups.join(' / ')||'Origen por confirmar'}
                   {' · '}Mensajes {item.sourceIds.join(', ')}
                 </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" disabled={decisionBusy===item.index || item.reviewStatus==='confirmed'}
+                    onClick={()=>void decideFinding(item.index,'approve')}>
+                    {item.reviewStatus==='confirmed'?'Aprobado':'Aprobar'}
+                  </Button>
+                  <Button size="sm" variant="outline"
+                    disabled={decisionBusy===item.index || item.reviewStatus==='dismissed'}
+                    onClick={()=>void decideFinding(item.index,'reject')}>
+                    {item.reviewStatus==='dismissed'?'Rechazado':'Rechazar'}
+                  </Button>
+                </div>
               </div>)}
             {!filtered.findings.length?<p className="text-sm text-muted-foreground">Sin coincidencias.</p>:null}
           </div> : <div className="divide-y rounded-md border">
