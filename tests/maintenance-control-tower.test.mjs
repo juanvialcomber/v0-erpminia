@@ -68,8 +68,8 @@ test('wallboard remains informational only', () => {
 test('wallboard preserves missing KPI truth instead of inventing availability', () => {
   assert.match(api, /availabilityPct: null/);
   assert.match(api, /Sin base canónica de disponibilidad diaria/);
-  assert.match(page, /Disponibilidad operacional/);
-  assert.match(page, /Sin base canónica/);
+  assert.doesNotMatch(page, /Disponibilidad operacional/);
+  assert.match(page, /Sólo métricas con información suficiente/);
 });
 
 test('standalone maintenance monitor keeps authentication but removes dashboard chrome', () => {
