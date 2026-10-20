@@ -92,12 +92,12 @@ test('wallboard never truncates operational names or table values', () => {
 
 
 test('wallboard translates internal maintenance priority codes into human language', () => {
-  assert.match(source, /P1'\) return 'Crítica'/);
-  assert.match(source, /P2'\) return 'Alta'/);
-  assert.match(source, /P3'\) return 'Media'/);
-  assert.match(source, /P4'\) return 'Baja'/);
-  assert.match(source, /P5'\) return 'Programable'/);
-  assert.match(source, /Urgencia y seguimiento/);
+  assert.match(source, /startsWith\('P1'\)\) return 'Crítica'/);
+  assert.match(source, /startsWith\('P2'\)\) return 'Alta'/);
+  assert.match(source, /startsWith\('P3'\)\) return 'Media'/);
+  assert.match(source, /startsWith\('P4'\)\) return 'Baja'/);
+  assert.match(source, /startsWith\('P5'\)\) return 'Programable'/);
+  assert.match(source, /Estado de las preventivas/);
   assert.doesNotMatch(source, /label: priority/);
 });
 
