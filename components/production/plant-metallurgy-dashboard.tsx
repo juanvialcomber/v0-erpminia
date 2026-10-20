@@ -71,6 +71,10 @@ export function PlantMetallurgyDashboard(){
         {p?<section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-4"><div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Cu contenido real</p><p className="mt-2 text-xl font-semibold">{tons(p.containedFeedCuTons,3)}</p><p className="mt-1 text-xs text-muted-foreground">Antes de recuperación</p></div><div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Plan Cu contenido</p><p className="mt-2 text-xl font-semibold">{data?.plan?.plannedContainedCuTons==null?'—':tons(data.plan.plannedContainedCuTons,2)}</p><p className="mt-1 text-xs text-muted-foreground">Programa mina · pre-recuperación</p></div><div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Avance Cu contenido</p><p className="mt-2 text-xl font-semibold">{pct(p.containedCuPlanProgressPct,1)}</p><p className="mt-1 text-xs text-muted-foreground">Real / plan mensual comparable</p></div><div className="bg-card px-4 py-4"><p className="text-xs text-muted-foreground">Tratado sin fino calculable</p><p className="mt-2 text-xl font-semibold">{tons(p.wetTonsWithoutFine,1)}</p><p className="mt-1 text-xs text-muted-foreground">Falta ensayo / evidencia</p></div></section>:null}
 
         <PlantSourceCutoff/>
+        <p className="text-xs leading-5 text-muted-foreground">
+          Los manuales no extienden esa ventana: sólo los días con ingreso manual registrado muestran transporte comparable.
+          Los demás días permanecen “sin fuente”, nunca 0.
+        </p>
       </div>
     </details>
     <details className="rounded-lg border bg-card">
