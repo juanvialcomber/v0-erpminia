@@ -136,7 +136,7 @@ test('tenant-scoped read-only API and UI never mutate operational modules',()=>{
   assert.match(ui,/>Todos<\/option>/);
   assert.match(ui,/Sin actividad extraída/);
   assert.match(ui,/Sin coincidencias\./);
-  assert.match(ui,/clasificación provisional/i);
+  assert.match(ui,/La clasificación es provisional/i);
   assert.match(admin,/WhatsappTriageInbox/);
 });
 
