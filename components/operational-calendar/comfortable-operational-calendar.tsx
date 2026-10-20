@@ -58,6 +58,9 @@ type OperationalCalendarItem = {
   asset_code?: string | null;
   asset_cost_center?: string | null;
   created_by_me?: boolean;
+  actionable_for_me?: boolean;
+  action_label?: string | null;
+  action_note?: string | null;
 };
 
 type CalendarResponse = {
@@ -248,7 +251,8 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
         const viewer = data?.viewerName?.trim().toLocaleLowerCase('es-CL');
         const assignedToMe = Boolean(viewer && item.owner?.trim().toLocaleLowerCase('es-CL') === viewer);
         const plannedByMe = Boolean(item.created_by_me);
-        if (!assignedToMe && !plannedByMe) return false;
+        const needsMyAction = Boolean(item.actionable_for_me);
+        if (!assignedToMe && !plannedByMe && !needsMyAction) return false;
       }
       if (term && ![item.title, item.reference, item.owner, item.kind, item.location]
         .some((value) => value?.toLocaleLowerCase('es-CL').includes(term))) return false;
@@ -338,7 +342,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
             <SelectItem value="finance" disabled={data?.allowedSources?.finance === false}>Finanzas ({summary.by_source.finance})</SelectItem>
             <SelectItem value="people" disabled={data?.allowedSources?.people === false}>Personas ({summary.by_source.people})</SelectItem>
           </SelectContent>
-        </Select> : <div className="flex items-center text-xs text-muted-foreground">{perspective === 'mine' ? 'Mis OT asignadas y las OT que programé. Para ver todo el equipo, selecciona Área u Organización.' : 'Todas las áreas autorizadas'}</div>}
+        </Select> : <div className="flex items-center text-xs text-muted-foreground">{perspective === 'mine' ? 'Mis OT y las acciones que tengo que revisar, programar o destrabar. Para ver todo el equipo, selecciona Área u Organización.' : 'Todas las áreas autorizadas'}</div>}
         <Select value={period} onValueChange={(value) => setPeriod(value as CalendarPeriod)}>
           <SelectTrigger aria-label="Escala temporal"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -489,6 +493,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                       <div className="flex items-start gap-2">
                         <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">{item.title}</p>
                         {item.historical ? <History className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : null}
+                        {item.actionable_for_me && item.action_label ? <Badge variant="outline" className="shrink-0 text-[10px]">{item.action_label}</Badge> : null}
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-muted-foreground">
                         {item.reference || item.kind}
@@ -557,7 +562,9 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span className={`rounded-md border px-2 py-1 font-semibold ${selectedItem.source === 'maintenance' ? otState(selectedItem).bar : SOURCE_META[selectedItem.source].bar}`}>{selectedItem.status_label}</span>
                 <span className="text-muted-foreground">{formatShortDate(selectedItem.date)}</span>
+                {selectedItem.actionable_for_me && selectedItem.action_label ? <Badge>{selectedItem.action_label}</Badge> : null}
               </div>
+              {selectedItem.action_note ? <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm"><p className="font-medium">Qué hacer</p><p className="mt-1 text-muted-foreground">{selectedItem.action_note}</p></div> : null}
               {selectedItem.source === 'maintenance' && selectedItem.asset_name ? (
                 <div className="mt-4 rounded-md border bg-muted/20 p-3 text-sm">
                   <p className="text-xs text-muted-foreground">Equipo / activo</p>
@@ -573,7 +580,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                 {selectedItem.location ? <p><span className="text-xs text-muted-foreground">Ubicación</span><span className="mt-1 block font-medium">{selectedItem.location}</span></p> : null}
               </div>
               <Link href={selectedItem.href} className="mt-5 flex items-center justify-between border-t pt-4 text-sm font-medium text-foreground hover:underline">
-                Ver OT completa <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                {selectedItem.actionable_for_me && selectedItem.action_label ? selectedItem.action_label : selectedItem.kind === 'Orden de trabajo' ? 'Ver OT completa' : 'Abrir'} <ExternalLink className="h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">Vista previa de solo lectura. Selecciona la ficha para abrir el registro y sus evidencias.</p>
