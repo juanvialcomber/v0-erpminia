@@ -197,6 +197,19 @@ test('composite mine reports preserve exact line spans and independent destinati
   assert.equal(prepared.items[0].sections[0].lineStart,1);
 });
 
+test('plant work headings stay in plant context instead of becoming mine activity',()=>{
+  const source=[
+    'Trabajos realizados 19/10/2026',
+    'Preventiva',
+    '- Cintas transportadoras N°1 chancado primario',
+    '- Mantención de parada de emergencia y limpieza',
+  ].join('\n');
+  const sections=extractWhatsappSections({groupName:'Planta Patagua',text:source});
+  assert.ok(sections.length>=1);
+  assert.ok(sections.every(section=>section.proposal.id!=='mine_activities'));
+  assert.equal(sections[0].proposal.id,'plant_equipment');
+});
+
 test('mixed plant shift bulletin separates completed text from PENDIENTE source lines',()=>{
   const source=[
     'Limpieza y revisión de mallas',
