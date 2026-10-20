@@ -87,7 +87,7 @@ test('wallboard never truncates operational names or table values', () => {
   assert.doesNotMatch(source, /min-w-0 truncate px-4 py-4/);
   assert.match(source, /whitespace-normal/);
   assert.match(source, /break-words/);
-  assert.match(source, /columnTemplate="1\.45fr \.8fr 1\.1fr 1\.5fr \.7fr 1\.25fr"/);
+  assert.match(source, /columnTemplate="1\.8fr \.75fr 1\.15fr 1\.45fr \.65fr 1\.2fr"/);
 });
 
 
@@ -159,4 +159,10 @@ test('wallboard uses plain language for confirmed equipment state', () => {
   assert.match(source, /Sin confirmación registrada/);
   assert.doesNotMatch(source, /Estado validado/);
   assert.doesNotMatch(source, /Sin estado validado/);
+});
+
+
+test('wallboard routes dashboard entry to standalone monitor', async () => {
+  const route = readFileSync(new URL('../app/dashboard/mantenimiento/torre-control/page.tsx', import.meta.url), 'utf8');
+  assert.match(route, /redirect\('\/monitor\/mantenimiento'\)/);
 });
