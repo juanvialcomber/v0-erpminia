@@ -318,14 +318,23 @@ function StoppedSlide({ data }: { data: any }) {
       </div>
       <Panel title="Detalle de equipos detenidos" subtitle="Sólo condiciones actuales respaldadas por evidencia">
         {rows.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center rounded-md border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-6 text-center" role="status">
-            <p className="text-2xl font-semibold tabular-nums text-[var(--tower-ink)]">{data?.summary?.stoppedAssets === 0 ? '0 detenciones reportadas' : 'Sin datos de detenciones confirmadas'}</p>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--tower-ink-muted)]">
-              {data?.summary?.stoppedAssets === 0
-                ? 'No hay equipos con detención vigente respaldada por las fuentes recibidas. Esto no confirma que toda la flota esté operativa.'
-                : 'No hay información suficiente para confirmar el estado de detención. Revisa la cobertura de las fuentes.'}
-            </p>
-          </div>
+          data?.summary?.stoppedAssets === 0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-6 py-8 text-center" role="status">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" aria-hidden="true">
+                <CheckCircle2 className="h-7 w-7" strokeWidth={1.7} />
+              </span>
+              <p className="text-4xl font-semibold tracking-tight tabular-nums text-[var(--tower-ink)]">0</p>
+              <p className="text-xl font-semibold text-[var(--tower-ink)]">Sin detenciones vigentes reportadas</p>
+              <p className="max-w-xl text-sm leading-relaxed text-[var(--tower-ink-muted)]">
+                Indicador favorable para la continuidad operacional, según las fuentes disponibles.
+              </p>
+            </div>
+          ) : (
+            <div className="flex min-h-40 flex-col items-center justify-center rounded-md border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-6 text-center" role="status">
+              <p className="text-xl font-semibold text-[var(--tower-ink)]">Sin datos suficientes</p>
+              <p className="mt-2 max-w-xl text-sm text-[var(--tower-ink-muted)]">No hay evidencia suficiente para confirmar el estado de detenciones.</p>
+            </div>
+          )
         ) : (
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
