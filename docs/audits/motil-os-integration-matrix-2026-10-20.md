@@ -39,3 +39,20 @@ No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegu
 
 - Validar claves de documento y organización desde órdenes, recepción y líneas hacia eventos y ledger.
 - Revisar consumidores de código OT -> Ficha 360, calendario y Torre de Control. La presencia de datos en SQL no prueba actualización de interfaz en tiempo real.
+
+## Contratos de lectura y actualización comprobados en código
+
+- `app/api/maintenance/work-orders/route.ts`: consulta `maintenance_work_orders` con límite por `organization_id`, resuelve `canonical_asset_id` contra `maintenance_canonical_assets_v1` y registra eventos en `work_order_events` cuando corresponda al flujo de escritura. **Solo inspeccionado; no invocado para escribir**.
+- `components/maintenance/work-orders-queue.tsx`: consume `/api/maintenance/work-orders` mediante SWR.
+- `app/api/calendar/operational/route.ts`: consulta `maintenance_work_orders` con `scheduled_date`, en el rango solicitado y además `preventive_maintenance_schedules`.
+- `components/operational-calendar/comfortable-operational-calendar.tsx`: consume `/api/calendar/operational?days=120&scope=...`, refresca cada 60 s.
+- `app/api/maintenance/control-tower/route.ts`: consulta OT, equipos canónicos, flujo de abastecimiento, evidencias y revisiones.
+- `components/maintenance/control-tower-screen.tsx`: consume `/api/maintenance/control-tower`, refresca cada 60 s.
+- **Interpretación estricta**: existen contratos compartidos y polling de lectura. No se verificó todavía que todos los cambios de estado, responsable, pausa o reprogramación propaguen el resultado correcto, ni la relación completa con Ficha 360.
+
+### Pruebas aisladas pendientes
+
+1. Contratos de cambio de estado OT: verificar fixtures de pause/resume/close y lectura en calendario/torre, sin crear OT productivas.
+2. Rango calendario 120 días vs pantallas, zona Santiago y días límite.
+3. Identificar ruta de Ficha 360 y sus consultas canónicas antes de declarar integración completa.
+4. Auditoría de RLS y privilegios en endpoints consumidores sin tocar permisos activos.
