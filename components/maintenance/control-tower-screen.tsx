@@ -318,7 +318,14 @@ function StoppedSlide({ data }: { data: any }) {
       </div>
       <Panel title="Detalle de equipos detenidos" subtitle="Sólo condiciones actuales respaldadas por evidencia">
         {rows.length === 0 ? (
-          <EmptyState title="Sin equipos detenidos con evidencia vigente" text="No se arrastran estados históricos como detención actual." />
+          <div className="flex min-h-40 flex-col items-center justify-center rounded-md border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-6 text-center" role="status">
+            <p className="text-2xl font-semibold tabular-nums text-[var(--tower-ink)]">{data?.summary?.stoppedAssets === 0 ? '0 detenciones reportadas' : 'Sin datos de detenciones confirmadas'}</p>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--tower-ink-muted)]">
+              {data?.summary?.stoppedAssets === 0
+                ? 'No hay equipos con detención vigente respaldada por las fuentes recibidas. Esto no confirma que toda la flota esté operativa.'
+                : 'No hay información suficiente para confirmar el estado de detención. Revisa la cobertura de las fuentes.'}
+            </p>
+          </div>
         ) : (
           <DataTable
             headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
