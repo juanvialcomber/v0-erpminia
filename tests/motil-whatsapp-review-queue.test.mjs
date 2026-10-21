@@ -13,6 +13,8 @@ test('review queue keeps source evidence and never publishes operational data', 
   assert.match(source,/message_id,group_id,group_name,sender_name,message_type,body/);
   assert.match(source,/\.limit\(100\)/);
   assert.match(source,/suggestWhatsappReviewDestinations\(row\)/);
+  assert.match(source,/sender_chat_id: senderByMessage\.get\(row\.message_id\)/);
+  assert.match(source,/\.in\('id', ids\)/);
   assert.match(source,/read_only: true/);
   assert.doesNotMatch(source,/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
 });
