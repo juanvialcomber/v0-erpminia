@@ -8,6 +8,7 @@ type ReviewItem = {
   source_excerpt: string;
   event_time_kind: string;
   suggested_destinations: string[];
+  existing_activity?: boolean;
 };
 type SourceMessage = {
   message_id: number;
@@ -64,7 +65,7 @@ export default function WhatsappReviewPage() {
                   <article key={item.item_index} className="rounded-md border bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">Sección {item.item_index + 1} · {temporalLabels[item.event_time_kind] || 'Por revisar'} · Destinos sugeridos: {item.suggested_destinations.join(', ') || 'Sin determinar'}</p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.source_excerpt}</p>
-                    <p className="mt-2 text-xs font-medium">Pendiente de validación · No publicado</p>
+                    <p className="mt-2 text-xs font-medium">{item.existing_activity ? 'Actividad con índice coincidente: verificar antes de duplicar' : 'Pendiente de validación · No publicado'}</p>
                   </article>
                 ))}
               </div>
