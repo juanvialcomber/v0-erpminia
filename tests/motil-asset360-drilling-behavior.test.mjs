@@ -18,7 +18,7 @@ function evaluate({ drillingError = null, ledgerRows = [{ amount: 125000, recogn
     ledgerResult: { rows: ledgerRows },
   };
   const expression = [`const sourceError = ${fatal[1]};`,`const drillingSourceUnavailable = ${unavailable[1]};`,`const reports = ${reports[1]};`,
-    '({ sourceError, drillingSourceUnavailable, reports, ledger: ledgerResult.rows })'].join('\\n');
+    '({ sourceError, drillingSourceUnavailable, reports, ledger: ledgerResult.rows })'].join('\n');
   return vm.runInNewContext(expression, context);
 }
 
