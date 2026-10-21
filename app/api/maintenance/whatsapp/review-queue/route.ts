@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { suggestWhatsappReviewDestinations } from '@/lib/maintenance/whatsapp-review-routing';
 
 // Read-only source queue. This endpoint must never create operational records.
 export async function GET(request: NextRequest) {
@@ -27,9 +28,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     items: (data || []).map((row) => ({
       ...row,
+      ...suggestWhatsappReviewDestinations(row),
       review_required: true,
-      suggested_destination: null,
-      publication_allowed: false,
     })),
     read_only: true,
     next_action: 'Clasificar por remitente, grupo y contenido; validar con responsable antes de publicar.',
