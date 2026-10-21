@@ -22,6 +22,7 @@ test('review queue keeps source evidence and never publishes operational data', 
 test('review checks existing activities within tenant before suggesting any distribution', () => {
   assert.match(source,/\.from\('motil_whatsapp_operational_activities'\)/);
   assert.match(source,/\.in\('message_id', ids\)/);
-  assert.match(source,/existing_activity: existingByMessage\.get\(row\.message_id\)/);
+  assert.match(source,/activity\.evidence === normalizeEvidence\(item\.source_excerpt\)/);
+  assert.match(source,/index_conflict:/);
   assert.match(source,/No fue posible comprobar actividades previas/);
 });
