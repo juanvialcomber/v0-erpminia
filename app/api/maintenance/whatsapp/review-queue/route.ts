@@ -63,6 +63,14 @@ export async function GET(request: NextRequest) {
     existingByMessage.set(activity.message_id, records);
   }
 
+  const { data: decisions, error: decisionError } = ids.length
+    ? await context.supabase.from('motil_whatsapp_review_decisions')
+        .select('message_id,item_index,evidence_excerpt,decision,destination_module')
+        .eq('organization_id', context.organizationId).in('message_id', ids)
+    : { data: [], error: null };
+  if (decisionError) return NextResponse.json({ error: 'No fue posible cargar decisiones' }, { status: 503 });
+  const decisionMap = new Map((decisions || []).map((d) => [`${d.message_id}:${d.item_index}`, d]));
+
   return NextResponse.json({
     items: (data || []).map((row) => ({
       ...row,
@@ -70,6 +78,8 @@ export async function GET(request: NextRequest) {
       ...suggestWhatsappReviewDestinations(row),
       review_items: splitWhatsappReviewItems(row).map((item) => ({
         ...item,
+        review_decision: (() => { const d = decisionMap.get(`${row.message_id}:${item.item_index}`); return d?.evidence_excerpt === item.source_excerpt ? d.decision : null; })(),
+        review_destination: (() => { const d = decisionMap.get(`${row.message_id}:${item.item_index}`); return d?.evidence_excerpt === item.source_excerpt ? d.destination_module : null; })(),
         existing_activity: (existingByMessage.get(row.message_id) || []).some(
           (activity) => activity.evidence.length > 0 && activity.evidence === normalizeEvidence(item.source_excerpt),
         ),
