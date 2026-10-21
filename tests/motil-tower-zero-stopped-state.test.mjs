@@ -9,7 +9,7 @@ test('zero stoppages use a calm favorable signal, without claiming all assets ar
   assert.match(stopped, /rows\.length === 0/);
   assert.match(stopped, /stoppedAssets === 0/);
   assert.match(stopped, /Sin detenciones vigentes reportadas/);
-  assert.match(stopped, /Indicador favorable para la continuidad operacional, según las fuentes disponibles/);
+  assert.doesNotMatch(stopped, /Indicador favorable para la continuidad operacional/);
   assert.match(stopped, /CheckCircle2/);
 });
 
