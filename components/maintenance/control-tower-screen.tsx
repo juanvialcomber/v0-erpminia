@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  CheckCircle2,
   Clock3,
   Gauge,
   Monitor,
