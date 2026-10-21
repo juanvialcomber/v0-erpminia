@@ -106,3 +106,11 @@ No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegu
 | Sin historial disponible | Mostrar estado vacío verificable, no cero inventado | Pendiente |
 
 No invocar POST/PATCH ni endpoints con efectos secundarios contra producción para estas pruebas.
+
+## Regresión automatizable: contratos estáticos añadidos
+
+Archivo: `tests/motil-os-integration-contracts.test.mjs` (Node `node:test`; **sin llamadas de red ni escrituras**).
+
+Incluye: permiso MANT_OPERACIONES y contexto organizacional en ambos GET de Ficha 360, fuentes canónicas de OT/activos/compras, ledger económico, consumo OT por calendario/torre y uso del catálogo canónico en listado de equipos.
+
+**Alcance real:** pruebas estáticas sobre código fuente; aún no ejecutadas en CI. No prueban RLS real, cambios de estado efectivos, temporización, exactitud numérica ni permisos entre usuarios. Próximo paso: ejecutar en CI aislado y ampliar fixtures de comportamiento con mocks. Prohibido activar tests de escritura contra Supabase productivo.
