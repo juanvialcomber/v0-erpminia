@@ -85,3 +85,24 @@ No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegu
 1. Leer GET de `operational-360` y `economic-operational-history` para comprobar relaciones y filtros de organización.
 2. Revisar estados de OT en fixtures de calendario/torre/ficha; no crear, pausar ni cerrar OT reales.
 3. Priorizar pruebas documentales o tests aislados sin despliegue y sin cambios de esquema.
+
+## Contratos backend de Ficha 360 — auditoría estática
+
+- `app/api/maintenance/assets/[id]/operational-360/route.ts` y `app/api/maintenance/assets/[id]/economic-operational-history/route.ts` exigen `requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES)` y `getOrganizationContext(request)`, y rechazan acceso cuando no están autorizados o no existe contexto.
+- Operacional 360 consulta activos canónicos, OT, catálogos de productos, proveedores, órdenes de compra y datos de cierre. En las consultas inspeccionadas se filtra por `organization_id`.
+- Histórico económico consulta `canonical_clp_cost_ledger`, confiabilidad, flujo de OT, preventivos, horómetros y fuentes de producción. En las consultas inspeccionadas se observan filtros por organización y equipo.
+- **Evidencia disponible:** contrato estático del código. No se ha probado RLS en sesión real, resultados endpoint, ni correspondencia de montos y contadores. No dar por aprobado el QA multirol.
+
+### Casos de regresión planificados (aislados)
+
+| Prueba | Aserción | Nivel |
+|---|---|---|
+| Usuario sin permiso | GET operacional e histórico deben rechazarlo | Pendiente |
+| Activo de otra organización | Ningún dato ajeno a su organización | Pendiente |
+| OT abierta/cerrada | Resúmenes muestran solo el estado/fecha que corresponda | Pendiente |
+| OT pausada | No es cerrada; tiempo y ejecución conservan semántica | Pendiente |
+| Evento sin vínculo a OT | Se conserva como compra general, no se fuerza enlace | Pendiente |
+| Ledger económico | Totales y estado de reconocimiento se conservan | Pendiente |
+| Sin historial disponible | Mostrar estado vacío verificable, no cero inventado | Pendiente |
+
+No invocar POST/PATCH ni endpoints con efectos secundarios contra producción para estas pruebas.
