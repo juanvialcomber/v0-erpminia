@@ -1,9 +1,11 @@
+import { inferEventTimeKind } from './whatsapp-event-time';
 import { suggestWhatsappReviewDestinations, type ReviewDestination } from './whatsapp-review-routing';
 
 export type WhatsappReviewItem = {
   message_id: number;
   item_index: number;
   source_excerpt: string;
+  event_time_kind: ReturnType<typeof inferEventTimeKind>;
   suggested_destinations: ReviewDestination[];
   requires_human_review: true;
   publication_allowed: false;
@@ -33,6 +35,7 @@ export function splitWhatsappReviewItems(message: {
     message_id: message.message_id,
     item_index,
     source_excerpt: chunk.slice(0, 2400),
+    event_time_kind: inferEventTimeKind(chunk),
     suggested_destinations: suggestWhatsappReviewDestinations({ ...message, body: chunk }).suggested_destinations,
     requires_human_review: true,
     publication_allowed: false,
