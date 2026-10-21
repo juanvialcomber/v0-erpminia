@@ -56,3 +56,16 @@ No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegu
 2. Rango calendario 120 días vs pantallas, zona Santiago y días límite.
 3. Identificar ruta de Ficha 360 y sus consultas canónicas antes de declarar integración completa.
 4. Auditoría de RLS y privilegios en endpoints consumidores sin tocar permisos activos.
+
+## Validación de contratos OT: estado y calendario
+
+- Distribución actual en `maintenance_work_orders` (SELECT): 5 `completed`, 1 `in_progress`, 5 `open` (11 total). No se introdujeron estados ni OT de prueba.
+- La API de Torre de Control clasifica `completed/closed` como terminadas; excluye `completed/closed/cancelled/canceled` de abiertas; cuenta `in_progress/in-progress/paused` como ejecución. Con la distribución actual se esperan 5 cerradas, 6 abiertas y 1 en ejecución, condicionadas al alcance por organización y filtros de endpoint.
+- El calendario consulta `scheduled_date` en ventana temporal solicitada y usa `includeForScope`: `active` excluye históricos, `historical` incluye históricos y el modo general incluye ambos. **No comparar totales del calendario con la totalidad de OT sin considerar rango temporal y scope.**
+- El calendario toma fecha de finalización de `completion_date || closed_at` y la Torre compara estado de OT para KPI. Confirmar coherencia de zona horaria Santiago en tests futuros.
+
+### Riesgo a comprobar (sin cambios ahora)
+
+- Variantes de `paused`, `in-progress`, `closed` y `cancelled` pueden tener tratamiento diferente entre vistas. Necesario un contrato común de estado y pruebas de fixtures sin escribir en producción.
+- La Ficha 360 sigue sin ruta/contrato confirmado en esta auditoría; no declarar interoperabilidad total hasta localizar su consumo.
+- Validación actual es estática/código + SELECT; no se ejecutaron flujos reales de pausa/reanudación/cierre.
