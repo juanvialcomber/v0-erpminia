@@ -132,3 +132,10 @@ Verificado en `pg_class`: `canonical_clp_cost_ledger`, `maintenance_reliability_
 `production_drilling_source_reports` es tabla con RLS habilitado y sin políticas visibles en `pg_policies`; podría resultar inaccesible a roles ordinarios. No alterar políticas: verificar primero si el endpoint tolera ausencia de datos, cuál es el contexto efectivo de credenciales y si existen pruebas reales de lectura.
 
 **Acción segura siguiente:** inspeccionar manejo de errores `production_drilling_source_reports` del endpoint económico y permisos efectivos sin cambiar datos, roles, grants o políticas.
+
+## Hallazgo confirmado: disponibilidad de reporte de perforación
+
+- `production_drilling_source_reports` tiene RLS habilitado sin políticas visibles. La consulta a `information_schema.role_table_grants` mostró privilegios para `service_role`, no para `authenticated` ni `anon`. Esto no determina por sí mismo el rol efectivo del contexto Supabase de la API.
+- `economic-operational-history/route.ts` incluye esa consulta entre las fuentes en `Promise.all` y agrega `operationalReportsResult.error` al fallo global `sourceError`, por lo que un rechazo puede producir HTTP 500 de toda la Ficha 360 económica.
+- **Recomendación de diseño:** gestionar explícitamente la indisponibilidad de una fuente complementaria sin convertir datos ausentes en cero ni modificar permisos de producción; registrar estado `unavailable` y conservar costos/mantenimiento cuando el contrato lo permita. Requiere revisar semánticas de salida y tests antes de aplicar el cambio.
+- Bloqueo: comprobar si `getOrganizationContext` usa permisos de usuario o rol de servicio para esa consulta. No habilitar grants ni relajar RLS como solución rápida.
