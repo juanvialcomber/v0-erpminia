@@ -14,8 +14,7 @@ test('WhatsApp review presents source identity, group, timestamp and sections', 
 test('WhatsApp review never writes operational data', () => {
   assert.match(page, /Solo lectura/);
   assert.match(page, /No publicado/);
-  assert.match(page, /whatsapp\/review-decisions/);
-  assert.match(page, /method: 'POST'/);
-  assert.doesNotMatch(page, /method:\s*['"](?:PUT|PATCH|DELETE)/);
+  assert.doesNotMatch(page, /method:\s*['"](?:POST|PUT|PATCH|DELETE)/);
+  assert.doesNotMatch(page, /whatsapp\/review-decisions/);
   assert.doesNotMatch(page, /whatsapp\/operational-activities/);
 });
