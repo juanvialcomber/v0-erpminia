@@ -12,7 +12,7 @@ test('review queue requires module and authenticated organization context', () =
 test('review queue keeps source evidence and never publishes operational data', () => {
   assert.match(source,/message_id,group_id,group_name,sender_name,message_type,body/);
   assert.match(source,/\.limit\(100\)/);
-  assert.match(source,/publication_allowed: false/);
+  assert.match(source,/suggestWhatsappReviewDestinations\(row\)/);
   assert.match(source,/read_only: true/);
   assert.doesNotMatch(source,/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
 });
