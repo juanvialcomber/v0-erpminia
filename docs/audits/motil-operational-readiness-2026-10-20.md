@@ -21,3 +21,17 @@ Auditoría de solo lectura de Supabase MOTIL `ttlptyheuqeotadtcbaw`. No ejecutar
 ## Próxima auditoría aislada
 
 Inspeccionar sin modificar: claves entre OT y equipos, coherencia de estados temporales, materiales reservados vs consumidos y permisos por rol. Generar issues o PR documentales sin merge automático.
+
+## Segundo bloque — Estados y materiales (solo lectura)
+
+- `maintenance_asset_status_history`: 7 eventos, todos `new_state=active`, `source=asset_insert`. Esta historia documenta altas, **no** una medición de disponibilidad horaria o detenciones actuales. La Torre de Control debe conservar la distinción entre estado reportado y disponibilidad temporal.
+- `work_order_material_requirements`: 6 requerimientos; los 6 registran `quantity_shortage > 0` y estado `procurement_needed`. Todos tienen `canonical_product_id` informado.
+- `work_order_material_approval_installations`: 6 confirmaciones; 6/6 enlazadas a OT existentes y 6/6 con `warehouse_reconciliation_status` no nulo.
+- `work_order_parts`: 0 registros. **No inferir** que no hubo entrega o uso de material: existen registros de instalación en otra tabla. Auditar rutas de stock/movimientos antes de proponer un cambio.
+
+### Riesgos y próximos pasos
+
+1. Trazar el contrato de fuentes entre `work_order_parts`, confirmaciones de instalación y movimientos de bodega (sin escrituras ni contabilizaciones).
+2. Diferenciar las solicitudes `procurement_needed` de faltantes actuales resueltos posteriormente; consultar fechas, estados de compras y conciliación.
+3. Confirmar que los KPI de disponibilidad de Torre de Control jamás infieran estado operacional desde `asset_insert`.
+4. Conservar roles, correos, WhatsApp, cron, OT y producción actuales; solo generar documentación o tests aislados.
