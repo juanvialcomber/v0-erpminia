@@ -69,3 +69,19 @@ No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegu
 - Variantes de `paused`, `in-progress`, `closed` y `cancelled` pueden tener tratamiento diferente entre vistas. Necesario un contrato común de estado y pruebas de fixtures sin escribir en producción.
 - La Ficha 360 sigue sin ruta/contrato confirmado en esta auditoría; no declarar interoperabilidad total hasta localizar su consumo.
 - Validación actual es estática/código + SELECT; no se ejecutaron flujos reales de pausa/reanudación/cierre.
+
+## Ficha 360 — contrato localizado (inspección estática)
+
+- Ruta real: `app/dashboard/mantenimiento/equipos/[id]/ficha/page.tsx`. Composición: `Asset360Overview`, `AssetHseControls`, `AssetEconomicOperationalHistory`, `AssetEconomicConditionTrend`.
+- Navegación: `components/maintenance/equipment-sheet.tsx` enlaza a esa ficha desde la lista; `components/maintenance/equipment-list.tsx` consulta `/api/maintenance/equipment`.
+- `components/maintenance/asset-360-overview.tsx` consume `/api/maintenance/assets/{assetId}/operational-360` con SWR. Contempla órdenes, cierres y evidencia operativa.
+- `components/maintenance/asset-economic-operational-history.tsx` consume `/api/maintenance/assets/{assetId}/economic-operational-history`, con campos de eventos financieros vinculados a OT y OT activas.
+- `app/api/maintenance/equipment/route.ts` ensambla `canonical_assets_current` con cierres, mantenimientos preventivos, horómetros y vistas de confiabilidad usando `canonical_asset_id`.
+
+**Hallazgo:** Ficha 360 ya está implementada y conectada mediante endpoints especializados. Integración de código verificada; falta verificar contratos backend internos y consistencia de datos en cada sección. No crear una segunda Ficha 360.
+
+### Próximas pruebas aisladas
+
+1. Leer GET de `operational-360` y `economic-operational-history` para comprobar relaciones y filtros de organización.
+2. Revisar estados de OT en fixtures de calendario/torre/ficha; no crear, pausar ni cerrar OT reales.
+3. Priorizar pruebas documentales o tests aislados sin despliegue y sin cambios de esquema.
