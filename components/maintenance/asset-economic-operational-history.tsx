@@ -25,6 +25,7 @@ type Response = {
     truncated: boolean;
   };
   observedUse: {
+    drilling_source_status: 'available' | 'unavailable';
     evidence_type: 'production_drilling_reports' | 'runtime_meter' | 'none';
     drilling_report_count: number;
     first_report_at: string | null;
@@ -91,6 +92,7 @@ export function AssetEconomicOperationalHistory({ assetId }: { assetId: string }
 
   const historical = data.historicalEconomics;
   const observed = data.observedUse;
+  const drillingUnavailable = observed.drilling_source_status === 'unavailable';
   const reliability = data.auditedReliability;
   const topYear = [...historical.annual].sort((a, b) => b.recognized_clp - a.recognized_clp)[0] || null;
   const signalCount = data.signals.length;
@@ -155,9 +157,9 @@ export function AssetEconomicOperationalHistory({ assetId }: { assetId: string }
       {hasDrillingUse || observed.runtime ? <section className="rounded-lg border">
         <div className="border-b px-4 py-3"><h3 className="font-medium">Uso y condición observados</h3><p className="mt-1 text-xs text-muted-foreground">Evidencia de producción y horómetro disponible para este activo.</p></div>
         <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Reportes operacionales" value={number(observed.drilling_report_count)} detail={hasDrillingUse ? `${shortDate(observed.first_report_at)} → ${shortDate(observed.last_report_at)}` : 'Sin reportes de perforación'} />
+          <Metric label="Reportes operacionales" value={drillingUnavailable ? "Sin acceso a fuente" : number(observed.drilling_report_count)} detail={drillingUnavailable ? "Fuente de perforación no disponible; otros datos conservados" : hasDrillingUse ? `${shortDate(observed.first_report_at)} → ${shortDate(observed.last_report_at)}` : 'Sin reportes de perforación'} />
           <Metric label="Producción observada" value={hasDrillingUse ? `${number(observed.drilled_meters, 1)} m` : 'No aplica / sin base'} detail="Metros perforados registrados; no equivalen a horas de motor" />
-          <Metric label="Fuera de servicio" value={number(observed.out_of_service_reports)} detail={`${number(observed.operational_with_observations_reports)} operativos con observaciones`} />
+          <Metric label="Fuera de servicio" value={drillingUnavailable ? "Sin base" : number(observed.out_of_service_reports)} detail={drillingUnavailable ? "Fuente de perforación no disponible" : `${number(observed.operational_with_observations_reports)} operativos con observaciones`} />
           <Metric label="Restricciones externas" value={number(observed.external_constraint_reports)} detail="Agua, energía o falta de dotación reportadas; no se clasifican automáticamente como falla mecánica" />
         </div>
         <div className="grid gap-4 border-t p-4 text-sm md:grid-cols-2">
