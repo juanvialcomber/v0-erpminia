@@ -124,3 +124,11 @@ Incluye: permiso MANT_OPERACIONES y contexto organizacional en ambos GET de Fich
 ### Release gate pendiente
 
 Antes de certificar la protección multiempresa: escenarios de usuario de una organización A intentando leer activo y OT de B, pruebas para usuario sin rol, e inspección de grants y vistas consumidas. No ejecutar estas pruebas con cambios a datos de Ariel.
+
+## Seguridad de vistas económicas, confiabilidad y producción — lectura de catálogo
+
+Verificado en `pg_class`: `canonical_clp_cost_ledger`, `maintenance_reliability_by_asset_v1`, `maintenance_reliability_by_root_cause_v1`, `maintenance_operational_work_order_flow_v1` y `asset_runtime_summary_v1` son vistas con `security_invoker=true`. Esto delega privilegios/RLS a sus relaciones subyacentes, pero no equivale por sí solo a un QA autenticado.
+
+`production_drilling_source_reports` es tabla con RLS habilitado y sin políticas visibles en `pg_policies`; podría resultar inaccesible a roles ordinarios. No alterar políticas: verificar primero si el endpoint tolera ausencia de datos, cuál es el contexto efectivo de credenciales y si existen pruebas reales de lectura.
+
+**Acción segura siguiente:** inspeccionar manejo de errores `production_drilling_source_reports` del endpoint económico y permisos efectivos sin cambiar datos, roles, grants o políticas.
