@@ -114,3 +114,13 @@ Archivo: `tests/motil-os-integration-contracts.test.mjs` (Node `node:test`; **si
 Incluye: permiso MANT_OPERACIONES y contexto organizacional en ambos GET de Ficha 360, fuentes canónicas de OT/activos/compras, ledger económico, consumo OT por calendario/torre y uso del catálogo canónico en listado de equipos.
 
 **Alcance real:** pruebas estáticas sobre código fuente; aún no ejecutadas en CI. No prueban RLS real, cambios de estado efectivos, temporización, exactitud numérica ni permisos entre usuarios. Próximo paso: ejecutar en CI aislado y ampliar fixtures de comportamiento con mocks. Prohibido activar tests de escritura contra Supabase productivo.
+
+## Revisión RLS real: sólo metadatos PostgreSQL
+
+- `maintenance_work_orders`: RLS habilitado. Política `work_orders_org_isolation`, rol `authenticated`, comando `ALL`; condición de lectura y escritura valida `organization_id` contra `user_roles` para `current_application_user_id()`.
+- `work_order_events`: RLS habilitado. Política `work_order_events_org_isolation`, rol `public`, comando `SELECT`; también restringe por organización del usuario efectivo según `current_application_user_id()`. El rol `public` en la definición no equivale a acceso irrestricto: la condición RLS sigue siendo relevante. Confirmar grants y resultado real con un usuario sin asociación.
+- Ambas APIs de Ficha 360 exigen permiso `MANT_OPERACIONES` y contexto de organización, con filtros `organization_id` en sus consultas. No se ha ejecutado una prueba autenticada entre organizaciones.
+
+### Release gate pendiente
+
+Antes de certificar la protección multiempresa: escenarios de usuario de una organización A intentando leer activo y OT de B, pruebas para usuario sin rol, e inspección de grants y vistas consumidas. No ejecutar estas pruebas con cambios a datos de Ariel.
