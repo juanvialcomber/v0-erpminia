@@ -326,9 +326,6 @@ function StoppedSlide({ data }: { data: any }) {
               </span>
               <p className="text-4xl font-semibold tracking-tight tabular-nums text-[var(--tower-ink)]">0</p>
               <p className="text-xl font-semibold text-[var(--tower-ink)]">Sin detenciones vigentes reportadas</p>
-              <p className="max-w-xl text-sm leading-relaxed text-[var(--tower-ink-muted)]">
-                Indicador favorable para la continuidad operacional, según las fuentes disponibles.
-              </p>
             </div>
           ) : (
             <div className="flex min-h-40 flex-col items-center justify-center rounded-md border border-[var(--tower-border)] bg-[var(--tower-surface-muted)] p-6 text-center" role="status">
