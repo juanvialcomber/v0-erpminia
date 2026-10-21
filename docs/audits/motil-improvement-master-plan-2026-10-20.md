@@ -61,3 +61,12 @@ Auditar la ruta **requerimiento -> abastecimiento -> compra -> recepción -> ent
 
 - 2026-10-20: 188 equipos canónicos, sin código/validación faltante; 11/11 OT enlazadas por canonical_asset_id; 7 eventos de asset_insert no representan disponibilidad actual.
 - 2026-10-20: 6 requerimientos procurement_needed con faltantes; 6 confirmaciones de instalación enlazadas a OT y con estado de conciliación; work_order_parts vacío, sin implicar ausencia de entrega por otros flujos.
+
+## Gate de PR #33 — 2026-10-20
+
+- GitHub Actions run #39527242909, Production release gate: completed/success; tests, build, secret scan y migrations check aprobados.
+- Vercel v0-erpminia y v0-erpminia-br1j: checks success sobre commit 98753c354e83cc9d275fff169d378e0104fa4e88.
+- Se añadió tolerancia a fallas de fuente complementaria de perforación en histórico económico Ficha 360 y rotulación de fuente indisponible. Verificación automatizada estática aprobada; **no** afirmar QA funcional multirol completado.
+- Protección operativa: sin escrituras de prueba en Supabase, sin cambios en OT reales, cron, WhatsApp, inventario ni permisos. Sin merge.
+- **Bloqueadores para merge:** QA funcional con fixtures simulando error de perforación y confirmación de costos intactos; QA autorizaciones cross-tenant en entorno aislado; inspección de UI para ausencia de valores engañosos.
+- Limpieza: evitar crear recursos adicionales; conservar rama/PR mientras exista trabajo abierto. Cerrar y eliminar rama temporal solo después del cierre del QA o decisión explícita de desestimar; conservar audit trail GitHub.
