@@ -27,3 +27,15 @@ MOTIL es un único OS: eventos con identidad y evidencia común que alimentan m�
 ## Protección Ariel
 
 No se modifican OT, cron, WhatsApp, correos, stock, permisos, estados, despliegues, ni integraciones activas. Cualquier cambio futuro requiere pruebas aisladas, release gate y autorización de merge.
+
+## Auditoría de enlaces indirectos — segundo pase
+
+- Compras: 5/5 eventos tienen `request_id` y 5/5 enlazan con una solicitud existente en `canonical_procurement_requests_v1`. 3/5 eventos referencian orden de compra; 1/5 referencia recepción.
+- Pipeline: 3/3 filas referencian solicitudes (`intake_request_id`), 3/3 tienen orden y 3/3 registran al menos una recepción. Esto no significa que la recepción esté conciliada o completa.
+- Ledger: 4 entradas, desglosadas en 1 `purchase_commitment` desde `procurement_operational_order_lines` y 3 `procurement_receipt_cost` desde `procurement_operational_receipt_lines`.
+- Al no referenciar directamente OT, **no** crear nuevos enlaces automáticos sin identificar intención, organización, línea de compra y origen. Podrían ser compras generales.
+
+### Pendiente
+
+- Validar claves de documento y organización desde órdenes, recepción y líneas hacia eventos y ledger.
+- Revisar consumidores de código OT -> Ficha 360, calendario y Torre de Control. La presencia de datos en SQL no prueba actualización de interfaz en tiempo real.
