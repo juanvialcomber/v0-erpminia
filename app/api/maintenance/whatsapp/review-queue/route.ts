@@ -25,9 +25,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No fue posible cargar la bandeja de revisión' }, { status: 503 });
   }
 
+  // Registry view stores the display alias, but not the stable sender ID.
+  // Recover IDs from the source table within the same organization.
+  const ids = (data || []).map((row) => row.message_id);
+  const { data: senders, error: senderError } = ids.length
+    ? await context.supabase
+        .from('motil_whatsapp_messages')
+        .select('id,sender_chat_id')
+        .eq('organization_id', context.organizationId)
+        .in('id', ids)
+    : { data: [], error: null };
+  if (senderError) {
+    console.error('[motil/whatsapp/review-queue] Sender lookup failed', senderError.code);
+    return NextResponse.json({ error: 'No fue posible verificar los remitentes' }, { status: 503 });
+  }
+  const senderByMessage = new Map((senders || []).map((sender) => [sender.id, sender.sender_chat_id]));
+
   return NextResponse.json({
     items: (data || []).map((row) => ({
       ...row,
+      sender_chat_id: senderByMessage.get(row.message_id) || null,
       ...suggestWhatsappReviewDestinations(row),
       review_required: true,
     })),
