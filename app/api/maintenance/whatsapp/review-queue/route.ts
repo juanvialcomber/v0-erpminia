@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { suggestWhatsappReviewDestinations } from '@/lib/maintenance/whatsapp-review-routing';
+import { splitWhatsappReviewItems } from '@/lib/maintenance/whatsapp-review-items';
 
 // Read-only source queue. This endpoint must never create operational records.
 export async function GET(request: NextRequest) {
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
       ...row,
       sender_chat_id: senderByMessage.get(row.message_id) || null,
       ...suggestWhatsappReviewDestinations(row),
+      review_items: splitWhatsappReviewItems(row),
       review_required: true,
     })),
     read_only: true,
