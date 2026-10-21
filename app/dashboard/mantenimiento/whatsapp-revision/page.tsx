@@ -8,6 +8,8 @@ type ReviewItem = {
   source_excerpt: string;
   event_time_kind: string;
   suggested_destinations: string[];
+  review_decision?: 'approved_for_review' | 'discarded' | null;
+  review_destination?: string | null;
   existing_activity?: boolean;
   index_conflict?: boolean;
 };
@@ -34,7 +36,7 @@ const fetcher = async (url: string) => {
 };
 
 export default function WhatsappReviewPage() {
-  const { data, error, isLoading } = useSWR('/api/maintenance/whatsapp/review-queue', fetcher, { refreshInterval: 60000 });
+  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/whatsapp/review-queue', fetcher, { refreshInterval: 60000 });
   const [expanded, setExpanded] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -49,6 +51,7 @@ export default function WhatsappReviewPage() {
       });
       const result = await response.json();
       setFeedback(response.ok ? 'Decisión guardada. No modifica datos operacionales.' : result.error || 'No fue posible guardar la decisión.');
+      if (response.ok) await mutate();
     } catch { setFeedback('No fue posible conectar con el servidor.'); }
     finally { setBusy(null); }
   };
@@ -83,7 +86,8 @@ export default function WhatsappReviewPage() {
                   <article key={item.item_index} className="rounded-md border bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">Sección {item.item_index + 1} · {temporalLabels[item.event_time_kind] || 'Por revisar'} · Destinos sugeridos: {item.suggested_destinations.join(', ') || 'Sin determinar'}</p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.source_excerpt}</p>
-                    {!item.existing_activity && !item.index_conflict && (
+                    {item.review_decision && <p className="mt-2 text-xs font-medium">{item.review_decision === 'discarded' ? 'Propuesta descartada' : `Revisado para ${item.review_destination || 'destino por verificar'}`}</p>}
+                    {!item.review_decision && !item.existing_activity && !item.index_conflict && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {item.suggested_destinations.map((destination) => (
                           <button key={destination} disabled={busy !== null} type="button"
