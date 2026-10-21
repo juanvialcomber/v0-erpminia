@@ -184,8 +184,6 @@ export default function MaintenanceControlTowerPage() {
       <header className="grid shrink-0 gap-3 border-b border-[var(--tower-border)] pb-2 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
           <div className="flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.10em] text-[var(--tower-ink-muted)]">
-            <img src="/brand/motil-wordmark.png" alt="MOTIL" width={2094} height={610} className="h-7 w-auto max-w-[140px] object-contain" />
-            <span className="h-5 w-px bg-[var(--tower-border)]" aria-hidden="true" />
             <Monitor className="h-4 w-4" />
             Compañía Minera La Patagua · Mantenimiento
             <span className="rounded-full bg-[var(--tower-copper-soft)] px-3 py-1 text-sm font-semibold normal-case tracking-normal text-[var(--tower-copper)]">Solo lectura</span>
@@ -197,7 +195,8 @@ export default function MaintenanceControlTowerPage() {
           </div>
           <p className="tower-topline mt-2 text-lg font-medium text-[var(--tower-ink-muted)] 2xl:text-xl">{slide.question}</p>
         </div>
-        <div className="grid min-w-[390px] grid-cols-[1fr_auto] gap-x-5 gap-y-1 text-sm text-[var(--tower-ink-muted)]">
+        <div className="relative grid min-w-0 grid-cols-[1fr_auto] gap-x-4 gap-y-1 pl-28 text-sm text-[var(--tower-ink-muted)] lg:min-w-[480px]">
+          <img src="/brand/motil-wordmark.png" alt="MOTIL" width={2094} height={610} className="absolute left-0 top-1 h-8 w-[100px] object-contain object-left" />
           <span>Hora Santiago</span><strong className="text-xl font-semibold tabular-nums text-[var(--tower-ink)]">{now.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: SANTIAGO_TIME_ZONE })}</strong>
           <span>Correo mantención</span><span>{dateTime(data?.freshness?.latestEmailAt)}</span>
           <span>WhatsApp vinculado</span><span>{dateTime(data?.freshness?.latestPublishedWhatsAppAt)}</span>
