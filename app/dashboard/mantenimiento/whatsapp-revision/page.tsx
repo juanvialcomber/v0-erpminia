@@ -8,8 +8,6 @@ type ReviewItem = {
   source_excerpt: string;
   event_time_kind: string;
   suggested_destinations: string[];
-  review_decision?: 'approved_for_review' | 'discarded' | null;
-  review_destination?: string | null;
   existing_activity?: boolean;
   index_conflict?: boolean;
 };
@@ -36,33 +34,15 @@ const fetcher = async (url: string) => {
 };
 
 export default function WhatsappReviewPage() {
-  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/whatsapp/review-queue', fetcher, { refreshInterval: 60000 });
+  const { data, error, isLoading } = useSWR('/api/maintenance/whatsapp/review-queue', fetcher, { refreshInterval: 60000 });
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const saveReview = async (messageId: number, item: ReviewItem, decision: 'approved_for_review' | 'discarded', destination?: string) => {
-    const key = `${messageId}:${item.item_index}`;
-    setBusy(key);
-    setFeedback(null);
-    try {
-      const response = await fetch('/api/maintenance/whatsapp/review-decisions', {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message_id: messageId, item_index: item.item_index, decision, destination_module: destination }),
-      });
-      const result = await response.json();
-      setFeedback(response.ok ? 'Decisión guardada. No modifica datos operacionales.' : result.error || 'No fue posible guardar la decisión.');
-      if (response.ok) await mutate();
-    } catch { setFeedback('No fue posible conectar con el servidor.'); }
-    finally { setBusy(null); }
-  };
   const messages: SourceMessage[] = data?.items || [];
   return (
     <main className="mx-auto max-w-5xl space-y-5 p-5">
       <div>
         <h1 className="text-2xl font-semibold">Revisión de WhatsApp</h1>
-        <p className="text-sm text-muted-foreground">Mensajes originales, remitentes y destinos sugeridos. Solo lectura: ninguna actividad se publica desde esta pantalla.</p>
+        <p className="text-sm text-muted-foreground">Mensajes originales, remitentes y destinos sugeridos. Solo lectura: permite revisar la evidencia sin modificar actividades.</p>
       </div>
-      {feedback && <p role="status" className="rounded-md border p-3 text-sm">{feedback}</p>}
       {isLoading && <p role="status">Cargando mensajes…</p>}
       {error && <p role="alert">No fue posible obtener los mensajes. Inténtalo nuevamente.</p>}
       {!isLoading && !error && messages.length === 0 && <p>No hay mensajes disponibles para revisión.</p>}
@@ -86,21 +66,6 @@ export default function WhatsappReviewPage() {
                   <article key={item.item_index} className="rounded-md border bg-muted/20 p-3">
                     <p className="text-xs text-muted-foreground">Sección {item.item_index + 1} · {temporalLabels[item.event_time_kind] || 'Por revisar'} · Destinos sugeridos: {item.suggested_destinations.join(', ') || 'Sin determinar'}</p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm">{item.source_excerpt}</p>
-                    {item.review_decision && <p className="mt-2 text-xs font-medium">{item.review_decision === 'discarded' ? 'Propuesta descartada' : `Revisado para ${item.review_destination || 'destino por verificar'}`}</p>}
-                    {!item.review_decision && !item.existing_activity && !item.index_conflict && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {item.suggested_destinations.map((destination) => (
-                          <button key={destination} disabled={busy !== null} type="button"
-                            onClick={() => saveReview(message.message_id, item, 'approved_for_review', destination)}
-                            className="rounded-md border px-3 py-2 text-xs disabled:opacity-50">
-                            Revisado para {destination}
-                          </button>
-                        ))}
-                        <button disabled={busy !== null} type="button"
-                          onClick={() => saveReview(message.message_id, item, 'discarded')}
-                          className="rounded-md border px-3 py-2 text-xs disabled:opacity-50">Descartar propuesta</button>
-                      </div>
-                    )}
                     <p className="mt-2 text-xs font-medium">{item.existing_activity ? 'Evidencia ya registrada: revisar antes de duplicar' : item.index_conflict ? 'Índice previamente utilizado: verificar el contenido' : 'Pendiente de validación · No publicado'}</p>
                   </article>
                 ))}
