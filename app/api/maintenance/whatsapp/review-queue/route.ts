@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
   const { data: existingActivities, error: activityError } = ids.length
     ? await context.supabase
         .from('motil_whatsapp_operational_activities')
-        .select('message_id,item_index,review_status')
+        .select('message_id,item_index,source_excerpt,review_status')
         .eq('organization_id', context.organizationId)
         .in('message_id', ids)
     : { data: [], error: null };
@@ -54,11 +54,13 @@ export async function GET(request: NextRequest) {
     console.error('[motil/whatsapp/review-queue] Activity lookup failed', activityError.code);
     return NextResponse.json({ error: 'No fue posible comprobar actividades previas' }, { status: 503 });
   }
-  const existingByMessage = new Map<number, Set<number>>();
+  const normalizeEvidence = (value: string | null) =>
+    (value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es-CL');
+  const existingByMessage = new Map<number, Array<{ item_index: number; evidence: string }>>();
   for (const activity of existingActivities || []) {
-    const ordinals = existingByMessage.get(activity.message_id) || new Set<number>();
-    ordinals.add(activity.item_index);
-    existingByMessage.set(activity.message_id, ordinals);
+    const records = existingByMessage.get(activity.message_id) || [];
+    records.push({ item_index: activity.item_index, evidence: normalizeEvidence(activity.source_excerpt) });
+    existingByMessage.set(activity.message_id, records);
   }
 
   return NextResponse.json({
@@ -68,7 +70,12 @@ export async function GET(request: NextRequest) {
       ...suggestWhatsappReviewDestinations(row),
       review_items: splitWhatsappReviewItems(row).map((item) => ({
         ...item,
-        existing_activity: existingByMessage.get(row.message_id)?.has(item.item_index) || false,
+        existing_activity: (existingByMessage.get(row.message_id) || []).some(
+          (activity) => activity.evidence.length > 0 && activity.evidence === normalizeEvidence(item.source_excerpt),
+        ),
+        index_conflict: (existingByMessage.get(row.message_id) || []).some(
+          (activity) => activity.item_index === item.item_index && activity.evidence !== normalizeEvidence(item.source_excerpt),
+        ),
       })),
       review_required: true,
     })),
