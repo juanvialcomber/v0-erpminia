@@ -21,6 +21,14 @@ const INTENT_TERMS: Record<string, string[]> = {
   'cash-impact-maintenance': ['impacto caja mantenimiento', 'flujo caja mantenimiento', 'compromisos mantenimiento'],
   'unit-normalization-review': ['unidad incorrecta', 'unidades distintas', 'unidad compra', 'normalizar unidad'],
   'purchase-request-completeness': ['solicitud incompleta', 'falta centro costo', 'falta justificacion compra', 'falta justificación compra'],
+  'work-order-readiness': ['ot lista', 'ot preparada', 'puede ejecutarse la ot', 'bloqueo ot'],
+  'maintenance-campaign-readiness': ['campaña mantenimiento', 'campana mantenimiento', 'preparar campaña', 'preparar campana'],
+  'critical-spare-lifecycle': ['repuesto critico', 'repuesto crítico', 'compatibilidad repuesto', 'bom equipo'],
+  'supplier-concentration-risk': ['dependencia proveedor', 'concentracion proveedor', 'concentración proveedor', 'proveedor unico', 'proveedor único'],
+  'invoice-aging-triage': ['facturas por vencer', 'facturas vencidas', 'aging', 'priorizar facturas'],
+  'procurement-anomaly-review': ['anomalia compra', 'anomalía compra', 'compra rara', 'duplicado compra', 'precio anormal'],
+  'cost-center-anomaly-review': ['anomalia centro costo', 'anomalía centro costo', 'gasto raro centro', 'desvio centro costo', 'desvío centro costo'],
+  'supplier-identity-resolution': ['proveedor duplicado', 'mismo proveedor', 'rut proveedor', 'identidad proveedor'],
 };
 
 function normalizeIntent(value: string): string {
