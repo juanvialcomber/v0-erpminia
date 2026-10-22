@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { OrganizationSuccessContext } from '@/lib/api/organization-context';
 import { routeOperationalQuery, type QueryCapability } from '@/lib/intelligence/query-router';
+import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
+import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
 
 export type OperationalAssistantDomain = 'inventory' | 'procurement' | 'production' | 'finance';
 
@@ -217,6 +219,25 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
     return NextResponse.json({ answer: actionRefusal(domain), model: null, sources: [], toolsUsed: [], conversationId: null, route, policy: 'READ_ONLY: ninguna mutación se ejecuta desde este runtime conversacional.' });
   }
   try {
+    const [skillRuntime, skillPlan] = await Promise.all([
+      resolveMotilSkillAvailability(context),
+      Promise.resolve(buildSkillPlan(message)),
+    ]);
+    const skillState = new Map(skillRuntime.skills.map((skill) => [skill.key, skill]));
+    const plannedSkills = skillPlan
+      ? [skillPlan.primary, ...skillPlan.supporting].map((skill) => {
+          const availability = skillState.get(skill.key);
+          return {
+            key: skill.key,
+            name: skill.name,
+            domain: skill.domain,
+            state: availability?.state || 'dormant',
+            missingEvidence: availability?.missingEvidence || [],
+            missingSyncedData: availability?.missingSyncedData || [],
+          };
+        })
+      : [];
+
     const desired = requestedOperationalDomains(route.capabilities, domain);
     const permitted = desired.filter((item) => args.allowedDomains.includes(item));
     const denied = desired.filter((item) => !args.allowedDomains.includes(item));
@@ -225,10 +246,27 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
     const toolsUsed = bundles.flatMap((bundle) => bundle.toolsUsed);
     const evidence = Object.fromEntries(bundles.map((bundle) => [bundle.capability, bundle.payload]));
     const localLabel = domainLabel(domain);
-    const instructions = `Eres el especialista de ${localLabel} dentro de MOTIL Intelligence Core para una operación minera chilena. Tu arquitectura es contexto local primero y expansión transversal sólo cuando aporta evidencia útil.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente la evidencia canónica incluida en EVIDENCIA MOTIL para afirmaciones operacionales.\n2. Distingue DATO CANÓNICO, INTERPRETACIÓN PROFESIONAL, HIPÓTESIS A REVISAR y SIGUIENTE ACCIÓN cuando corresponda.\n3. Si el usuario pregunta por hoy, ahora o estado actual, declara explícitamente la fecha de frescura disponible. No presentes un snapshot antiguo como tiempo real.\n4. Un stock en reorder/out_of_stock/negative no es por sí solo criticidad operacional, riesgo de falla ni prioridad de compra.\n5. Un estado de orden de compra no autoriza inferir recepción, entrega, pago o cierre si esos hechos no están en la evidencia.\n6. En Producción separa valores reportados por fuente de cálculos determinísticos, respeta fine_coverage_state y no conviertas balances, frecuencias o excepciones en causas raíz o pronósticos.\n7. En Finanzas conserva la fecha de corte de cada proyección; no combines silenciosamente fuentes con distinta frescura. No interpretes presupuesto cero/ausente como presupuesto aprobado igual a cero. No confundas compromiso, gasto reconocido, devengo ni pago.\n8. No inventes precios vigentes, proveedores, lead times, criticidades, repuestos equivalentes, costos, causas, disponibilidad, tonelajes, leyes, recuperaciones, presupuestos ni producción faltante.\n9. Si falta permiso para una capacidad transversal solicitada, dilo de forma breve y limita la conclusión a la evidencia autorizada.\n10. No ejecutes compras, reservas, ajustes de stock, recepciones, aprobaciones, cambios de plan, cierres, pagos ni otra mutación. Puedes preparar una recomendación para validación humana.\n11. Mantén la respuesta operacional, concreta y breve. Prioriza qué sabemos, qué excepción importa, qué falta confirmar y cuál es el siguiente paso de mayor valor.\n12. No expongas JSON crudo ni detalles internos del runtime.`;
+    const instructions = `Eres el especialista de ${localLabel} dentro de MOTIL Intelligence Core para una operación minera chilena. Tu arquitectura es contexto local primero y expansión transversal sólo cuando aporta evidencia útil.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente la evidencia canónica incluida en EVIDENCIA MOTIL para afirmaciones operacionales.\n2. Distingue DATO CANÓNICO, INTERPRETACIÓN PROFESIONAL, HIPÓTESIS A REVISAR y SIGUIENTE ACCIÓN cuando corresponda.\n3. Si el usuario pregunta por hoy, ahora o estado actual, declara explícitamente la fecha de frescura disponible. No presentes un snapshot antiguo como tiempo real.\n4. Un stock en reorder/out_of_stock/negative no es por sí solo criticidad operacional, riesgo de falla ni prioridad de compra.\n5. Un estado de orden de compra no autoriza inferir recepción, entrega, pago o cierre si esos hechos no están en la evidencia.\n6. En Producción separa valores reportados por fuente de cálculos determinísticos, respeta fine_coverage_state y no conviertas balances, frecuencias o excepciones en causas raíz o pronósticos.\n7. En Finanzas conserva la fecha de corte de cada proyección; no combines silenciosamente fuentes con distinta frescura. No interpretes presupuesto cero/ausente como presupuesto aprobado igual a cero. No confundas compromiso, gasto reconocido, devengo ni pago.\n8. No inventes precios vigentes, proveedores, lead times, criticidades, repuestos equivalentes, costos, causas, disponibilidad, tonelajes, leyes, recuperaciones, presupuestos ni producción faltante.\n9. Si falta permiso para una capacidad transversal solicitada, dilo de forma breve y limita la conclusión a la evidencia autorizada.\n10. No ejecutes compras, reservas, ajustes de stock, recepciones, aprobaciones, cambios de plan, cierres, pagos ni otra mutación. Puedes preparar una recomendación para validación humana.\n11. Mantén la respuesta operacional, concreta y breve. Prioriza qué sabemos, qué excepción importa, qué falta confirmar y cuál es el siguiente paso de mayor valor.\n12. No expongas JSON crudo ni detalles internos del runtime.
+13. PLAN DE SKILLS es orientación interna, no una fuente. Una skill AVAILABLE puede orientar qué evidencia combinar, pero la afirmación final debe seguir respaldada por EVIDENCIA MOTIL.
+14. Una skill DEGRADED sólo puede usarse para explicar qué información falta; no la presentes como capacidad completa ni extraigas una conclusión positiva de ella.
+15. Una skill DORMANT no debe usarse, nombrarse como disponible ni insinuarse. Si la pregunta depende de ella, explica brevemente que faltan datos sincronizados.
+16. Nunca amplíes evidencia o permisos sólo porque una skill lo sugiera.`;
     const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${message}`;
     const result = await callOpenAI({ instructions, input });
-    return NextResponse.json({ answer: result.text, model: result.model, responseId: result.responseId, sources, toolsUsed, conversationId: null, route, deniedCapabilities: denied, persistence: 'stateless_v1', policy: 'READ_ONLY: evidencia canónica → interpretación → hipótesis → siguiente acción humana. Expansión transversal sólo con permiso y cuando la consulta la requiere.' });
+    return NextResponse.json({
+      answer: result.text,
+      model: result.model,
+      responseId: result.responseId,
+      sources,
+      toolsUsed,
+      conversationId: null,
+      route,
+      deniedCapabilities: denied,
+      skillPlan: plannedSkills,
+      skillSummary: skillRuntime.summary,
+      persistence: 'stateless_v1',
+      policy: 'READ_ONLY: evidencia canónica → interpretación → hipótesis → siguiente acción humana. Skills orientan composición; nunca sustituyen evidencia ni permisos.',
+    });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error ?? 'unknown');
     const configurationError = detail.includes('OPENAI_API_KEY');
