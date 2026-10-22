@@ -19,6 +19,7 @@ export type MotilSkill = {
   outputs: string[];
   risk: MotilSkillRisk;
   requiresSyncedData?: string[];
+  evidenceMode?: 'all' | 'any';
 };
 
 export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
@@ -31,6 +32,7 @@ export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
     outputs: ['matched', 'new_candidate', 'conflict', 'source evidence'],
     risk: 'review_required',
     requiresSyncedData: ['laudus'],
+    evidenceMode: 'any',
   },
   {
     key: 'inventory-stock-risk',
@@ -119,6 +121,7 @@ export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
     evidence: ['integration.reconciliation_items', 'data_reconciliation_reviews'],
     outputs: ['duplicate', 'identity conflict', 'unit conflict', 'source conflict', 'review queue'],
     risk: 'review_required',
+    evidenceMode: 'any',
   },
   {
     key: 'purchase-need-context',
@@ -299,6 +302,7 @@ export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
     outputs: ['exact identity', 'duplicate candidate', 'name variant', 'identity conflict'],
     risk: 'review_required',
     requiresSyncedData: ['suppliers'],
+    evidenceMode: 'any',
   }
 ];
 
