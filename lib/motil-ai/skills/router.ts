@@ -13,6 +13,14 @@ const INTENT_TERMS: Record<string, string[]> = {
   'data-quality-guardian': ['duplicado', 'inconsistencia', 'conflicto', 'dato dudoso', 'calidad dato'],
   'purchase-need-context': ['necesitamos comprar', 'comprar repuesto', 'solicitud compra', 'necesidad compra'],
   'dte-procurement-check': ['dte', 'xml', 'factura sii', 'documento tributario'],
+  'inventory-discrepancy-review': ['diferencia stock', 'descuadre inventario', 'conteo bodega', 'stock no cuadra'],
+  'supplier-return-resolution': ['devolucion proveedor', 'devolución proveedor', 'nota de credito pendiente', 'nota de crédito pendiente'],
+  'maintenance-procurement-urgency': ['repuesto urgente', 'ot detenida por repuesto', 'urgencia compra', 'repuesto critico', 'repuesto crítico'],
+  'stock-transfer-opportunity': ['mover stock', 'trasladar stock', 'otra bodega', 'transferencia bodega'],
+  'asset-replacement-economics': ['reemplazar activo', 'renovar equipo', 'cambiar equipo', 'costo reemplazo'],
+  'cash-impact-maintenance': ['impacto caja mantenimiento', 'flujo caja mantenimiento', 'compromisos mantenimiento'],
+  'unit-normalization-review': ['unidad incorrecta', 'unidades distintas', 'unidad compra', 'normalizar unidad'],
+  'purchase-request-completeness': ['solicitud incompleta', 'falta centro costo', 'falta justificacion compra', 'falta justificación compra'],
 };
 
 function normalizeIntent(value: string): string {
