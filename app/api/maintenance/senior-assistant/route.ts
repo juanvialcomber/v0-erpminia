@@ -463,7 +463,7 @@ export async function POST(request: NextRequest) {
       resolveCargo(db, context.userId),
       buildCanonicalMaintenanceContext(db, context.organizationId),
       loadSupportAdvisoryHandoffs(context, 'maintenance', message),
-      resolveMotilSkillAvailability(context),
+      resolveMotilSkillAvailability(context, ['maintenance']),
       Promise.resolve(buildSkillPlan(message)),
     ]);
 
