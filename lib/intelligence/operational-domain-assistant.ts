@@ -220,7 +220,12 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
   }
   try {
     const [skillRuntime, skillPlan] = await Promise.all([
-      resolveMotilSkillAvailability(context),
+      resolveMotilSkillAvailability(
+        context,
+        args.allowedDomains.filter((item): item is 'inventory' | 'procurement' | 'finance' =>
+          item === 'inventory' || item === 'procurement' || item === 'finance',
+        ),
+      ),
       Promise.resolve(buildSkillPlan(message)),
     ]);
     const skillState = new Map(skillRuntime.skills.map((skill) => [skill.key, skill]));
