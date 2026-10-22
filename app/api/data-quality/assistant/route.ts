@@ -9,6 +9,8 @@ import {
   recordSupportAdvisoryRevalidation,
   supportAdvisoryHandoffPrompt,
 } from '@/lib/intelligence/advisory-handoff-context';
+import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
+import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
 import {
   appendCoreMessage,
   archiveCoreConversation,
@@ -134,11 +136,29 @@ export async function POST(request: NextRequest) {
   const route = routeOperationalQuery(message, { domain: 'data_health' });
 
   try {
-    const conversation = await resolveCoreConversation(context.supabase, scope, {
-      conversationId: typeof body?.conversationId === 'string' ? body.conversationId : null,
-      firstMessage: message,
-    });
+    const [conversation, skillRuntime] = await Promise.all([
+      resolveCoreConversation(context.supabase, scope, {
+        conversationId: typeof body?.conversationId === 'string' ? body.conversationId : null,
+        firstMessage: message,
+      }),
+      resolveMotilSkillAvailability(context),
+    ]);
     const history = await getCoreConversationHistory(context.supabase, scope, conversation.id);
+    const skillPlan = buildSkillPlan(message);
+    const skillState = new Map(skillRuntime.skills.map((skill) => [skill.key, skill]));
+    const plannedSkills = skillPlan
+      ? [skillPlan.primary, ...skillPlan.supporting].map((skill) => {
+          const availability = skillState.get(skill.key);
+          return {
+            key: skill.key,
+            name: skill.name,
+            domain: skill.domain,
+            state: availability?.state || 'dormant',
+            missingEvidence: availability?.missingEvidence || [],
+            missingSyncedData: availability?.missingSyncedData || [],
+          };
+        })
+      : [];
     await appendCoreMessage(context.supabase, scope, {
       conversationId: conversation.id,
       role: 'user',
@@ -304,7 +324,9 @@ export async function POST(request: NextRequest) {
       'Una advertencia, inconsistencia o diagnóstico previo nunca representa la calidad, frescura, cobertura o conciliación actual. Si las fuentes actuales contradicen el caso, indícalo y prioriza la evidencia actual.',
     );
 
-    const instructions = `Eres el especialista de Calidad de Datos dentro de MOTIL Intelligence Core. Tu función es explicar si una conclusión operacional puede confiar en sus fuentes y qué evidencia falta para mejorarla.\n\nREGLAS:\n1. Usa sólo EVIDENCIA MOTIL y sólo los dominios autorizados presentes para afirmar calidad, frescura, cobertura, conciliación o inconsistencia.\n2. HISTORIAL CONVERSACIONAL es contexto NO CANÓNICO. Puede ayudarte a entender qué fuente, problema o comparación quiere revisar el usuario, pero una advertencia o diagnóstico previo nunca representa el estado actual sin nueva evidencia MOTIL.\n3. HANDOFF ADVISORY es contexto NO CANÓNICO: sólo define qué revalidar. Nunca transforma un warning, diagnóstico o inconsistencia previa en estado actual.\n4. Diferencia calidad, frescura, cobertura, conciliación e inconsistencia. No conviertas ausencia de datos en una conclusión operacional.\n5. Una fuente atrasada puede seguir siendo válida históricamente, pero no representa el estado actual. Declara las fechas de corte cuando sean relevantes.\n6. Un warning, excepción o cola de revisión no es automáticamente un error operativo ni una causa raíz.\n7. Nunca expongas datos de dominios no incluidos en EVIDENCIA MOTIL ni insinúes que conoces su estado.\n8. No corrijas ni modifiques datos, no fusiones registros y no cierres revisiones. Recomienda la validación humana mínima necesaria.\n9. Responde en formato operativo: Dato canónico → impacto en confiabilidad → evidencia faltante → siguiente validación.\n10. Mantén la respuesta breve y específica. No muestres JSON crudo.`;
+    const instructions = `Eres el especialista de Calidad de Datos dentro de MOTIL Intelligence Core. Tu función es explicar si una conclusión operacional puede confiar en sus fuentes y qué evidencia falta para mejorarla.\n\nREGLAS:\n1. Usa sólo EVIDENCIA MOTIL y sólo los dominios autorizados presentes para afirmar calidad, frescura, cobertura, conciliación o inconsistencia.\n2. HISTORIAL CONVERSACIONAL es contexto NO CANÓNICO. Puede ayudarte a entender qué fuente, problema o comparación quiere revisar el usuario, pero una advertencia o diagnóstico previo nunca representa el estado actual sin nueva evidencia MOTIL.\n3. HANDOFF ADVISORY es contexto NO CANÓNICO: sólo define qué revalidar. Nunca transforma un warning, diagnóstico o inconsistencia previa en estado actual.\n4. Diferencia calidad, frescura, cobertura, conciliación e inconsistencia. No conviertas ausencia de datos en una conclusión operacional.\n5. Una fuente atrasada puede seguir siendo válida históricamente, pero no representa el estado actual. Declara las fechas de corte cuando sean relevantes.\n6. Un warning, excepción o cola de revisión no es automáticamente un error operativo ni una causa raíz.\n7. Nunca expongas datos de dominios no incluidos en EVIDENCIA MOTIL ni insinúes que conoces su estado.\n8. No corrijas ni modifiques datos, no fusiones registros y no cierres revisiones. Recomienda la validación humana mínima necesaria.\n9. Responde en formato operativo: Dato canónico → impacto en confiabilidad → evidencia faltante → siguiente validación.\n10. Mantén la respuesta breve y específica. No muestres JSON crudo.
+11. PLAN DE SKILLS es orientación interna, no evidencia. Una skill AVAILABLE puede orientar la revisión; una DEGRADED sólo explica qué falta; una DORMANT no debe presentarse como disponible.
+12. Ninguna skill amplía permisos, cambia la fuente ni cierra una revisión por sí sola.`;
 
     const result = await callModel(
       instructions,
@@ -350,6 +372,8 @@ export async function POST(request: NextRequest) {
       decisionCaseRevalidation,
       route,
       authorizedDomains: access.domains,
+      skillPlan: plannedSkills,
+      skillSummary: skillRuntime.summary,
       persistence: 'core_continuity_v1',
       policy: 'READ_ONLY + permission-aware: calidad/frescura/cobertura sólo sobre dominios que el usuario puede leer. Historial y Decision Cases son contexto no canónico separado de evidencia.',
     });
