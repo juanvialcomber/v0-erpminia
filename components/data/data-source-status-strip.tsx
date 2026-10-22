@@ -13,6 +13,7 @@ export type DataSourceItem = {
   state: DataSourceState;
   detail?: string;
   updatedAt?: string | null;
+  reviewCount?: number;
 };
 
 const LABELS: Record<DataSourceState, string> = {
@@ -29,6 +30,19 @@ function iconFor(state: DataSourceState) {
   if (state === 'review') return AlertTriangle;
   if (state === 'offline') return WifiOff;
   return Clock3;
+}
+
+function formatUpdatedAt(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'America/Santiago',
+  }).format(date);
 }
 
 function badgeVariant(state: DataSourceState): 'default' | 'destructive' | 'outline' | 'secondary' {
@@ -72,6 +86,12 @@ export function DataSourceStatusStrip({
                 <Badge variant={badgeVariant(source.state)} className="shrink-0">{LABELS[source.state]}</Badge>
               </div>
               {source.detail ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{source.detail}</p> : null}
+              {source.updatedAt || (source.reviewCount ?? 0) > 0 ? (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  {source.updatedAt ? <span>Actualizado {formatUpdatedAt(source.updatedAt)}</span> : null}
+                  {(source.reviewCount ?? 0) > 0 ? <span>{source.reviewCount} revisión{source.reviewCount === 1 ? '' : 'es'}</span> : null}
+                </div>
+              ) : null}
             </div>
           );
         })}
