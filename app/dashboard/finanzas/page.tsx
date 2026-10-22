@@ -5,6 +5,8 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { FileSearch } from 'lucide-react';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 
 type Row = Record<string, string | number | null>;
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
@@ -46,6 +48,26 @@ export default function FinanzasPage() {
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Finanzas</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Costo, compromisos y caja en una sola vista, sin mezclar conceptos.</p></div>
         <Link href="/dashboard/finanzas/trazabilidad" className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"><FileSearch className="h-4 w-4"/>Ver trazabilidad</Link>
       </section>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          { key: 'motil-finance', label: 'MOTIL Finanzas', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Costos, compromisos y trazabilidad operacional.' },
+          { key: 'procurement', label: 'Compras', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'OC, recepciones, facturas y cuentas por pagar.' },
+          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' },
+          { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
+        ]}
+      />
+
+      <DataReceptionReadiness
+        description="Finanzas está preparada para recibir hechos ERP sin confundirlos con aprobación de pagos ni con decisiones operacionales. Los datos externos entrarán con procedencia y conciliación."
+        items={[
+          { label: 'Centros de costo', ready: true, detail: 'Dimensión canónica disponible.' },
+          { label: 'Compras y CxP', ready: true, detail: 'Vistas operacionales y tesorería disponibles.' },
+          { label: 'Trazabilidad', ready: true, detail: 'Eventos y fuentes auditables.' },
+          { label: 'Laudus contable', ready: false, detail: 'Esperando acceso API efectivo.' },
+        ]}
+      />
 
       {error ? <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error.message}</div> : null}
       <section aria-label="Alcance de control regulatorio minero" className="rounded-lg border p-4 text-sm">
