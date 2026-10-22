@@ -61,3 +61,20 @@ test('executive assistant gates priorities with runtime skills', () => {
   assert.match(executive, /skillPlan: plannedSkills/);
   assert.match(executive, /una DORMANT no debe participar de una prioridad ejecutiva/);
 });
+
+
+test('skill runtime is permission-scoped and fails closed for hidden domains', () => {
+  const runtime = readFileSync(new URL('../lib/motil-ai/skills/runtime-availability.ts', import.meta.url), 'utf8');
+  const endpoint = readFileSync(new URL('../app/api/motil-ai/skills/availability/route.ts', import.meta.url), 'utf8');
+  const sourceStatus = readFileSync(new URL('../app/api/data-sources/status/route.ts', import.meta.url), 'utf8');
+
+  assert.match(runtime, /allowedDomains: SkillRuntimeDomain\[]/);
+  assert.match(runtime, /visibleByDomain/);
+  assert.match(runtime, /userVisible: false/);
+  assert.match(endpoint, /requireModuleAccess/);
+  assert.match(endpoint, /allowedDomains/);
+  assert.match(sourceStatus, /canInventory/);
+  assert.match(sourceStatus, /canProcurement/);
+  assert.match(sourceStatus, /canFinance/);
+  assert.match(sourceStatus, /canSeeExternalErp/);
+});
