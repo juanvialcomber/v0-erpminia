@@ -10,6 +10,7 @@ import { EquipmentList } from '@/components/maintenance/equipment-list';
 import { EquipmentSheet } from '@/components/maintenance/equipment-sheet';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 const assetViews = [
   { href: '/dashboard/mantenimiento/disponibilidad', label: 'Disponibilidad', icon: Activity },
@@ -23,6 +24,7 @@ const assetViews = [
 export default function EquiposPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const sourceStatus = useDataSourceStatus();
 
   const handleSelectEquipment = (equipment: Equipment) => {
     setSelectedEquipment(equipment);
@@ -59,8 +61,8 @@ export default function EquiposPage() {
         reviewHref="/dashboard/calidad-datos"
         sources={[
           { key: 'maintenance', label: 'Mantenimiento', state: 'updated', detail: 'OT, horómetros, evidencia y condición operacional.' },
-          { key: 'procurement', label: 'Compras', state: 'updated', detail: 'Costos y repuestos vinculables al activo.' },
-          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Activo fijo y costo financiero: pendiente de API.' },
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Costos y repuestos vinculables al activo.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Activo fijo y costo financiero: pendiente de API.' }),
           { key: 'documents', label: 'Documentos', state: 'updated', detail: 'Ficha técnica y expediente permanecen trazables.' },
         ]}
       />
