@@ -90,7 +90,7 @@ export default function BodegaPage() {
         { label: 'Productos', ready: true, detail: 'Catálogo canónico disponible.' },
         { label: 'Stock por bodega', ready: true, detail: 'Modelo operacional disponible.' },
         { label: 'Conciliación', ready: true, detail: 'Conflictos se muestran antes de corregir.' },
-        { label: 'Stock Laudus', ready: false, detail: 'Se activará después del acceso API.' },
+        { label: 'Stock Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Stock ERP y movimientos sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
       ]}
     /> : null}
 
