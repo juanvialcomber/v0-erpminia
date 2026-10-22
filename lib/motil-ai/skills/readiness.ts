@@ -17,10 +17,15 @@ export function evaluateSkillReadiness(skill: MotilSkill, state: EvidenceState):
   const synced = new Set(state.syncedDomains);
 
   const missingEvidence = skill.evidence.filter((source) => !available.has(source));
+  const presentEvidence = skill.evidence.filter((source) => available.has(source));
+  const evidenceReady = skill.evidenceMode === 'any'
+    ? skill.evidence.length === 0 || presentEvidence.length > 0
+    : missingEvidence.length === 0;
+
   const missingSyncedData = (skill.requiresSyncedData || []).filter((domain) => !synced.has(domain));
 
   return {
-    ready: missingEvidence.length === 0 && missingSyncedData.length === 0,
+    ready: evidenceReady && missingSyncedData.length === 0,
     missingEvidence,
     missingSyncedData,
     canAct: false,
