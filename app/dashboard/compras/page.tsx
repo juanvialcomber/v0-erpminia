@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { OperationalPipelineBoard } from '@/components/pipeline/operational-pipeline-board';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 
 type Overview = {
   canEdit: boolean;
@@ -56,6 +58,26 @@ export default function ComprasPage() {
           </Button>
         </PageHeaderActions>
       </PageHeader>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          { key: 'motil', label: 'MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Solicitudes, recepciones, documentos y flujo operacional.' },
+          { key: 'canonical', label: 'Base canónica', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Órdenes de compra y proveedores conciliados.' },
+          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'API habilitada comercialmente: pendiente de activación del proveedor.' },
+          { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
+        ]}
+      />
+
+      <DataReceptionReadiness
+        description="Compras ya separa evidencia canónica y operación. Cuando Laudus sincronice, las OC, proveedores, facturas y pagos entrarán como fuente reconciliable sin reemplazar decisiones humanas."
+        items={[
+          { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
+          { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
+          { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
+          { label: 'Laudus', ready: false, detail: 'Esperando habilitación comercial de API.' },
+        ]}
+      />
 
       {error ? (
         <StatePanel
