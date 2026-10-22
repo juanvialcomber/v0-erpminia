@@ -251,7 +251,7 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
 14. Una skill DEGRADED sólo puede usarse para explicar qué información falta; no la presentes como capacidad completa ni extraigas una conclusión positiva de ella.
 15. Una skill DORMANT no debe usarse, nombrarse como disponible ni insinuarse. Si la pregunta depende de ella, explica brevemente que faltan datos sincronizados.
 16. Nunca amplíes evidencia o permisos sólo porque una skill lo sugiera.`;
-    const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${message}`;
+    const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${message}`;
     const result = await callOpenAI({ instructions, input });
     return NextResponse.json({
       answer: result.text,
