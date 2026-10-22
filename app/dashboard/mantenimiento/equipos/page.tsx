@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EquipmentList } from '@/components/maintenance/equipment-list';
 import { EquipmentSheet } from '@/components/maintenance/equipment-sheet';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 
 const assetViews = [
   { href: '/dashboard/mantenimiento/disponibilidad', label: 'Disponibilidad', icon: Activity },
@@ -52,6 +54,26 @@ export default function EquiposPage() {
           <Button asChild><Link href="/dashboard/mantenimiento/equipos/importar"><Upload className="mr-2 h-4 w-4" />Importar activos</Link></Button>
         </div>
       </section>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          { key: 'maintenance', label: 'Mantenimiento', state: 'updated', detail: 'OT, horómetros, evidencia y condición operacional.' },
+          { key: 'procurement', label: 'Compras', state: 'updated', detail: 'Costos y repuestos vinculables al activo.' },
+          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Activo fijo y costo financiero: pendiente de API.' },
+          { key: 'documents', label: 'Documentos', state: 'updated', detail: 'Ficha técnica y expediente permanecen trazables.' },
+        ]}
+      />
+
+      <DataReceptionReadiness
+        description="La Ficha 360 puede enriquecerse con activo fijo, compras y costos de Laudus sin reemplazar el historial operacional de MOTIL."
+        items={[
+          { label: 'Identidad del activo', ready: true, detail: 'Activo canónico como autoridad operacional.' },
+          { label: 'Historial de OT', ready: true, detail: 'Mantenimiento y evidencia disponibles.' },
+          { label: 'Compras y costos', ready: true, detail: 'Relaciones financieras ya modeladas.' },
+          { label: 'Activo fijo Laudus', ready: false, detail: 'Se activará después de reconciliar IDs.' },
+        ]}
+      />
 
       <EquipmentList onSelectEquipment={handleSelectEquipment} />
 
