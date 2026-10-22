@@ -153,7 +153,12 @@ export async function POST(request: NextRequest) {
         conversationId: typeof body?.conversationId === 'string' ? body.conversationId : null,
         firstMessage: message,
       }),
-      resolveMotilSkillAvailability(context),
+      resolveMotilSkillAvailability(
+        context,
+        access.domains.filter((item): item is 'maintenance' | 'inventory' | 'procurement' | 'finance' =>
+          item === 'maintenance' || item === 'inventory' || item === 'procurement' || item === 'finance',
+        ),
+      ),
     ]);
     const history = await getCoreConversationHistory(context.supabase, scope, conversation.id);
     const skillPlan = buildSkillPlan(message);
