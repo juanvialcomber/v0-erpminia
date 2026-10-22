@@ -21,7 +21,7 @@ function add(set: Set<string>, values: string[]) {
 }
 
 export function buildEvidenceState(facts: SkillEvidenceFacts): EvidenceState {
-  const availableSources = new Set<string>();
+  const availableSources = new Set<string>(['data_reconciliation_reviews']);
   const syncedDomains = new Set<string>();
 
   if (facts.products) {
@@ -135,7 +135,6 @@ export function buildEvidenceState(facts: SkillEvidenceFacts): EvidenceState {
     add(availableSources, [
       'integration.raw_records',
       'integration.reconciliation_items',
-      'data_reconciliation_reviews',
     ]);
   }
 
