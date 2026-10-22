@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -69,6 +71,26 @@ export default function BodegaPage() {
         {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
       </PageHeaderActions>
     </PageHeader>
+
+    {!negativeStockMode ? <DataSourceStatusStrip
+      reviewHref="/dashboard/calidad-datos"
+      sources={[
+        { key: 'inventory', label: 'Bodega MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Existencias, reservas, conteos y movimientos operacionales.' },
+        { key: 'canonical-products', label: 'Productos canónicos', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Identidad, unidad, familia y costo de referencia.' },
+        { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Stock ERP y movimientos: pendiente de habilitación comercial de API.' },
+        { key: 'purchases', label: 'Compras', state: 'updated', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' },
+      ]}
+    /> : null}
+
+    {!negativeStockMode ? <DataReceptionReadiness
+      description="Bodega está preparada para recibir stock y movimientos externos sin reemplazar saldos automáticamente. Cualquier diferencia entre fuentes quedará en conciliación."
+      items={[
+        { label: 'Productos', ready: true, detail: 'Catálogo canónico disponible.' },
+        { label: 'Stock por bodega', ready: true, detail: 'Modelo operacional disponible.' },
+        { label: 'Conciliación', ready: true, detail: 'Conflictos se muestran antes de corregir.' },
+        { label: 'Stock Laudus', ready: false, detail: 'Se activará después del acceso API.' },
+      ]}
+    /> : null}
 
     {negativeStockMode ? <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive"/><div><p className="font-medium">Data Health · saldo negativo</p><p className="mt-1 text-muted-foreground">Esta vista filtra posiciones cuyo saldo disponible quedó bajo cero. Antes de corregir el saldo, concilia movimientos, reservas e importación fuente. MOTIL no ajusta cantidades automáticamente.</p></div></div> : null}
 
