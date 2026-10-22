@@ -1,0 +1,109 @@
+{
+  "forward": "20261022023844_explicit_server_table_data_api_grants.sql",
+  "tables": {
+    "geology_ai_conversations": {
+      "migration": "20260904173000_add_geology_ai_conversations.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "app/api/produccion/geologia/assistant/route.ts"
+    },
+    "geology_ai_messages": {
+      "migration": "20260904173000_add_geology_ai_conversations.sql",
+      "privileges": [
+        "select",
+        "insert"
+      ],
+      "consumer": "app/api/produccion/geologia/assistant/route.ts"
+    },
+    "geology_ai_user_memory": {
+      "migration": "20260904173000_add_geology_ai_conversations.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "app/api/intelligence/memory/route.ts"
+    },
+    "motil_ai_conversations": {
+      "migration": "20260908150000_add_motil_ai_core_continuity.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "lib/intelligence/core-conversation.ts"
+    },
+    "motil_ai_messages": {
+      "migration": "20260908150000_add_motil_ai_core_continuity.sql",
+      "privileges": [
+        "select",
+        "insert"
+      ],
+      "consumer": "lib/intelligence/core-conversation.ts"
+    },
+    "motil_ai_user_memory": {
+      "migration": "20260908150000_add_motil_ai_core_continuity.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "lib/intelligence/core-conversation.ts; app/api/intelligence/memory/route.ts"
+    },
+    "motil_ai_decision_cases": {
+      "migration": "20260908152500_add_motil_ai_decision_cases.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "app/api/intelligence/decision-cases/route.ts"
+    },
+    "user_push_subscriptions": {
+      "migration": "20261011224500_user_push_subscriptions.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update",
+        "delete"
+      ],
+      "consumer": "app/api/notifications/push/route.ts"
+    },
+    "eecc_document_applicability": {
+      "migration": "20261012225000_eecc_document_applicability.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "app/api/carpeta-arranque/[id]/applicability/route.ts"
+    },
+    "carpeta_documento_versiones": {
+      "migration": "20261012231000_eecc_document_versions.sql",
+      "privileges": [
+        "select"
+      ],
+      "consumer": "app/api/carpeta-arranque/[id]/versions/route.ts"
+    },
+    "legal_ai_document_reviews": {
+      "migration": "20261013010000_legal_ai_document_reviews.sql",
+      "privileges": [
+        "select",
+        "insert",
+        "update"
+      ],
+      "consumer": "app/api/legal/asistente/history/route.ts; app/api/legal/asistente/analyze-document/route.ts"
+    },
+    "motil_whatsapp_review_decisions": {
+      "migration": "20261021020000_motil_whatsapp_review_decisions.sql",
+      "privileges": [
+        "select",
+        "insert"
+      ],
+      "consumer": "app/api/maintenance/whatsapp/review-decisions/route.ts"
+    }
+  }
+}
