@@ -7,6 +7,7 @@ import { FileSearch } from 'lucide-react';
 import { useModuleAccess } from '@/hooks/use-module-access';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 type Row = Record<string, string | number | null>;
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
@@ -31,6 +32,7 @@ export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher);
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
+  const sourceStatus = useDataSourceStatus();
   const overview = error ? {} : data?.overview || {};
   const operationalProcurement = error ? {} : data?.operationalProcurement || {};
   const treasury = error ? [] : data?.treasury || [];
@@ -52,9 +54,9 @@ export default function FinanzasPage() {
       <DataSourceStatusStrip
         reviewHref="/dashboard/calidad-datos"
         sources={[
-          { key: 'motil-finance', label: 'MOTIL Finanzas', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Costos, compromisos y trazabilidad operacional.' },
-          { key: 'procurement', label: 'Compras', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'OC, recepciones, facturas y cuentas por pagar.' },
-          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' },
+          sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' }),
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
