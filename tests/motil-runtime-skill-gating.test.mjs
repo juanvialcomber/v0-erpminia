@@ -45,3 +45,10 @@ test('data quality assistant receives runtime skill state without gaining mutati
   assert.match(dataQuality, /PLAN DE SKILLS NO CANÓNICO/);
   assert.match(dataQuality, /Ninguna skill amplía permisos, cambia la fuente ni cierra una revisión/);
 });
+
+
+test('data guardian keeps a native MOTIL evidence path even before Laudus is active', () => {
+  const sourceState = readFileSync(new URL('../lib/motil-ai/skills/source-state.ts', import.meta.url), 'utf8');
+  assert.match(sourceState, /new Set<string>\(\['data_reconciliation_reviews'\]\)/);
+  assert.match(sourceState, /integration\.reconciliation_items/);
+});
