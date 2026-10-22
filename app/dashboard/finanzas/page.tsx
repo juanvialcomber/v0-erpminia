@@ -67,7 +67,7 @@ export default function FinanzasPage() {
           { label: 'Centros de costo', ready: true, detail: 'Dimensión canónica disponible.' },
           { label: 'Compras y CxP', ready: true, detail: 'Vistas operacionales y tesorería disponibles.' },
           { label: 'Trazabilidad', ready: true, detail: 'Eventos y fuentes auditables.' },
-          { label: 'Laudus contable', ready: false, detail: 'Esperando acceso API efectivo.' },
+          { label: 'Laudus contable', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Contabilidad y ERP sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
 
