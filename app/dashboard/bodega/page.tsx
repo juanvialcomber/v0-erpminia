@@ -14,6 +14,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { useModuleAccess } from '@/hooks/use-module-access';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -44,6 +45,7 @@ export default function BodegaPage() {
   const [status, setStatus] = useState(initialStatus);
   const endpoint = useMemo(() => { const params = new URLSearchParams(); if (query.trim()) params.set('q', query.trim()); if (status !== 'all') params.set('status', status); return `/api/inventory/intelligence?${params.toString()}`; }, [query, status]);
   const { data, error, isLoading, mutate } = useSWR(endpoint, fetcher, { revalidateOnFocus: false, keepPreviousData: true });
+  const sourceStatus = useDataSourceStatus();
   const overview = error ? {} : data?.overview || {};
   const positions: InventoryPosition[] = error ? [] : data?.positions || [];
   const diesel: DieselEvidence | null = error ? null : data?.diesel || null;
@@ -75,10 +77,10 @@ export default function BodegaPage() {
     {!negativeStockMode ? <DataSourceStatusStrip
       reviewHref="/dashboard/calidad-datos"
       sources={[
-        { key: 'inventory', label: 'Bodega MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Existencias, reservas, conteos y movimientos operacionales.' },
-        { key: 'canonical-products', label: 'Productos canónicos', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Identidad, unidad, familia y costo de referencia.' },
-        { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Stock ERP y movimientos: pendiente de habilitación comercial de API.' },
-        { key: 'purchases', label: 'Compras', state: 'updated', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' },
+        sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
+        sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
+        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Stock ERP y movimientos: pendiente de habilitación comercial de API.' }),
+        sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
       ]}
     /> : null}
 
