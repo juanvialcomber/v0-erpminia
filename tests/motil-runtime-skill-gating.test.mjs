@@ -52,3 +52,12 @@ test('data guardian keeps a native MOTIL evidence path even before Laudus is act
   assert.match(sourceState, /new Set<string>\(\['data_reconciliation_reviews'\]\)/);
   assert.match(sourceState, /integration\.reconciliation_items/);
 });
+
+
+test('executive assistant gates priorities with runtime skills', () => {
+  const executive = readFileSync(new URL('../app/api/intelligence/executive-assistant/route.ts', import.meta.url), 'utf8');
+  assert.match(executive, /resolveMotilSkillAvailability/);
+  assert.match(executive, /PLAN DE SKILLS NO CANÓNICO/);
+  assert.match(executive, /skillPlan: plannedSkills/);
+  assert.match(executive, /una DORMANT no debe participar de una prioridad ejecutiva/);
+});
