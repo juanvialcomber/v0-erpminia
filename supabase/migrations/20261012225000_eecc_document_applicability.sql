@@ -18,3 +18,7 @@ create index if not exists eecc_document_applicability_folder_idx on public.eecc
 alter table public.eecc_document_applicability enable row level security;
 -- No direct client policies: service-side route enforces scoped Legal EECC editing.
 comment on table public.eecc_document_applicability is 'Human-reviewed applicability of EECC document slots; not an operational work/access permit.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/carpeta-arranque/[id]/applicability/route.ts
+grant select, insert, update on table public.eecc_document_applicability to service_role;
