@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
+import { suggestedPromptsForDomain } from '@/lib/motil-ai/skills/prompt-suggestions';
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
@@ -10,11 +11,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const runtime = await resolveMotilSkillAvailability(context);
+    const promptsByDomain = Object.fromEntries(
+      ['maintenance', 'inventory', 'procurement', 'finance', 'data_health', 'executive']
+        .map((domain) => [domain, suggestedPromptsForDomain(runtime.skills, domain)]),
+    );
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       sourceState: runtime.sourceState,
       summary: runtime.summary,
       skills: runtime.skills,
+      promptsByDomain,
     });
   } catch (error) {
     console.error('[motil-ai/skills/availability]', error);
