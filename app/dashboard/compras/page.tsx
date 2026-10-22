@@ -77,7 +77,7 @@ export default function ComprasPage() {
           { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
           { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
           { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
-          { label: 'Laudus', ready: false, detail: 'Esperando habilitación comercial de API.' },
+          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
 
