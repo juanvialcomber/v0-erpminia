@@ -6,7 +6,7 @@ import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 
 type Issue = {
   issue_key: string;
-  entity_type: 'product' | 'supplier' | 'asset' | 'person' | 'inventory' | 'work_order';
+  entity_type: 'product' | 'supplier' | 'asset' | 'person' | 'inventory' | 'work_order' | 'purchase_order' | 'invoice' | 'cost_center' | 'warehouse' | 'external_source';
   entity_id: string | null;
   issue_type: string;
   field_name: string | null;
@@ -19,6 +19,26 @@ type Issue = {
 function text(value: unknown) { return String(value ?? '').trim(); }
 function norm(value: unknown) { return text(value).toLocaleLowerCase('es-CL').replace(/\s+/g, ' '); }
 function addIssue(list: Issue[], issue: Issue) { list.push(issue); }
+
+function externalEntityType(value: unknown): Issue['entity_type'] {
+  const type = norm(value);
+  if (type === 'product') return 'product';
+  if (type === 'supplier') return 'supplier';
+  if (type === 'warehouse' || type === 'stock') return type === 'stock' ? 'inventory' : 'warehouse';
+  if (type === 'purchase_order' || type === 'purchase_order_line') return 'purchase_order';
+  if (type === 'supplier_invoice' || type === 'supplier_invoice_line' || type === 'dte') return 'invoice';
+  if (type === 'cost_center') return 'cost_center';
+  if (type === 'fixed_asset') return 'asset';
+  return 'external_source';
+}
+
+function externalHref(entityType: Issue['entity_type']) {
+  if (entityType === 'product' || entityType === 'inventory' || entityType === 'warehouse') return '/dashboard/bodega';
+  if (entityType === 'supplier' || entityType === 'purchase_order' || entityType === 'invoice') return '/dashboard/compras';
+  if (entityType === 'cost_center') return '/dashboard/finanzas/centros';
+  if (entityType === 'asset') return '/dashboard/mantenimiento/equipos';
+  return '/dashboard/calidad-datos';
+}
 
 async function fetchAll(queryFactory: (from: number, to: number) => any) {
   const rows: any[] = [];
@@ -87,6 +107,45 @@ export async function GET(request: NextRequest) {
     ]);
 
     const issues: Issue[] = [];
+
+    try {
+      const externalRows = await fetchAll((from, to) => context.supabase
+        .schema('integration')
+        .from('reconciliation_items')
+        .select('id,source_id,raw_record_id,entity_type,external_id,canonical_id,resolution_status,resolution_method,confidence,conflict_reasons,created_at,updated_at')
+        .eq('organization_id', context.organizationId)
+        .in('resolution_status', ['pending', 'conflict', 'new_candidate'])
+        .range(from, to));
+
+      for (const row of externalRows) {
+        const entityType = externalEntityType(row.entity_type);
+        const conflictReasons = Array.isArray(row.conflict_reasons)
+          ? row.conflict_reasons.map((item: unknown) => text(item)).filter(Boolean)
+          : [];
+        const resolutionStatus = norm(row.resolution_status);
+        const severity: Issue['severity'] = resolutionStatus === 'conflict' ? 'critical' : 'warning';
+        const label = `${text(row.entity_type) || 'Fuente externa'} · ${text(row.external_id) || 'Sin ID externo'}`;
+        const reason = conflictReasons.length
+          ? conflictReasons.join(' · ')
+          : resolutionStatus === 'new_candidate'
+            ? 'Registro externo sin correspondencia canónica.'
+            : 'Registro externo pendiente de conciliación.';
+
+        addIssue(issues, {
+          issue_key: `external:${row.id}`,
+          entity_type: entityType,
+          entity_id: null,
+          issue_type: resolutionStatus === 'conflict' ? 'source_conflict' : resolutionStatus === 'new_candidate' ? 'new_external_candidate' : 'external_reconciliation',
+          field_name: null,
+          severity,
+          label,
+          detail: `${reason} La evidencia externa no modifica el maestro automáticamente.`,
+          href: externalHref(entityType),
+        });
+      }
+    } catch {
+      // External integration intake is optional until its migration is deployed.
+    }
     const productIds = new Set(products.map((row) => row.id));
     const assetIds = new Set(assets.map((row) => row.id));
     const peopleIds = new Set(people.map((row) => row.id));
@@ -161,6 +220,11 @@ export async function GET(request: NextRequest) {
         person: open.filter((row: any) => row.entity_type === 'person').length,
         inventory: open.filter((row: any) => row.entity_type === 'inventory').length,
         work_order: open.filter((row: any) => row.entity_type === 'work_order').length,
+        purchase_order: open.filter((row: any) => row.entity_type === 'purchase_order').length,
+        invoice: open.filter((row: any) => row.entity_type === 'invoice').length,
+        cost_center: open.filter((row: any) => row.entity_type === 'cost_center').length,
+        warehouse: open.filter((row: any) => row.entity_type === 'warehouse').length,
+        external_source: open.filter((row: any) => row.entity_type === 'external_source').length,
       },
     };
 
@@ -176,4 +240,67 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'No se pudo construir la conciliación de datos';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+
+export async function PATCH(request: NextRequest) {
+  const access = await resolveDataHealthAccess(request);
+  if (!access.ok) return access.response;
+  if (!access.admin) {
+    return NextResponse.json({ error: 'La revisión transversal requiere permisos de administración.' }, { status: 403 });
+  }
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const body = await request.json().catch(() => null);
+  const issueKey = text(body?.issueKey);
+  const entityType = text(body?.entityType);
+  const entityId = text(body?.entityId) || null;
+  const issueType = text(body?.issueType);
+  const fieldName = text(body?.fieldName) || null;
+  const status = text(body?.status);
+  const resolutionNote = text(body?.resolutionNote);
+  const evidenceReference = text(body?.evidenceReference) || null;
+
+  const allowedStatuses = new Set(['open', 'resolved', 'accepted', 'ignored']);
+  if (!issueKey || !entityType || !issueType || !allowedStatuses.has(status)) {
+    return NextResponse.json({ error: 'Revisión inválida.' }, { status: 400 });
+  }
+  if (status !== 'open' && !resolutionNote) {
+    return NextResponse.json({ error: 'Debes registrar el fundamento de la decisión.' }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+  const payload = {
+    organization_id: context.organizationId,
+    issue_key: issueKey,
+    entity_type: entityType,
+    entity_id: entityId,
+    issue_type: issueType,
+    field_name: fieldName,
+    status,
+    resolution_note: resolutionNote || null,
+    evidence_reference: evidenceReference,
+    reviewed_by: status === 'open' ? null : access.user.id,
+    reviewed_at: status === 'open' ? null : now,
+    updated_at: now,
+  };
+
+  const result = await context.supabase
+    .from('data_reconciliation_reviews')
+    .upsert(payload, { onConflict: 'organization_id,issue_key' })
+    .select('id,issue_key,status,resolution_note,evidence_reference,reviewed_by,reviewed_at,updated_at')
+    .single();
+
+  if (result.error) {
+    console.error('[data-quality/reconciliation PATCH]', result.error);
+    return NextResponse.json({ error: 'No se pudo guardar la revisión.' }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    review: result.data,
+    sourceModified: false,
+    message: 'Revisión registrada. El dato fuente no fue modificado.',
+  });
 }
