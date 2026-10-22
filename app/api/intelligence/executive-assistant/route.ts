@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
 
     const result = await callModel(
       instructions,
-      `DOMINIOS AUTORIZADOS\n${JSON.stringify(access.domains)}\n\n${governedMemory.promptContext}\n\n${regulatoryContext.promptContext}\n\nHISTORIAL CONVERSACIONAL NO CANÓNICO\n${conversationTranscript(history)}\n\n${advisoryContext}\n\nEVIDENCIA MOTIL CANÓNICA/AUTORIZADA\n${JSON.stringify(evidence)}\n\nPREGUNTA ACTUAL\n${message}`,
+      `DOMINIOS AUTORIZADOS\n${JSON.stringify(access.domains)}\n\n${governedMemory.promptContext}\n\n${regulatoryContext.promptContext}\n\nHISTORIAL CONVERSACIONAL NO CANÓNICO\n${conversationTranscript(history)}\n\n${advisoryContext}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nEVIDENCIA MOTIL CANÓNICA/AUTORIZADA\n${JSON.stringify(evidence)}\n\nPREGUNTA ACTUAL\n${message}`,
     );
 
     const refs = sourceRefs(sources, toolsUsed);
