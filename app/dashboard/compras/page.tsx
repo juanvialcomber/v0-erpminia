@@ -9,6 +9,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { OperationalPipelineBoard } from '@/components/pipeline/operational-pipeline-board';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 type Overview = {
   canEdit: boolean;
@@ -42,6 +43,7 @@ const shortcuts = [
 
 export default function ComprasPage() {
   const { data, error, isLoading, mutate } = useSWR<Overview>('/api/procurement/overview', fetcher, { revalidateOnFocus: false });
+  const sourceStatus = useDataSourceStatus();
 
   return (
     <div className="space-y-6">
@@ -62,9 +64,9 @@ export default function ComprasPage() {
       <DataSourceStatusStrip
         reviewHref="/dashboard/calidad-datos"
         sources={[
-          { key: 'motil', label: 'MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Solicitudes, recepciones, documentos y flujo operacional.' },
-          { key: 'canonical', label: 'Base canónica', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Órdenes de compra y proveedores conciliados.' },
-          { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'API habilitada comercialmente: pendiente de activación del proveedor.' },
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
+          sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
           { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
         ]}
       />
