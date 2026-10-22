@@ -139,7 +139,7 @@ export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
     outputs: ['linked DTE', 'missing purchase order', 'amount mismatch', 'duplicate fiscal identity'],
     risk: 'review_required',
     requiresSyncedData: ['dte', 'supplier_invoices'],
-  },,
+  },
   {
     key: 'inventory-discrepancy-review',
     name: 'Discrepancias de inventario',
