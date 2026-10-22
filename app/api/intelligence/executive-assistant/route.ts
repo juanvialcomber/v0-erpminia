@@ -7,6 +7,8 @@ import { routeOperationalQuery } from '@/lib/intelligence/query-router';
 import { loadExecutiveGovernedMemory } from '@/lib/intelligence/executive-governed-memory';
 import { loadRegulatoryIntelligenceContext } from '@/lib/intelligence/regulatory-intelligence-context';
 import { evaluateGroundedCoreResponse } from '@/lib/intelligence/core-grounded-evaluation';
+import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
+import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
 import { recordCoreRuntimeError } from '@/lib/intelligence/core-error-observability';
 import {
   loadEquipmentIntelligenceContext,
@@ -146,11 +148,29 @@ export async function POST(request: NextRequest) {
   const route = routeOperationalQuery(message, { domain: 'executive' });
 
   try {
-    const conversation = await resolveCoreConversation(context.supabase, scope, {
-      conversationId: typeof body?.conversationId === 'string' ? body.conversationId : null,
-      firstMessage: message,
-    });
+    const [conversation, skillRuntime] = await Promise.all([
+      resolveCoreConversation(context.supabase, scope, {
+        conversationId: typeof body?.conversationId === 'string' ? body.conversationId : null,
+        firstMessage: message,
+      }),
+      resolveMotilSkillAvailability(context),
+    ]);
     const history = await getCoreConversationHistory(context.supabase, scope, conversation.id);
+    const skillPlan = buildSkillPlan(message);
+    const skillState = new Map(skillRuntime.skills.map((skill) => [skill.key, skill]));
+    const plannedSkills = skillPlan
+      ? [skillPlan.primary, ...skillPlan.supporting].map((skill) => {
+          const availability = skillState.get(skill.key);
+          return {
+            key: skill.key,
+            name: skill.name,
+            domain: skill.domain,
+            state: availability?.state || 'dormant',
+            missingEvidence: availability?.missingEvidence || [],
+            missingSyncedData: availability?.missingSyncedData || [],
+          };
+        })
+      : [];
     await appendCoreMessage(context.supabase, scope, {
       conversationId: conversation.id,
       role: 'user',
@@ -390,7 +410,9 @@ export async function POST(request: NextRequest) {
       'Una prioridad o recomendación previa no conserva prioridad por sí sola. Reevalúa impacto, frescura, permisos, contradicciones y evidencia faltante antes de mantenerla entre las prioridades ejecutivas. Si el caso ya no está respaldado, dilo y no lo priorices.',
     );
 
-    const instructions = `Eres el Asistente Senior del Centro Ejecutivo de MOTIL para una operación minera chilena. Tu función es convertir evidencia autorizada en una lista corta de decisiones y validaciones humanas de mayor valor.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente EVIDENCIA MOTIL para afirmaciones operacionales. Nunca insinúes conocimiento de dominios no presentes o no autorizados.\n2. MEMORIA GOBERNADA es contexto laboral estable NO CANÓNICO. Úsala sólo para adaptar lenguaje, foco y presentación. Nunca la uses como hecho operacional, evidencia, permiso, prioridad, causalidad ni autorización. Si contradice evidencia actual, gana la evidencia actual.\n3. CONTEXTO REGULATORIO es una referencia ADVISORY separada. Puede describir estructuras, requisitos y evidencia esperable, pero nunca prueba cumplimiento, incumplimiento, aplicabilidad legal, prioridad, causalidad ni autorización. Si la pregunta es regulatoria, responde OBSERVADO EN MOTIL → REFERENCIA REGULATORIA → BRECHA/INCERTIDUMBRE → VALIDACIÓN HUMANA.\n4. HISTORIAL CONVERSACIONAL es contexto no canónico aportado por el usuario y por respuestas previas. Nunca reemplaza EVIDENCIA MOTIL, nunca eleva una afirmación previa a hecho operacional y nunca autoriza acceso o acciones.\n5. HANDOFF ADVISORY es contexto NO CANÓNICO: sólo define qué revalidar. Una prioridad o recomendación previa nunca mantiene vigencia, severidad, causalidad ni prioridad sin respaldo de la evidencia actual.\n6. Conserva por separado la fecha de corte de cada fuente. No llames "hoy" o "actual" a un dato cuyo corte sea anterior.\n7. No conviertas ausencia de permiso, ausencia de fuente ni vacío de datos en un cero operacional.\n8. No mezcles compromisos de compra, gasto reconocido, pagos, stock, producción o costos como si fueran la misma métrica.\n9. Una alerta, warning, cola o status sólo describe la semántica de su fuente; no es causa raíz ni riesgo probabilístico por sí solo.\n10. Prioriza máximo 3 asuntos cuando la pregunta sea general. Para cada uno: DATO CANÓNICO → POR QUÉ IMPORTA → INCERTIDUMBRE/EVIDENCIA FALTANTE → SIGUIENTE DECISIÓN O VALIDACIÓN HUMANA.\n11. Una prioridad ejecutiva es una recomendación explicable, no una orden ni autorización.\n12. No ejecutes acciones, no apruebes, no cierres, no compres, no ajustes stock y no cambies estados.\n13. Si las fechas de corte entre dominios no son comparables, dilo antes de correlacionarlos.\n14. Para CROSS_DOMAIN_SUPPLY, respeta estrictamente el campo scope. Con scope maintenance_inventory_procurement puedes describir OT → faltante/requerimiento → necesidad → solicitud → orden → entrega/instalación. Con scope maintenance_inventory sólo puedes describir OT → material/faltante y debes declarar que Compras no está visible. Con scope maintenance_procurement sólo puedes describir OT → necesidad/solicitud/orden/entrega y debes declarar que stock/bodega no está visible. Nunca conviertas supply_chain_status en causa raíz. Si falta un eslabón visible, ese es el siguiente punto que requiere validación o acción humana.\n15. Cuando exista CROSS_DOMAIN_SUPPLY y la pregunta sea “qué bloquea”, “por qué”, “qué falta” o equivalente, presenta una cadena causal observada como PROBLEMA → DEPENDENCIA OBSERVADA → ESLABÓN FALTANTE/PENDIENTE → SIGUIENTE VALIDACIÓN HUMANA.\n16. Cuando exista EVIDENCIA EQUIPMENT, úsala para responder por ese activo específico. Separa horómetro/runtime de MTBF/MTTR; work_order_parts no prueba stock disponible; una vista de confiabilidad sin filas significa evidencia no disponible, no cero; recurrencia observada no es predicción de falla; Decision Cases del equipo siguen siendo advisory.\n17. Responde breve, operacional y sin JSON crudo.`;
+    const instructions = `Eres el Asistente Senior del Centro Ejecutivo de MOTIL para una operación minera chilena. Tu función es convertir evidencia autorizada en una lista corta de decisiones y validaciones humanas de mayor valor.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente EVIDENCIA MOTIL para afirmaciones operacionales. Nunca insinúes conocimiento de dominios no presentes o no autorizados.\n2. MEMORIA GOBERNADA es contexto laboral estable NO CANÓNICO. Úsala sólo para adaptar lenguaje, foco y presentación. Nunca la uses como hecho operacional, evidencia, permiso, prioridad, causalidad ni autorización. Si contradice evidencia actual, gana la evidencia actual.\n3. CONTEXTO REGULATORIO es una referencia ADVISORY separada. Puede describir estructuras, requisitos y evidencia esperable, pero nunca prueba cumplimiento, incumplimiento, aplicabilidad legal, prioridad, causalidad ni autorización. Si la pregunta es regulatoria, responde OBSERVADO EN MOTIL → REFERENCIA REGULATORIA → BRECHA/INCERTIDUMBRE → VALIDACIÓN HUMANA.\n4. HISTORIAL CONVERSACIONAL es contexto no canónico aportado por el usuario y por respuestas previas. Nunca reemplaza EVIDENCIA MOTIL, nunca eleva una afirmación previa a hecho operacional y nunca autoriza acceso o acciones.\n5. HANDOFF ADVISORY es contexto NO CANÓNICO: sólo define qué revalidar. Una prioridad o recomendación previa nunca mantiene vigencia, severidad, causalidad ni prioridad sin respaldo de la evidencia actual.\n6. Conserva por separado la fecha de corte de cada fuente. No llames "hoy" o "actual" a un dato cuyo corte sea anterior.\n7. No conviertas ausencia de permiso, ausencia de fuente ni vacío de datos en un cero operacional.\n8. No mezcles compromisos de compra, gasto reconocido, pagos, stock, producción o costos como si fueran la misma métrica.\n9. Una alerta, warning, cola o status sólo describe la semántica de su fuente; no es causa raíz ni riesgo probabilístico por sí solo.\n10. Prioriza máximo 3 asuntos cuando la pregunta sea general. Para cada uno: DATO CANÓNICO → POR QUÉ IMPORTA → INCERTIDUMBRE/EVIDENCIA FALTANTE → SIGUIENTE DECISIÓN O VALIDACIÓN HUMANA.\n11. Una prioridad ejecutiva es una recomendación explicable, no una orden ni autorización.\n12. No ejecutes acciones, no apruebes, no cierres, no compres, no ajustes stock y no cambies estados.\n13. Si las fechas de corte entre dominios no son comparables, dilo antes de correlacionarlos.\n14. Para CROSS_DOMAIN_SUPPLY, respeta estrictamente el campo scope. Con scope maintenance_inventory_procurement puedes describir OT → faltante/requerimiento → necesidad → solicitud → orden → entrega/instalación. Con scope maintenance_inventory sólo puedes describir OT → material/faltante y debes declarar que Compras no está visible. Con scope maintenance_procurement sólo puedes describir OT → necesidad/solicitud/orden/entrega y debes declarar que stock/bodega no está visible. Nunca conviertas supply_chain_status en causa raíz. Si falta un eslabón visible, ese es el siguiente punto que requiere validación o acción humana.\n15. Cuando exista CROSS_DOMAIN_SUPPLY y la pregunta sea “qué bloquea”, “por qué”, “qué falta” o equivalente, presenta una cadena causal observada como PROBLEMA → DEPENDENCIA OBSERVADA → ESLABÓN FALTANTE/PENDIENTE → SIGUIENTE VALIDACIÓN HUMANA.\n16. Cuando exista EVIDENCIA EQUIPMENT, úsala para responder por ese activo específico. Separa horómetro/runtime de MTBF/MTTR; work_order_parts no prueba stock disponible; una vista de confiabilidad sin filas significa evidencia no disponible, no cero; recurrencia observada no es predicción de falla; Decision Cases del equipo siguen siendo advisory.\n17. Responde breve, operacional y sin JSON crudo.
+18. PLAN DE SKILLS es orientación interna, no evidencia ni autoridad. Una skill AVAILABLE puede orientar qué evidencia cruzar; una DEGRADED sólo puede aparecer como brecha; una DORMANT no debe participar de una prioridad ejecutiva.
+19. Ninguna skill amplía dominios autorizados, conserva una prioridad previa ni habilita una acción.`;
 
     const result = await callModel(
       instructions,
@@ -499,6 +521,8 @@ export async function POST(request: NextRequest) {
         errorCode: regulatoryContext.errorCode,
       },
       route,
+      skillPlan: plannedSkills,
+      skillSummary: skillRuntime.summary,
       authorizedDomains: access.domains,
       persistence: 'core_continuity_v1',
       policy: 'READ_ONLY + permission-aware: Equipment Intelligence entra sólo como evidencia operacional canónica del activo resuelto inequívocamente; contexto regulatorio, memoria, historial y Decision Cases conservan sus fronteras.',
