@@ -73,7 +73,7 @@ export default function EquiposPage() {
           { label: 'Identidad del activo', ready: true, detail: 'Activo canónico como autoridad operacional.' },
           { label: 'Historial de OT', ready: true, detail: 'Mantenimiento y evidencia disponibles.' },
           { label: 'Compras y costos', ready: true, detail: 'Relaciones financieras ya modeladas.' },
-          { label: 'Activo fijo Laudus', ready: false, detail: 'Se activará después de reconciliar IDs.' },
+          { label: 'Activo fijo Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Activo fijo y costo financiero sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
 
