@@ -15,6 +15,7 @@ import { LaudusProcurementReconciliationCard } from '@/components/integrations/l
 import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
 import { LaudusProcurementLiveCard } from '@/components/integrations/laudus-procurement-live-card';
 import { LaudusOperationalIntelligenceCard } from '@/components/integrations/laudus-operational-intelligence-card';
+import { LaudusIntelligenceBrief } from '@/components/integrations/laudus-intelligence-brief';
 import { LaudusMatchReviewInbox } from '@/components/integrations/laudus-match-review-inbox';
 import { SupplyRiskCard } from '@/components/integrations/supply-risk-card';
 
@@ -87,6 +88,8 @@ export default function ComprasPage() {
           { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
+
+      <LaudusIntelligenceBrief />
 
       <LaudusProcurementLiveCard />
 

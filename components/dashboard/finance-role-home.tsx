@@ -23,6 +23,7 @@ import {
   PageHeaderTitle,
 } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
+import { LaudusIntelligenceBrief } from '@/components/integrations/laudus-intelligence-brief';
 
 type InboxSummary = {
   total?: number;
@@ -274,6 +275,8 @@ export function FinanceRoleHome({
           </div>
         )}
       </section>
+
+      <LaudusIntelligenceBrief compact />
 
       <section aria-label="Contexto económico operacional" className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-card p-5">

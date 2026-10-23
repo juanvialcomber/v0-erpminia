@@ -359,3 +359,26 @@ Se reconstruyó el alcance enviado a Daniel Villarroel el 4 de mayo de 2026 desd
 La copia contractual localizada conserva placeholders del Cliente y no se encontró una versión final firmada en la búsqueda actual. Por eso MOTIL separará contrato explícito, propuesta comercial y capacidad adicional, evitando afirmar jurídicamente que una función está fuera de alcance sin revisar la versión ejecutada.
 
 Valor comercial: Laudus/Compras-Finanzas, matching, Supplier Intelligence, riesgo de abastecimiento, workflows de decisión/resultado e impacto E1-E3 son capacidades claramente superiores al núcleo contractual de tres módulos y deben documentarse como expansión de valor. Las integraciones y áreas funcionales que aparecen sólo de forma genérica en la propuesta se tratarán como ampliaciones específicas, no automáticamente como fuera de alcance.
+
+
+## 2026-10-23 — MOTIL Intelligence sobre Laudus
+
+### Problema previo
+La integración ya exponía volúmenes, matching, proveedores y riesgo de abastecimiento, pero el usuario todavía debía interpretar varias tarjetas técnicas para entender qué requería atención. Además, la tarjeta operacional sumaba categorías de facturas que podían superponerse.
+
+### Investigación aplicada
+El trabajo reciente sobre event logs ERP muestra que una representación canónica de proceso permite derivar familias reutilizables de KPIs y comparar comportamiento procure-to-pay sin construir un join distinto para cada métrica. La literatura de anomalías en compras refuerza que el objetivo útil es priorizar casos para revisión y explicar por qué son anómalos, no declarar automáticamente fraude o error.
+
+### Capacidad
+Se creó una capa MOTIL Intelligence que combina datos reales de Laudus con matching documental y riesgo de abastecimiento para producir señales explicables con:
+- prioridad;
+- evidencia;
+- interpretación;
+- siguiente decisión humana;
+- vínculo al módulo donde se revisa.
+
+### Guardrails
+Laudus conserva autoridad financiera. La capa es read-only, no aprueba pagos, no crea compras y no modifica Laudus. Fecha de vencimiento de factura no se interpreta como estado de pago. Stock bajo mínimo no se convierte automáticamente en urgencia. Un candidato de matching no se promueve a match canónico.
+
+### Valor
+MOTIL deja de ser sólo un visor de registros Laudus y comienza a reducir el universo que una persona debe revisar. La métrica futura es tiempo por decisión, cobertura del universo manual y tasa de aceptación/rechazo de las señales priorizadas.

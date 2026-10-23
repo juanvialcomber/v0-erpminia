@@ -104,7 +104,9 @@ export function LaudusOperationalIntelligenceCard() {
 
   if (error) return null;
 
-  const openInvoices = (data?.invoices.ambiguous || 0) + (data?.invoices.price_review || 0) + (data?.invoices.unmatched || 0);
+  const openInvoices = data?.documentMatch
+    ? data.documentMatch.summary.ambiguous + data.documentMatch.summary.review + data.documentMatch.summary.no_order_candidate
+    : undefined;
   const openWaybills = (data?.waybills.ambiguous || 0) + (data?.waybills.unmatched || 0);
 
   return (
@@ -129,7 +131,7 @@ export function LaudusOperationalIntelligenceCard() {
         <div className="bg-card p-4">
           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : n(openInvoices)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Facturas para revisar</p>
+          <p className="mt-1 text-xs text-muted-foreground">Facturas en buckets de revisión</p>
         </div>
         <div className="bg-card p-4">
           <Truck className="h-4 w-4 text-muted-foreground" />
