@@ -39,24 +39,36 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const productIds = Array.isArray(data?.top_actions)
-    ? data.top_actions.map((row: any) => row.product_id).filter(Boolean)
-    : [];
+  const decisionResult = await context.supabase
+    .from('procurement_supply_risk_decisions')
+    .select('id,product_id,product_code,decision,reason_code,note,risk_score,risk_reasons,evidence_snapshot,decided_by,decided_at')
+    .eq('organization_id', context.organizationId)
+    .order('decided_at', { ascending: false })
+    .limit(500);
 
-  let decisions: any[] = [];
-  if (productIds.length) {
-    const result = await context.supabase
-      .from('procurement_supply_risk_decisions')
-      .select('id,product_id,product_code,decision,reason_code,note,risk_score,risk_reasons,decided_by,decided_at')
+  if (decisionResult.error) {
+    console.error('[procurement/supply-risk decisions]', decisionResult.error);
+    return NextResponse.json({ error: 'No fue posible cargar las decisiones de abastecimiento.' }, { status: 500 });
+  }
+
+  const decisions = decisionResult.data || [];
+  const actionDecisions = decisions.filter((row) => row.decision === 'action_required');
+  const actionDecisionIds = actionDecisions.map((row) => row.id);
+
+  let outcomes: any[] = [];
+  if (actionDecisionIds.length) {
+    const outcomeResult = await context.supabase
+      .from('procurement_supply_risk_outcomes')
+      .select('id,decision_id,product_id,outcome,note,risk_score_before,risk_score_after,time_to_outcome_ms,recorded_by,recorded_at')
       .eq('organization_id', context.organizationId)
-      .in('product_id', productIds)
-      .order('decided_at', { ascending: false })
-      .limit(200);
-    if (result.error) {
-      console.error('[procurement/supply-risk decisions]', result.error);
-      return NextResponse.json({ error: 'No fue posible cargar las decisiones de abastecimiento.' }, { status: 500 });
+      .in('decision_id', actionDecisionIds.slice(0, 100))
+      .order('recorded_at', { ascending: false });
+
+    if (outcomeResult.error) {
+      console.error('[procurement/supply-risk outcomes]', outcomeResult.error);
+      return NextResponse.json({ error: 'No fue posible cargar los resultados de abastecimiento.' }, { status: 500 });
     }
-    decisions = result.data || [];
+    outcomes = outcomeResult.data || [];
   }
 
   const latestByProduct = new Map<string, any>();
@@ -70,14 +82,53 @@ export async function GET(request: NextRequest) {
     return Number(previous.risk_score) !== Number(row.risk_score);
   });
 
-  const actionRequired = decisions.filter((row) => row.decision === 'action_required').length;
+  const actionRequired = actionDecisions.length;
   const reviewed = decisions.filter((row) => row.decision === 'reviewed').length;
   const notApplicable = decisions.filter((row) => row.decision === 'not_applicable').length;
+
+  const outcomesByDecision = new Map(outcomes.map((row) => [row.decision_id, row]));
+  const currentByProduct = new Map((data?.top_actions || []).map((row: any) => [row.product_id, row]));
+  const openActions = actionDecisions
+    .filter((row) => !outcomesByDecision.has(row.id))
+    .map((row) => {
+      const current: any = currentByProduct.get(row.product_id);
+      return {
+        ...row,
+        current_risk_score: current?.risk_score ?? 0,
+        current_signal_active: Boolean(current),
+        current_risk_reasons: current?.risk_reasons || [],
+      };
+    })
+    .slice(0, 12);
+
+  const closedOutcomes = outcomes.length;
+  const positiveOutcomes = outcomes.filter((row) => ['resolved','risk_reduced'].includes(row.outcome)).length;
+  const falsePositives = outcomes.filter((row) => row.outcome === 'false_positive').length;
+  const measuredTimes = outcomes.map((row) => Number(row.time_to_outcome_ms)).filter((value) => Number.isFinite(value) && value >= 0);
+  const riskDeltas = outcomes
+    .map((row) => Number(row.risk_score_before) - Number(row.risk_score_after))
+    .filter((value) => Number.isFinite(value));
 
   return NextResponse.json({
     ...data,
     pending: pending.slice(0, 12),
     decisions: decisions.slice(0, 12),
+    openActions,
+    outcomes: outcomes.slice(0, 12),
+    outcomeMetrics: {
+      openActions: openActions.length,
+      closedOutcomes,
+      positiveOutcomes,
+      falsePositives,
+      positiveRate: closedOutcomes ? positiveOutcomes / closedOutcomes : null,
+      averageTimeToOutcomeHours: measuredTimes.length
+        ? measuredTimes.reduce((sum, value) => sum + value, 0) / measuredTimes.length / 3600000
+        : null,
+      averageRiskReduction: riskDeltas.length
+        ? riskDeltas.reduce((sum, value) => sum + value, 0) / riskDeltas.length
+        : null,
+      evidenceLevel: closedOutcomes > 0 ? 'E2' : 'E1',
+    },
     decisionMetrics: {
       reviewed,
       actionRequired,
@@ -102,9 +153,82 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const productId = String(body?.productId || '').trim();
+  const outcomeDecisionId = String(body?.outcomeDecisionId || '').trim();
+  const outcome = String(body?.outcome || '').trim();
   const decision = String(body?.decision || '').trim();
   const reasonCode = String(body?.reasonCode || '').trim();
   const note = String(body?.note || '').trim();
+
+  if (outcomeDecisionId) {
+    if (!['resolved','risk_reduced','no_change','false_positive'].includes(outcome)) {
+      return NextResponse.json({ error: 'Resultado inválido.' }, { status: 400 });
+    }
+    if (['no_change','false_positive'].includes(outcome) && note.length < 3) {
+      return NextResponse.json({ error: 'Describe brevemente el resultado.' }, { status: 400 });
+    }
+
+    const decisionResult = await context.supabase
+      .from('procurement_supply_risk_decisions')
+      .select('id,product_id,product_code,decision,risk_score,risk_reasons,evidence_snapshot,decided_at')
+      .eq('organization_id', context.organizationId)
+      .eq('id', outcomeDecisionId)
+      .maybeSingle();
+
+    if (decisionResult.error || !decisionResult.data || decisionResult.data.decision !== 'action_required') {
+      return NextResponse.json({ error: 'La acción no existe o no corresponde a una acción requerida.' }, { status: 404 });
+    }
+
+    const current = await context.supabase.rpc('motil_supply_risk_preview', {
+      p_organization_id: context.organizationId,
+      p_scope_days: 365,
+    });
+    if (current.error) {
+      return NextResponse.json({ error: 'No fue posible revalidar el riesgo actual.' }, { status: 500 });
+    }
+
+    const currentSignal = (current.data?.top_actions || []).find(
+      (row: any) => row.product_id === decisionResult.data.product_id,
+    );
+    const recordedAt = new Date();
+    const decidedAt = new Date(decisionResult.data.decided_at);
+    const timeToOutcomeMs = Number.isFinite(decidedAt.getTime())
+      ? Math.max(0, recordedAt.getTime() - decidedAt.getTime())
+      : null;
+
+    const result = await context.supabase
+      .from('procurement_supply_risk_outcomes')
+      .insert({
+        organization_id: context.organizationId,
+        decision_id: decisionResult.data.id,
+        product_id: decisionResult.data.product_id,
+        outcome,
+        note: note || null,
+        risk_score_before: decisionResult.data.risk_score,
+        risk_score_after: currentSignal?.risk_score ?? 0,
+        evidence_after: currentSignal || { signal_cleared: true },
+        time_to_outcome_ms: timeToOutcomeMs,
+        recorded_by: context.userId,
+        recorded_at: recordedAt.toISOString(),
+      })
+      .select('id,decision_id,product_id,outcome,note,risk_score_before,risk_score_after,time_to_outcome_ms,recorded_by,recorded_at')
+      .single();
+
+    if (result.error) {
+      const duplicate = String(result.error.code || '') === '23505';
+      return NextResponse.json(
+        { error: duplicate ? 'Esta acción ya tiene un resultado registrado.' : 'No fue posible guardar el resultado.' },
+        { status: duplicate ? 409 : 500 },
+      );
+    }
+
+    return NextResponse.json({
+      outcome: result.data,
+      sourceModified: false,
+      canonicalModified: false,
+      purchaseCreated: false,
+      message: 'Resultado registrado con evidencia antes/después.',
+    });
+  }
 
   if (!productId || !['reviewed','action_required','not_applicable'].includes(decision)) {
     return NextResponse.json({ error: 'Decisión inválida.' }, { status: 400 });

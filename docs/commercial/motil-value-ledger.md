@@ -245,3 +245,29 @@ MOTIL pasa de L3 (detectar/priorizar) a L4 (decisión asistida) en abastecimient
 
 ### Valor comercial
 Esta capacidad es un argumento directo para una expansión de tarifa porque incorpora un workflow decisional continuo entre Bodega, Compras, Laudus y Mantenimiento. El precio debe justificarse posteriormente con tasa de uso, acciones derivadas, tiempo de resolución y resultados observados; todavía no con ahorro monetario atribuido.
+
+
+## 2026-10-23 — Closed loop de abastecimiento: acción -> resultado
+
+### Capacidad
+Toda decisión marcada como Actuar puede cerrarse con un resultado humano: Resuelto, Riesgo reducido, Sin cambio o Falso positivo. Al cerrar, MOTIL recalcula el riesgo del producto y guarda un snapshot posterior junto al score original.
+
+### Métricas habilitadas
+- acciones abiertas;
+- acciones cerradas;
+- resultados positivos (resuelto/riesgo reducido);
+- falsos positivos;
+- tasa de resultado positivo;
+- tiempo desde decisión a resultado;
+- reducción observada del risk score.
+
+### Frontera de atribución
+Una caída del risk score después de una acción no se declara ahorro ni causalidad automática. Es evidencia operacional antes/después. La persona sigue declarando el resultado y MOTIL conserva ambas capas por separado.
+
+### Valor generado
+MOTIL cierra por primera vez el ciclo completo de abastecimiento:
+señal -> decisión -> acción -> resultado medido.
+Esto permite distinguir alertas útiles de ruido y medir si el sistema realmente cambia la operación.
+
+### Valor comercial
+Nivel L4 sólido. El módulo deja de ser una superficie de recomendaciones y se convierte en un sistema de gestión y medición de decisiones. Cuando existan resultados reales repetidos, esta capa puede producir evidencia E2/E3 para sostener una revisión de tarifa basada en uso e impacto observado.

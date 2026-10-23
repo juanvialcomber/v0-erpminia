@@ -52,6 +52,29 @@ type Payload = {
     total: number;
     actionRate: number | null;
   };
+  openActions: Array<{
+    id: string;
+    product_id: string;
+    product_code: string;
+    reason_code: string | null;
+    note: string | null;
+    risk_score: number;
+    risk_reasons: string[];
+    decided_at: string;
+    current_risk_score: number;
+    current_signal_active: boolean;
+    current_risk_reasons: string[];
+  }>;
+  outcomeMetrics: {
+    openActions: number;
+    closedOutcomes: number;
+    positiveOutcomes: number;
+    falsePositives: number;
+    positiveRate: number | null;
+    averageTimeToOutcomeHours: number | null;
+    averageRiskReduction: number | null;
+    evidenceLevel: 'E1' | 'E2';
+  };
   policy: 'read_only_explainable';
 };
 
@@ -95,6 +118,8 @@ export function SupplyRiskCard() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [outcomeMode, setOutcomeMode] = useState<string | null>(null);
+  const [outcomeNote, setOutcomeNote] = useState('');
 
   if (error) return null;
 
@@ -133,6 +158,37 @@ export function SupplyRiskCard() {
       await mutate();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo guardar la decisión.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeAction = async (decisionId: string, outcome: 'resolved' | 'risk_reduced' | 'no_change' | 'false_positive') => {
+    if (['no_change','false_positive'].includes(outcome) && outcomeNote.trim().length < 3) {
+      setMessage('Describe brevemente el resultado.');
+      return;
+    }
+    setSaving(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/procurement/supply-risk', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outcomeDecisionId: decisionId,
+          outcome,
+          note: outcomeNote.trim(),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cerrar la acción.');
+      setOutcomeMode(null);
+      setOutcomeNote('');
+      setMessage(payload?.message || 'Resultado registrado.');
+      await mutate();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo cerrar la acción.');
     } finally {
       setSaving(false);
     }
@@ -245,6 +301,53 @@ export function SupplyRiskCard() {
         </div>
       ) : null}
 
+      {!isLoading && data?.openActions?.length ? (
+        <div className="border-t p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Seguimiento de acción</p>
+              <p className="mt-1 text-sm font-semibold">{data.openActions[0].product_code}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Riesgo {data.openActions[0].risk_score}/100 → {data.openActions[0].current_risk_score}/100
+                {data.openActions[0].current_signal_active ? ' · señal aún activa' : ' · señal ya no aparece'}
+              </p>
+            </div>
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setOutcomeMode(data.openActions[0].id)}>
+              Registrar resultado
+            </Button>
+          </div>
+          {outcomeMode === data.openActions[0].id ? (
+            <div className="mt-3 rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium">Qué ocurrió después de la acción</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" disabled={saving} onClick={() => void closeAction(data.openActions[0].id,'resolved')}>Resuelto</Button>
+                <Button size="sm" variant="outline" disabled={saving} onClick={() => void closeAction(data.openActions[0].id,'risk_reduced')}>Riesgo reducido</Button>
+                <Button size="sm" variant="outline" disabled={saving} onClick={() => setOutcomeMode(data.openActions[0].id + ':no_change')}>Sin cambio</Button>
+                <Button size="sm" variant="ghost" disabled={saving} onClick={() => setOutcomeMode(data.openActions[0].id + ':false_positive')}>Falso positivo</Button>
+              </div>
+            </div>
+          ) : null}
+          {(outcomeMode === data.openActions[0].id + ':no_change' || outcomeMode === data.openActions[0].id + ':false_positive') ? (
+            <div className="mt-3 rounded-md border bg-muted/20 p-3">
+              <Textarea className="min-h-16" value={outcomeNote} onChange={(event) => setOutcomeNote(event.target.value)} placeholder="Describe brevemente qué pasó…" />
+              <div className="mt-3 flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={saving || outcomeNote.trim().length < 3}
+                  onClick={() => void closeAction(
+                    data.openActions[0].id,
+                    outcomeMode.endsWith(':false_positive') ? 'false_positive' : 'no_change',
+                  )}
+                >
+                  Guardar resultado
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setOutcomeMode(null); setOutcomeNote(''); }}>Cancelar</Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {!isLoading && data?.top_actions?.length ? (
         <div className="border-t">
           <div className="px-4 py-3">
@@ -288,6 +391,7 @@ export function SupplyRiskCard() {
         <div className="border-t px-4 py-3 text-xs text-muted-foreground">
           {n(data.summary.high_risk)} señales altas · {n(data.summary.medium_risk)} medias · {n(data.summary.below_minimum)} productos bajo mínimo.
           {data.decisionMetrics.total > 0 ? ` · ${n(data.decisionMetrics.actionRequired)} acciones requeridas de ${n(data.decisionMetrics.total)} decisiones.` : ''}
+          {data.outcomeMetrics.closedOutcomes > 0 ? ` · ${n(data.outcomeMetrics.positiveOutcomes)} resultados positivos de ${n(data.outcomeMetrics.closedOutcomes)} cierres.` : ''}
           La cobertura Laudus se informa aparte para no confundir falta de enlace con falta de proveedor.
         </div>
       ) : null}
