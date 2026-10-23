@@ -223,3 +223,25 @@ Nivel L3, acercándose a L4. Proveedor 360 se vuelve una capacidad diferenciable
 - ahorro o costo evitado sólo después de una decisión comprobada;
 - cobertura adicional de SKU/proveedores;
 - vínculos reales a activos críticos.
+
+
+## 2026-10-23 — Bandeja ejecutiva de decisiones de abastecimiento
+
+### Capacidad
+Las señales del motor de riesgo ahora pueden convertirse en decisiones humanas trazables: Revisar, Actuar o No aplica. Actuar exige una acción estructurada (cotizar, diversificar proveedor, validar precio, reponer stock, revisar inventario, revisar mantención u otra). No aplica exige motivo.
+
+### Autoridad
+La bandeja no crea OC, no mueve stock, no altera Laudus y no modifica una OT. Registra la decisión humana y conserva un snapshot de la evidencia que la originó.
+
+### Métricas habilitadas
+- número de señales revisadas;
+- número y tasa de señales que terminan en acción;
+- señales descartadas;
+- distribución de acciones requeridas;
+- evolución del risk score si la misma señal reaparece.
+
+### Valor generado
+MOTIL pasa de L3 (detectar/priorizar) a L4 (decisión asistida) en abastecimiento. Compras deja de recibir sólo alertas y dispone de una cola orientada a decisión con evidencia y seguimiento medible.
+
+### Valor comercial
+Esta capacidad es un argumento directo para una expansión de tarifa porque incorpora un workflow decisional continuo entre Bodega, Compras, Laudus y Mantenimiento. El precio debe justificarse posteriormente con tasa de uso, acciones derivadas, tiempo de resolución y resultados observados; todavía no con ahorro monetario atribuido.
