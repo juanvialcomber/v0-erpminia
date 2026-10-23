@@ -290,3 +290,22 @@ Esto permite preparar una negociación de tarifa con evidencia por caso en lugar
 
 ### Qué falta antes de usarlo comercialmente
 Acumular una muestra suficiente de resultados reales y revisar manualmente los casos monetarios más importantes. Para una afirmación de ROI formal, contrastar baseline, período, recurrencia y atribución.
+
+
+## 2026-10-23 — Scorecard ejecutivo Valor MOTIL
+
+### Capacidad
+Administración dispone de una superficie separada para ver madurez comercial basada en datos reales: conectividad, decisiones asistidas, resultados cerrados e impacto observado.
+
+### Gates iniciales de escala
+- 20 revisiones de matching;
+- 5 resultados cerrados de abastecimiento;
+- 3 impactos E3 con referencia de evidencia.
+
+Estos umbrales son gates internos de adopción, no promesas contractuales ni benchmarks universales.
+
+### Modelo de evidencia
+El scorecard separa L4 de producto (capacidad disponible) de E1/E2/E3 de evidencia (grado de demostración). MOTIL puede tener una capacidad avanzada sin afirmar ROI mientras el uso real todavía sea insuficiente.
+
+### Valor comercial
+El scorecard permite preparar una conversación de tarifa basada en un dossier vivo: qué procesos están conectados, cuánto se usa la decisión asistida, qué resultados se cierran y qué impacto tiene referencia trazable. La tarifa se defiende con evidencia acumulada, no con número de pantallas.

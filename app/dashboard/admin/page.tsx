@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, ShieldCheck, Users } from 'lucide-react';
+import { AlertCircle, ArrowRight, BarChart3, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 const areas = [
   { title: 'Usuarios', description: 'Cuentas, altas e importación.', href: '/dashboard/admin/users', icon: Users },
   { title: 'Roles y cargos', description: 'Cargos, permisos y solicitudes de cambio.', href: '/dashboard/admin/roles', icon: ShieldCheck },
+  { title: 'Valor MOTIL', description: 'Evidencia de uso, resultados e impacto para expansión de tarifa.', href: '/dashboard/admin/valor-motil', icon: BarChart3 },
 ];
 
 export default function AdministrationPage() {
