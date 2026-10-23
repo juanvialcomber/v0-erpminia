@@ -452,3 +452,10 @@ Nuevo RPC backend-only `motil_product_laudus_intelligence_preview`:
 ### Valor
 Producto 360 pasa de expediente descriptivo a punto de decisión que junta Bodega + Laudus + Mantención sin mezclar autoridad de fuentes.
 Nivel: L3 Inteligencia.
+
+
+## 2026-10-23 — Activo 360 Economics: puente repuesto -> Laudus
+
+La base actual tiene 0 filas en `work_order_parts`; por lo tanto no existe evidencia suficiente para atribuir compras Laudus a activos. MOTIL no usa centro de costo o similitud textual para fingir esa atribución.
+
+Se agregó `motil_asset_laudus_parts_preview`: Activo -> OT -> repuesto trazado -> producto canónico -> historial Laudus del mismo SKU. La compra Laudus se conserva como contexto del SKU, no como prueba de consumo por el activo. El estado inicial es `material_traceability_required`. TCO y reparar/reemplazar siguen bloqueados hasta tener cobertura suficiente de adquisición, consumo, servicios externos y detención.

@@ -3,6 +3,7 @@ import { AssetHseControls } from '@/components/maintenance/asset-hse-controls';
 import { getDictionaryForRequest } from '@/lib/i18n/server';
 import { AssetEconomicOperationalHistory } from '@/components/maintenance/asset-economic-operational-history';
 import { AssetEconomicConditionTrend } from '@/components/maintenance/asset-economic-condition-trend';
+import { AssetSupplyEconomics } from '@/components/maintenance/asset-supply-economics';
 
 export const metadata = {
   title: 'Equipo 360° | Mantenimiento',
@@ -21,6 +22,7 @@ export default async function FichaPage({ params }: FichaPageProps) {
   return (
     <div className="space-y-4">
       <Asset360Overview assetId={assetId} locale={locale} />
+      <AssetSupplyEconomics assetId={assetId} />
       <AssetHseControls assetId={assetId} />
       <details className="group rounded-lg border border-border bg-card">
         <summary className="cursor-pointer list-none px-5 py-4">
