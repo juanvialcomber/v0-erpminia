@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, Database, Search, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Database, MapPin, Search, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,7 @@ type Payload = {
   };
   filteredTotal: number;
   items: Item[];
+  warehouses: { total: number; matched: number; new_candidate: number; conflict: number; synced_at?: string | null; items: Array<{ external_id: string; laudus_warehouse_id: number | null; name: string | null; address: string | null; county: string | null; city: string | null; state: string | null; reconciliation_status: string; motil_warehouse_id: string | null; }> };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -117,6 +118,36 @@ export default function LaudusProductsPage() {
           <p className="mt-1 text-xs text-muted-foreground">Laudus · lectura</p>
         </div>
       </section>
+
+      {!isLoading && data?.warehouses ? (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Bodegas Laudus</h2>
+              <p className="text-sm text-muted-foreground">Ubicaciones reales del ERP. Se muestran como evidencia y no crean bodegas MOTIL automáticamente.</p>
+            </div>
+            <Badge variant="outline">{number(data.warehouses.total)} bodegas</Badge>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {data.warehouses.items.map((warehouse) => (
+              <div key={warehouse.external_id} className="rounded-lg border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted"><MapPin className="h-4 w-4" /></div>
+                    <div className="min-w-0">
+                      <p className="font-medium">{warehouse.name || 'Bodega sin nombre'}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">ID Laudus {warehouse.laudus_warehouse_id ?? warehouse.external_id}</p>
+                    </div>
+                  </div>
+                  <Badge variant={warehouse.reconciliation_status === 'matched' ? 'outline' : 'secondary'}>{warehouse.reconciliation_status === 'matched' ? 'Conciliada' : 'Nueva'}</Badge>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">{warehouse.address || 'Sin dirección'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{[warehouse.county, warehouse.city, warehouse.state].filter(Boolean).join(' · ') || 'Ubicación sin detalle'}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div className="flex flex-col gap-1">
