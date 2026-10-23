@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
         key: 'laudus',
         label: 'Laudus',
         state: 'pending',
-        detail: 'Pendiente de habilitación comercial de API.',
+        detail: 'API activa; verificando última sincronización.',
         updatedAt: null,
       };
 
