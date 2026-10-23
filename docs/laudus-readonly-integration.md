@@ -40,3 +40,12 @@ Juan confirmó usuario con permisos de sólo lectura y llamadas gratuitas dispon
 OpenAPI oficial accesible en https://api.laudus.cl/swagger/v2/swagger.json. SupplierDto confirma supplierId y modifiedAt. También se identificaron /purchases/orders/list, /purchases/invoices/list y /purchases/payments/list; inventario dispone de /production/products/stock y /production/products/stockByWarehouses. Estos últimos no se consultaron autenticados y requieren revisar sus parámetros antes de implementación.
 
 Esta evidencia reemplaza únicamente el estado anterior de conexión no demostrada: autenticación y lectura pequeña sí están demostradas desde el entorno de desarrollo. Persistencia, sincronización desplegada, configuración de secretos en Vercel y permisos de lectura de cada módulo siguen pendientes. No afirmar integración productiva.
+
+
+## Control de consumo reforzado
+
+Tope preventivo del conector: 1.800 llamadas/mes, configurable sólo hacia abajo. No implica 200 llamadas garantizadas para terceros: el store debe conciliar consumo real compartido por RUT y negar reservas sin baseline. Cada ejecución admite por defecto seis llamadas, incluyendo autenticación; pausa conservando checkpoint al agotarlas. No hay reintento automático. El resultado devuelve calls.
+
+readSession/writeSession/clearSession permiten reutilizar token entre instancias dentro del lock; requieren store protegido y duradero, aún pendiente. Token válido se reutiliza hasta un minuto antes del vencimiento. Un 401/403 invalida la sesión sin repetir la consulta. Caché configurable entre cinco minutos y un día. pageSize sólo puede superar 100 cuando el contrato certifique maxPageSize; menos campos reduce bytes, no necesariamente llamadas. Priorizar listados masivos y deltas; las pantallas deben leer el espejo local, nunca Laudus directamente.
+
+Validación actual: 10/10 pruebas, incluyendo sesión compartida, presupuesto por ejecución y límites de página/mes. Sin nuevas llamadas reales durante este refuerzo. No activar cron hasta tener contador atómico y sesión persistente implementados.
