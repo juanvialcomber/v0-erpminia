@@ -15,20 +15,41 @@ export async function GET() {
 
   try {
     await getLaudusAccessToken();
-    const products = await listLaudus('/production/products/list', {
-      options: { offset: 0, limit: 5 },
-      fields: ['productId', 'SKU', 'description', 'unitOfMeasure'],
-      filterBy: [],
-      orderBy: [{ field: 'productId', direction: 'ASC' }],
-    });
+
+    const pageSize = 25;
+    const maxPages = 10;
+    const products: unknown[] = [];
+    let calls = 1;
+
+    for (let page = 0; page < maxPages; page += 1) {
+      const payload = await listLaudus('/production/products/list', {
+        options: { offset: page * pageSize, limit: pageSize },
+        fields: ['productId', 'SKU', 'description', 'unitOfMeasure'],
+        filterBy: [],
+        orderBy: [{ field: 'productId', direction: 'ASC' }],
+      });
+      calls += 1;
+
+      const rows = Array.isArray(payload)
+        ? payload
+        : payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown[] }).data)
+          ? (payload as { data: unknown[] }).data
+          : [];
+
+      products.push(...rows);
+      if (rows.length < pageSize) break;
+    }
 
     return NextResponse.json({
       status: 'ok',
       authenticated: true,
-      calls: 2,
       persisted: false,
       domain: 'products',
-      sample: products,
+      calls,
+      rowsRead: products.length,
+      first: products.slice(0, 5),
+      last: products.slice(-5),
+      truncated: products.length === pageSize * maxPages,
     });
   } catch (error) {
     return NextResponse.json(
