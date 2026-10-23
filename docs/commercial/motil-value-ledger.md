@@ -142,3 +142,44 @@ Desde la primera decisión humana, MOTIL separa las revisiones por tramo de scor
 El gate de 20 etiquetas se mantiene antes de proponer recalibración. La medición temprana permite detectar señales sin confundir una muestra pequeña con precisión global.
 
 Valor comercial: permite demostrar con datos si las recomendaciones de alta confianza requieren menos intervención humana y construir una narrativa de decisión asistida basada en desempeño observado.
+
+
+## 2026-10-23 — Riesgo de abastecimiento conectado a operación
+
+### Investigación y decisión de diseño
+La evidencia reciente sobre mantenimiento y provisión de repuestos respalda tratar ambas decisiones de forma conjunta y explícita bajo incertidumbre. MOTIL implementa primero reglas determinísticas y explicables, sin automatizar compras.
+
+### Problema detectado
+La vista histórica de repuestos elevaba seis faltantes asociados a una OT ya completada. Esos registros son evidencia histórica, no riesgo vigente. El nuevo motor excluye OT cerradas y sólo considera demanda de mantenimiento cuando existe requerimiento activo > 0.
+
+### Datos conectados
+- catálogo canónico: 12.267 productos activos comprables;
+- inventario actual y mínimos;
+- requerimientos de materiales de OT;
+- estado/prioridad de OT;
+- compras Laudus de los últimos 365 días;
+- historial de proveedores por SKU;
+- benchmarks de precio canónicos.
+
+### Evidencia actual
+- 89 productos están sin stock y bajo mínimo;
+- 196 están bajo mínimo;
+- 697 productos con evidencia Laudus tienen historial de proveedor único en la ventana;
+- 897 presentan precio reciente >=20% sobre referencia histórica y requieren revisión contextual;
+- 0 OT activas presentan hoy faltante de material según la evidencia vigente;
+- 7 señales alcanzan score de riesgo alto y 167 riesgo medio;
+- 2.723 de 12.267 productos activos comprables tienen match SKU Laudus en la ventana de 365 días (~22%). La cobertura se muestra explícitamente y no se interpreta como ausencia de proveedor.
+
+### Valor generado por MOTIL
+MOTIL separa tres preguntas que antes podían confundirse: qué falta hoy, qué abastecimiento está estructuralmente concentrado y qué precios merecen revisión. Además evita convertir requerimientos históricos de OT cerradas en alertas vigentes.
+
+### Valor comercial
+Nivel L3 — Inteligencia operacional. El módulo convierte Bodega + Mantenimiento + Laudus en una superficie preventiva de abastecimiento. Puede evolucionar a L4 cuando Compras confirme/descarta señales y esas decisiones se midan.
+
+### Qué falta medir
+- acciones de compra originadas por señales;
+- tiempo desde alerta a resolución;
+- quiebres evitados;
+- diferencia de precio validada vs falso positivo;
+- recurrencia de proveedor único en materiales efectivamente críticos;
+- cobertura SKU Laudus ampliada.
