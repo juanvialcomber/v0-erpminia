@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   const result = await context.supabase
     .from('laudus_match_review_decisions')
-    .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,score,next_score,evidence_snapshot,reviewed_by,reviewed_at')
+    .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,reason_code,score,next_score,evidence_snapshot,reviewed_by,reviewed_at,review_started_at,review_duration_ms')
     .eq('organization_id', context.organizationId)
     .order('reviewed_at', { ascending: false })
     .limit(500);
@@ -66,6 +66,18 @@ export async function GET(request: NextRequest) {
   const rejected = decisions.filter((row) => row.decision === 'rejected').length;
   const labelled = approved + rejected;
   const calibrationMinimum = 20;
+  const measuredDurations = decisions
+    .map((row) => Number(row.review_duration_ms))
+    .filter((value) => Number.isFinite(value) && value >= 0);
+  const averageReviewSeconds = measuredDurations.length
+    ? measuredDurations.reduce((sum, value) => sum + value, 0) / measuredDurations.length / 1000
+    : null;
+  const rejectionReasons = decisions
+    .filter((row) => row.decision === 'rejected' && row.reason_code)
+    .reduce<Record<string, number>>((acc, row) => {
+      acc[row.reason_code] = (acc[row.reason_code] || 0) + 1;
+      return acc;
+    }, {});
 
   return NextResponse.json({
     pending,
@@ -84,6 +96,12 @@ export async function GET(request: NextRequest) {
       acceptanceRate: labelled > 0 ? approved / labelled : null,
       appliesToScoring: false,
     },
+    valueMetrics: {
+      measuredReviews: measuredDurations.length,
+      averageReviewSeconds,
+      rejectionReasons,
+      evidenceLevel: measuredDurations.length > 0 ? 'E2' : 'E1',
+    },
     sourceModified: false,
     policy: 'human-review-only',
   });
@@ -99,14 +117,13 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const invoiceExternalId = text(body?.invoiceExternalId);
   const orderExternalId = text(body?.orderExternalId);
+  const event = text(body?.event);
   const decision = text(body?.decision);
+  const reasonCode = text(body?.reasonCode);
   const suppliedReason = text(body?.reason);
 
-  if (!invoiceExternalId || !orderExternalId || !['approved', 'rejected'].includes(decision)) {
-    return NextResponse.json({ error: 'Decisión inválida.' }, { status: 400 });
-  }
-  if (decision === 'rejected' && suppliedReason.length < 3) {
-    return NextResponse.json({ error: 'Indica el motivo del rechazo.' }, { status: 400 });
+  if (!invoiceExternalId || !orderExternalId) {
+    return NextResponse.json({ error: 'Caso de revisión inválido.' }, { status: 400 });
   }
 
   const candidateResult = await loadCandidates(context);
@@ -128,6 +145,45 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (event === 'shown') {
+    const shown = await context.supabase
+      .from('laudus_match_review_events')
+      .upsert({
+        organization_id: context.organizationId,
+        invoice_external_id: invoiceExternalId,
+        order_external_id: orderExternalId,
+        event_type: 'shown',
+        actor_id: context.userId,
+        candidate_status: candidate.match_status,
+        score: candidate.score,
+        evidence_snapshot: candidate.evidence || {},
+      }, {
+        onConflict: 'organization_id,actor_id,invoice_external_id,order_external_id,event_type',
+        ignoreDuplicates: true,
+      });
+
+    if (shown.error) {
+      console.error('[laudus/match-reviews POST shown]', shown.error);
+      return NextResponse.json({ error: 'No se pudo registrar el inicio de revisión.' }, { status: 500 });
+    }
+    return NextResponse.json({ recorded: true, sourceModified: false, canonicalModified: false });
+  }
+
+  if (!['approved', 'rejected'].includes(decision)) {
+    return NextResponse.json({ error: 'Decisión inválida.' }, { status: 400 });
+  }
+
+  const allowedRejectReasons = new Set([
+    'wrong_order','quantity_mismatch','price_mismatch','warehouse_mismatch',
+    'date_mismatch','insufficient_evidence','other',
+  ]);
+  if (decision === 'rejected' && !allowedRejectReasons.has(reasonCode)) {
+    return NextResponse.json({ error: 'Selecciona el motivo del rechazo.' }, { status: 400 });
+  }
+  if (decision === 'rejected' && reasonCode === 'other' && suppliedReason.length < 3) {
+    return NextResponse.json({ error: 'Describe brevemente el motivo.' }, { status: 400 });
+  }
+
   const existing = await context.supabase
     .from('laudus_match_review_decisions')
     .select('id,decision,reason,reviewed_at')
@@ -144,9 +200,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Este candidato ya fue revisado.', review: existing.data }, { status: 409 });
   }
 
+  const rejectLabels: Record<string, string> = {
+    wrong_order: 'Corresponde a otra OC',
+    quantity_mismatch: 'Cantidad no coincide',
+    price_mismatch: 'Precio no coincide',
+    warehouse_mismatch: 'Bodega no coincide',
+    date_mismatch: 'Fecha no corresponde',
+    insufficient_evidence: 'Evidencia insuficiente',
+    other: 'Otro motivo',
+  };
+
+  const shownResult = await context.supabase
+    .from('laudus_match_review_events')
+    .select('occurred_at')
+    .eq('organization_id', context.organizationId)
+    .eq('actor_id', context.userId)
+    .eq('invoice_external_id', invoiceExternalId)
+    .eq('order_external_id', orderExternalId)
+    .eq('event_type', 'shown')
+    .maybeSingle();
+
+  const reviewedAt = new Date();
+  const reviewStartedAt = shownResult.data?.occurred_at ? new Date(shownResult.data.occurred_at) : null;
+  const rawDuration = reviewStartedAt ? reviewedAt.getTime() - reviewStartedAt.getTime() : null;
+  const reviewDurationMs = rawDuration !== null && rawDuration >= 0
+    ? Math.min(rawDuration, 86400000)
+    : null;
+
   const reason = decision === 'approved'
-    ? suppliedReason || 'Coincidencia verificada por Finanzas.'
-    : suppliedReason;
+    ? 'Coincidencia verificada por Finanzas.'
+    : reasonCode === 'other'
+      ? suppliedReason
+      : rejectLabels[reasonCode];
 
   const result = await context.supabase
     .from('laudus_match_review_decisions')
@@ -157,13 +242,16 @@ export async function POST(request: NextRequest) {
       candidate_status: candidate.match_status,
       decision,
       reason,
+      reason_code: decision === 'approved' ? 'approved_match' : reasonCode,
       score: candidate.score,
       next_score: candidate.next_score,
       evidence_snapshot: candidate.evidence || {},
       reviewed_by: context.userId,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: reviewedAt.toISOString(),
+      review_started_at: reviewStartedAt?.toISOString() || null,
+      review_duration_ms: reviewDurationMs,
     })
-    .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,score,reviewed_by,reviewed_at')
+    .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,reason_code,score,reviewed_by,reviewed_at,review_started_at,review_duration_ms')
     .single();
 
   if (result.error) {

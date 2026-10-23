@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Check, ClipboardCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -38,6 +38,12 @@ type QueuePayload = {
     reviewed_at: string;
   }>;
   counts: { pending: number; approved: number; rejected: number; labelled: number };
+  valueMetrics: {
+    measuredReviews: number;
+    averageReviewSeconds: number | null;
+    rejectionReasons: Record<string, number>;
+    evidenceLevel: 'E1' | 'E2';
+  };
   learning: {
     status: 'collecting_feedback' | 'ready_for_calibration';
     labelled: number;
@@ -68,11 +74,36 @@ export function LaudusMatchReviewInbox() {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [reasonCode, setReasonCode] = useState('');
+  const shownRef = useRef(new Set<string>());
+
+  const current = data?.pending?.[0];
+
+  useEffect(() => {
+    if (!current) return;
+    const key = current.invoice_id + ':' + current.order_id;
+    if (shownRef.current.has(key)) return;
+    shownRef.current.add(key);
+    void fetch('/api/integrations/laudus/match-reviews', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'shown',
+        invoiceExternalId: current.invoice_id,
+        orderExternalId: current.order_id,
+      }),
+    }).catch(() => undefined);
+  }, [current?.invoice_id, current?.order_id]);
 
   const decide = async (candidate: Candidate, decision: 'approved' | 'rejected') => {
     const key = candidate.invoice_id + ':' + candidate.order_id;
-    if (decision === 'rejected' && reason.trim().length < 3) {
-      setMessage('Indica el motivo del rechazo.');
+    if (decision === 'rejected' && !reasonCode) {
+      setMessage('Selecciona el motivo del rechazo.');
+      return;
+    }
+    if (decision === 'rejected' && reasonCode === 'other' && reason.trim().length < 3) {
+      setMessage('Describe brevemente el motivo.');
       return;
     }
 
@@ -87,6 +118,7 @@ export function LaudusMatchReviewInbox() {
           invoiceExternalId: candidate.invoice_id,
           orderExternalId: candidate.order_id,
           decision,
+          reasonCode: decision === 'rejected' ? reasonCode : 'approved_match',
           reason: decision === 'rejected' ? reason.trim() : '',
         }),
       });
@@ -94,6 +126,7 @@ export function LaudusMatchReviewInbox() {
       if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar la decisión.');
       setRejecting(null);
       setReason('');
+      setReasonCode('');
       setMessage(payload?.message || 'Decisión registrada.');
       await mutate();
     } catch (err) {
@@ -105,7 +138,15 @@ export function LaudusMatchReviewInbox() {
 
   if (error) return null;
 
-  const current = data?.pending?.[0];
+  const rejectReasons = [
+    ['wrong_order', 'Otra OC'],
+    ['quantity_mismatch', 'Cantidad'],
+    ['price_mismatch', 'Precio'],
+    ['warehouse_mismatch', 'Bodega'],
+    ['date_mismatch', 'Fecha'],
+    ['insufficient_evidence', 'Falta evidencia'],
+    ['other', 'Otro'],
+  ] as const;
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
@@ -178,24 +219,43 @@ export function LaudusMatchReviewInbox() {
 
           {rejecting === current.invoice_id + ':' + current.order_id ? (
             <div className="mt-4 rounded-md border bg-muted/20 p-3">
-              <label className="text-xs font-medium" htmlFor="laudus-reject-reason">Motivo del rechazo</label>
-              <Textarea
-                id="laudus-reject-reason"
-                className="mt-2 min-h-20"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Ej.: corresponde a otra OC, cantidad no coincide, proveedor correcto pero compra distinta…"
-              />
-              <div className="mt-2 flex gap-2">
+              <p className="text-xs font-medium">Motivo del rechazo</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {rejectReasons.map(([code, label]) => (
+                  <Button
+                    key={code}
+                    type="button"
+                    size="sm"
+                    variant={reasonCode === code ? 'secondary' : 'outline'}
+                    onClick={() => setReasonCode(code)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              {reasonCode === 'other' ? (
+                <Textarea
+                  id="laudus-reject-reason"
+                  className="mt-3 min-h-20"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Describe brevemente el motivo…"
+                />
+              ) : null}
+              <div className="mt-3 flex gap-2">
                 <Button
                   size="sm"
                   variant="destructive"
-                  disabled={saving === current.invoice_id + ':' + current.order_id || reason.trim().length < 3}
+                  disabled={
+                    saving === current.invoice_id + ':' + current.order_id ||
+                    !reasonCode ||
+                    (reasonCode === 'other' && reason.trim().length < 3)
+                  }
                   onClick={() => void decide(current, 'rejected')}
                 >
                   Confirmar rechazo
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(''); }}>
+                <Button size="sm" variant="ghost" onClick={() => { setRejecting(null); setReason(''); setReasonCode(''); }}>
                   Cancelar
                 </Button>
               </div>
@@ -204,8 +264,17 @@ export function LaudusMatchReviewInbox() {
 
           {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
 
-          <p className="mt-4 text-xs text-muted-foreground">
-            Se muestra un caso a la vez para mantener la revisión rápida. MOTIL prioriza casos ambiguos e informativos; el feedback todavía no altera el score automáticamente.
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>{data?.valueMetrics.measuredReviews || 0} revisiones con tiempo medido</span>
+            <span>
+              Tiempo medio {typeof data?.valueMetrics.averageReviewSeconds === 'number'
+                ? Math.round(data.valueMetrics.averageReviewSeconds) + ' s'
+                : '—'}
+            </span>
+            <span>Evidencia {data?.valueMetrics.evidenceLevel || 'E1'}</span>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Se muestra un caso a la vez. MOTIL prioriza casos ambiguos e informativos; el feedback todavía no altera el score automáticamente.
           </p>
         </div>
       ) : (

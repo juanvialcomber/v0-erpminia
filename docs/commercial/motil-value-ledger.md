@@ -113,3 +113,23 @@ MOTIL no modifica todavía el score a partir del feedback. Primero exige un mín
 
 ### Siguiente evidencia comercial
 Cuando existan al menos 20 decisiones, comparar score original contra aceptación humana por tramo de confianza y medir precisión observada. Sólo después evaluar ajustes del ranking.
+
+
+## 2026-10-23 — Medición del trabajo humano de conciliación
+
+### Instrumentación
+La bandeja registra de forma no canónica cuándo un candidato fue mostrado al revisor y, al decidir, calcula el tiempo de revisión. Los rechazos usan motivos estructurados: otra OC, cantidad, precio, bodega, fecha, evidencia insuficiente u otro.
+
+### Valor medible
+MOTIL ya puede producir, cuando existan decisiones reales:
+- tiempo medio observado por revisión;
+- volumen de revisiones medidas;
+- tasa de aceptación/rechazo;
+- distribución de causas de rechazo;
+- precisión observada por tramo de score después del mínimo de calibración.
+
+### Frontera de evidencia
+Mientras no existan decisiones humanas reales, el valor permanece E1: volumen/cobertura demostrada. Con tiempos y decisiones observadas pasa a E2. No se afirmará ahorro económico hasta comparar contra un baseline humano real o un ciclo previo comparable.
+
+### Valor comercial
+Esta instrumentación permite justificar el módulo de decisión asistida con evidencia operacional propia, no con narrativa. El argumento de precio futuro debe basarse en reducción observada de trabajo manual, excepciones detectadas y recurrencia del beneficio.
