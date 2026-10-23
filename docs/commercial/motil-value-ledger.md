@@ -481,3 +481,8 @@ Esto convierte ausencia de datos en una decisión explícita. Desde ahora, las O
 La declaración de materiales se incorporó a la cola de cierre como acción explícita. Una OT no puede cerrarse si `materials_required` sigue NULL. Si declara uso de materiales debe tener al menos un requerimiento activo; si declara no usar materiales no puede mantener requerimientos activos.
 
 Esto evita que la brecha se detecte recién en aprobación y transforma la calidad de datos en parte natural del flujo operacional.
+
+
+## 2026-10-23 — Guard de cantidad fraccionaria en materiales OT
+
+Se verificó que `work_order_material_requirements.quantity_required` es numérico, pero `warehouse_stock`, `stock_movements` y `work_order_parts` usan cantidades enteras. Para evitar redondeo silencioso, la captura operativa de materiales de OT rechaza cantidades fraccionarias hasta que la cadena completa de stock sea migrada explícitamente a unidades decimales.

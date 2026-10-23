@@ -72,6 +72,9 @@ export async function POST(request: NextRequest, contextRoute: { params: Promise
     if (!item.canonicalProductId || !Number.isFinite(Number(item.quantityRequired)) || Number(item.quantityRequired) <= 0) {
       return NextResponse.json({ error: 'Producto y cantidad requerida son obligatorios' }, { status: 400 });
     }
+    if (!Number.isInteger(Number(item.quantityRequired))) {
+      return NextResponse.json({ error: 'La reserva operativa de OT admite cantidades enteras. No se redondean cantidades fraccionarias.' }, { status: 400 });
+    }
 
     const { error: declarationError } = await context.supabase.rpc('declare_work_order_materials_v1', {
       p_organization_id: context.organizationId,
@@ -118,6 +121,9 @@ export async function PUT(request: NextRequest, contextRoute: { params: Promise<
     for (const item of materials) {
       if (!item.canonicalProductId || !Number.isFinite(Number(item.quantityRequired)) || Number(item.quantityRequired) <= 0) {
         return NextResponse.json({ error: 'Producto y cantidad requerida son obligatorios' }, { status: 400 });
+      }
+      if (!Number.isInteger(Number(item.quantityRequired))) {
+        return NextResponse.json({ error: 'La reserva operativa de OT admite cantidades enteras. No se redondean cantidades fraccionarias.' }, { status: 400 });
       }
     }
 
