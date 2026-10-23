@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { OperationalPipelineBoard } from '@/components/pipeline/operational-pipeline-board';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
+import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
+import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
 
 type Overview = {
   canEdit: boolean;
@@ -40,6 +46,7 @@ const shortcuts = [
 
 export default function ComprasPage() {
   const { data, error, isLoading, mutate } = useSWR<Overview>('/api/procurement/overview', fetcher, { revalidateOnFocus: false });
+  const sourceStatus = useDataSourceStatus();
 
   return (
     <div className="space-y-6">
@@ -56,6 +63,32 @@ export default function ComprasPage() {
           </Button>
         </PageHeaderActions>
       </PageHeader>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
+          sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
+          { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
+        ]}
+      />
+
+      <DataReceptionReadiness
+        description="Compras ya separa evidencia canónica y operación. Cuando Laudus sincronice, las OC, proveedores, facturas y pagos entrarán como fuente reconciliable sin reemplazar decisiones humanas."
+        items={[
+          { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
+          { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
+          { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
+          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+        ]}
+      />
+
+      <LaudusProcurementReadinessCard />
+
+      <LaudusProcurementReconciliationCard />
+
+      <LaudusSupplierResolutionQueueCard />
 
       {error ? (
         <StatePanel

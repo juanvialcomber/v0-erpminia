@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { DashboardPeriodProvider } from '@/components/dashboard/dashboard-period-provider';
 import { useAuth } from '@/hooks/use-auth';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
+import { DataSourceAttentionBanner } from '@/components/data/data-source-attention-banner';
 import type { Dictionary } from '@/lib/i18n/dictionaries';
 import type { Locale } from '@/lib/i18n/dictionaries';
 
@@ -64,6 +65,7 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
         <DashboardPeriodProvider>
           <main className="flex-1 overflow-x-hidden bg-muted/20 px-4 py-5 md:px-6 md:py-6 xl:px-8 xl:py-7">
             <div className="motil-page space-y-6">
+              <DataSourceAttentionBanner />
               {children}
               {pathname === '/dashboard' ? <HomeDecisionPriorities locale={locale} dictionary={dictionary} /> : null}
             </div>

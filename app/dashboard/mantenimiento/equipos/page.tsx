@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EquipmentList } from '@/components/maintenance/equipment-list';
 import { EquipmentSheet } from '@/components/maintenance/equipment-sheet';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 const assetViews = [
   { href: '/dashboard/mantenimiento/disponibilidad', label: 'Disponibilidad', icon: Activity },
@@ -21,6 +24,7 @@ const assetViews = [
 export default function EquiposPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const sourceStatus = useDataSourceStatus();
 
   const handleSelectEquipment = (equipment: Equipment) => {
     setSelectedEquipment(equipment);
@@ -52,6 +56,26 @@ export default function EquiposPage() {
           <Button asChild><Link href="/dashboard/mantenimiento/equipos/importar"><Upload className="mr-2 h-4 w-4" />Importar activos</Link></Button>
         </div>
       </section>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          { key: 'maintenance', label: 'Mantenimiento', state: 'updated', detail: 'OT, horómetros, evidencia y condición operacional.' },
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Costos y repuestos vinculables al activo.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Activo fijo y costo financiero: pendiente de API.' }),
+          { key: 'documents', label: 'Documentos', state: 'updated', detail: 'Ficha técnica y expediente permanecen trazables.' },
+        ]}
+      />
+
+      <DataReceptionReadiness
+        description="La Ficha 360 puede enriquecerse con activo fijo, compras y costos de Laudus sin reemplazar el historial operacional de MOTIL."
+        items={[
+          { label: 'Identidad del activo', ready: true, detail: 'Activo canónico como autoridad operacional.' },
+          { label: 'Historial de OT', ready: true, detail: 'Mantenimiento y evidencia disponibles.' },
+          { label: 'Compras y costos', ready: true, detail: 'Relaciones financieras ya modeladas.' },
+          { label: 'Activo fijo Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Activo fijo y costo financiero sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+        ]}
+      />
 
       <EquipmentList onSelectEquipment={handleSelectEquipment} />
 

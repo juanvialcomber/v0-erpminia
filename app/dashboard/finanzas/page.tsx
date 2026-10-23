@@ -5,6 +5,11 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { FileSearch } from 'lucide-react';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-finance-readiness-card';
+import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-accounting-readiness-card';
 
 type Row = Record<string, string | number | null>;
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
@@ -29,6 +34,7 @@ export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher);
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
+  const sourceStatus = useDataSourceStatus();
   const overview = error ? {} : data?.overview || {};
   const operationalProcurement = error ? {} : data?.operationalProcurement || {};
   const treasury = error ? [] : data?.treasury || [];
@@ -46,6 +52,30 @@ export default function FinanzasPage() {
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Finanzas</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Costo, compromisos y caja en una sola vista, sin mezclar conceptos.</p></div>
         <Link href="/dashboard/finanzas/trazabilidad" className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"><FileSearch className="h-4 w-4"/>Ver trazabilidad</Link>
       </section>
+
+      <DataSourceStatusStrip
+        reviewHref="/dashboard/calidad-datos"
+        sources={[
+          sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
+          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' }),
+          { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
+        ]}
+      />
+
+      <LaudusFinanceReadinessCard />
+
+      <LaudusAccountingReadinessCard />
+
+      <DataReceptionReadiness
+        description="Finanzas está preparada para recibir hechos ERP sin confundirlos con aprobación de pagos ni con decisiones operacionales. Los datos externos entrarán con procedencia y conciliación."
+        items={[
+          { label: 'Centros de costo', ready: true, detail: 'Dimensión canónica disponible.' },
+          { label: 'Compras y CxP', ready: true, detail: 'Vistas operacionales y tesorería disponibles.' },
+          { label: 'Trazabilidad', ready: true, detail: 'Eventos y fuentes auditables.' },
+          { label: 'Laudus contable', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Contabilidad y ERP sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+        ]}
+      />
 
       {error ? <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{error.message}</div> : null}
       <section aria-label="Alcance de control regulatorio minero" className="rounded-lg border p-4 text-sm">

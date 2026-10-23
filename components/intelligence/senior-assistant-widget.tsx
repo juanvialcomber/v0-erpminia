@@ -8,6 +8,7 @@ import { ArrowUpRight, X } from 'lucide-react';
 import { resolveAssistantContext } from '@/lib/intelligence/assistant-context';
 import { SpecialistAssistantBody } from '@/components/intelligence/specialist-assistant-body';
 import { ControlledMemoryPopover } from '@/components/intelligence/controlled-memory-popover';
+import { useMotilSkillAvailability } from '@/hooks/use-motil-skill-availability';
 
 const maintenanceToolCopy: Record<string, string> = {
   search_assets: 'Activos',
@@ -186,6 +187,7 @@ export function SeniorAssistantMark({ className = '' }: { className?: string }) 
 export function SeniorAssistantWidget() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const skillAvailability = useMotilSkillAvailability();
   // The cookie only controls visibility; the endpoint verifies cargo and permissions on the server.
   const engineeringCargo = String(user?.cargo || '').trim().toUpperCase() === 'JEFE ING. PLA MINA';
   const isEngineeringContext = pathname === '/dashboard' || pathname.startsWith('/dashboard/produccion/topografia');
@@ -249,6 +251,11 @@ export function SeniorAssistantWidget() {
   const displayTitle = roleProfile?.title || (engineeringAssistant ? 'Asistente de Ingeniería Minera' : context.title);
   const displayContext = roleProfile?.context || (engineeringAssistant ? 'Ingeniería / Topografía' : context.label);
   const showsControlledMemory = !mineAssistant && !engineeringAssistant && controlledMemoryDomains.has(context.domain);
+  const contextualStarters = roleProfile?.starters
+    ? [...roleProfile.starters]
+    : engineeringAssistant
+      ? engineeringPrompts
+      : skillAvailability.promptsFor(context.domain, context.suggestedPrompts);
 
   useEffect(() => {
     if (!open) return;
@@ -285,7 +292,7 @@ export function SeniorAssistantWidget() {
           {specialist ? (
             <SpecialistAssistantBody
               endpoint={specialist.endpoint}
-              starters={roleProfile?.starters ? [...roleProfile.starters] : engineeringAssistant ? engineeringPrompts : context.suggestedPrompts}
+              starters={contextualStarters}
               emptyCopy={specialist.emptyCopy}
               loadingCopy={specialist.loadingCopy}
               placeholder={specialist.placeholder}

@@ -6,6 +6,8 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getSupabaseAdmin } from '@/lib/db/supabase';
 import { callMaintenanceOperationalAI } from '@/lib/maintenance/senior-assistant-openai';
 import { loadSupportAdvisoryHandoffs, supportAdvisoryHandoffPrompt } from '@/lib/intelligence/advisory-handoff-context';
+import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
+import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const DEFAULT_MODEL = 'gpt-5.6';
@@ -449,7 +451,7 @@ export async function POST(request: NextRequest) {
           .limit(HISTORY_LIMIT)
       : Promise.resolve({ data: [], error: null });
 
-    const [historyResult, memoryResult, cargo, canonical, advisoryHandoffs] = await Promise.all([
+    const [historyResult, memoryResult, cargo, canonical, advisoryHandoffs, skillRuntime, skillPlan] = await Promise.all([
       historyQuery,
       db.from('maintenance_ai_user_memory')
         .select('memory_type,memory_text,confidence')
@@ -461,6 +463,8 @@ export async function POST(request: NextRequest) {
       resolveCargo(db, context.userId),
       buildCanonicalMaintenanceContext(db, context.organizationId),
       loadSupportAdvisoryHandoffs(context, 'maintenance', message),
+      resolveMotilSkillAvailability(context, ['maintenance']),
+      Promise.resolve(buildSkillPlan(message)),
     ]);
 
     if ((historyResult as any)?.error) throw new Error((historyResult as any).error.message);
@@ -471,12 +475,27 @@ export async function POST(request: NextRequest) {
     const memory = memoryRows.map((row: any) => `${row.memory_type}: ${row.memory_text}`);
     const userIdentity = context.userName || context.userEmail || 'Usuario';
     const accessLevel = access.canWrite ? 'ED' : 'LEC';
+    const skillState = new Map(skillRuntime.skills.map((skill) => [skill.key, skill]));
+    const plannedSkills = skillPlan
+      ? [skillPlan.primary, ...skillPlan.supporting].map((skill) => {
+          const availability = skillState.get(skill.key);
+          return {
+            key: skill.key,
+            name: skill.name,
+            domain: skill.domain,
+            state: availability?.state || 'dormant',
+            missingEvidence: availability?.missingEvidence || [],
+            missingSyncedData: availability?.missingSyncedData || [],
+          };
+        })
+      : [];
+
     const advisoryContext = supportAdvisoryHandoffPrompt(
       advisoryHandoffs,
       'En Mantención, revalida activos, observaciones, OT, preventivos, materiales, cierre y confiabilidad con las herramientas READ/PREPARE_ONLY. Un caso previo no confirma diagnóstico, causa raíz, criticidad, probabilidad de falla ni prioridad de intervención.',
     );
 
-    const instructions = `Eres el Asistente Senior de Mantenimiento de MOTIL para una operación minera chilena. Respondes como copiloto técnico de un jefe de mantenimiento, planificador o supervisor.\n\nCONTEXTO DEL USUARIO:\n- Usuario: ${userIdentity}\n- Cargo: ${cargo || 'no informado'}\n- Nivel de acceso: ${accessLevel}\n- Memoria de trabajo declarada por el usuario: ${memory.length ? memory.join(' | ') : 'sin memoria durable registrada'}\nLa memoria de usuario sirve para personalizar forma de trabajo y continuidad, pero NUNCA reemplaza evidencia canónica sobre activos, fallas, causas, repuestos, prioridades o intervenciones.\n\nREGLAS DE AUTORIDAD Y SEGURIDAD:\n1. Usa únicamente el CONTEXTO CANÓNICO y las herramientas READ/PREPARE_ONLY entregadas para afirmaciones operacionales. Si falta evidencia, dilo explícitamente.\n2. Distingue siempre DATO CANÓNICO, INTERPRETACIÓN PROFESIONAL, HIPÓTESIS A REVISAR y RECOMENDACIÓN/PRÓXIMA ACCIÓN cuando corresponda.\n3. Un porcentaje de reportes fuera de servicio u observados describe frecuencia histórica observada; jamás lo llames probabilidad de falla.\n4. Separa causas mecánicas de restricciones externas como falta de agua, corte de energía o falta de dotación.\n5. No uses UAT, simulaciones o pruebas como evidencia de confiabilidad real.\n6. No declares causa raíz si no está validada. No declares MTBF/MTTR predictivo si no existe evidencia suficiente.\n7. No inventes repuestos, costos, horas, manuales, tolerancias ni procedimientos OEM.\n8. No crees, cierres, priorices de forma irreversible ni autorices una OT. Puedes recomendar qué revisar y por qué; la decisión final es humana.\n9. Si existe evidencia contradictoria, muéstrala. Si una máquina tuvo reportes degradados y también muchos reportes operativos normales, incluye ambos.\n10. Prioriza respuestas operacionales y concretas: qué sabemos, qué nos preocupa, qué falta confirmar y cuál es el siguiente dato/acción de mayor valor.\n11. La conversación reciente aporta continuidad, pero una afirmación previa del usuario no se transforma por repetición en dato canónico.\n12. Cuando una pregunta requiera activos, señales, preventivos, OT o preparación de cierre específicos, usa las herramientas READ en vez de inferir desde memoria o conversación.\n13. PREPARE_ONLY puede estructurar un borrador de Decision Case para revisión humana, pero no lo persiste como verdad operacional, no lo aprueba, no autoriza y no ejecuta ninguna acción.\n14. No muestres al usuario call_id, argumentos JSON crudos, resultados JSON crudos ni detalles internos de herramientas. Resume la evidencia operacional relevante.\n15. Un score de atención sólo ordena revisión humana de forma determinística; no es probabilidad de falla, criticidad OEM, diagnóstico ni autorización de prioridad.\n16. HANDOFF ADVISORY es contexto NO CANÓNICO y sólo define qué revalidar. Nunca conserva diagnóstico, causa, prioridad, severidad ni vigencia sin respaldo del contexto canónico y de las herramientas actuales.\n\nCuando el usuario pregunte qué equipo requiere atención, usa la cola de atención y luego profundiza con herramientas del activo cuando sea necesario. Compara señales observadas, estado fuera de servicio, preventivos, OT abiertas y evidencia de cierre. No conviertas un ranking operacional en riesgo probabilístico.`;
+    const instructions = `Eres el Asistente Senior de Mantenimiento de MOTIL para una operación minera chilena. Respondes como copiloto técnico de un jefe de mantenimiento, planificador o supervisor.\n\nCONTEXTO DEL USUARIO:\n- Usuario: ${userIdentity}\n- Cargo: ${cargo || 'no informado'}\n- Nivel de acceso: ${accessLevel}\n- Memoria de trabajo declarada por el usuario: ${memory.length ? memory.join(' | ') : 'sin memoria durable registrada'}\nLa memoria de usuario sirve para personalizar forma de trabajo y continuidad, pero NUNCA reemplaza evidencia canónica sobre activos, fallas, causas, repuestos, prioridades o intervenciones.\n\nREGLAS DE AUTORIDAD Y SEGURIDAD:\n1. Usa únicamente el CONTEXTO CANÓNICO y las herramientas READ/PREPARE_ONLY entregadas para afirmaciones operacionales. Si falta evidencia, dilo explícitamente.\n2. Distingue siempre DATO CANÓNICO, INTERPRETACIÓN PROFESIONAL, HIPÓTESIS A REVISAR y RECOMENDACIÓN/PRÓXIMA ACCIÓN cuando corresponda.\n3. Un porcentaje de reportes fuera de servicio u observados describe frecuencia histórica observada; jamás lo llames probabilidad de falla.\n4. Separa causas mecánicas de restricciones externas como falta de agua, corte de energía o falta de dotación.\n5. No uses UAT, simulaciones o pruebas como evidencia de confiabilidad real.\n6. No declares causa raíz si no está validada. No declares MTBF/MTTR predictivo si no existe evidencia suficiente.\n7. No inventes repuestos, costos, horas, manuales, tolerancias ni procedimientos OEM.\n8. No crees, cierres, priorices de forma irreversible ni autorices una OT. Puedes recomendar qué revisar y por qué; la decisión final es humana.\n9. Si existe evidencia contradictoria, muéstrala. Si una máquina tuvo reportes degradados y también muchos reportes operativos normales, incluye ambos.\n10. Prioriza respuestas operacionales y concretas: qué sabemos, qué nos preocupa, qué falta confirmar y cuál es el siguiente dato/acción de mayor valor.\n11. La conversación reciente aporta continuidad, pero una afirmación previa del usuario no se transforma por repetición en dato canónico.\n12. Cuando una pregunta requiera activos, señales, preventivos, OT o preparación de cierre específicos, usa las herramientas READ en vez de inferir desde memoria o conversación.\n13. PREPARE_ONLY puede estructurar un borrador de Decision Case para revisión humana, pero no lo persiste como verdad operacional, no lo aprueba, no autoriza y no ejecuta ninguna acción.\n14. No muestres al usuario call_id, argumentos JSON crudos, resultados JSON crudos ni detalles internos de herramientas. Resume la evidencia operacional relevante.\n15. Un score de atención sólo ordena revisión humana de forma determinística; no es probabilidad de falla, criticidad OEM, diagnóstico ni autorización de prioridad.\n16. HANDOFF ADVISORY es contexto NO CANÓNICO y sólo define qué revalidar. Nunca conserva diagnóstico, causa, prioridad, severidad ni vigencia sin respaldo del contexto canónico y de las herramientas actuales.\n17. PLAN DE SKILLS es orientación interna, no evidencia. Una skill AVAILABLE puede orientar qué fuentes combinar, pero la conclusión debe provenir del contexto canónico y herramientas actuales.\n18. Una skill DEGRADED sólo sirve para explicar qué falta; no debe presentarse como capacidad completa.\n19. Una skill DORMANT no debe usarse ni insinuarse como disponible. Si la consulta depende de ella, declara qué dato sincronizado falta.\n20. Ninguna skill amplía permisos ni convierte una recomendación en acción autorizada.\n\nCuando el usuario pregunte qué equipo requiere atención, usa la cola de atención y luego profundiza con herramientas del activo cuando sea necesario. Compara señales observadas, estado fuera de servicio, preventivos, OT abiertas y evidencia de cierre. No conviertas un ranking operacional en riesgo probabilístico.`;
 
     const canonicalAvailability = {
       generated_at: canonical.context.generated_at,
@@ -493,7 +512,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    const modelInput = `CONVERSACIÓN RECIENTE\n${conversationTranscript(history)}\n\n${advisoryContext}\n\nCONTEXTO CANÓNICO MOTIL\n${JSON.stringify(canonicalAvailability)}\n\nPREGUNTA ACTUAL\n${message}`;
+    const modelInput = `CONVERSACIÓN RECIENTE\n${conversationTranscript(history)}\n\n${advisoryContext}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nCONTEXTO CANÓNICO MOTIL\n${JSON.stringify(canonicalAvailability)}\n\nPREGUNTA ACTUAL\n${message}`;
     const result = await callMaintenanceOperationalAI({
       instructions,
       input: modelInput,
@@ -560,6 +579,8 @@ export async function POST(request: NextRequest) {
       message: assistantMessage,
       learned,
       decisionCaseRefs: advisoryHandoffs.map((row) => row.id),
+      skillPlan: plannedSkills,
+      skillSummary: skillRuntime.summary,
       policy: 'Copiloto explicable con herramientas READ/PREPARE_ONLY: evidencia canónica → interpretación → hipótesis → acción humana. Memoria laboral separada de la verdad operacional; Decision Cases también permanecen como contexto no canónico.',
     });
   } catch (error) {

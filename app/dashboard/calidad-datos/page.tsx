@@ -10,12 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { LaudusMasterReadinessCard } from '@/components/integrations/laudus-master-readiness-card';
 
 type Review = { status: 'open' | 'accepted' | 'resolved' | 'ignored'; resolution_note: string | null; evidence_reference: string | null; reviewed_at: string | null } | null;
 type Issue = { issue_key: string; entity_type: string; entity_id: string | null; issue_type: string; field_name: string | null; severity: 'observation' | 'warning' | 'critical'; label: string; detail: string; href: string; active: boolean; review: Review };
 type Data = { counts: { total_records: number; active_issues: number; critical: number; duplicate_candidates: number; orphan_references: number; reviewed: number; by_entity: Record<string, number> }; issues: Issue[]; generatedAt: string };
 const fetcher = async (url: string) => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar'); return payload as Data; };
-const entityLabels: Record<string, string> = { product: 'Producto', supplier: 'Proveedor', asset: 'Equipo', person: 'Persona', inventory: 'Inventario', work_order: 'Orden de trabajo' };
+const entityLabels: Record<string, string> = { product: 'Producto', supplier: 'Proveedor', asset: 'Equipo', person: 'Persona', inventory: 'Inventario', work_order: 'Orden de trabajo', purchase_order: 'Orden de compra', invoice: 'Factura', cost_center: 'Centro de costo', warehouse: 'Bodega', external_source: 'Fuente externa' };
 const issueLabels: Record<string, string> = { missing_field: 'Campo incompleto', missing_identity: 'Identidad incompleta', validation_status: 'Validación pendiente', duplicate_candidate: 'Duplicado candidato', orphan_reference: 'Referencia huérfana', negative_value: 'Valor negativo', inconsistent_quantity: 'Cantidad inconsistente' };
 
 export default function CalidadDatosPage() {
@@ -71,9 +73,21 @@ export default function CalidadDatosPage() {
 
   return <div className="space-y-6">
     <section className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
-      <div><p className="text-sm font-medium text-muted-foreground">Datos</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Calidad de datos</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Revisa excepciones reales y registra decisiones sin modificar automáticamente la fuente.</p></div>
+      <div><p className="text-sm font-medium text-muted-foreground">Datos · revisión transversal</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Revisiones</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola bandeja para discrepancias de productos, proveedores, equipos, inventario, compras, finanzas y futuras fuentes externas. Revisar no modifica automáticamente la fuente.</p></div>
       <Button variant="outline" onClick={() => void mutate()}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>
     </section>
+
+    <DataSourceStatusStrip
+      reviewHref="/dashboard/calidad-datos/salud"
+      sources={[
+        { key: 'canonical', label: 'Datos canónicos', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Productos, proveedores, activos y relaciones validadas.' },
+        { key: 'operations', label: 'Operación MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Bodega, OT, compras y registros operacionales.' },
+        { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Se incorporará a esta misma bandeja cuando la API quede habilitada.' },
+        { key: 'evidence', label: 'Evidencia externa', state: 'updated', detail: 'Archivos, DTE y fuentes permanecen separadas hasta ser conciliadas.' },
+      ]}
+    />
+
+    <LaudusMasterReadinessCard />
 
     {message && <Card className="shadow-none"><CardContent className="p-4 text-sm">{message}</CardContent></Card>}
 
