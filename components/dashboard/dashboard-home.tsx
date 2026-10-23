@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { HomeDecisionPriorities } from '@/components/dashboard/home-decision-priorities';
+import { FinanceRoleHome } from '@/components/dashboard/finance-role-home';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
 type RoleTask = {
@@ -281,6 +282,10 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
   const needsBroadData = moreOpen && Boolean(inbox.data) && mode !== 'engineering' && mode !== 'mine';
   const production = useSWR<ProductionOverview | null>(needsBroadData ? '/api/produccion/canonical-overview' : null, optionalFetcher, { revalidateOnFocus: false });
   const maintenance = useSWR<MaintenanceOverview | null>(needsBroadData ? '/api/maintenance/work-order-flow?limit=200' : null, optionalFetcher, { revalidateOnFocus: false });
+
+  if (mode === 'finance' && inbox.data) {
+    return <FinanceRoleHome name={inbox.data.profile?.name} summary={inbox.data.summary} />;
+  }
 
   const config = configFor(mode, production.data, maintenance.data, inbox.data, t, locale);
   const tasks = (inbox.data?.tasks || []).slice(0, 5);

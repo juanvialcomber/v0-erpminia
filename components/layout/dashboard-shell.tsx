@@ -45,6 +45,8 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
     });
   };
 
+  const financeHome = pathname === '/dashboard' && /finanzas|financiero/i.test(String(user?.cargo || ''));
+
   return (
     <div className="flex min-h-screen bg-background">
       <div
@@ -67,7 +69,7 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
             <div className="motil-page space-y-6">
               <DataSourceAttentionBanner />
               {children}
-              {pathname === '/dashboard' ? <HomeDecisionPriorities locale={locale} dictionary={dictionary} /> : null}
+              {pathname === '/dashboard' && !financeHome ? <HomeDecisionPriorities locale={locale} dictionary={dictionary} /> : null}
             </div>
           </main>
         </DashboardPeriodProvider>
