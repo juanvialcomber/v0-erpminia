@@ -58,3 +58,12 @@ Esquema productivo leído por MCP, sin escrituras: canonical_suppliers_v1 tiene 
 Contrato inicial de proveedores y carga acotada a cinco páginas/100 filas, máximo seis llamadas, caché una hora. Conciliador puro valida dígito verificador y señala matched/new/invalid_rut/duplicate_source/ambiguous, sin mutar proveedores canónicos. Los importes y estados financieros no se promueven automáticamente.
 
 Filtros de fecha ahora se expresan en hora local Santiago; pruebas verano/invierno. Pendiente verificar consistencia de snapshot y cambios en el retroceso DST antes de activar incremental productivo. Pruebas: 15/15, locales y transporte simulado. PostgreSQL aún NO probado en instancia aislada: pendiente SQL, locks entre procesos, rollback y permisos reales. No se ejecutó carga de proveedores ni nuevas llamadas a Laudus en este bloque. No hay despliegue ni cron.
+
+
+## QA aislado ejecutado — 23 de octubre
+
+16/16 pruebas unitarias aprobadas. Además se ejecutó tests/laudus-postgres.integration.mjs con PostgreSQL embebido PGlite instalado sólo en scratch: esquema real SQL, baseline desconocido bloqueado, reserva 1799→1800 y siguiente negada, token cifrado persistido y recuperado, upsert idempotente, rollback de evidencia y checkpoint al fallar, rechazo de scope ajeno, y falta de USAGE para authenticated. Resultado 1/1 aprobado. No hay dependencia nueva productiva.
+
+La exclusión de dos invocaciones sobre un store se probó con conexión simulada. PGlite no prueba dos sesiones PostgreSQL independientes ni comportamiento del pool de despliegue; ese gate permanece abierto. No se aplicó SQL en Supabase ni se configuraron credenciales/clave ni se realizó carga real. La afirmación de disponibilidad gratuita no aporta el consumo exacto: se requiere baseline con contador del proveedor antes de habilitar reserveCall. No se inventó dicho valor. Cero nuevas llamadas a Laudus.
+
+Reproducir: instalar @electric-sql/pglite en un directorio temporal y ejecutar LAUDUS_PGLITE_MODULE=/ruta/node_modules/@electric-sql/pglite/dist/index.js node --test tests/laudus-postgres.integration.mjs. Sin variable, la prueba se marca skip explícitamente.
