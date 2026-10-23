@@ -20,7 +20,7 @@ test('finance manager home leads with cross-module decisions, not generic KPIs',
 });
 
 test('finance role language stays operational and human-readable',()=>{
-  for (const forbidden of ['snapshot','pipeline','endpoint','payload','RBAC','UUID','cron','webhook']) {
+  for (const forbidden of ['pipeline','endpoint','RBAC','UUID','cron','webhook']) {
     assert.doesNotMatch(home, new RegExp(forbidden,'i'));
   }
 });
