@@ -1,0 +1,212 @@
+const DEFAULT_BASE_URL = 'https://api.laudus.cl';
+
+type LaudusCredentials = {
+  baseUrl: string;
+  userName: string;
+  password: string;
+  companyVATId: string;
+};
+
+type TokenCache = {
+  token: string;
+  expiresAt: number;
+} | null;
+
+let tokenCache: TokenCache = null;
+
+function configuredValue(value: string | undefined) {
+  return String(value || '').trim();
+}
+
+export function getLaudusConfigurationState() {
+  const userName = configuredValue(process.env.LAUDUS_USER_NAME);
+  const password = configuredValue(process.env.LAUDUS_PASSWORD);
+  const companyVATId = configuredValue(process.env.LAUDUS_COMPANY_VAT_ID);
+
+  const missing = [
+    !userName ? 'LAUDUS_USER_NAME' : null,
+    !password ? 'LAUDUS_PASSWORD' : null,
+    !companyVATId ? 'LAUDUS_COMPANY_VAT_ID' : null,
+  ].filter((value): value is string => Boolean(value));
+
+  return {
+    configured: missing.length === 0,
+    missing,
+  };
+}
+
+function credentials(): LaudusCredentials {
+  const state = getLaudusConfigurationState();
+  if (!state.configured) {
+    throw new Error(`Laudus no está configurado. Faltan: ${state.missing.join(', ')}`);
+  }
+
+  return {
+    baseUrl: configuredValue(process.env.LAUDUS_BASE_URL) || DEFAULT_BASE_URL,
+    userName: configuredValue(process.env.LAUDUS_USER_NAME),
+    password: configuredValue(process.env.LAUDUS_PASSWORD),
+    companyVATId: configuredValue(process.env.LAUDUS_COMPANY_VAT_ID),
+  };
+}
+
+async function parseResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+
+  let parsed: unknown = text;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return text;
+  }
+
+  if (typeof parsed === 'string') {
+    try {
+      return JSON.parse(parsed);
+    } catch {
+      return parsed;
+    }
+  }
+
+  return parsed;
+}
+
+function safeApiError(status: number) {
+  if (status === 400) return 'Laudus rechazó la solicitud.';
+  if (status === 401) return 'La autenticación Laudus no fue aceptada.';
+  if (status === 403) return 'Laudus denegó acceso para este usuario o empresa.';
+  if (status === 404) return 'El recurso Laudus solicitado no existe.';
+  if (status === 422) return 'Laudus rechazó la solicitud por una validación de negocio.';
+  if (status === 429) return 'Laudus alcanzó temporalmente su límite de llamadas.';
+  if (status >= 500) return 'Laudus no está disponible temporalmente.';
+  return `Laudus respondió con HTTP ${status}.`;
+}
+
+async function request(path: string, init: RequestInit = {}) {
+  const { baseUrl } = credentials();
+  const response = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      ...(init.headers || {}),
+    },
+  });
+
+  const payload = await parseResponse(response);
+  if (!response.ok) {
+    throw new Error(safeApiError(response.status));
+  }
+
+  return payload;
+}
+
+function tokenFromPayload(payload: unknown): { token: string; expiration?: string } {
+  if (typeof payload === 'string' && payload.trim()) {
+    return { token: payload.trim() };
+  }
+
+  if (payload && typeof payload === 'object') {
+    const value = payload as Record<string, unknown>;
+    const token = typeof value.token === 'string' ? value.token.trim() : '';
+    const expiration = typeof value.expiration === 'string' ? value.expiration : undefined;
+    if (token) return { token, expiration };
+  }
+
+  throw new Error('Laudus no devolvió un token válido.');
+}
+
+export async function getLaudusAccessToken() {
+  const now = Date.now();
+  if (tokenCache && tokenCache.expiresAt - now > 60_000) {
+    return tokenCache.token;
+  }
+
+  const { userName, password, companyVATId } = credentials();
+
+  const payload = await request('/security/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userName, password, companyVATId }),
+  });
+
+  const parsed = tokenFromPayload(payload);
+  const parsedExpiration = parsed.expiration ? Date.parse(parsed.expiration) : Number.NaN;
+
+  tokenCache = {
+    token: parsed.token,
+    expiresAt: Number.isFinite(parsedExpiration) ? parsedExpiration : now + 10 * 60_000,
+  };
+
+  return tokenCache.token;
+}
+
+type LaudusListQuery = {
+  options?: {
+    offset?: number;
+    limit?: number;
+  };
+  fields?: string[];
+  filterBy?: unknown[];
+  orderBy?: unknown[];
+};
+
+export async function listLaudus(path: string, query: LaudusListQuery = {}) {
+  const token = await getLaudusAccessToken();
+
+  return request(path, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...query,
+      options: {
+        offset: query.options?.offset ?? 0,
+        limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
+      },
+    }),
+  });
+}
+
+function summarizePayload(payload: unknown) {
+  if (Array.isArray(payload)) return { rows: payload.length, shape: 'array' as const };
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    for (const key of ['data', 'items', 'results', 'rows']) {
+      if (Array.isArray(record[key])) {
+        return { rows: record[key].length, shape: key };
+      }
+    }
+    return { rows: null, shape: 'object' as const };
+  }
+
+  return { rows: null, shape: typeof payload };
+}
+
+export async function runLaudusReadOnlySmokeTest() {
+  await getLaudusAccessToken();
+
+  const targets = [
+    ['products', '/production/products/list'],
+    ['suppliers', '/purchases/suppliers/list'],
+    ['warehouses', '/production/warehouses/list'],
+    ['costCenters', '/purchases/costcenters/list'],
+  ] as const;
+
+  const results: Record<string, { rows: number | null; shape: string }> = {};
+
+  for (const [key, path] of targets) {
+    const payload = await listLaudus(path, { options: { offset: 0, limit: 5 } });
+    results[key] = summarizePayload(payload);
+  }
+
+  return {
+    authenticated: true,
+    calls: 5,
+    persisted: false,
+    results,
+  };
+}
