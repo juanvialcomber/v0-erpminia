@@ -8,8 +8,16 @@ const login=await fetch(base+'/security/login',{method:'POST',headers:{'Content-
 if(!login.ok) throw new Error('Login '+login.status);
 const lp=await login.json(); const token=typeof lp==='string'?lp:lp?.token; if(!token) throw new Error('No token');
 const fields=['purchaseOrderId','issuedDate','dueDate','status','supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId','warehouse.warehouseId','warehouse.name','items.itemId','items.product.productId','items.product.sku','items.product.description','items.product.unitOfMeasure','items.quantity','items.unitCost'];
-const res=await fetch(base+'/purchases/orders/list',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({options:{offset:0,limit:2},fields})});
-const text=await res.text(); let p=null; try{p=JSON.parse(text)}catch{}
-const rows=Array.isArray(p)?p:Array.isArray(p?.data)?p.data:Array.isArray(p?.items)?p.items:Array.isArray(p?.rows)?p.rows:[];
-const sample=rows.slice(0,2).map(r=>({keys:Object.keys(r),types:Object.fromEntries(Object.entries(r).map(([k,v])=>[k,Array.isArray(v)?'array':v===null?'null':typeof v]))}));
-console.log('LAUDUS_ORDER_SHAPE '+JSON.stringify({status:res.status,rowCount:rows.length,sample,error:res.ok?null:(p?.message||String(text).slice(0,1000))}));
+const bodies=[
+ {name:'no_filter',body:{options:{offset:0,limit:10},fields}},
+ {name:'date_filter',body:{options:{offset:0,limit:10},fields,filterBy:[{field:'issuedDate',operator:'>=',value:'2025-01-01T00:00:00'}]}},
+ {name:'date_filter_order',body:{options:{offset:0,limit:10},fields,filterBy:[{field:'issuedDate',operator:'>=',value:'2025-01-01T00:00:00'}],orderBy:[{field:'purchaseOrderId',direction:'ASC'}]}}
+];
+const out=[];
+for(const c of bodies){
+ const res=await fetch(base+'/purchases/orders/list',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(c.body)});
+ const text=await res.text(); let p=null; try{p=JSON.parse(text)}catch{}
+ const rows=Array.isArray(p)?p:Array.isArray(p?.data)?p.data:Array.isArray(p?.items)?p.items:Array.isArray(p?.rows)?p.rows:[];
+ out.push({name:c.name,status:res.status,rowCount:rows.length,uniqueOrders:new Set(rows.map(r=>r.purchaseOrderId)).size,firstIssued:rows[0]?.issuedDate||null,lastIssued:rows.at(-1)?.issuedDate||null,error:res.ok?null:(p?.message||String(text).slice(0,500))});
+}
+console.log('LAUDUS_ORDER_FILTER_CONTRACT '+JSON.stringify(out));
