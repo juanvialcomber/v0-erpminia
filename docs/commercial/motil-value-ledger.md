@@ -382,3 +382,29 @@ Laudus conserva autoridad financiera. La capa es read-only, no aprueba pagos, no
 
 ### Valor
 MOTIL deja de ser sólo un visor de registros Laudus y comienza a reducir el universo que una persona debe revisar. La métrica futura es tiempo por decisión, cobertura del universo manual y tasa de aceptación/rechazo de las señales priorizadas.
+
+
+## 2026-10-23 — Bodega Intelligence
+
+### Problema previo
+Bodega podía mostrar stock, mínimos y estados, mientras Laudus aportaba historial económico. El usuario debía cruzar mentalmente disponibilidad, precio, proveedor y mantenimiento. Además, el mínimo registrado no es suficientemente confiable para tratar cada posición bajo mínimo como urgencia operacional.
+
+### Capacidad
+Se añadió una proyección read-only que prioriza productos con reglas explicables:
+1. demanda o faltante ligado a OT activa;
+2. saldo negativo por conciliar;
+3. precio Laudus al menos 20% sobre su mediana con historial suficiente;
+4. dependencia de un solo proveedor con compras recurrentes.
+
+El estado bajo mínimo por sí solo no eleva una señal a caso prioritario.
+
+### Evidencia
+La capa reutiliza `motil_supply_risk_preview` y conserva stock MOTIL, vínculo Laudus, líneas de compra, proveedor, último precio, mediana histórica, última compra y contexto de mantenimiento como evidencia separada.
+
+### Valor
+Antes: revisar Bodega y luego buscar historial en Laudus/Compras.
+Ahora: MOTIL reduce el universo a productos concretos y explica qué decisión humana corresponde.
+Nivel: L3 Inteligencia. La futura transición a L4 requiere capturar decisiones y resultados por caso.
+
+### Qué falta medir
+Tiempo de revisión por producto, tasa de casos útiles, tasa de descarte, acciones tomadas y resultados observados.
