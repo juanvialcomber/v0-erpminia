@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
+import { supplierLaudusMirror } from '@/lib/integrations/laudus/server-mirror';
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_COMPRAS);
   if (!access.authorized) return access.response;
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       supplier,
+      laudus: await supplierLaudusMirror(context.organizationId, supplier.tax_id),
       contractor: contractorResult.data || null,
       performance: performanceResult.data || null,
       legacyPerformance: legacyPerformanceResult.data || null,

@@ -14,3 +14,10 @@ test('overlapping jobs are rejected before acquiring another connection',async()
  await assert.rejects(store.withLock(scope,async()=>{}),/ALREADY_BUSY/);
  finish();await first;assert.equal(connections,1);
 });
+test('session identity changes with credentials and server key',()=>{
+ const credentials={userName:'technical',password:'fixture'};
+ const a=createPostgresStore({pool:{},key:Buffer.alloc(32,1)});
+ const b=createPostgresStore({pool:{},key:Buffer.alloc(32,2)});
+ assert.notEqual(a.sessionIdentity(credentials),b.sessionIdentity(credentials));
+ assert.notEqual(a.sessionIdentity(credentials),a.sessionIdentity({...credentials,password:'rotated'}));
+});

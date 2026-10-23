@@ -72,3 +72,14 @@ Reproducir: instalar @electric-sql/pglite en un directorio temporal y ejecutar L
 ## Revisión local paginada de proveedores
 
 readSupplierReview prepara propuestas de conciliación desde la evidencia local, con filtro de organización/RUT/dominio, páginas de hasta 100 filas y cruce canónico acotado. Detecta duplicados del RUT en toda la evidencia del RUT empresa, incluso fuera de la página. Nunca consulta Laudus ni escribe en fichas. El caller debe aplicar fin_compras; no hay ruta pública ni bypass de permisos. Devuelve campos con diferencias sólo para coincidencias únicas. Tests: 16 unitarios y 2 de PostgreSQL embebido aprobados; se comprobó aislamiento de tenant y duplicación fuera de página. Cero llamadas nuevas a Laudus y cero cambios de producción. Persisten gates de despliegue, baseline y concurrencia entre conexiones.
+
+
+## Primer hito de aplicación implementado — 23 de octubre
+
+Proveedor 360° incorpora antecedentes y hasta 20 cabeceras OC Laudus desde espejo local. Mantiene fin_compras y organización autenticada; consulta parametrizada al esquema privado, filtrada por RUT empresa y proveedor. Ambigüedad devuelve revisión; errores no bloquean la ficha original. Datos Laudus no alimentan totales ni aprobaciones canónicas. Sin configuración no muestra un panel ficticio.
+
+Contrato de cabeceras de órdenes verificado en Swagger v2, aún sin consulta autenticada de órdenes. Ejecutor manual scripts/laudus-readonly-sync.mjs secuencia proveedores y compras con un máximo global de seis intentos, reutilizando sesión. Env template vacío incluido. Sync y lecturas desactivadas por defecto; no hay cron ni despliegue ni carga real.
+
+Revisión de equipo corrigió dos defectos: paginación por offset sustituida por cursor ID creciente con validación; caché de sesión ligada a identidad de credenciales mediante HMAC con clave server-side, junto con AAD y auth_identity. Cambio de credenciales produce cache miss. No se guarda un hash de contraseña verificable sin clave. También se corrigió validación del TTL mínimo.
+
+Validación: 20 pruebas específicas y 3 de PostgreSQL embebido aprobadas. Suite general pasó 1817 pruebas antes de la última prueba añadida de HMAC (verificación específica posterior aprobada); lint de tests/scripts aprobado; typecheck pasó con heap 6GB antes del último ajuste de identidad. Build compiló pero verificación completa sigue pendiente. El primer intento de types/build agotó heap 2GB. No se realizó QA autenticado/visual ni gate de concurrencia entre conexiones independientes. No activar integración ni fusionar sin completar gates.

@@ -15,7 +15,7 @@ create table motil_laudus.monthly_usage (
 -- reconciling the provider count under the same company advisory lock.
 create table motil_laudus.sessions (
  organization_id uuid not null references public.organizations(id), company_vat text not null,
- ciphertext text not null, primary key(organization_id,company_vat)
+ ciphertext text not null, auth_identity text not null, primary key(organization_id,company_vat)
 );
 create table motil_laudus.sync_state (
  organization_id uuid not null references public.organizations(id), company_vat text not null,
