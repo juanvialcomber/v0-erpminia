@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import {
   getLaudusConfigurationState,
+  LaudusApiError,
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
 
@@ -39,13 +40,19 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    console.error('[laudus/smoke]', error instanceof Error ? error.message : 'Unknown Laudus error');
+    const laudusError = error instanceof LaudusApiError ? error : null;
+    console.error('[laudus/smoke]', laudusError
+      ? { status: laudusError.status, path: laudusError.path, upstreamCode: laudusError.upstreamCode }
+      : error instanceof Error ? error.message : 'Unknown Laudus error');
     return NextResponse.json(
       {
         status: 'failed',
         configured: true,
         calls: null,
         persisted: false,
+        stage: laudusError?.path || null,
+        upstreamStatus: laudusError?.status || null,
+        upstreamCode: laudusError?.upstreamCode || null,
         error: error instanceof Error ? error.message : 'No fue posible validar Laudus.',
       },
       { status: 502 },
