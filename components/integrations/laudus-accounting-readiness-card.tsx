@@ -21,10 +21,20 @@ type Payload = {
     usedByFinance: number;
     financeUsageCoverage: number;
   };
+  assets: {
+    canonical: number;
+    finance: number;
+    exactFinanceMatches: number;
+    exactFinanceMatchCoverage: number;
+    acquisitionDateCoverage: number;
+    acquisitionCostCoverage: number;
+    expectedLifespanCoverage: number;
+  };
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
     autoPostAccountingEntries: false;
     autoRewriteLedger: false;
+    autoMergeAssets: false;
     humanReviewRequired: true;
   };
 };
@@ -88,7 +98,7 @@ export function LaudusAccountingReadinessCard() {
         </div>
       </div>
 
-      <div className="grid gap-px border-t bg-border md:grid-cols-3">
+      <div className="grid gap-px border-t bg-border md:grid-cols-4">
         <div className="bg-card p-4">
           <p className="text-sm font-medium">Centros de costo</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -102,9 +112,18 @@ export function LaudusAccountingReadinessCard() {
           </p>
         </div>
         <div className="bg-card p-4">
+          <p className="text-sm font-medium">Activos financieros</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isLoading || !data ? '—' : data.assets.exactFinanceMatches.toLocaleString('es-CL')} de {isLoading || !data ? '—' : data.assets.finance.toLocaleString('es-CL')} reconciliados por código exacto.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Fecha/costo/vida útil disponibles en {isLoading || !data ? '—' : pct(data.assets.acquisitionCostCoverage)} de los activos canónicos.
+          </p>
+        </div>
+        <div className="bg-card p-4">
           <p className="text-sm font-medium">Conciliación</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]} · sin contabilización ni reescritura automática.
+            {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]} · sin contabilización, reescritura ni fusión automática.
           </p>
         </div>
       </div>
