@@ -1,4 +1,6 @@
 const DEFAULT_BASE_URL = 'https://api.laudus.cl';
+const DEFAULT_USER_NAME = 'Motil';
+const DEFAULT_COMPANY_VAT_ID = '84542800-K';
 
 type LaudusCredentials = {
   baseUrl: string;
@@ -19,14 +21,10 @@ function configuredValue(value: string | undefined) {
 }
 
 export function getLaudusConfigurationState() {
-  const userName = configuredValue(process.env.LAUDUS_USER_NAME);
   const password = configuredValue(process.env.LAUDUS_PASSWORD);
-  const companyVATId = configuredValue(process.env.LAUDUS_COMPANY_VAT_ID);
 
   const missing = [
-    !userName ? 'LAUDUS_USER_NAME' : null,
     !password ? 'LAUDUS_PASSWORD' : null,
-    !companyVATId ? 'LAUDUS_COMPANY_VAT_ID' : null,
   ].filter((value): value is string => Boolean(value));
 
   return {
@@ -43,9 +41,9 @@ function credentials(): LaudusCredentials {
 
   return {
     baseUrl: configuredValue(process.env.LAUDUS_BASE_URL) || DEFAULT_BASE_URL,
-    userName: configuredValue(process.env.LAUDUS_USER_NAME),
+    userName: configuredValue(process.env.LAUDUS_USER_NAME) || DEFAULT_USER_NAME,
     password: configuredValue(process.env.LAUDUS_PASSWORD),
-    companyVATId: configuredValue(process.env.LAUDUS_COMPANY_VAT_ID),
+    companyVATId: configuredValue(process.env.LAUDUS_COMPANY_VAT_ID) || DEFAULT_COMPANY_VAT_ID,
   };
 }
 
