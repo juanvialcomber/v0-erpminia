@@ -94,3 +94,22 @@ Cada decisión conserva organización, factura Laudus, OC candidata, estado del 
 - porcentaje de facturas cuya conciliación requiere intervención humana.
 
 Esta capacidad eleva MOTIL desde inteligencia estática a inteligencia que aprende de la operación, manteniendo autoridad humana.
+
+
+## 2026-10-23 — Aprendizaje supervisado: fase de calibración
+
+### Diseño
+La bandeja prioriza casos ambiguos con menor separación entre las dos mejores candidatas. Esto concentra el tiempo humano donde una etiqueta aporta más información. El pool de revisión se amplió de 12 a 100 candidatos internos, pero la interfaz sigue mostrando sólo 12 pendientes y un caso a la vez.
+
+### Gate de aprendizaje
+MOTIL no modifica todavía el score a partir del feedback. Primero exige un mínimo inicial de 20 decisiones humanas para poder observar una señal de calibración. La interfaz muestra progreso de feedback, tasa de aceptación cuando exista y mantiene explícito que el feedback aún no altera el scoring.
+
+### Valor generado
+- Evita que la cola se agote artificialmente después de las primeras 12 revisiones.
+- Prioriza tiempo experto en casos informativos.
+- Crea una métrica verificable de entrenamiento humano.
+- Permite medir cuándo existe evidencia suficiente para calibrar el matcher.
+- Reduce el riesgo de vender “IA que aprende” antes de tener suficientes etiquetas reales.
+
+### Siguiente evidencia comercial
+Cuando existan al menos 20 decisiones, comparar score original contra aceptación humana por tramo de confianza y medir precisión observada. Sólo después evaluar ajustes del ranking.

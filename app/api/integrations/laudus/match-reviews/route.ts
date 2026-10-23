@@ -46,34 +46,43 @@ export async function GET(request: NextRequest) {
   const candidates = Array.isArray(candidateResult.data?.recent_review)
     ? candidateResult.data.recent_review as Candidate[]
     : [];
-  const invoiceIds = [...new Set(candidates.map((row) => text(row.invoice_id)).filter(Boolean))];
 
-  let decisions: any[] = [];
-  if (invoiceIds.length) {
-    const result = await context.supabase
-      .from('laudus_match_review_decisions')
-      .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,score,next_score,evidence_snapshot,reviewed_by,reviewed_at')
-      .eq('organization_id', context.organizationId)
-      .in('invoice_external_id', invoiceIds)
-      .order('reviewed_at', { ascending: false });
+  const result = await context.supabase
+    .from('laudus_match_review_decisions')
+    .select('id,invoice_external_id,order_external_id,candidate_status,decision,reason,score,next_score,evidence_snapshot,reviewed_by,reviewed_at')
+    .eq('organization_id', context.organizationId)
+    .order('reviewed_at', { ascending: false })
+    .limit(500);
 
-    if (result.error) {
-      console.error('[laudus/match-reviews GET decisions]', result.error);
-      return NextResponse.json({ error: 'No se pudieron cargar las decisiones previas.' }, { status: 500 });
-    }
-    decisions = result.data || [];
+  if (result.error) {
+    console.error('[laudus/match-reviews GET decisions]', result.error);
+    return NextResponse.json({ error: 'No se pudieron cargar las decisiones previas.' }, { status: 500 });
   }
 
+  const decisions = result.data || [];
   const decided = new Set(decisions.map((row) => `${row.invoice_external_id}:${row.order_external_id}`));
-  const pending = candidates.filter((row) => !decided.has(`${row.invoice_id}:${row.order_id}`));
+  const pending = candidates.filter((row) => !decided.has(`${row.invoice_id}:${row.order_id}`)).slice(0, 12);
+  const approved = decisions.filter((row) => row.decision === 'approved').length;
+  const rejected = decisions.filter((row) => row.decision === 'rejected').length;
+  const labelled = approved + rejected;
+  const calibrationMinimum = 20;
 
   return NextResponse.json({
     pending,
     reviewed: decisions.slice(0, 8),
     counts: {
       pending: pending.length,
-      approved: decisions.filter((row) => row.decision === 'approved').length,
-      rejected: decisions.filter((row) => row.decision === 'rejected').length,
+      approved,
+      rejected,
+      labelled,
+    },
+    learning: {
+      status: labelled >= calibrationMinimum ? 'ready_for_calibration' : 'collecting_feedback',
+      labelled,
+      minimum: calibrationMinimum,
+      remaining: Math.max(calibrationMinimum - labelled, 0),
+      acceptanceRate: labelled > 0 ? approved / labelled : null,
+      appliesToScoring: false,
     },
     sourceModified: false,
     policy: 'human-review-only',

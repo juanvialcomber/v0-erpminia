@@ -37,7 +37,15 @@ type QueuePayload = {
     reason: string;
     reviewed_at: string;
   }>;
-  counts: { pending: number; approved: number; rejected: number };
+  counts: { pending: number; approved: number; rejected: number; labelled: number };
+  learning: {
+    status: 'collecting_feedback' | 'ready_for_calibration';
+    labelled: number;
+    minimum: number;
+    remaining: number;
+    acceptanceRate: number | null;
+    appliesToScoring: false;
+  };
 };
 
 const fetcher = async (url: string): Promise<QueuePayload> => {
@@ -111,7 +119,14 @@ export function LaudusMatchReviewInbox() {
             Finanzas confirma o descarta la OC sugerida. La decisión no modifica Laudus, facturas ni pagos.
           </p>
         </div>
-        <Badge variant="outline">{isLoading ? '—' : data?.counts.pending || 0} pendientes visibles</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">{isLoading ? '—' : data?.counts.pending || 0} pendientes visibles</Badge>
+          <Badge variant="outline">
+            {isLoading || !data ? 'Aprendiendo…' : data.learning.status === 'ready_for_calibration'
+              ? 'Feedback listo para calibrar'
+              : `Aprendiendo · ${data.learning.labelled}/${data.learning.minimum}`}
+          </Badge>
+        </div>
       </div>
 
       {isLoading ? (
@@ -190,7 +205,7 @@ export function LaudusMatchReviewInbox() {
           {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Se muestra un caso a la vez para mantener la revisión rápida. Al decidir, MOTIL carga el siguiente.
+            Se muestra un caso a la vez para mantener la revisión rápida. MOTIL prioriza casos ambiguos e informativos; el feedback todavía no altera el score automáticamente.
           </p>
         </div>
       ) : (
