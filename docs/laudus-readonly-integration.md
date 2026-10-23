@@ -49,3 +49,12 @@ Tope preventivo del conector: 1.800 llamadas/mes, configurable sólo hacia abajo
 readSession/writeSession/clearSession permiten reutilizar token entre instancias dentro del lock; requieren store protegido y duradero, aún pendiente. Token válido se reutiliza hasta un minuto antes del vencimiento. Un 401/403 invalida la sesión sin repetir la consulta. Caché configurable entre cinco minutos y un día. pageSize sólo puede superar 100 cuando el contrato certifique maxPageSize; menos campos reduce bytes, no necesariamente llamadas. Priorizar listados masivos y deltas; las pantallas deben leer el espejo local, nunca Laudus directamente.
 
 Validación actual: 10/10 pruebas, incluyendo sesión compartida, presupuesto por ejecución y límites de página/mes. Sin nuevas llamadas reales durante este refuerzo. No activar cron hasta tener contador atómico y sesión persistente implementados.
+
+
+## Persistencia y proveedores — 23 de octubre de 2026
+
+Esquema productivo leído por MCP, sin escrituras: canonical_suppliers_v1 tiene organization_id, tax_id y procedencia Excel (source_file/source_sheet/source_row/source_payload). No se encontraron tablas laudus. Se implementó createPostgresStore: advisory lock por RUT, reserva mensual atómica conservadora, sesión AES-256-GCM ligada a organización/RUT y evidencia+checkpoint transaccionales en esquema privado. SQL en database/proposals es una propuesta no aplicada, no una migración. Requiere conexión directa o session pooling, jamás transaction pooling, clave de cifrado server-side de 32 bytes y baseline mensual reciente verificado. No guarda contraseña en DB.
+
+Contrato inicial de proveedores y carga acotada a cinco páginas/100 filas, máximo seis llamadas, caché una hora. Conciliador puro valida dígito verificador y señala matched/new/invalid_rut/duplicate_source/ambiguous, sin mutar proveedores canónicos. Los importes y estados financieros no se promueven automáticamente.
+
+Filtros de fecha ahora se expresan en hora local Santiago; pruebas verano/invierno. Pendiente verificar consistencia de snapshot y cambios en el retroceso DST antes de activar incremental productivo. Pruebas: 15/15, locales y transporte simulado. PostgreSQL aún NO probado en instancia aislada: pendiente SQL, locks entre procesos, rollback y permisos reales. No se ejecutó carga de proveedores ni nuevas llamadas a Laudus en este bloque. No hay despliegue ni cron.
