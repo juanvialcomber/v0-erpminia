@@ -13,6 +13,7 @@ import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
 import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
 import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
+import { LaudusProcurementLiveCard } from '@/components/integrations/laudus-procurement-live-card';
 
 type Overview = {
   canEdit: boolean;
@@ -83,6 +84,8 @@ export default function ComprasPage() {
           { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
+
+      <LaudusProcurementLiveCard />
 
       <LaudusProcurementReadinessCard />
 
