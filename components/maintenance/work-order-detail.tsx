@@ -210,7 +210,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           onWorkOrderChange={mutate}
         />
         <div className="mx-auto w-full max-w-xl space-y-4">
-          <WorkOrderMaterialCoverage workOrderId={id} />
+          <WorkOrderMaterialCoverage workOrderId={id} executionMode />
           <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
           {workOrder.status === 'completed' ? (
             <details className="rounded-lg border bg-card">

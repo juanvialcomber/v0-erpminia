@@ -2,8 +2,19 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+
+async function authorizeWrite(request: NextRequest, workOrderId: string) {
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context;
+  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
+  if (accessLevel === 'ED') return context;
+  const assigned = await requireAssignedMaintenanceExecution(context, workOrderId);
+  if (!assigned.ok) return { ok: false as const, response: assigned.response };
+  return context;
+}
 
 type MaterialInput = {
   canonicalProductId: string;
@@ -49,13 +60,11 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
 }
 
 export async function POST(request: NextRequest, contextRoute: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
-  const context = await getOrganizationContext(request);
+  const { id } = await contextRoute.params;
+  const context = await authorizeWrite(request, id);
   if (!context.ok) return context.response;
 
   try {
-    const { id } = await contextRoute.params;
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
@@ -145,13 +154,11 @@ export async function PUT(request: NextRequest, contextRoute: { params: Promise<
 
 
 export async function PATCH(request: NextRequest, contextRoute: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
-  const context = await getOrganizationContext(request);
+  const { id } = await contextRoute.params;
+  const context = await authorizeWrite(request, id);
   if (!context.ok) return context.response;
 
   try {
-    const { id } = await contextRoute.params;
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 

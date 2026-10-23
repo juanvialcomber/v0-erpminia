@@ -96,6 +96,10 @@ function isAssignedWorkOrderExecutionMutation(request: NextRequest) {
     return true;
   }
 
+  if (['POST', 'PATCH'].includes(method) && /^\/api\/maintenance\/work-orders\/[^/]+\/materials$/.test(path)) {
+    return true;
+  }
+
   if (method === 'POST' && path === '/api/maintenance/work-order-runtime-evidence') {
     return true;
   }

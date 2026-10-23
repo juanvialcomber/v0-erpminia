@@ -58,7 +58,7 @@ const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
 
-export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string }) {
+export function WorkOrderMaterialCoverage({ workOrderId, executionMode = false }: { workOrderId: string; executionMode?: boolean }) {
   const { data, error, isLoading, mutate } = useSWR(`/api/maintenance/work-orders/${workOrderId}/materials`, fetcher);
   const [issuing, setIssuing] = useState(false);
   const [sending, setSending] = useState(false);
@@ -186,9 +186,13 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
     : rows.length === 0
       ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido; MOTIL reservará automáticamente el stock disponible.', action: 'add' as const }
     : reservedTotal > 0
-      ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
+      ? executionMode
+        ? { title: 'Material reservado en Bodega', detail: `${reservedTotal} unidad(es) están reservadas; Bodega o supervisión debe registrar la entrega.`, action: 'reserved' as const }
+        : { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
       : shortageTotal > 0 && !alreadySent
-        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
+        ? executionMode
+          ? { title: 'Faltante detectado', detail: `${shortageTotal} unidad(es) requieren gestión de Compras.`, action: 'needs_procurement' as const }
+          : { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
         : shortageTotal > 0
           ? { title: 'Compras está gestionando los faltantes', detail: `${procurementTotal || shortageTotal} unidad(es) están registradas en el flujo de abastecimiento.`, action: 'waiting' as const }
           : { title: 'Materiales listos para ejecución', detail: `${issuedTotal} de ${requiredTotal} unidad(es) requeridas ya fueron entregadas.`, action: 'ready' as const };
@@ -221,6 +225,8 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
             {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
             {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
+            {primaryAction.action === 'reserved' ? <Badge variant="secondary">Reserva lista</Badge> : null}
+            {primaryAction.action === 'needs_procurement' ? <Badge variant="outline">Compras debe gestionar</Badge> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
             {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
           </div>
