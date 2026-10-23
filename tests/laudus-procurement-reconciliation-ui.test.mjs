@@ -14,5 +14,6 @@ test('reconciliation UI surfaces resolvable and unresolved counts', () => {
   assert.match(card, /Proveedor sin resolver/);
   assert.match(card, /Centro de costo sin resolver/);
   assert.match(card, /nombre exacto y único/);
-  assert.match(card, /consenso de líneas/);
+  assert.match(card, /consenso \+ código canónico/);
+  assert.match(card, /códigos no reconocidos/);
 });
