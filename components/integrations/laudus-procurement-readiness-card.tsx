@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { AlertTriangle, CheckCircle2, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ReceiptText, ShoppingCart } from 'lucide-react';
 
 type Payload = {
   orders: {
@@ -20,6 +20,23 @@ type Payload = {
     receivedCoverage: number;
     costCenterCoverage: number;
     assetCoverage: number;
+  };
+  flow: {
+    receipts: number;
+    receiptLines: number;
+    receiptOrderCoverage: number;
+    receiptLineOrderCoverage: number;
+    invoices: number;
+    invoiceLines: number;
+    invoiceOrderCoverage: number;
+    invoiceSupplierCoverage: number;
+    invoiceLineOrderCoverage: number;
+    payables: number;
+    payableInvoiceCoverage: number;
+    payments: number;
+    paymentPayableCoverage: number;
+    dtes: number;
+    dteInvoiceCoverage: number;
   };
 };
 
@@ -81,6 +98,35 @@ export function LaudusProcurementReadinessCard() {
             <div><p className="font-medium text-foreground">{isLoading || !data ? '—' : fmt(data.lines.costCoverage)}</p><p>Costo unitario</p></div>
             <div><p className="font-medium text-foreground">{isLoading || !data ? '—' : fmt(data.lines.receivedCoverage)}</p><p>Recepción</p></div>
             <div><p className="font-medium text-foreground">{isLoading || !data ? '—' : fmt(data.lines.unitCoverage)}</p><p>Unidad de compra</p></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t bg-muted/20 px-4 py-4">
+        <div className="flex items-center gap-2">
+          <ReceiptText className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-medium">Flujo recepción → factura → pago</p>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div>
+            <p className="text-lg font-semibold">{isLoading || !data ? '—' : data.flow.receipts.toLocaleString('es-CL')}</p>
+            <p className="text-xs text-muted-foreground">Recepciones · {isLoading || !data ? '—' : fmt(data.flow.receiptOrderCoverage)} con OC</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold">{isLoading || !data ? '—' : data.flow.invoices.toLocaleString('es-CL')}</p>
+            <p className="text-xs text-muted-foreground">Facturas · {isLoading || !data ? '—' : fmt(data.flow.invoiceOrderCoverage)} con OC</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold">{isLoading || !data ? '—' : data.flow.payables.toLocaleString('es-CL')}</p>
+            <p className="text-xs text-muted-foreground">CxP · {isLoading || !data ? '—' : fmt(data.flow.payableInvoiceCoverage)} con factura</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold">{isLoading || !data ? '—' : data.flow.payments.toLocaleString('es-CL')}</p>
+            <p className="text-xs text-muted-foreground">Pagos · {isLoading || !data ? '—' : fmt(data.flow.paymentPayableCoverage)} con CxP</p>
+          </div>
+          <div>
+            <p className="text-lg font-semibold">{isLoading || !data ? '—' : data.flow.dtes.toLocaleString('es-CL')}</p>
+            <p className="text-xs text-muted-foreground">DTE importados</p>
           </div>
         </div>
       </div>
