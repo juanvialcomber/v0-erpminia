@@ -12,6 +12,7 @@ import { DataReceptionReadiness } from '@/components/data/data-reception-readine
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
 import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
+import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
 
 type Overview = {
   canEdit: boolean;
@@ -86,6 +87,8 @@ export default function ComprasPage() {
       <LaudusProcurementReadinessCard />
 
       <LaudusProcurementReconciliationCard />
+
+      <LaudusSupplierResolutionQueueCard />
 
       {error ? (
         <StatePanel
