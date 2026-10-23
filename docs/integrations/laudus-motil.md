@@ -1,7 +1,7 @@
 # Integración Laudus -> MOTIL
 
 Fecha: 2026-10-22
-Estado: diseño validado; activación comercial API Laudus pendiente.
+Estado: diseño validado; Visma/Laudus confirmó el 2026-10-22 que el RUT 84.542.800-K ya tiene la API activa. Autenticación v2 aún pendiente de prueba porque las credenciales técnicas no están configuradas en Vercel.
 Alcance inicial: solo lectura desde Laudus. Sin escrituras hacia Laudus hasta completar conciliación y UAT.
 
 ## Objetivo
