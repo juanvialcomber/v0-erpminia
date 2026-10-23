@@ -350,3 +350,12 @@ Sólo se generan afirmaciones cuando el delta es positivo y está presente en sn
 
 ### Valor comercial
 Esto prepara una conversación mensual de expansión basada en evolución demostrada. El argumento de tarifa puede mostrar cuánto aumentó el uso y la evidencia desde el baseline, sin confundir capacidad instalada con resultado económico.
+
+
+## 2026-10-23 — Baseline contractual/comercial
+
+Se reconstruyó el alcance enviado a Daniel Villarroel el 4 de mayo de 2026 desde Gmail y sus anexos. El contrato enviado para revisión define explícitamente tres módulos: Mantención y maquinaria, Inventario y Gestión documental; además de diagnóstico, implementación/capacitación, soporte y asesoría. La propuesta comercial es más amplia y presenta Operaciones, Reportes, Cumplimiento, Personas, Seguridad, Medioambiente, Integraciones y acceso multiplataforma.
+
+La copia contractual localizada conserva placeholders del Cliente y no se encontró una versión final firmada en la búsqueda actual. Por eso MOTIL separará contrato explícito, propuesta comercial y capacidad adicional, evitando afirmar jurídicamente que una función está fuera de alcance sin revisar la versión ejecutada.
+
+Valor comercial: Laudus/Compras-Finanzas, matching, Supplier Intelligence, riesgo de abastecimiento, workflows de decisión/resultado e impacto E1-E3 son capacidades claramente superiores al núcleo contractual de tres módulos y deben documentarse como expansión de valor. Las integraciones y áreas funcionales que aparecen sólo de forma genérica en la propuesta se tratarán como ampliaciones específicas, no automáticamente como fuera de alcance.

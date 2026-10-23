@@ -77,6 +77,32 @@ export default function MotilValuePage(){
       </div>
     </section>:null}
 
+    {!isLoading&&data?.contractBaseline?<section className="rounded-lg border bg-card">
+      <div className="border-b p-5">
+        <h2 className="text-sm font-semibold">Contrato y propuesta vs evolución</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Fuente: correo enviado a Daniel el 4 de mayo de 2026. La copia contractual encontrada es un borrador con placeholders; falta localizar la versión final firmada.
+        </p>
+      </div>
+      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Módulos explícitos contrato</p><p className="mt-1 text-xl font-semibold">{data.contractBaseline.explicitContract.modules.length}</p><p className="text-xs text-muted-foreground">Mantención · Inventario · Documental</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Desarrollo neto</p><p className="mt-1 text-xl font-semibold">{money(data.contractBaseline.explicitContract.developmentNetClp)}</p><p className="text-xs text-muted-foreground">30% · 40% · 30%</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Soporte mensual neto</p><p className="mt-1 text-xl font-semibold">{money(data.contractBaseline.explicitContract.monthlySupportNetClp)}</p><p className="text-xs text-muted-foreground">desde operación módulos 1 y 2</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Áreas propuesta</p><p className="mt-1 text-xl font-semibold">{data.contractBaseline.commercialProposal.functionalAreas.length}</p><p className="text-xs text-muted-foreground">visión comercial más amplia</p></div>
+      </div>
+      <div className="grid gap-5 border-t p-5 xl:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Base comprometida explícita</p>
+          <ul className="mt-3 space-y-2 text-sm">{data.contractBaseline.explicitContract.services.map((item:string)=><li key={item}>• {item}</li>)}</ul>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Capacidades adicionales actuales</p>
+          <ul className="mt-3 space-y-2 text-sm">{data.contractBaseline.currentExpansionExamples.map((item:any)=><li key={item.capability}>• <span className="font-medium">{item.capability}</span><span className="text-muted-foreground"> — {item.rationale}</span></li>)}</ul>
+        </div>
+      </div>
+      {data.contractBaseline.documentaryTensions.map((item:any)=><div key={item.topic} className="border-t bg-muted/20 p-4 text-xs text-muted-foreground"><span className="font-medium text-foreground">{item.topic}:</span> {item.rule}</div>)}
+    </section>:null}
+
     {!isLoading&&data?.comparison?<section className="rounded-lg border bg-card">
       <div className="border-b p-5">
         <h2 className="text-sm font-semibold">Comparación comercial del período</h2>

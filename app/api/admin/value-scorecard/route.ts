@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MOTIL_CONTRACT_BASELINE } from '@/lib/commercial/motil-contract-baseline';
 
 const ADMIN_ROLES = new Set(['admin','superadmin','super_admin']);
 
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
     history: historyResult.data,
     comparison,
     commercialEvidence,
+    contractBaseline: MOTIL_CONTRACT_BASELINE,
     generatedAt: new Date().toISOString(),
     narrative: {
       demonstrated: [
