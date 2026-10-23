@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
+import { LaudusMasterReadinessCard } from '@/components/integrations/laudus-master-readiness-card';
 
 type Review = { status: 'open' | 'accepted' | 'resolved' | 'ignored'; resolution_note: string | null; evidence_reference: string | null; reviewed_at: string | null } | null;
 type Issue = { issue_key: string; entity_type: string; entity_id: string | null; issue_type: string; field_name: string | null; severity: 'observation' | 'warning' | 'critical'; label: string; detail: string; href: string; active: boolean; review: Review };
@@ -85,6 +86,8 @@ export default function CalidadDatosPage() {
         { key: 'evidence', label: 'Evidencia externa', state: 'updated', detail: 'Archivos, DTE y fuentes permanecen separadas hasta ser conciliadas.' },
       ]}
     />
+
+    <LaudusMasterReadinessCard />
 
     {message && <Card className="shadow-none"><CardContent className="p-4 text-sm">{message}</CardContent></Card>}
 
