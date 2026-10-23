@@ -13,11 +13,10 @@ type LaudusProduct = {
   unitOfMeasure?: string;
 };
 
-type CanonicalProduct = {
-  product_code: string;
-  name: string | null;
-  description: string | null;
-  unit: string | null;
+type MotilStockProduct = {
+  part_code: string;
+  part_name: string | null;
+  canonical_product_id: string | null;
 };
 
 function asRows(payload: unknown): unknown[] {
@@ -71,33 +70,27 @@ async function readAllPages(
     offset += pageRows.length;
   }
 
-  return {
-    rows,
-    calls,
-    exhausted,
-    bounded: !exhausted,
-  };
+  return { rows, calls, exhausted, bounded: !exhausted };
 }
 
-async function readCanonicalProducts() {
+async function readMotilStockProducts() {
   const supabase = getSupabaseServerClient();
   const pageSize = 1000;
   const maxPages = 20;
-  const rows: CanonicalProduct[] = [];
+  const rows: MotilStockProduct[] = [];
 
   for (let page = 0; page < maxPages; page += 1) {
     const from = page * pageSize;
     const to = from + pageSize - 1;
     const { data, error } = await supabase
-      .schema('canonical')
-      .from('products')
-      .select('product_code,name,description,unit')
-      .order('product_code', { ascending: true })
+      .from('warehouse_stock')
+      .select('part_code,part_name,canonical_product_id')
+      .order('part_code', { ascending: true })
       .range(from, to);
 
-    if (error) throw new Error(`No fue posible leer canonical.products: ${error.message}`);
+    if (error) throw new Error(`No fue posible leer warehouse_stock: ${error.message}`);
 
-    const pageRows = (data || []) as CanonicalProduct[];
+    const pageRows = (data || []) as MotilStockProduct[];
     rows.push(...pageRows);
     if (pageRows.length < pageSize) break;
   }
@@ -160,26 +153,25 @@ export async function GET() {
       };
     }
 
-    const canonicalProducts = await readCanonicalProducts();
-    const canonicalByCode = new Map(
-      canonicalProducts.map((product) => [product.product_code, product]),
-    );
-    const matchedCanonicalCodes = new Set<string>();
+    const stockProducts = await readMotilStockProducts();
+    const stockByCode = new Map(stockProducts.map((p) => [p.part_code, p]));
+    const matchedStockCodes = new Set<string>();
 
     let exactCodeMatches = 0;
-    let exactSemanticMatches = 0;
+    let exactNameMatches = 0;
+    let linkedToCanonical = 0;
     const differences: Array<Record<string, unknown>> = [];
-    const missingInMotil: Array<Record<string, unknown>> = [];
+    const missingInMotilStock: Array<Record<string, unknown>> = [];
 
     for (const rawProduct of products.rows) {
       const product = rawProduct as LaudusProduct;
       const sku = String(product.SKU || '').trim();
       if (!sku) continue;
 
-      const canonical = canonicalByCode.get(sku);
-      if (!canonical) {
-        if (missingInMotil.length < 20) {
-          missingInMotil.push({
+      const stock = stockByCode.get(sku);
+      if (!stock) {
+        if (missingInMotilStock.length < 20) {
+          missingInMotilStock.push({
             productId: product.productId,
             SKU: sku,
             description: product.description,
@@ -190,36 +182,27 @@ export async function GET() {
       }
 
       exactCodeMatches += 1;
-      matchedCanonicalCodes.add(sku);
+      matchedStockCodes.add(sku);
+      if (stock.canonical_product_id) linkedToCanonical += 1;
 
-      const laudusDescription = normalized(product.description);
-      const canonicalDescription = normalized(canonical.description || canonical.name);
-      const laudusUnit = normalized(product.unitOfMeasure);
-      const canonicalUnit = normalized(canonical.unit);
-
-      if (
-        laudusDescription === canonicalDescription &&
-        laudusUnit === canonicalUnit
-      ) {
-        exactSemanticMatches += 1;
+      if (normalized(product.description) === normalized(stock.part_name)) {
+        exactNameMatches += 1;
       } else if (differences.length < 20) {
         differences.push({
           SKU: sku,
           laudusDescription: product.description,
-          motilDescription: canonical.description || canonical.name,
-          laudusUnit: product.unitOfMeasure,
-          motilUnit: canonical.unit,
+          motilName: stock.part_name,
         });
       }
     }
 
-    const canonicalOnly = canonicalProducts
-      .filter((product) => !matchedCanonicalCodes.has(product.product_code))
+    const motilStockOnly = stockProducts
+      .filter((product) => !matchedStockCodes.has(product.part_code))
       .slice(0, 20)
       .map((product) => ({
-        productCode: product.product_code,
-        description: product.description || product.name,
-        unit: product.unit,
+        productCode: product.part_code,
+        name: product.part_name,
+        canonicalProductId: product.canonical_product_id,
       }));
 
     const motilWarehouses = await readMotilWarehouses();
@@ -240,15 +223,16 @@ export async function GET() {
         laudusRows: products.rows.length,
         laudusExhausted: products.exhausted,
         laudusBounded: products.bounded,
-        motilCanonicalRows: canonicalProducts.length,
+        motilWarehouseStockRows: stockProducts.length,
         exactCodeMatches,
-        exactSemanticMatches,
-        fieldDifferences: exactCodeMatches - exactSemanticMatches,
-        missingInMotil: products.rows.length - exactCodeMatches,
-        canonicalOnly: canonicalProducts.length - matchedCanonicalCodes.size,
+        exactNameMatches,
+        fieldDifferences: exactCodeMatches - exactNameMatches,
+        matchedLinkedToCanonical: linkedToCanonical,
+        missingInMotilStock: products.rows.length - exactCodeMatches,
+        motilStockOnly: stockProducts.length - matchedStockCodes.size,
         sampleDifferences: differences,
-        sampleMissingInMotil: missingInMotil,
-        sampleCanonicalOnly: canonicalOnly,
+        sampleMissingInMotilStock: missingInMotilStock,
+        sampleMotilStockOnly: motilStockOnly,
         first: products.rows.slice(0, 3),
         last: products.rows.slice(-3),
       },
