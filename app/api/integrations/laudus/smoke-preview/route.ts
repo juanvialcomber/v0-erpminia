@@ -162,6 +162,8 @@ export async function GET() {
     let linkedToCanonical = 0;
     const differences: Array<Record<string, unknown>> = [];
     const missingInMotilStock: Array<Record<string, unknown>> = [];
+    const missingCodes: string[] = [];
+    const differenceCodes: string[] = [];
 
     for (const rawProduct of products.rows) {
       const product = rawProduct as LaudusProduct;
@@ -170,6 +172,7 @@ export async function GET() {
 
       const stock = stockByCode.get(sku);
       if (!stock) {
+        missingCodes.push(sku);
         if (missingInMotilStock.length < 20) {
           missingInMotilStock.push({
             productId: product.productId,
@@ -187,8 +190,9 @@ export async function GET() {
 
       if (normalized(product.description) === normalized(stock.part_name)) {
         exactNameMatches += 1;
-      } else if (differences.length < 20) {
-        differences.push({
+      } else {
+        differenceCodes.push(sku);
+        if (differences.length < 20) differences.push({
           SKU: sku,
           laudusDescription: product.description,
           motilName: stock.part_name,
@@ -230,6 +234,8 @@ export async function GET() {
         matchedLinkedToCanonical: linkedToCanonical,
         missingInMotilStock: products.rows.length - exactCodeMatches,
         motilStockOnly: stockProducts.length - matchedStockCodes.size,
+        missingCodes,
+        differenceCodes,
         sampleDifferences: differences,
         sampleMissingInMotilStock: missingInMotilStock,
         sampleMotilStockOnly: motilStockOnly,
