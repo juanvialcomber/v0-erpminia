@@ -15,6 +15,15 @@ test('procurement readiness measures headers and lines separately', () => {
   assert.match(helper, /receivedCoverage/);
 });
 
+test('procurement readiness measures downstream receipt invoice payable and payment flow', () => {
+  assert.match(helper, /flow:/);
+  assert.match(helper, /receiptOrderCoverage/);
+  assert.match(helper, /invoiceOrderCoverage/);
+  assert.match(helper, /payableInvoiceCoverage/);
+  assert.match(helper, /paymentPayableCoverage/);
+  assert.match(helper, /dteInvoiceCoverage/);
+});
+
 test('procurement readiness is read-only and permission scoped', () => {
   assert.match(route, /requireModuleAccess/);
   assert.match(route, /FIN_COMPRAS/);
@@ -25,5 +34,7 @@ test('UI communicates gaps without inventing data', () => {
   assert.match(card, /Preparación histórica para Laudus/);
   assert.match(card, /Proveedor enlazado/);
   assert.match(card, /Unidad de compra/);
+  assert.match(card, /Flujo recepción → factura → pago/);
+  assert.match(card, /DTE importados/);
   assert.match(card, /no completa proveedores, centros de costo ni unidades por inferencia/);
 });
