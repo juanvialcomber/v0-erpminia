@@ -263,6 +263,16 @@ async function proxyRequest(request: NextRequest) {
     return withSecurityHeaders(response);
   }
 
+  const isLaudusPreviewSmoke =
+    pathname === '/api/integrations/laudus/smoke-preview' &&
+    process.env.VERCEL_ENV === 'preview' &&
+    process.env.VERCEL_GIT_COMMIT_REF === 'test/laudus-smoke-preview-20261023';
+
+  if (isLaudusPreviewSmoke) {
+    return withSecurityHeaders(response);
+  }
+
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
