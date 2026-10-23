@@ -31,3 +31,12 @@ Seis pruebas ejecutables usan datos sintéticos y transporte simulado. No consti
 ## Validación realizada
 
 `node --test tests/laudus-readonly-sync.test.mjs`: 6/6. No se ejecutó build completo ni QA de producción. No se consultó consumo mensual real ni se inspeccionaron secretos de despliegue. No se desplegó ni migró base de datos.
+
+
+## Prueba real posterior — 22 de octubre, America/Santiago
+
+Juan confirmó usuario con permisos de sólo lectura y llamadas gratuitas disponibles. Se hicieron dos autenticaciones POST /security/login, ambas HTTP 200 (la primera prueba no conservó el token; la segunda se reutilizó para el listado). Una consulta POST /purchases/suppliers/list, limit=5, offset=0, fields supplierId/name/modifiedAt, orderBy supplierId ASC respondió HTTP 200 y cinco registros con esos campos. Total de solicitudes autenticadas enviadas: 3. No se imprimieron ni persistieron tokens, contraseñas o valores de proveedores. No se escribió en Laudus ni en base de datos MOTIL.
+
+OpenAPI oficial accesible en https://api.laudus.cl/swagger/v2/swagger.json. SupplierDto confirma supplierId y modifiedAt. También se identificaron /purchases/orders/list, /purchases/invoices/list y /purchases/payments/list; inventario dispone de /production/products/stock y /production/products/stockByWarehouses. Estos últimos no se consultaron autenticados y requieren revisar sus parámetros antes de implementación.
+
+Esta evidencia reemplaza únicamente el estado anterior de conexión no demostrada: autenticación y lectura pequeña sí están demostradas desde el entorno de desarrollo. Persistencia, sincronización desplegada, configuración de secretos en Vercel y permisos de lectura de cada módulo siguen pendientes. No afirmar integración productiva.
