@@ -46,6 +46,36 @@ export async function loadLaudusInventoryReadiness(
 
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
 
+  let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
+
+  try {
+    const source = await db
+      .schema('integration')
+      .from('external_sources')
+      .select('id,enabled')
+      .eq('organization_id', organizationId)
+      .eq('source_key', 'laudus')
+      .maybeSingle();
+
+    if (!source.error && source.data?.enabled) {
+      const run = await db
+        .schema('integration')
+        .from('sync_runs')
+        .select('status')
+        .eq('organization_id', organizationId)
+        .eq('source_id', source.data.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const status = String(run.data?.status || '').toLowerCase();
+      if (status === 'completed') laudusState = 'ready_to_compare';
+      if (status === 'partial' || status === 'failed') laudusState = 'review';
+    }
+  } catch {
+    // Expected before the private integration schema is deployed.
+  }
+
   return {
     stock: {
       rows: stockRows,
@@ -59,6 +89,13 @@ export async function loadLaudusInventoryReadiness(
       negativeRows: snapshotNegative,
     },
     movementCount: movements,
+    reconciliation: {
+      state: laudusState,
+      defaultAbsoluteTolerance: 0,
+      requiresApprovedTolerance: true,
+      physicalCountUsedAsEvidence: true,
+      autoApply: false,
+    },
     policy: {
       laudusStockRole: 'erp_evidence',
       motilOperationalStockRole: 'operational_truth',
