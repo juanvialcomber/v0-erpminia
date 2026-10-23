@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     'date_mismatch','insufficient_evidence','other',
   ]);
   if (decision === 'rejected' && !allowedRejectReasons.has(reasonCode)) {
-    return NextResponse.json({ error: 'Selecciona el motivo del rechazo.' }, { status: 400 });
+    return NextResponse.json({ error: 'Indica el motivo del rechazo.' }, { status: 400 });
   }
   if (decision === 'rejected' && reasonCode === 'other' && suppliedReason.length < 3) {
     return NextResponse.json({ error: 'Describe brevemente el motivo.' }, { status: 400 });
