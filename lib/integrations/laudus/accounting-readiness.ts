@@ -30,6 +30,12 @@ export async function loadLaudusAccountingReadiness(
     clpRows,
     canonicalCostCenters,
     financeCostCenters,
+    canonicalAssets,
+    financeAssets,
+    exactFinanceAssets,
+    assetsWithAcquisitionDate,
+    assetsWithAcquisitionCost,
+    assetsWithExpectedLifespan,
   ] = await Promise.all([
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('event_type', 'purchase_commitment')),
@@ -43,6 +49,12 @@ export async function loadLaudusAccountingReadiness(
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('currency', 'CLP')),
     count(db.schema('canonical').from('cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_finance_cost_centers').select('cost_center_code', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_finance_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('finance_asset_reconciliation_v1').select('finance_asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact')),
+    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
+    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null)),
+    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null)),
   ]);
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
@@ -93,15 +105,27 @@ export async function loadLaudusAccountingReadiness(
       usedByFinance: financeCostCenters,
       financeUsageCoverage: pct(financeCostCenters, canonicalCostCenters),
     },
+    assets: {
+      canonical: canonicalAssets,
+      finance: financeAssets,
+      exactFinanceMatches: exactFinanceAssets,
+      exactFinanceMatchCoverage: pct(exactFinanceAssets, financeAssets),
+      acquisitionDateCoverage: pct(assetsWithAcquisitionDate, canonicalAssets),
+      acquisitionCostCoverage: pct(assetsWithAcquisitionCost, canonicalAssets),
+      expectedLifespanCoverage: pct(assetsWithExpectedLifespan, canonicalAssets),
+    },
     reconciliation: {
       state: laudusState,
       autoPostAccountingEntries: false,
       autoRewriteLedger: false,
+      autoMergeAssets: false,
       humanReviewRequired: true,
     },
     policy: {
       laudusAccountingRole: 'financial_source',
+      laudusFixedAssetRole: 'financial_source',
       motilLedgerRole: 'operational_financial_ledger',
+      motilAssetRole: 'operational_asset_authority',
       commitmentsRemainDistinctFromRecognizedCosts: true,
     },
   };
