@@ -313,3 +313,18 @@ El scorecard permite preparar una conversación de tarifa basada en un dossier v
 
 ### Hardening del scorecard
 El scorecard ejecutivo se encapsuló en un único RPC backend-only. La API administrativa no consulta directamente tablas del esquema integration ni depende de su exposición Data API. Esto preserva el contrato interno y reduce el riesgo de exposición accidental.
+
+
+## 2026-10-23 — Snapshots históricos de Valor MOTIL
+
+### Capacidad
+MOTIL captura diariamente un snapshot idempotente del scorecard ejecutivo usando fecha de negocio America/Santiago. Se preservan conectividad, decisiones asistidas, resultados, impacto observado, nivel de evidencia y gate comercial.
+
+### Regla de integridad
+Los snapshots no recalculan el pasado con información futura. Cada día conserva lo que MOTIL podía demostrar en ese momento. Esto crea un baseline temporal defendible para comparar adopción y resultados.
+
+### Automatización
+El job reutiliza CRON_SECRET y la infraestructura de cron existente. La captura está encapsulada en RPC backend-only; usuarios finales no pueden crear ni alterar snapshots.
+
+### Valor comercial
+La negociación de tarifa podrá mostrar evolución entre períodos: crecimiento de decisiones asistidas, resultados cerrados, evidencia E3 y madurez del gate. Esto convierte el Value Ledger en una serie histórica reproducible y reduce el riesgo de argumentar valor sólo con fotografías actuales.

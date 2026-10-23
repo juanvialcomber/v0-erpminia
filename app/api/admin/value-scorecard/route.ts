@@ -12,14 +12,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Solo administración puede ver Valor MOTIL.' }, { status: 403 });
   }
 
-  const { data, error } = await context.supabase.rpc('motil_value_scorecard_preview', {
-    p_organization_id: context.organizationId,
-  });
+  const [currentResult, historyResult] = await Promise.all([
+    context.supabase.rpc('motil_value_scorecard_preview', {
+      p_organization_id: context.organizationId,
+    }),
+    context.supabase.rpc('motil_value_scorecard_history_preview', {
+      p_organization_id: context.organizationId,
+      p_limit: 90,
+    }),
+  ]);
 
-  if (error) {
-    console.error('[admin/value-scorecard]', error);
+  if (currentResult.error || historyResult.error) {
+    console.error('[admin/value-scorecard]', currentResult.error || historyResult.error);
     return NextResponse.json({ error: 'No fue posible construir el scorecard de valor.' }, { status: 500 });
   }
+
+  const data = currentResult.data;
 
   const reviews = Number(data?.assistedDecision?.matchReviews || 0);
   const outcomes = Number(data?.outcomes?.closed || 0);
@@ -27,6 +35,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ...data,
+    history: historyResult.data,
     generatedAt: new Date().toISOString(),
     narrative: {
       demonstrated: [

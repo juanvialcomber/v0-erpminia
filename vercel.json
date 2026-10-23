@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/whatsapp-vision",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/value-scorecard-daily",
+      "schedule": "45 6 * * *"
     }
   ]
 }

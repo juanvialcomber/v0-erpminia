@@ -64,6 +64,19 @@ export default function MotilValuePage(){
       </section>
     </div>:null}
 
+    {!isLoading&&data?.history?.count?<section className="rounded-lg border bg-card">
+      <div className="border-b p-5">
+        <h2 className="text-sm font-semibold">Evolución observada</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Snapshots diarios. No se recalcula el pasado con información futura.</p>
+      </div>
+      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Días observados</p><p className="mt-1 text-xl font-semibold">{n(data.history.count)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Revisiones matching</p><p className="mt-1 text-xl font-semibold">{n(data.history.latest?.assisted_decision?.matchReviews)}</p><p className="text-xs text-muted-foreground">inicio {n(data.history.first?.assisted_decision?.matchReviews)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Resultados cerrados</p><p className="mt-1 text-xl font-semibold">{n(data.history.latest?.outcomes?.closed)}</p><p className="text-xs text-muted-foreground">inicio {n(data.history.first?.outcomes?.closed)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Impactos E3</p><p className="mt-1 text-xl font-semibold">{n(data.history.latest?.observed_impact?.e3Records)}</p><p className="text-xs text-muted-foreground">inicio {n(data.history.first?.observed_impact?.e3Records)}</p></div>
+      </div>
+    </section>:null}
+
     {!isLoading&&data?<section className="rounded-lg border bg-card">
       <div className="border-b p-5"><h2 className="text-sm font-semibold">Gate para defender cambio de tarifa</h2><p className="mt-1 text-xs text-muted-foreground">No se escala por cantidad de features. Se escala cuando uso, resultados y evidencia convergen.</p></div>
       <div className="divide-y">
