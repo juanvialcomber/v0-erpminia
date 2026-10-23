@@ -36,7 +36,7 @@ export const LAUDUS_ENTITY_TARGETS: Record<LaudusEntityType, CanonicalTarget> = 
   accounts_payable: { schema: 'public', table: 'procurement_accounts_payable', authority: 'financial_source', autoApply: false },
   payment: { schema: 'integration', table: 'reconciliation_items', authority: 'candidate_only', autoApply: false },
   credit_note: { schema: 'public', table: 'procurement_supplier_credit_notes', authority: 'financial_source', autoApply: false },
-  fixed_asset: { schema: 'integration', table: 'reconciliation_items', authority: 'candidate_only', autoApply: false },
+  fixed_asset: { schema: 'canonical', table: 'assets', authority: 'candidate_only', autoApply: false },
   accounting_entry: { schema: 'integration', table: 'raw_records', authority: 'financial_source', autoApply: false },
   bank_statement: { schema: 'integration', table: 'raw_records', authority: 'financial_source', autoApply: false },
   dte: { schema: 'public', table: 'procurement_sii_dte_imports', authority: 'external_evidence', autoApply: false },
@@ -73,6 +73,8 @@ export function reconciliationKey(record: ExternalRecordEnvelope): string | null
       return normalizeCode(p.code ?? p.warehouseCode ?? p.id);
     case 'cost_center':
       return normalizeCode(p.code ?? p.costCenterCode ?? p.id);
+    case 'fixed_asset':
+      return normalizeCode(p.code ?? p.assetCode ?? p.fixedAssetCode ?? p.id);
     case 'purchase_order':
       return normalizeCode(p.number ?? p.orderNumber ?? p.id);
     default:
