@@ -16,6 +16,7 @@ const supportItems = [
   { href: '/dashboard/bodega/inteligencia', label: 'Inteligencia' },
   { href: '/dashboard/bodega/documentos', label: 'Documentos' },
   { href: '/dashboard/bodega/fuentes', label: 'Fuentes' },
+  { href: '/dashboard/bodega/laudus', label: 'Laudus' },
   { href: '/dashboard/bodega/importar-datos', label: 'Importar' },
 ];
 
