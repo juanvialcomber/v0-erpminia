@@ -10,6 +10,7 @@ import { OperationalPipelineBoard } from '@/components/pipeline/operational-pipe
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
 
 type Overview = {
   canEdit: boolean;
@@ -80,6 +81,8 @@ export default function ComprasPage() {
           { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
         ]}
       />
+
+      <LaudusProcurementReadinessCard />
 
       {error ? (
         <StatePanel
