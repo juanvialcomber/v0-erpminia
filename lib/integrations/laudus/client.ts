@@ -80,6 +80,30 @@ function safeApiError(status: number) {
   return `Laudus respondió con HTTP ${status}.`;
 }
 
+function safeUpstreamCode(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return null;
+  const value = payload as Record<string, unknown>;
+  for (const key of ['code', 'errorCode', 'errorNumber']) {
+    const candidate = value[key];
+    if (typeof candidate === 'string' || typeof candidate === 'number') return String(candidate).slice(0, 80);
+  }
+  return null;
+}
+
+export class LaudusApiError extends Error {
+  status: number;
+  path: string;
+  upstreamCode: string | null;
+
+  constructor(status: number, path: string, upstreamCode: string | null = null) {
+    super(safeApiError(status));
+    this.name = 'LaudusApiError';
+    this.status = status;
+    this.path = path;
+    this.upstreamCode = upstreamCode;
+  }
+}
+
 async function request(path: string, init: RequestInit = {}) {
   const { baseUrl } = credentials();
   const response = await fetch(`${baseUrl}${path}`, {
@@ -93,7 +117,7 @@ async function request(path: string, init: RequestInit = {}) {
 
   const payload = await parseResponse(response);
   if (!response.ok) {
-    throw new Error(safeApiError(response.status));
+    throw new LaudusApiError(response.status, path, safeUpstreamCode(payload));
   }
 
   return payload;
@@ -159,11 +183,13 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      ...query,
       options: {
         offset: query.options?.offset ?? 0,
         limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
       },
+      fields: query.fields ?? [],
+      filterBy: query.filterBy ?? [],
+      orderBy: query.orderBy ?? [],
     }),
   });
 }
