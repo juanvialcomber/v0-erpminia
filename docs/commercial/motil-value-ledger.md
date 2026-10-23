@@ -183,3 +183,43 @@ Nivel L3 — Inteligencia operacional. El módulo convierte Bodega + Mantenimien
 - diferencia de precio validada vs falso positivo;
 - recurrencia de proveedor único en materiales efectivamente críticos;
 - cobertura SKU Laudus ampliada.
+
+
+## 2026-10-23 — Proveedor 360 económico-operacional
+
+### Problema previo
+Proveedor 360 consolidaba contratos, documentos y desempeño operacional, pero la cobertura de supplier_performance_v1 era insuficiente para representar el universo: actualmente sólo un proveedor presenta evidencia en esa vista. Además, los encabezados de OC Laudus contienen total_amount=0 en múltiples registros, por lo que usar ese campo produciría exposición económica falsa.
+
+### Capacidad implementada
+MOTIL calcula una fotografía económica por RUT directamente desde líneas de OC Laudus en una ventana de 365 días:
+- número de OC;
+- productos distintos;
+- exposición económica por suma de line_total;
+- productos donde el proveedor es fuente única observada;
+- productos con múltiples fuentes;
+- variaciones de precio >=20% contra la mediana histórica;
+- productos vinculados históricamente a requerimientos de mantenimiento;
+- dependencia de mantenimiento activa, cuando exista.
+
+### Evidencia actual
+La fuente Laudus contiene 514 proveedores con compras en 365 días. El motor fue validado con un proveedor de alta actividad: 325 OC, 94 productos distintos y 92 productos donde aparece como fuente única observada. Esta concentración no se presenta como criticidad operacional automáticamente.
+
+### Fronteras de confianza
+- exposición económica se calcula desde líneas, no desde totales de cabecera;
+- proveedor único significa única fuente observada dentro de la ventana, no imposibilidad de comprar a otro;
+- variación de precio es señal de revisión, no sobrecosto demostrado;
+- sólo un vínculo con OT/activo permite hablar de exposición operacional de mantenimiento.
+
+### Valor generado por MOTIL
+Compras puede responder cuánto se compra a un proveedor, en qué productos existe concentración, qué precios cambiaron y si esa relación toca mantenimiento. La ficha deja de ser un directorio documental y se convierte en soporte de decisión.
+
+### Valor comercial
+Nivel L3, acercándose a L4. Proveedor 360 se vuelve una capacidad diferenciable de Supplier Intelligence y puede justificar expansión de tarifa cuando se mida uso, decisiones de sourcing y excepciones resueltas.
+
+### Qué falta medir
+- proveedores revisados por mes;
+- decisiones de diversificación originadas por concentración;
+- variaciones de precio validadas;
+- ahorro o costo evitado sólo después de una decisión comprobada;
+- cobertura adicional de SKU/proveedores;
+- vínculos reales a activos críticos.

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     if (supplierError) throw supplierError;
 
     const orderFilter = `canonical_supplier_id.eq.${supplierId}${supplier.tax_id ? `,supplier_tax_id.eq.${supplier.tax_id}` : ''}`;
-    const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult] = await Promise.all([
+    const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult, economicResult] = await Promise.all([
       context.supabase.from('canonical_purchase_orders_v1').select('id, order_number, order_date, total_amount, currency, status, operational_status, expected_delivery_date, supplier_tax_id').eq('organization_id', context.organizationId).or(orderFilter).order('order_date', { ascending: false }).limit(100),
       context.supabase.from('canonical_supplier_quotations_v1').select('id, quotation_number, quotation_date, valid_until, total_amount, currency, lead_time_days, payment_terms, status').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('quotation_date', { ascending: false }).limit(100),
       context.supabase.from('procurement_operational_orders').select('id, order_number, status, currency, total_amount, expected_delivery_date, actual_delivery_date, issued_at').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('issued_at', { ascending: false }).limit(100),
@@ -46,9 +46,14 @@ export async function GET(request: NextRequest) {
       context.supabase.from('supplier_operational_score_v2').select('*').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).maybeSingle(),
       context.supabase.from('supplier_performance_v1').select('*').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).maybeSingle(),
       context.supabase.from('contractors').select('id, name, rut, business_type, contact_email, contact_phone, address, city, region, registration_status').eq('rut', supplier.tax_id).maybeSingle(),
+      context.supabase.rpc('motil_supplier_economic_snapshot', {
+        p_organization_id: context.organizationId,
+        p_supplier_tax_id: supplier.tax_id,
+        p_scope_days: 365,
+      }),
     ]);
 
-    const firstError = [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult].find((result) => result.error)?.error;
+    const firstError = [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult, economicResult].find((result) => result.error)?.error;
     if (firstError) throw firstError;
 
     const orderIds = (ordersResult.data || []).map((order) => order.id);
@@ -89,6 +94,7 @@ export async function GET(request: NextRequest) {
       invoices: invoicesResult.data || [],
       returns: returnsResult.data || [],
       suppliedProducts: Array.from(productMap.values()).sort((a, b) => b.spend - a.spend).slice(0, 100),
+      economic: economicResult.data || null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la ficha del proveedor.';

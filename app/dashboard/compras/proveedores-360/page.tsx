@@ -6,7 +6,40 @@ import { apiFetch } from '@/lib/api-client';
 
 type Supplier = { id: string; tax_id: string; legal_name: string; trade_name?: string | null; business_activity?: string | null; payment_terms?: string | null; email?: string | null; phone?: string | null; region?: string | null; is_active: boolean; validation_status: string };
 type Performance = { operational_score?: number | null; delivery_score?: number | null; quality_score?: number | null; invoice_score?: number | null; evidence_dimensions?: number | null; score_version?: string | null; delivery_scored_orders?: number | null; receipt_count?: number | null; invoice_scored_count?: number | null; returns_count?: number | null; returned_quantity?: number | null };
-type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[] };
+type Detail = {
+  supplier: Supplier;
+  contractor: any;
+  performance: Performance | null;
+  legacyPerformance?: any;
+  orders: any[];
+  operationalOrders: any[];
+  quotations: any[];
+  contracts: any[];
+  documents: any[];
+  invoices: any[];
+  returns: any[];
+  suppliedProducts: any[];
+  economic?: {
+    scope_days: number;
+    spend_basis: string;
+    summary: {
+      order_count: number;
+      distinct_products: number;
+      line_spend: number;
+      purchased_quantity: number;
+      sole_source_products: number;
+      multi_source_products: number;
+      price_outliers_20pct: number;
+      maintenance_linked_products: number;
+      active_maintenance_products: number;
+      historical_work_orders: number;
+      historical_asset_links: number;
+      last_purchase_at: string | null;
+    };
+    top_products: any[];
+    price_review: any[];
+  } | null;
+};
 const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 const pct = (value?: number | null) => value == null ? 'Sin evidencia' : `${Number(value).toFixed(0)}%`;
 
@@ -49,10 +82,19 @@ export default function Suppliers360Page() {
   }, [detail]);
 
   const scoreLabel = detail?.performance?.operational_score == null ? 'Sin evidencia' : `${Number(detail.performance.operational_score).toFixed(0)}/100`;
+  const economic = detail?.economic?.summary;
   const cards = detail ? [
-    { label: 'Compras acumuladas', value: money.format(totals.spend), Icon: ShoppingCart },
-    { label: 'Facturado', value: money.format(totals.invoices), Icon: ReceiptText },
-    { label: 'Productos', value: detail.suppliedProducts.length, Icon: PackageSearch },
+    {
+      label: 'Compras 365 días',
+      value: economic ? money.format(Number(economic.line_spend || 0)) : 'Sin evidencia Laudus',
+      Icon: ShoppingCart,
+    },
+    { label: 'Facturado operacional', value: money.format(totals.invoices), Icon: ReceiptText },
+    {
+      label: 'Productos Laudus',
+      value: economic ? Number(economic.distinct_products || 0).toLocaleString('es-CL') : '—',
+      Icon: PackageSearch,
+    },
     { label: 'Contratos', value: detail.contracts.length, Icon: FileText },
     { label: 'Score operacional', value: scoreLabel, Icon: ShieldCheck },
   ] : [];
@@ -71,6 +113,76 @@ export default function Suppliers360Page() {
         {detail && !loading && <>
           <section className="rounded-lg border bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold">{detail.supplier.trade_name || detail.supplier.legal_name}</h2><p className="text-sm text-muted-foreground">{detail.supplier.legal_name} · {detail.supplier.tax_id}</p><p className="mt-2 text-sm">{detail.supplier.business_activity || 'Actividad no informada'}</p></div><div className="text-right text-sm"><p>{detail.supplier.email || 'Sin correo'}</p><p>{detail.supplier.phone || 'Sin teléfono'}</p><p>{detail.supplier.payment_terms || 'Sin condición de pago'}</p></div></div></section>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map(({ label, value, Icon }) => <article key={label} className="rounded-lg border bg-card p-4"><div className="flex justify-between text-muted-foreground"><span className="text-xs">{label}</span><Icon className="h-4 w-4"/></div><p className="mt-2 text-xl font-semibold">{value}</p></article>)}</section>
+
+
+          {detail.economic ? <section className="rounded-lg border bg-card">
+            <div className="border-b p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inteligencia económica · 365 días</p>
+              <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">Exposición y concentración</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Calculado desde líneas de OC Laudus. Los totales de cabecera no se usan cuando no son confiables.</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Última compra: {detail.economic.summary.last_purchase_at ? new Date(detail.economic.summary.last_purchase_at).toLocaleDateString('es-CL') : '—'}</p>
+              </div>
+            </div>
+            <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+              {[
+                ['OC Laudus', detail.economic.summary.order_count],
+                ['Productos', detail.economic.summary.distinct_products],
+                ['Fuente única', detail.economic.summary.sole_source_products],
+                ['Precio +20%', detail.economic.summary.price_outliers_20pct],
+                ['Ligados a mantención', detail.economic.summary.maintenance_linked_products],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="bg-card p-4">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-semibold">{Number(value || 0).toLocaleString('es-CL')}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-5 border-t p-5 xl:grid-cols-2">
+              <div>
+                <h4 className="text-sm font-semibold">Productos con mayor exposición</h4>
+                <p className="mt-1 text-xs text-muted-foreground">Concentración es evidencia de abastecimiento, no criticidad operacional por sí sola.</p>
+                <div className="mt-3 divide-y rounded-md border">
+                  {detail.economic.top_products.slice(0, 6).map((row: any) => (
+                    <div key={row.product_code} className="flex items-start justify-between gap-4 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{row.product_code} · {row.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {row.sourcing_state === 'sole_source' ? 'Fuente única observada' : row.supplier_count + ' proveedores observados'}
+                          {row.historical_work_orders > 0 ? ` · ${row.historical_work_orders} OT históricas` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm">{money.format(Number(row.spend || 0))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold">Precios a revisar</h4>
+                <p className="mt-1 text-xs text-muted-foreground">Variación histórica; puede deberse a unidad, marca, especificación o condición distinta.</p>
+                <div className="mt-3 divide-y rounded-md border">
+                  {detail.economic.price_review.length ? detail.economic.price_review.slice(0, 6).map((row: any) => (
+                    <div key={row.product_code} className="flex items-start justify-between gap-4 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{row.product_code} · {row.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{money.format(Number(row.median_unit_price || 0))} mediana → {money.format(Number(row.latest_unit_price || 0))} reciente</p>
+                      </div>
+                      <span className="shrink-0 text-sm font-medium">+{Math.round((Number(row.price_ratio || 1) - 1) * 100)}%</span>
+                    </div>
+                  )) : <p className="p-4 text-sm text-muted-foreground">Sin variaciones ≥20% con evidencia suficiente.</p>}
+                </div>
+              </div>
+            </div>
+            {detail.economic.summary.active_maintenance_products > 0 ? (
+              <div className="border-t p-4 text-sm">
+                {detail.economic.summary.active_maintenance_products} producto(s) de este proveedor están vinculados a requerimientos de mantenimiento activos.
+              </div>
+            ) : (
+              <div className="border-t p-4 text-sm text-muted-foreground">Sin dependencia de mantenimiento activa identificada para este proveedor.</div>
+            )}
+          </section> : null}
 
           <section className="rounded-lg border bg-card p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Score operacional v2</p><h3 className="mt-1 text-lg font-semibold">Evidencia que alimenta la próxima adjudicación</h3><p className="mt-1 text-sm text-muted-foreground">Promedio simple sólo de dimensiones con evidencia. Sin datos, Motil no asigna score.</p></div><p className="text-sm text-muted-foreground">Evidencia: {Number(detail.performance?.evidence_dimensions || 0)}/3 dimensiones</p></div>
