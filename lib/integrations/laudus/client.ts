@@ -1,6 +1,7 @@
 const DEFAULT_BASE_URL = 'https://api.laudus.cl';
 const DEFAULT_USER_NAME = 'Motil';
 const DEFAULT_COMPANY_VAT_ID = '84542800-K';
+const MAX_LIST_PAGE_SIZE = 500;
 
 type LaudusCredentials = {
   baseUrl: string;
@@ -87,6 +88,7 @@ async function request(path: string, init: RequestInit = {}) {
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate, br',
       ...(init.headers || {}),
     },
   });
@@ -151,6 +153,8 @@ type LaudusListQuery = {
 
 export async function listLaudus(path: string, query: LaudusListQuery = {}) {
   const token = await getLaudusAccessToken();
+  const requestedLimit = query.options?.limit ?? 5;
+  const boundedLimit = Math.min(Math.max(requestedLimit, 1), MAX_LIST_PAGE_SIZE);
 
   return request(path, {
     method: 'POST',
@@ -162,7 +166,7 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
       ...query,
       options: {
         offset: query.options?.offset ?? 0,
-        limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
+        limit: boundedLimit,
       },
     }),
   });
