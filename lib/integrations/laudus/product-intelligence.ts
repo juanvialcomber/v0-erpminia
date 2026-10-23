@@ -43,6 +43,106 @@ type Rule = {
 };
 
 const RULES: Record<string, Rule> = {
+
+  FITTING: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.98,
+    reason: 'SKU Laudus identifica fitting o conexión operacional.',
+  },
+  PERFORACION: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.97,
+    reason: 'SKU Laudus identifica material o componente de perforación.',
+  },
+  CORREA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.98,
+    reason: 'SKU Laudus identifica correa o componente de transmisión.',
+  },
+  SOLDADURA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.98,
+    reason: 'SKU Laudus identifica insumo de soldadura.',
+  },
+  CORAZA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.97,
+    reason: 'SKU Laudus identifica coraza o componente de desgaste.',
+  },
+  MADERA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.9,
+    reason: 'SKU Laudus identifica material de madera de uso operacional.',
+  },
+  FORTIFICACION: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.96,
+    reason: 'SKU Laudus identifica material de fortificación.',
+  },
+  MALLA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.9,
+    reason: 'SKU Laudus identifica malla de uso operacional.',
+  },
+  CINTA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.9,
+    reason: 'SKU Laudus identifica cinta de uso operacional.',
+  },
+  LONA: {
+    category: 'maintenance_supply',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.9,
+    reason: 'SKU Laudus identifica lona de uso operacional.',
+  },
+  BOLA: {
+    category: 'process_consumable',
+    inventoryEligibility: 'eligible',
+    targets: ['warehouse', 'plant_lab', 'procurement'],
+    confidence: 0.92,
+    reason: 'SKU Laudus identifica medio o consumible de proceso.',
+  },
+  SERVTEC: {
+    category: 'service',
+    inventoryEligibility: 'exclude',
+    targets: ['procurement'],
+    confidence: 0.98,
+    reason: 'SKU Laudus identifica servicio técnico.',
+  },
+  EXPLOSIVO: {
+    category: 'process_consumable',
+    inventoryEligibility: 'review',
+    targets: ['hse', 'procurement'],
+    confidence: 0.98,
+    reason: 'SKU Laudus identifica explosivo; requiere tratamiento especial y revisión humana.',
+  },
+  COMBUSTIBLE: {
+    category: 'process_consumable',
+    inventoryEligibility: 'review',
+    targets: ['warehouse', 'maintenance', 'procurement'],
+    confidence: 0.95,
+    reason: 'SKU Laudus identifica combustible; requiere política operacional específica.',
+  },
+
   REPUESTO: {
     category: 'maintenance_supply',
     inventoryEligibility: 'eligible',
