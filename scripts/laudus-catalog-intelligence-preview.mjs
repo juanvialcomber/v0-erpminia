@@ -67,6 +67,8 @@ const categoryCounts = {};
 const eligibilityCounts = {};
 const prefixCounts = {};
 const qualityFlagCounts = {};
+const samplePrefixes = new Set(['SACOI','CEAR','FERIA','HI','EQUS','VENTA']);
+const prefixSamples = {};
 let totalRows = 0;
 let offset = 0;
 let pages = 0;
@@ -112,6 +114,10 @@ for (;;) {
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
     eligibilityCounts[eligibility] = (eligibilityCounts[eligibility] || 0) + 1;
     prefixCounts[prefix] = (prefixCounts[prefix] || 0) + 1;
+    if (samplePrefixes.has(prefix)) {
+      prefixSamples[prefix] ||= [];
+      if (prefixSamples[prefix].length < 8) prefixSamples[prefix].push({ SKU: row?.SKU ?? null, description: row?.description ?? null, unitOfMeasure: row?.unitOfMeasure ?? null });
+    }
 
     const sku = String(row?.SKU ?? '').trim();
     const description = String(row?.description ?? '').trim();
@@ -146,4 +152,5 @@ console.log('LAUDUS_CATALOG_INTELLIGENCE ' + JSON.stringify({
   eligibilityCounts,
   qualityFlagCounts,
   topPrefixes,
+  prefixSamples,
 }));
