@@ -287,6 +287,7 @@ export async function POST(request: NextRequest) {
     if (decisionResult.error || !decisionResult.data || decisionResult.data.decision !== 'action_required') {
       return NextResponse.json({ error: 'La acción no existe o no corresponde a una acción requerida.' }, { status: 404 });
     }
+    const decisionRow = decisionResult.data;
 
     const current = await context.supabase.rpc('motil_supply_risk_preview', {
       p_organization_id: context.organizationId,
@@ -297,10 +298,10 @@ export async function POST(request: NextRequest) {
     }
 
     const currentSignal = (current.data?.top_actions || []).find(
-      (row: any) => row.product_id === decisionResult.data.product_id,
+      (row: any) => row.product_id === decisionRow.product_id,
     );
     const recordedAt = new Date();
-    const decidedAt = new Date(decisionResult.data.decided_at);
+    const decidedAt = new Date(decisionRow.decided_at);
     const timeToOutcomeMs = Number.isFinite(decidedAt.getTime())
       ? Math.max(0, recordedAt.getTime() - decidedAt.getTime())
       : null;
@@ -309,11 +310,11 @@ export async function POST(request: NextRequest) {
       .from('procurement_supply_risk_outcomes')
       .insert({
         organization_id: context.organizationId,
-        decision_id: decisionResult.data.id,
-        product_id: decisionResult.data.product_id,
+        decision_id: decisionRow.id,
+        product_id: decisionRow.product_id,
         outcome,
         note: note || null,
-        risk_score_before: decisionResult.data.risk_score,
+        risk_score_before: decisionRow.risk_score,
         risk_score_after: currentSignal?.risk_score ?? 0,
         evidence_after: currentSignal || { signal_cleared: true },
         time_to_outcome_ms: timeToOutcomeMs,
