@@ -86,12 +86,22 @@ const numeric = (value: unknown) => {
 const number = (value: unknown) =>
   new Intl.NumberFormat('es-CL', { maximumFractionDigits: 0 }).format(numeric(value));
 
-const money = (value: unknown) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(numeric(value));
+const amount = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const money = (value: unknown) => {
+  const parsed = amount(value);
+  return parsed === null
+    ? '—'
+    : new Intl.NumberFormat('es-CL', {
+        style: 'currency',
+        currency: 'CLP',
+        maximumFractionDigits: 0,
+      }).format(parsed);
+};
 
 type Priority = {
   label: string;
