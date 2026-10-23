@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "pnpm migrations:check && pnpm test && pnpm lint:eslint",
+    "prebuild": "node scripts/laudus-warehouse-sync-preview.mjs && pnpm migrations:check && pnpm test && pnpm lint:eslint",
     "build": "next build",
     "start": "next start",
     "lint": "pnpm lint:eslint && pnpm typecheck",
