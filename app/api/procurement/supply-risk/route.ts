@@ -101,6 +101,23 @@ export async function GET(request: NextRequest) {
     })
     .slice(0, 12);
 
+  const outcomeIds = outcomes.map((row) => row.id);
+  let valueEvidence: any[] = [];
+  if (outcomeIds.length) {
+    const valueResult = await context.supabase
+      .from('procurement_supply_value_evidence')
+      .select('id,outcome_id,decision_id,product_id,impact_type,observed_value_clp,observed_minutes,evidence_level,basis_note,evidence_reference,recorded_by,recorded_at')
+      .eq('organization_id', context.organizationId)
+      .in('outcome_id', outcomeIds.slice(0, 100))
+      .order('recorded_at', { ascending: false });
+
+    if (valueResult.error) {
+      console.error('[procurement/supply-risk value-evidence]', valueResult.error);
+      return NextResponse.json({ error: 'No fue posible cargar la evidencia de valor.' }, { status: 500 });
+    }
+    valueEvidence = valueResult.data || [];
+  }
+
   const closedOutcomes = outcomes.length;
   const positiveOutcomes = outcomes.filter((row) => ['resolved','risk_reduced'].includes(row.outcome)).length;
   const falsePositives = outcomes.filter((row) => row.outcome === 'false_positive').length;
@@ -109,12 +126,30 @@ export async function GET(request: NextRequest) {
     .map((row) => Number(row.risk_score_before) - Number(row.risk_score_after))
     .filter((value) => Number.isFinite(value));
 
+  const observedValueClp = valueEvidence
+    .map((row) => Number(row.observed_value_clp))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .reduce((sum, value) => sum + value, 0);
+  const observedMinutes = valueEvidence
+    .map((row) => Number(row.observed_minutes))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .reduce((sum, value) => sum + value, 0);
+  const e3Count = valueEvidence.filter((row) => row.evidence_level === 'E3').length;
+
   return NextResponse.json({
     ...data,
     pending: pending.slice(0, 12),
     decisions: decisions.slice(0, 12),
     openActions,
     outcomes: outcomes.slice(0, 12),
+    valueEvidence: valueEvidence.slice(0, 12),
+    valueMetrics: {
+      records: valueEvidence.length,
+      observedValueClp,
+      observedMinutes,
+      e3Count,
+      maturity: e3Count > 0 ? 'E3' : valueEvidence.length > 0 ? 'E2' : 'E1',
+    },
     outcomeMetrics: {
       openActions: openActions.length,
       closedOutcomes,
@@ -152,12 +187,87 @@ export async function POST(request: NextRequest) {
   if (!context.ok) return context.response;
 
   const body = await request.json().catch(() => null);
+  const valueOutcomeId = String(body?.valueOutcomeId || '').trim();
+  const impactType = String(body?.impactType || '').trim();
+  const basisNote = String(body?.basisNote || '').trim();
+  const evidenceReference = String(body?.evidenceReference || '').trim();
+  const observedValueClpRaw = body?.observedValueClp;
+  const observedMinutesRaw = body?.observedMinutes;
   const productId = String(body?.productId || '').trim();
   const outcomeDecisionId = String(body?.outcomeDecisionId || '').trim();
   const outcome = String(body?.outcome || '').trim();
   const decision = String(body?.decision || '').trim();
   const reasonCode = String(body?.reasonCode || '').trim();
   const note = String(body?.note || '').trim();
+
+  if (valueOutcomeId) {
+    const allowedImpactTypes = new Set([
+      'time_saved','validated_price_difference','stockout_prevented','risk_reduced','other',
+    ]);
+    if (!allowedImpactTypes.has(impactType) || basisNote.length < 10) {
+      return NextResponse.json({ error: 'Completa el tipo de impacto y su base de evidencia.' }, { status: 400 });
+    }
+
+    const outcomeResult = await context.supabase
+      .from('procurement_supply_risk_outcomes')
+      .select('id,decision_id,product_id,outcome')
+      .eq('organization_id', context.organizationId)
+      .eq('id', valueOutcomeId)
+      .maybeSingle();
+
+    if (outcomeResult.error || !outcomeResult.data) {
+      return NextResponse.json({ error: 'El resultado de abastecimiento no existe.' }, { status: 404 });
+    }
+
+    const observedValueClp = observedValueClpRaw === '' || observedValueClpRaw == null
+      ? null : Number(observedValueClpRaw);
+    const observedMinutes = observedMinutesRaw === '' || observedMinutesRaw == null
+      ? null : Number(observedMinutesRaw);
+
+    if (observedValueClp !== null && (!Number.isFinite(observedValueClp) || observedValueClp < 0)) {
+      return NextResponse.json({ error: 'Monto observado inválido.' }, { status: 400 });
+    }
+    if (observedMinutes !== null && (!Number.isFinite(observedMinutes) || observedMinutes < 0)) {
+      return NextResponse.json({ error: 'Tiempo observado inválido.' }, { status: 400 });
+    }
+
+    const evidenceLevel = evidenceReference.length >= 5 ? 'E3' : 'E2';
+    const result = await context.supabase
+      .from('procurement_supply_value_evidence')
+      .insert({
+        organization_id: context.organizationId,
+        outcome_id: outcomeResult.data.id,
+        decision_id: outcomeResult.data.decision_id,
+        product_id: outcomeResult.data.product_id,
+        impact_type: impactType,
+        observed_value_clp: observedValueClp,
+        observed_minutes: observedMinutes,
+        evidence_level: evidenceLevel,
+        basis_note: basisNote,
+        evidence_reference: evidenceReference || null,
+        recorded_by: context.userId,
+        recorded_at: new Date().toISOString(),
+      })
+      .select('id,outcome_id,decision_id,product_id,impact_type,observed_value_clp,observed_minutes,evidence_level,basis_note,evidence_reference,recorded_by,recorded_at')
+      .single();
+
+    if (result.error) {
+      const duplicate = String(result.error.code || '') === '23505';
+      return NextResponse.json(
+        { error: duplicate ? 'Este impacto ya fue registrado para el resultado.' : 'No fue posible guardar la evidencia de valor.' },
+        { status: duplicate ? 409 : 500 },
+      );
+    }
+
+    return NextResponse.json({
+      valueEvidence: result.data,
+      accountingModified: false,
+      canonicalModified: false,
+      message: evidenceLevel === 'E3'
+        ? 'Impacto observado registrado con referencia de evidencia.'
+        : 'Impacto observado registrado como evidencia E2.',
+    });
+  }
 
   if (outcomeDecisionId) {
     if (!['resolved','risk_reduced','no_change','false_positive'].includes(outcome)) {

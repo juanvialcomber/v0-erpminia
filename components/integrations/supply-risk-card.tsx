@@ -65,6 +65,24 @@ type Payload = {
     current_signal_active: boolean;
     current_risk_reasons: string[];
   }>;
+  valueEvidence: Array<{
+    id: string;
+    outcome_id: string;
+    impact_type: string;
+    observed_value_clp: number | null;
+    observed_minutes: number | null;
+    evidence_level: 'E2' | 'E3';
+    basis_note: string;
+    evidence_reference: string | null;
+    recorded_at: string;
+  }>;
+  valueMetrics: {
+    records: number;
+    observedValueClp: number;
+    observedMinutes: number;
+    e3Count: number;
+    maturity: 'E1' | 'E2' | 'E3';
+  };
   outcomeMetrics: {
     openActions: number;
     closedOutcomes: number;
@@ -120,6 +138,12 @@ export function SupplyRiskCard() {
   const [message, setMessage] = useState('');
   const [outcomeMode, setOutcomeMode] = useState<string | null>(null);
   const [outcomeNote, setOutcomeNote] = useState('');
+  const [valueOutcomeId, setValueOutcomeId] = useState<string | null>(null);
+  const [impactType, setImpactType] = useState('');
+  const [basisNote, setBasisNote] = useState('');
+  const [evidenceReference, setEvidenceReference] = useState('');
+  const [observedValueClp, setObservedValueClp] = useState('');
+  const [observedMinutes, setObservedMinutes] = useState('');
 
   if (error) return null;
 
@@ -189,6 +213,44 @@ export function SupplyRiskCard() {
       await mutate();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo cerrar la acción.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const recordValue = async () => {
+    if (!valueOutcomeId || !impactType || basisNote.trim().length < 10) {
+      setMessage('Describe el impacto y la base de evidencia.');
+      return;
+    }
+    setSaving(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/procurement/supply-risk', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          valueOutcomeId,
+          impactType,
+          basisNote: basisNote.trim(),
+          evidenceReference: evidenceReference.trim(),
+          observedValueClp,
+          observedMinutes,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el impacto.');
+      setValueOutcomeId(null);
+      setImpactType('');
+      setBasisNote('');
+      setEvidenceReference('');
+      setObservedValueClp('');
+      setObservedMinutes('');
+      setMessage(payload?.message || 'Impacto observado registrado.');
+      await mutate();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo guardar el impacto.');
     } finally {
       setSaving(false);
     }
@@ -343,6 +405,60 @@ export function SupplyRiskCard() {
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => { setOutcomeMode(null); setOutcomeNote(''); }}>Cancelar</Button>
               </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!isLoading && data?.outcomes?.length ? (
+        <div className="border-t p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Valor observado</p>
+              <p className="mt-1 text-sm font-semibold">Documenta sólo efectos que puedas explicar</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                E2 = observado/declarado · E3 = observado con referencia de evidencia. No equivale a ahorro auditado.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" disabled={saving} onClick={() => setValueOutcomeId(data.outcomes[0].id)}>
+              Registrar impacto
+            </Button>
+          </div>
+
+          {valueOutcomeId === data.outcomes[0].id ? (
+            <div className="mt-3 rounded-md border bg-muted/20 p-3">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ['time_saved','Tiempo ahorrado'],
+                  ['validated_price_difference','Diferencia de precio'],
+                  ['stockout_prevented','Quiebre evitado'],
+                  ['risk_reduced','Riesgo reducido'],
+                  ['other','Otro'],
+                ].map(([code,label]) => (
+                  <Button key={code} size="sm" type="button" variant={impactType === code ? 'secondary' : 'outline'} onClick={() => setImpactType(code)}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <input className="h-9 rounded-md border bg-background px-3 text-sm" inputMode="numeric" value={observedValueClp} onChange={(e) => setObservedValueClp(e.target.value)} placeholder="Monto CLP observado (opcional)" />
+                <input className="h-9 rounded-md border bg-background px-3 text-sm" inputMode="numeric" value={observedMinutes} onChange={(e) => setObservedMinutes(e.target.value)} placeholder="Minutos observados (opcional)" />
+              </div>
+              <Textarea className="mt-3 min-h-20" value={basisNote} onChange={(event) => setBasisNote(event.target.value)} placeholder="Base de evidencia: qué ocurrió y cómo se observó…" />
+              <input className="mt-3 h-9 w-full rounded-md border bg-background px-3 text-sm" value={evidenceReference} onChange={(e) => setEvidenceReference(e.target.value)} placeholder="Referencia opcional: OC, cotización, documento, ticket…" />
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" disabled={saving || !impactType || basisNote.trim().length < 10} onClick={() => void recordValue()}>Guardar impacto</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setValueOutcomeId(null); setImpactType(''); setBasisNote(''); setEvidenceReference(''); setObservedValueClp(''); setObservedMinutes(''); }}>Cancelar</Button>
+              </div>
+            </div>
+          ) : null}
+
+          {data.valueMetrics.records > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span>{data.valueMetrics.records} impactos registrados</span>
+              <span>Evidencia {data.valueMetrics.maturity}</span>
+              {data.valueMetrics.observedMinutes > 0 ? <span>{n(data.valueMetrics.observedMinutes)} min observados</span> : null}
+              {data.valueMetrics.observedValueClp > 0 ? <span>{money(data.valueMetrics.observedValueClp)} observados</span> : null}
             </div>
           ) : null}
         </div>

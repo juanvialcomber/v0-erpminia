@@ -271,3 +271,22 @@ Esto permite distinguir alertas útiles de ruido y medir si el sistema realmente
 
 ### Valor comercial
 Nivel L4 sólido. El módulo deja de ser una superficie de recomendaciones y se convierte en un sistema de gestión y medición de decisiones. Cuando existan resultados reales repetidos, esta capa puede producir evidencia E2/E3 para sostener una revisión de tarifa basada en uso e impacto observado.
+
+
+## 2026-10-23 — Evidencia de impacto observado
+
+### Capacidad
+Después de cerrar un resultado, Compras puede registrar evidencia de impacto: tiempo ahorrado, diferencia de precio validada, quiebre evitado, reducción de riesgo u otro. Se puede adjuntar monto CLP observado, minutos y una referencia trazable.
+
+### Evidencia y madurez
+- E2: efecto observado/declarado con explicación.
+- E3: efecto observado con referencia documental u operacional.
+- Ningún monto se trata como ahorro auditado ni se escribe a contabilidad.
+
+### Valor generado
+MOTIL puede acumular evidencia de uso e impacto conectada a una cadena causal documentada:
+señal -> decisión -> acción -> resultado -> impacto observado.
+Esto permite preparar una negociación de tarifa con evidencia por caso en lugar de una lista de funcionalidades.
+
+### Qué falta antes de usarlo comercialmente
+Acumular una muestra suficiente de resultados reales y revisar manualmente los casos monetarios más importantes. Para una afirmación de ROI formal, contrastar baseline, período, recurrencia y atribución.
