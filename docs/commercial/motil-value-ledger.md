@@ -328,3 +328,25 @@ El job reutiliza CRON_SECRET y la infraestructura de cron existente. La captura 
 
 ### Valor comercial
 La negociación de tarifa podrá mostrar evolución entre períodos: crecimiento de decisiones asistidas, resultados cerrados, evidencia E3 y madurez del gate. Esto convierte el Value Ledger en una serie histórica reproducible y reduce el riesgo de argumentar valor sólo con fotografías actuales.
+
+
+## 2026-10-23 — Comparación comercial periódica
+
+### Capacidad
+Valor MOTIL ahora compara el último snapshot con el snapshot de hace aproximadamente 30 días cuando existe; si todavía no hay 30 días de historia, usa el primer baseline disponible. La comparación es determinística y no usa generación de lenguaje para inventar beneficios.
+
+### Deltas observados
+El scorecard calcula cambios en:
+- revisiones de matching;
+- decisiones y acciones de abastecimiento;
+- resultados cerrados;
+- resultados positivos;
+- casos E3;
+- minutos de impacto observado;
+- montos CLP asociados a evidencia observada.
+
+### Narrativa comercial
+Sólo se generan afirmaciones cuando el delta es positivo y está presente en snapshots persistidos. Si no existe cambio, la interfaz dice explícitamente que aún no hay delta observado.
+
+### Valor comercial
+Esto prepara una conversación mensual de expansión basada en evolución demostrada. El argumento de tarifa puede mostrar cuánto aumentó el uso y la evidencia desde el baseline, sin confundir capacidad instalada con resultado económico.

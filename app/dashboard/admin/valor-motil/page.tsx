@@ -77,6 +77,35 @@ export default function MotilValuePage(){
       </div>
     </section>:null}
 
+    {!isLoading&&data?.comparison?<section className="rounded-lg border bg-card">
+      <div className="border-b p-5">
+        <h2 className="text-sm font-semibold">Comparación comercial del período</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {data.comparison.mode === '30d'
+            ? 'Últimos 30 días observados.'
+            : data.comparison.mode === 'available-history'
+              ? 'Comparación contra el primer snapshot disponible.'
+              : 'Baseline inicial: aún no existe historia suficiente para medir cambio.'}
+        </p>
+      </div>
+      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Revisiones nuevas</p><p className="mt-1 text-xl font-semibold">+{n(data.comparison.deltas.matchReviews)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Acciones nuevas</p><p className="mt-1 text-xl font-semibold">+{n(data.comparison.deltas.supplyActions)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Resultados cerrados</p><p className="mt-1 text-xl font-semibold">+{n(data.comparison.deltas.closedOutcomes)}</p></div>
+        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Casos E3 nuevos</p><p className="mt-1 text-xl font-semibold">+{n(data.comparison.deltas.e3Records)}</p></div>
+      </div>
+      <div className="border-t p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Evidencia defendible</p>
+        {data.commercialEvidence?.length ? (
+          <ul className="mt-3 space-y-2 text-sm">
+            {data.commercialEvidence.map((item:string)=><li key={item}>• {item}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">Todavía no existe delta observado. El baseline ya quedó congelado para medirlo correctamente desde ahora.</p>
+        )}
+      </div>
+    </section>:null}
+
     {!isLoading&&data?<section className="rounded-lg border bg-card">
       <div className="border-b p-5"><h2 className="text-sm font-semibold">Gate para defender cambio de tarifa</h2><p className="mt-1 text-xs text-muted-foreground">No se escala por cantidad de features. Se escala cuando uso, resultados y evidencia convergen.</p></div>
       <div className="divide-y">

@@ -33,9 +33,79 @@ export async function GET(request: NextRequest) {
   const outcomes = Number(data?.outcomes?.closed || 0);
   const e3 = Number(data?.observedImpact?.e3Records || 0);
 
+  const series = Array.isArray(historyResult.data?.series) ? historyResult.data.series : [];
+  const latest = historyResult.data?.latest || null;
+  const first = historyResult.data?.first || null;
+  const latestDate = latest?.snapshot_date ? new Date(latest.snapshot_date + 'T12:00:00Z') : null;
+  const target30 = latestDate ? new Date(latestDate.getTime() - 30 * 86400000) : null;
+
+  const baseline30 = target30 && series.length
+    ? [...series]
+        .filter((row: any) => row?.snapshot_date)
+        .sort((a: any, b: any) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime())
+        .reduce((best: any, row: any) => {
+          const rowDate = new Date(row.snapshot_date + 'T12:00:00Z');
+          if (rowDate > target30) return best;
+          return !best || rowDate > new Date(best.snapshot_date + 'T12:00:00Z') ? row : best;
+        }, null)
+    : null;
+
+  const comparisonBase = baseline30 || first;
+  const numberAt = (row: any, path: string[]) => {
+    let value = row;
+    for (const key of path) value = value?.[key];
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const delta = (path: string[]) => latest && comparisonBase
+    ? numberAt(latest, path) - numberAt(comparisonBase, path)
+    : 0;
+
+  const comparison = {
+    mode: baseline30 ? '30d' : series.length > 1 ? 'available-history' : 'baseline-only',
+    fromDate: comparisonBase?.snapshot_date || null,
+    toDate: latest?.snapshot_date || null,
+    daysObserved: comparisonBase?.snapshot_date && latest?.snapshot_date
+      ? Math.max(0, Math.round(
+          (new Date(latest.snapshot_date + 'T12:00:00Z').getTime()
+            - new Date(comparisonBase.snapshot_date + 'T12:00:00Z').getTime()) / 86400000,
+        ))
+      : 0,
+    deltas: {
+      matchReviews: delta(['assisted_decision','matchReviews']),
+      supplyDecisions: delta(['assisted_decision','supplyDecisions']),
+      supplyActions: delta(['assisted_decision','supplyActions']),
+      closedOutcomes: delta(['outcomes','closed']),
+      positiveOutcomes: delta(['outcomes','positive']),
+      e3Records: delta(['observed_impact','e3Records']),
+      observedMinutes: delta(['observed_impact','observedMinutes']),
+      observedValueClp: delta(['observed_impact','observedValueClp']),
+    },
+  };
+
+  const commercialEvidence = [
+    comparison.deltas.matchReviews > 0
+      ? `${comparison.deltas.matchReviews} nuevas revisiones de matching registradas en el período.`
+      : null,
+    comparison.deltas.supplyActions > 0
+      ? `${comparison.deltas.supplyActions} nuevas acciones de abastecimiento originadas desde MOTIL.`
+      : null,
+    comparison.deltas.closedOutcomes > 0
+      ? `${comparison.deltas.closedOutcomes} resultados de abastecimiento cerrados.`
+      : null,
+    comparison.deltas.e3Records > 0
+      ? `${comparison.deltas.e3Records} nuevos casos E3 con referencia de evidencia.`
+      : null,
+    comparison.deltas.observedMinutes > 0
+      ? `${Math.round(comparison.deltas.observedMinutes)} minutos de impacto observado documentado.`
+      : null,
+  ].filter(Boolean);
+
   return NextResponse.json({
     ...data,
     history: historyResult.data,
+    comparison,
+    commercialEvidence,
     generatedAt: new Date().toISOString(),
     narrative: {
       demonstrated: [
