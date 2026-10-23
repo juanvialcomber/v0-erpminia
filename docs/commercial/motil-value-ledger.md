@@ -309,3 +309,7 @@ El scorecard separa L4 de producto (capacidad disponible) de E1/E2/E3 de evidenc
 
 ### Valor comercial
 El scorecard permite preparar una conversación de tarifa basada en un dossier vivo: qué procesos están conectados, cuánto se usa la decisión asistida, qué resultados se cierran y qué impacto tiene referencia trazable. La tarifa se defiende con evidencia acumulada, no con número de pantallas.
+
+
+### Hardening del scorecard
+El scorecard ejecutivo se encapsuló en un único RPC backend-only. La API administrativa no consulta directamente tablas del esquema integration ni depende de su exposición Data API. Esto preserva el contrato interno y reduce el riesgo de exposición accidental.
