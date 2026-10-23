@@ -1,4 +1,9 @@
-import { type ExternalRecordEnvelope, reconciliationKey } from './model';
+import {
+  normalizeCode,
+  normalizeRut,
+  type ExternalRecordEnvelope,
+  reconciliationKey,
+} from './model';
 
 export type Candidate = {
   id: string;
@@ -11,6 +16,12 @@ export type ReconciliationDecision =
   | { status: 'new_candidate'; key: string | null; confidence: null }
   | { status: 'conflict'; key: string; candidateIds: string[]; confidence: null };
 
+function candidateKey(record: ExternalRecordEnvelope, candidate: Candidate) {
+  return record.entityType === 'supplier'
+    ? normalizeRut(candidate.taxId)
+    : normalizeCode(candidate.code);
+}
+
 export function reconcileDeterministically(
   record: ExternalRecordEnvelope,
   candidates: Candidate[],
@@ -18,12 +29,7 @@ export function reconcileDeterministically(
   const key = reconciliationKey(record);
   if (!key) return { status: 'new_candidate', key: null, confidence: null };
 
-  const matches = candidates.filter((candidate) => {
-    const candidateKey = record.entityType === 'supplier'
-      ? candidate.taxId?.toUpperCase().replace(/[^0-9K]/g, '').replace(/(.+)(.)$/, '$1-$2')
-      : candidate.code?.trim().toUpperCase().replace(/\s+/g, ' ');
-    return candidateKey === key;
-  });
+  const matches = candidates.filter((candidate) => candidateKey(record, candidate) === key);
 
   if (matches.length === 1) {
     return {
