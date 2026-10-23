@@ -459,3 +459,18 @@ Nivel: L3 Inteligencia.
 La base actual tiene 0 filas en `work_order_parts`; por lo tanto no existe evidencia suficiente para atribuir compras Laudus a activos. MOTIL no usa centro de costo o similitud textual para fingir esa atribución.
 
 Se agregó `motil_asset_laudus_parts_preview`: Activo -> OT -> repuesto trazado -> producto canónico -> historial Laudus del mismo SKU. La compra Laudus se conserva como contexto del SKU, no como prueba de consumo por el activo. El estado inicial es `material_traceability_required`. TCO y reparar/reemplazar siguen bloqueados hasta tener cobertura suficiente de adquisición, consumo, servicios externos y detención.
+
+
+## 2026-10-23 — Declaración de materiales por OT
+
+### Problema
+El motor ya reservaba stock automáticamente al existir un requerimiento, pero la UX dejaba materiales dentro del detalle técnico. Una OT sin filas podía significar dos cosas distintas: realmente no usa materiales o nadie los declaró. Esa ambigüedad impedía construir economía de activo defendible.
+
+### Cambio
+Cada OT moderna puede declarar explícitamente `materials_required = true|false`, con actor y timestamp. La pregunta se muestra en el flujo de ejecución. Agregar un material declara automáticamente que la OT usa materiales; la reserva de stock existente continúa automática vía `refresh_work_order_supply_need`.
+
+### Gate
+La aprobación supervisora queda bloqueada si la declaración sigue en NULL. Si la OT declara materiales, debe existir al menos un requerimiento activo. Si declara no usar materiales, no puede mantener requerimientos activos.
+
+### Valor
+Esto convierte ausencia de datos en una decisión explícita. Desde ahora, las OT pueden alimentar `work_order_parts` cuando corresponda y distinguir cero consumo real de falta de captura. Es prerrequisito para Activo 360 Economics y futuro reparar vs renovar.

@@ -31,6 +31,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const materialLines = review.data?.materialRequirementsCount ?? 0;
+  const approvalBlocker = review.data?.approvalBlocker || null;
 
   const approve = async () => {
     setApproving(true);
@@ -106,6 +107,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 <>
                   <p className="text-sm font-medium">Pendiente de aprobación</p>
                   <p className="mt-1 text-xs text-muted-foreground">Ariel López o Mauricio Astudillo revisan la evidencia y aprueban la OT.</p>
+                  {approvalBlocker ? <p className="mt-2 text-xs font-medium text-destructive">{approvalBlocker}</p> : null}
                 </>
               )}
             </div>

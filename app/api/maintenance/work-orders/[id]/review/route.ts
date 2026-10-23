@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
-    .select('id,status,work_order_number')
+    .select('id,status,work_order_number,materials_required,materials_reviewed_at')
     .eq('organization_id', context.organizationId)
     .eq('id', id)
     .maybeSingle();
@@ -76,7 +76,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       reviewed_by_name: null,
       reviewed_at: null,
     },
-    canApprove: Boolean(reviewer) && String(workOrder.status || '') === 'completed' && review?.status !== 'approved',
+    materialDeclaration: {
+      requiresMaterials: workOrder.materials_required,
+      reviewedAt: workOrder.materials_reviewed_at,
+    },
+    approvalBlocker: workOrder.materials_required == null ? 'Confirma si la OT utilizó materiales antes de aprobar.' : null,
+    canApprove: Boolean(reviewer) && String(workOrder.status || '') === 'completed' && review?.status !== 'approved' && workOrder.materials_required != null,
   });
 }
 
@@ -95,7 +100,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
-    .select('id,status,work_order_number,canonical_asset_id')
+    .select('id,status,work_order_number,canonical_asset_id,materials_required,materials_reviewed_at')
     .eq('organization_id', context.organizationId)
     .eq('id', id)
     .maybeSingle();
@@ -103,6 +108,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!workOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo.' }, { status: 404 });
   if (String(workOrder.status || '') !== 'completed') {
     return NextResponse.json({ error: 'La OT debe estar terminada antes de ser aprobada.' }, { status: 409 });
+  }
+  if (workOrder.materials_required == null) {
+    return NextResponse.json({ error: 'Confirma si la OT utilizó materiales antes de aprobar.' }, { status: 409 });
+  }
+
+  const { count: activeMaterialRequirements, error: activeRequirementsError } = await context.supabase
+    .from('work_order_material_requirements')
+    .select('id', { head: true, count: 'exact' })
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .neq('status', 'cancelled');
+  if (activeRequirementsError) return NextResponse.json({ error: activeRequirementsError.message }, { status: 500 });
+  if (workOrder.materials_required === true && Number(activeMaterialRequirements || 0) === 0) {
+    return NextResponse.json({ error: 'La OT está marcada con uso de materiales, pero no tiene materiales requeridos registrados.' }, { status: 409 });
+  }
+  if (workOrder.materials_required === false && Number(activeMaterialRequirements || 0) > 0) {
+    return NextResponse.json({ error: 'La OT está marcada sin materiales, pero existen requerimientos activos.' }, { status: 409 });
   }
 
   const body = (await request.json().catch(() => null)) as { note?: string | null; confirmMaterialsInstalled?: boolean } | null;

@@ -69,8 +69,11 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const [quantity, setQuantity] = useState('1');
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [declaring, setDeclaring] = useState(false);
 
   const status = (data?.data || data || {}) as SupplyStatus;
+  const materialDeclaration = data?.materialDeclaration || null;
+  const requiresMaterials = materialDeclaration?.requiresMaterials as boolean | null | undefined;
   const rows = Array.isArray(status.materials) ? status.materials : [];
   const shortageCount = rows.filter((row) => shortage(row) > 0).length;
   const reservedTotal = rows.reduce((sum, row) => sum + reserved(row), 0);
@@ -82,6 +85,29 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
   const { data: catalogData, isLoading: catalogLoading } = useSWR<{ rows: CatalogRow[] }>(catalogKey, fetcher, { revalidateOnFocus: false });
   const catalogRows = useMemo(() => (catalogData?.rows || []).filter((item) => !rows.some((row) => row.product_id === item.productId)), [catalogData, rows]);
+
+  const declareMaterials = async (value: boolean) => {
+    setDeclaring(true);
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/materials`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requiresMaterials: value }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar la declaración.');
+      setActionMessage(value ? 'OT marcada con uso de materiales.' : 'OT confirmada sin materiales.');
+      if (value) setAdding(true);
+      await mutate();
+    } catch (declareError) {
+      setActionError(declareError instanceof Error ? declareError.message : 'No se pudo guardar la declaración.');
+    } finally {
+      setDeclaring(false);
+    }
+  };
 
   const resetEditor = () => {
     setAdding(false);
@@ -155,8 +181,10 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
     }
   };
 
-  const primaryAction = rows.length === 0
-    ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
+  const primaryAction = requiresMaterials === false
+    ? { title: 'OT confirmada sin materiales', detail: 'No se esperan repuestos ni consumos para esta intervención.', action: 'none' as const }
+    : rows.length === 0
+      ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido; MOTIL reservará automáticamente el stock disponible.', action: 'add' as const }
     : reservedTotal > 0
       ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
       : shortageTotal > 0 && !alreadySent
@@ -173,10 +201,20 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <CardTitle className="text-base">Materiales de la OT</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">Una sola secuencia: requerir → reservar → entregar → comprar faltantes.</p>
           </div>
-          {rows.length > 0 ? <Badge variant={shortageCount > 0 ? 'destructive' : 'secondary'}>{shortageCount > 0 ? `${shortageCount} línea(s) con faltante` : 'Cobertura completa'}</Badge> : <Badge variant="outline">Sin requerimiento</Badge>}
+          {requiresMaterials === false ? <Badge variant="outline">Sin materiales</Badge> : rows.length > 0 ? <Badge variant={shortageCount > 0 ? 'destructive' : 'secondary'}>{shortageCount > 0 ? `${shortageCount} línea(s) con faltante` : 'Cobertura completa'}</Badge> : <Badge variant="outline">{requiresMaterials === true ? 'Materiales pendientes' : 'Sin revisar'}</Badge>}
         </div>
 
-        <div className="rounded-lg border bg-muted/20 p-4">
+        {requiresMaterials == null ? <div className="rounded-lg border bg-muted/20 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Declaración necesaria</p>
+          <p className="mt-2 font-medium">¿Esta OT utilizará repuestos o materiales?</p>
+          <p className="mt-1 text-sm text-muted-foreground">Esta respuesta permite distinguir una OT sin consumo de una OT donde falta registrar materiales.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => void declareMaterials(true)} disabled={declaring}>Sí, agregar materiales</Button>
+            <Button size="sm" variant="outline" onClick={() => void declareMaterials(false)} disabled={declaring}>No requiere materiales</Button>
+          </div>
+        </div> : null}
+
+        {requiresMaterials != null ? <div className="rounded-lg border bg-muted/20 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
@@ -186,7 +224,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
             {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
           </div>
-        </div>
+        </div> : null}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -197,7 +235,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           {[['Requerido', requiredTotal], ['Reservado', reservedTotal], ['Entregado', issuedTotal], ['Faltante', shortageTotal], ['En Compras', procurementTotal]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}
         </div> : null}
 
-        <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div>
+        {requiresMaterials === true ? <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div> : null}
 
         {adding ? <div className="rounded-lg border bg-muted/20 p-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">
@@ -213,7 +251,8 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
 
         {isLoading ? <div className="h-20 animate-pulse rounded-lg bg-muted" /> : null}
         {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
-        {!isLoading && !error && rows.length === 0 ? <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground"><PackageSearch className="mx-auto mb-2 h-5 w-5" />Aún no se han definido materiales requeridos para esta orden.</div> : null}
+        {!isLoading && !error && requiresMaterials === true && rows.length === 0 ? <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground"><PackageSearch className="mx-auto mb-2 h-5 w-5" />La OT usa materiales, pero aún no se han definido productos requeridos.</div> : null}
+        {!isLoading && !error && requiresMaterials === false ? <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed p-4 text-sm"><span className="text-muted-foreground">Declaración guardada: esta OT no requiere materiales.</span><Button size="sm" variant="ghost" onClick={() => void declareMaterials(true)} disabled={declaring}>Cambiar</Button></div> : null}
         {rows.length > 0 ? <div className="divide-y rounded-lg border">{rows.map((row) => {
           const missing = shortage(row);
           const reservedQty = reserved(row);
