@@ -15,6 +15,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -83,6 +84,8 @@ export default function BodegaPage() {
         sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
       ]}
     /> : null}
+
+    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
 
     {!negativeStockMode ? <DataReceptionReadiness
       description="Bodega está preparada para recibir stock y movimientos externos sin reemplazar saldos automáticamente. Cualquier diferencia entre fuentes quedará en conciliación."
