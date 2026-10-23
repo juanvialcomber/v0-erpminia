@@ -70,7 +70,7 @@ export default function ComprasPage() {
         sources={[
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
           sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'API activa; verificando última sincronización.' }),
           { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
         ]}
       />
