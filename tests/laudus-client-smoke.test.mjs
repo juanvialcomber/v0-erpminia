@@ -41,3 +41,20 @@ test('smoke endpoint is admin scoped and never persists data', () => {
   assert.match(route, /persisted: false/);
   assert.doesNotMatch(route, /insert\(|update\(|upsert\(|delete\(/);
 });
+
+
+test('Laudus list requests always send the four official query sections', () => {
+  assert.match(client, /fields: query\.fields \?\? \[\]/);
+  assert.match(client, /filterBy: query\.filterBy \?\? \[\]/);
+  assert.match(client, /orderBy: query\.orderBy \?\? \[\]/);
+  assert.match(client, /offset: query\.options\?\.offset \?\? 0/);
+});
+
+test('Laudus errors expose only safe diagnostic stage and status metadata', () => {
+  assert.match(client, /class LaudusApiError/);
+  assert.match(client, /this\.status = status/);
+  assert.match(client, /this\.path = path/);
+  assert.match(route, /stage: laudusError\?\.path/);
+  assert.match(route, /upstreamStatus: laudusError\?\.status/);
+  assert.doesNotMatch(route, /password|tokenFromPayload|Authorization: Bearer/);
+});
