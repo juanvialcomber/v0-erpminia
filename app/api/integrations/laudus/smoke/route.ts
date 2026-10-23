@@ -60,6 +60,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
-// Temporary authenticated smoke alias. Remove after production validation.
-export const GET = POST;
