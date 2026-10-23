@@ -65,6 +65,18 @@ type Payload = {
     current_signal_active: boolean;
     current_risk_reasons: string[];
   }>;
+  outcomes: Array<{
+    id: string;
+    decision_id: string;
+    product_id: string;
+    outcome: 'resolved' | 'risk_reduced' | 'no_change' | 'false_positive';
+    note: string | null;
+    risk_score_before: number;
+    risk_score_after: number;
+    time_to_outcome_ms: number | null;
+    recorded_by: string;
+    recorded_at: string;
+  }>;
   valueEvidence: Array<{
     id: string;
     outcome_id: string;
