@@ -14,6 +14,7 @@ import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus
 import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
 import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
 import { LaudusProcurementLiveCard } from '@/components/integrations/laudus-procurement-live-card';
+import { LaudusOperationalIntelligenceCard } from '@/components/integrations/laudus-operational-intelligence-card';
 
 type Overview = {
   canEdit: boolean;
@@ -86,6 +87,8 @@ export default function ComprasPage() {
       />
 
       <LaudusProcurementLiveCard />
+
+      <LaudusOperationalIntelligenceCard />
 
       <LaudusProcurementReadinessCard />
 
