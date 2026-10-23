@@ -8,6 +8,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-finance-readiness-card';
 
 type Row = Record<string, string | number | null>;
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
@@ -60,6 +61,8 @@ export default function FinanzasPage() {
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
+
+      <LaudusFinanceReadinessCard />
 
       <DataReceptionReadiness
         description="Finanzas está preparada para recibir hechos ERP sin confundirlos con aprobación de pagos ni con decisiones operacionales. Los datos externos entrarán con procedencia y conciliación."
