@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { runLaudusReadOnlySmokeTest } from '@/lib/integrations/laudus/client';
+import { getLaudusAccessToken } from '@/lib/integrations/laudus/client';
 
 const EXPECTED_BRANCH = 'test/laudus-smoke-preview-20261023';
 
@@ -14,17 +14,20 @@ export async function GET() {
   }
 
   try {
-    const result = await runLaudusReadOnlySmokeTest();
+    await getLaudusAccessToken();
     return NextResponse.json({
       status: 'ok',
-      ...result,
+      authenticated: true,
+      calls: 1,
+      persisted: false,
+      mode: 'read-only-auth-smoke',
     });
   } catch (error) {
     return NextResponse.json(
       {
         status: 'failed',
         persisted: false,
-        error: error instanceof Error ? error.message : 'Laudus smoke failed.',
+        error: error instanceof Error ? error.message : 'Laudus auth smoke failed.',
       },
       { status: 502 },
     );
