@@ -3,18 +3,6 @@
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, GitMerge } from 'lucide-react';
 
-type ExceptionRow = {
-  purchase_order_id: string;
-  order_number: string | null;
-  order_date: string | null;
-  supplier_name: string | null;
-  supplier_resolution_status: string;
-  cost_center_resolution_status: string;
-  distinct_line_cost_centers: number;
-  total_amount: number | null;
-  currency: string | null;
-};
-
 type Payload = {
   summary: {
     total: number;
@@ -28,11 +16,12 @@ type Payload = {
       alreadyLinked: number;
       consensusCandidates: number;
       conflicts: number;
+      unknownCode: number;
       unresolved: number;
     };
     fullyResolvable: number;
   };
-  exceptions: ExceptionRow[];
+  exceptions: unknown[];
   policy: 'preview_only';
 };
 
@@ -60,7 +49,9 @@ export function LaudusProcurementReconciliationCard() {
   const supplierOpen =
     (data?.summary.supplier.conflicts || 0) + (data?.summary.supplier.unresolved || 0);
   const ccOpen =
-    (data?.summary.costCenter.conflicts || 0) + (data?.summary.costCenter.unresolved || 0);
+    (data?.summary.costCenter.conflicts || 0) +
+    (data?.summary.costCenter.unknownCode || 0) +
+    (data?.summary.costCenter.unresolved || 0);
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
@@ -109,7 +100,7 @@ export function LaudusProcurementReconciliationCard() {
         <div className="bg-card p-4">
           <p className="text-sm font-medium">Centro de costo</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            {isLoading || !data ? '—' : data.summary.costCenter.consensusCandidates.toLocaleString('es-CL')} por consenso de líneas · {isLoading || !data ? '—' : data.summary.costCenter.conflicts.toLocaleString('es-CL')} conflictos.
+            {isLoading || !data ? '—' : data.summary.costCenter.consensusCandidates.toLocaleString('es-CL')} por consenso + código canónico · {isLoading || !data ? '—' : data.summary.costCenter.unknownCode.toLocaleString('es-CL')} códigos no reconocidos · {isLoading || !data ? '—' : data.summary.costCenter.conflicts.toLocaleString('es-CL')} conflictos.
           </p>
         </div>
       </div>
