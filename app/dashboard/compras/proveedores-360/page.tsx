@@ -83,6 +83,49 @@ export default function Suppliers360Page() {
 
   const scoreLabel = detail?.performance?.operational_score == null ? 'Sin evidencia' : `${Number(detail.performance.operational_score).toFixed(0)}/100`;
   const economic = detail?.economic?.summary;
+  const supplierInsights = useMemo(() => {
+    if (!detail?.economic) return [];
+    const summary = detail.economic.summary;
+    const insights: Array<{ priority: 'high' | 'medium' | 'context'; title: string; detail: string; action: string }> = [];
+
+    if (Number(summary.active_maintenance_products || 0) > 0) {
+      insights.push({
+        priority: 'high',
+        title: 'Dependencia operacional activa',
+        detail: `${Number(summary.active_maintenance_products || 0)} producto(s) de este proveedor están vinculados a requerimientos de mantenimiento activos.`,
+        action: 'Revisar continuidad de suministro antes de comprometer las OT asociadas.',
+      });
+    }
+
+    if (Number(summary.sole_source_products || 0) > 0) {
+      insights.push({
+        priority: 'medium',
+        title: 'Concentración de abastecimiento',
+        detail: `${Number(summary.sole_source_products || 0)} producto(s) aparecen con una sola fuente observada en la ventana Laudus.`,
+        action: 'Priorizar alternativas sólo para productos recurrentes o críticos; fuente única no implica riesgo por sí sola.',
+      });
+    }
+
+    if (Number(summary.price_outliers_20pct || 0) > 0) {
+      insights.push({
+        priority: 'medium',
+        title: 'Precios que merecen revisión',
+        detail: `${Number(summary.price_outliers_20pct || 0)} producto(s) muestran una compra reciente al menos 20% sobre su mediana observada.`,
+        action: 'Validar unidad, especificación y condición comercial antes de interpretar la variación como sobreprecio.',
+      });
+    }
+
+    if (Number(summary.order_count || 0) >= 20 && Number(summary.distinct_products || 0) > 0) {
+      insights.push({
+        priority: 'context',
+        title: 'Relación de compra recurrente',
+        detail: `${Number(summary.order_count || 0).toLocaleString('es-CL')} OC y ${Number(summary.distinct_products || 0).toLocaleString('es-CL')} productos observados en 365 días.`,
+        action: 'Usar el historial para negociar condiciones y comparar comportamiento futuro contra esta base.',
+      });
+    }
+
+    return insights.slice(0, 4);
+  }, [detail]);
   const cards = detail ? [
     {
       label: 'Compras 365 días',
@@ -126,6 +169,23 @@ export default function Suppliers360Page() {
                 <p className="text-xs text-muted-foreground">Última compra: {detail.economic.summary.last_purchase_at ? new Date(detail.economic.summary.last_purchase_at).toLocaleDateString('es-CL') : '—'}</p>
               </div>
             </div>
+            {supplierInsights.length ? <div className="border-b p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Lectura MOTIL</p>
+              <div className="mt-3 grid gap-3 xl:grid-cols-2">
+                {supplierInsights.map((insight) => (
+                  <div key={insight.title} className="rounded-md border bg-background p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold">{insight.title}</p>
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] ${insight.priority === 'high' ? 'border-destructive/40 text-destructive' : 'text-muted-foreground'}`}>
+                        {insight.priority === 'high' ? 'Prioridad alta' : insight.priority === 'medium' ? 'Revisar' : 'Contexto'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{insight.detail}</p>
+                    <p className="mt-3 text-sm"><span className="font-medium">Siguiente decisión:</span> {insight.action}</p>
+                  </div>
+                ))}
+              </div>
+            </div> : null}
             <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
               {[
                 ['OC Laudus', detail.economic.summary.order_count],

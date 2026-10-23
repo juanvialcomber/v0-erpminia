@@ -408,3 +408,23 @@ Nivel: L3 Inteligencia. La futura transición a L4 requiere capturar decisiones 
 
 ### Qué falta medir
 Tiempo de revisión por producto, tasa de casos útiles, tasa de descarte, acciones tomadas y resultados observados.
+
+
+## 2026-10-23 — Proveedor 360 Intelligence
+
+### Problema previo
+Proveedor 360 ya tenía evidencia económica rica —OC, gasto por líneas, productos, fuente única, variaciones de precio y vínculos con mantenimiento— pero el usuario debía interpretar esos indicadores por separado.
+
+### Capacidad
+La ficha ahora construye una lectura MOTIL determinística y explicable:
+- dependencia operacional activa si existen productos ligados a requerimientos de mantenimiento;
+- concentración si hay productos con una sola fuente observada;
+- precios a revisar si existen variaciones >=20% con evidencia;
+- relación recurrente cuando existe historial suficiente de OC/productos.
+
+Cada señal incluye una siguiente decisión y evita convertir concentración o variación en una acusación automática.
+
+### Valor
+Antes: métricas separadas.
+Ahora: contexto proveedor -> evidencia -> implicancia -> siguiente revisión.
+Nivel: L3 Inteligencia. Se acerca a L4 cuando Compras registre decisiones/acciones sobre estas señales.
