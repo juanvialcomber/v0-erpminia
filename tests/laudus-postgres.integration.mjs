@@ -31,3 +31,17 @@ test('isolated PostgreSQL schema, budget, encryption, idempotency and rollback',
  const perms=await pg.query("select has_schema_privilege('authenticated','motil_laudus','usage') as allowed");assert.equal(perms.rows[0].allowed,false);
  }finally{await pg.close();}
 });
+
+test('supplier review scopes tenants and catches duplicates outside current page',{skip:!modulePath},async()=>{
+ const {PGlite}=await import(modulePath);const {readSupplierReview}=await import('../lib/integrations/laudus/supplier-review.mjs');const pg=new PGlite();
+ try{
+ await pg.exec(`create schema motil_laudus;create table motil_laudus.evidence(organization_id text,company_vat text,domain text,external_id text,payload jsonb,observed_at timestamptz default now());create table canonical_suppliers_v1(id text,organization_id text,tax_id text,legal_name text,trade_name text,email text,phone text);`);
+ for(const [id,org] of [['1','one'],['2','one'],['3','other']])await pg.query("insert into motil_laudus.evidence(organization_id,company_vat,domain,external_id,payload) values($1,'84542800-K','suppliers',$2,$3)",[org,id,JSON.stringify({supplierId:id,VATId:'84.542.800-K',name:'fixture'})]);
+ await pg.query("insert into canonical_suppliers_v1(id,organization_id,tax_id) values('foreign','other','84.542.800-K')");
+ const r=await readSupplierReview(pg,{organizationId:'one',companyVATId:'84.542.800-K',limit:1});
+ assert.equal(r.returned,1);assert.equal(r.proposals[0].status,'duplicate_source');assert.equal(r.proposals[0].canonicalId,null);
+ await pg.query("delete from motil_laudus.evidence where organization_id='one' and external_id='2'");
+ const clean=await readSupplierReview(pg,{organizationId:'one',companyVATId:'84542800-K'});assert.equal(clean.proposals[0].status,'new');
+ await assert.rejects(readSupplierReview(pg,{organizationId:'one',companyVATId:'84542800-K',limit:101}),/SCOPE/);
+ }finally{await pg.close();}
+});

@@ -67,3 +67,8 @@ Filtros de fecha ahora se expresan en hora local Santiago; pruebas verano/invier
 La exclusión de dos invocaciones sobre un store se probó con conexión simulada. PGlite no prueba dos sesiones PostgreSQL independientes ni comportamiento del pool de despliegue; ese gate permanece abierto. No se aplicó SQL en Supabase ni se configuraron credenciales/clave ni se realizó carga real. La afirmación de disponibilidad gratuita no aporta el consumo exacto: se requiere baseline con contador del proveedor antes de habilitar reserveCall. No se inventó dicho valor. Cero nuevas llamadas a Laudus.
 
 Reproducir: instalar @electric-sql/pglite en un directorio temporal y ejecutar LAUDUS_PGLITE_MODULE=/ruta/node_modules/@electric-sql/pglite/dist/index.js node --test tests/laudus-postgres.integration.mjs. Sin variable, la prueba se marca skip explícitamente.
+
+
+## Revisión local paginada de proveedores
+
+readSupplierReview prepara propuestas de conciliación desde la evidencia local, con filtro de organización/RUT/dominio, páginas de hasta 100 filas y cruce canónico acotado. Detecta duplicados del RUT en toda la evidencia del RUT empresa, incluso fuera de la página. Nunca consulta Laudus ni escribe en fichas. El caller debe aplicar fin_compras; no hay ruta pública ni bypass de permisos. Devuelve campos con diferencias sólo para coincidencias únicas. Tests: 16 unitarios y 2 de PostgreSQL embebido aprobados; se comprobó aislamiento de tenant y duplicación fuera de página. Cero llamadas nuevas a Laudus y cero cambios de producción. Persisten gates de despliegue, baseline y concurrencia entre conexiones.
