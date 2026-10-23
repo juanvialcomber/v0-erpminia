@@ -38,6 +38,27 @@ type Payload = {
   };
   exceptions: ExceptionRow[];
   policy: 'candidate_only';
+  threeWay?: {
+    invoice_lines: {
+      total_invoice_lines: number;
+      exact_invoice_lines: number;
+      probable_invoice_lines: number;
+      ambiguous_invoice_lines: number;
+      review_invoice_lines: number;
+      unmatched_invoice_lines: number;
+      three_way_lines: number;
+    };
+    waybill_lines: {
+      total_waybill_lines: number;
+      exact_waybill_lines: number;
+      probable_waybill_lines: number;
+      ambiguous_waybill_lines: number;
+      review_waybill_lines: number;
+      unmatched_waybill_lines: number;
+    };
+    score_model: string;
+    policy: 'candidate_only';
+  };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -129,6 +150,33 @@ export function LaudusOperationalIntelligenceCard() {
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {n(data.waybills.with_lines)} con detalle · {n(data.waybills.ambiguous)} ambiguas · {n(data.waybills.unmatched)} sin OC candidata.
             </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!isLoading && data?.threeWay ? (
+        <div className="border-t">
+          <div className="px-4 py-3">
+            <p className="text-sm font-medium">Three-way match por línea</p>
+            <p className="text-xs text-muted-foreground">OC → recepción → factura con evidencia y margen de ambigüedad. No aprueba pagos ni modifica documentos.</p>
+          </div>
+          <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.threeWay.invoice_lines.exact_invoice_lines + data.threeWay.invoice_lines.probable_invoice_lines)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Líneas de factura con OC fuerte</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.threeWay.invoice_lines.three_way_lines)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Cadenas OC + recepción + factura</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.threeWay.invoice_lines.ambiguous_invoice_lines)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Líneas ambiguas</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.threeWay.invoice_lines.unmatched_invoice_lines)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Líneas sin OC candidata</p>
+            </div>
           </div>
         </div>
       ) : null}

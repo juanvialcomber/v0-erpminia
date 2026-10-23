@@ -14,13 +14,19 @@ export async function GET(request: NextRequest) {
   const rawScope = Number(request.nextUrl.searchParams.get('days') || 120);
   const scopeDays = Number.isFinite(rawScope) ? Math.min(Math.max(Math.trunc(rawScope), 30), 365) : 120;
 
-  const { data, error } = await context.supabase.rpc('motil_laudus_operational_intelligence_preview', {
-    p_organization_id: context.organizationId,
-    p_scope_days: scopeDays,
-  });
+  const [operational, threeWay] = await Promise.all([
+    context.supabase.rpc('motil_laudus_operational_intelligence_preview', {
+      p_organization_id: context.organizationId,
+      p_scope_days: scopeDays,
+    }),
+    context.supabase.rpc('motil_laudus_three_way_match_preview', {
+      p_organization_id: context.organizationId,
+      p_scope_days: scopeDays,
+    }),
+  ]);
 
-  if (error) {
-    console.error('[laudus/operational-intelligence]', error);
+  if (operational.error || threeWay.error) {
+    console.error('[laudus/operational-intelligence]', operational.error || threeWay.error);
     return NextResponse.json(
       { error: 'No fue posible calcular la inteligencia operacional de compras.' },
       { status: 500 },
@@ -31,6 +37,7 @@ export async function GET(request: NextRequest) {
     source: 'Laudus',
     readOnly: true,
     generatedAt: new Date().toISOString(),
-    ...data,
+    ...operational.data,
+    threeWay: threeWay.data,
   });
 }
