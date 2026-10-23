@@ -10,6 +10,7 @@ import { DataReceptionReadiness } from '@/components/data/data-reception-readine
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-finance-readiness-card';
 import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-accounting-readiness-card';
+import { LaudusFinanceLiveCard } from '@/components/integrations/laudus-finance-live-card';
 
 type Row = Record<string, string | number | null>;
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
@@ -62,6 +63,8 @@ export default function FinanzasPage() {
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
+
+      <LaudusFinanceLiveCard />
 
       <LaudusFinanceReadinessCard />
 
