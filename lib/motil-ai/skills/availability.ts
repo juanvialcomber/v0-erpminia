@@ -6,6 +6,8 @@ export type SkillAvailability = {
   name: string;
   domain: MotilSkill['domain'];
   state: 'available' | 'degraded' | 'dormant';
+  evidence: string[];
+  requiresSyncedData: string[];
   missingEvidence: string[];
   missingSyncedData: string[];
   userVisible: boolean;
@@ -28,6 +30,8 @@ export function buildSkillAvailability(state: EvidenceState): SkillAvailability[
       name: skill.name,
       domain: skill.domain,
       state: availabilityState,
+      evidence: skill.evidence,
+      requiresSyncedData: skill.requiresSyncedData || [],
       missingEvidence: readiness.missingEvidence,
       missingSyncedData: readiness.missingSyncedData,
       userVisible: availabilityState !== 'dormant',
