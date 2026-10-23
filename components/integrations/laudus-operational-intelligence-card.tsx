@@ -59,6 +59,18 @@ type Payload = {
     score_model: string;
     policy: 'candidate_only';
   };
+  documentMatch?: {
+    summary: {
+      total_invoices: number;
+      invoices_with_candidate: number;
+      exact_candidate: number;
+      probable: number;
+      ambiguous: number;
+      review: number;
+      no_order_candidate: number;
+    };
+    policy: 'candidate_only';
+  };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -150,6 +162,33 @@ export function LaudusOperationalIntelligenceCard() {
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               {n(data.waybills.with_lines)} con detalle · {n(data.waybills.ambiguous)} ambiguas · {n(data.waybills.unmatched)} sin OC candidata.
             </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!isLoading && data?.documentMatch ? (
+        <div className="border-t">
+          <div className="px-4 py-3">
+            <p className="text-sm font-medium">Resolución documental</p>
+            <p className="text-xs text-muted-foreground">MOTIL prioriza la OC más consistente antes de comparar líneas. Esto reduce falsos matches por SKU repetidos.</p>
+          </div>
+          <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.documentMatch.summary.exact_candidate)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Factura ↔ OC exacta</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.documentMatch.summary.probable)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Candidatas probables</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.documentMatch.summary.ambiguous)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Ambigüedades fuertes</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-2xl font-semibold">{n(data.documentMatch.summary.no_order_candidate)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Sin OC candidata</p>
+            </div>
           </div>
         </div>
       ) : null}

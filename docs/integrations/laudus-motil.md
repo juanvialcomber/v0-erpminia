@@ -1,7 +1,7 @@
 # Integración Laudus -> MOTIL
 
 Fecha: 2026-10-22
-Estado: diseño validado; Visma/Laudus confirmó el 2026-10-22 que el RUT 84.542.800-K ya tiene la API activa. Autenticación v2 aún pendiente de prueba porque las credenciales técnicas no están configuradas en Vercel.
+Estado: integración real activa. Visma/Laudus confirmó el 2026-10-22 que el RUT 84.542.800-K tiene API activa. MOTIL ya ingiere en modo lectura proveedores, productos/bodegas, OC, guías y facturas y ejecuta reconciliación candidate-only sobre staging trazable.
 Alcance inicial: solo lectura desde Laudus. Sin escrituras hacia Laudus hasta completar conciliación y UAT.
 
 ## Objetivo
@@ -190,3 +190,31 @@ No avanzar a ingesta real hasta que:
 Laudus = fuente ERP financiera/abastecimiento.
 MOTIL = sistema operacional minero y capa de inteligencia/reconciliación.
 La integración inicial es unidireccional Laudus -> MOTIL.
+
+
+## Valor generado por MOTIL — 2026-10-23
+
+La integración ya superó la etapa de conectividad. Laudus conserva la autoridad ERP; MOTIL transforma sus datos en control operacional y financiero.
+
+Evidencia actual, ventana de 120 días:
+- 2.306 facturas observadas por el motor documental.
+- 1.750 facturas tienen al menos una OC candidata.
+- 128 relaciones factura -> OC califican como candidato exacto.
+- 11 relaciones adicionales califican como probables.
+- 222 casos presentan dos o más candidatas fuertes y se mantienen en revisión.
+- 556 facturas no tienen OC candidata dentro de la ventana definida.
+- El three-way match por línea ya identifica cadenas OC -> recepción -> factura, manteniendo la incertidumbre explícita.
+
+Valor operacional:
+1. Reduce búsqueda manual entre documentos de compra.
+2. Separa automáticamente casos claros de casos que requieren criterio humano.
+3. Detecta ausencia de OC, ambigüedades, diferencias de cantidad/precio y fechas anómalas.
+4. Crea trazabilidad reutilizable para Compras, Finanzas, Bodega, Proveedor 360 y posteriormente Activo 360.
+5. Permite medir tiempos OC -> recepción -> factura y construir desempeño real de proveedores.
+
+Valor comercial:
+- Nivel 1 — Conectividad: MOTIL consulta y normaliza Laudus.
+- Nivel 2 — Inteligencia: MOTIL reconcilia, prioriza excepciones y explica evidencia.
+- Nivel 3 — Autonomía controlada: MOTIL prepara decisiones/acciones para aprobación humana.
+
+La expansión comercial debe justificarse por capacidades verificadas y resultados observables, no por volumen de tablas o llamadas API.
