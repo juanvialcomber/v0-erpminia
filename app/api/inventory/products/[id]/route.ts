@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const canonical = context.supabase.schema('canonical');
     const intelligence = context.supabase.schema('intelligence');
 
-    const [productResult, traceResult, positionResult, purchaseLinesResult, receiptLinesResult, movementResult, workOrderPartsResult] = await Promise.all([
+    const [productResult, traceResult, positionResult, purchaseLinesResult, receiptLinesResult, movementResult, workOrderPartsResult, laudusIntelligenceResult] = await Promise.all([
       canonical
         .from('products')
         .select('id, product_code, name, description, family, subfamily, unit, standard_cost, minimum_stock, maximum_stock, is_active, validation_status, validation_notes')
@@ -62,9 +62,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         .eq('canonical_product_id', id)
         .order('created_at', { ascending: false })
         .limit(100),
+      context.supabase.rpc('motil_product_laudus_intelligence_preview', {
+        p_organization_id: organizationId,
+        p_product_id: id,
+        p_scope_days: 365,
+      }),
     ]);
 
-    const baseError = productResult.error || traceResult.error || positionResult.error || purchaseLinesResult.error || receiptLinesResult.error || movementResult.error || workOrderPartsResult.error;
+    const baseError = productResult.error || traceResult.error || positionResult.error || purchaseLinesResult.error || receiptLinesResult.error || movementResult.error || workOrderPartsResult.error || laudusIntelligenceResult.error;
     if (baseError) throw baseError;
     if (!productResult.data) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
 
@@ -160,6 +165,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       maintenanceUsage,
       suppliers,
       assets,
+      laudusIntelligence: laudusIntelligenceResult.data || null,
       source: 'canonical_product_traceability',
       canonical: true,
     });

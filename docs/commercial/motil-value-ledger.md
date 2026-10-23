@@ -428,3 +428,27 @@ Cada señal incluye una siguiente decisión y evita convertir concentración o v
 Antes: métricas separadas.
 Ahora: contexto proveedor -> evidencia -> implicancia -> siguiente revisión.
 Nivel: L3 Inteligencia. Se acerca a L4 cuando Compras registre decisiones/acciones sobre estas señales.
+
+
+## 2026-10-23 — Producto 360 Intelligence con Laudus
+
+### Frontera de fuente verificada
+El historial canónico existente en Producto 360 proviene principalmente de archivos Excel históricos, no de Laudus. Se mantuvo esa evidencia separada y se agregó una proyección Laudus específica por SKU.
+
+### Capacidad
+Nuevo RPC backend-only `motil_product_laudus_intelligence_preview`:
+- stock actual y mínimo como contexto;
+- requerimientos de mantenimiento activos;
+- líneas de compra Laudus de 365 días;
+- proveedores observados y concentración;
+- última compra;
+- mediana y último precio sólo cuando el SKU es comparable;
+- top proveedores y compras recientes;
+- señal principal explicable.
+
+### Guardrail descubierto
+`Otros004 / Servicios Varios` agrupa compras heterogéneas. La primera prueba mostró miles de líneas y precios no comparables. Se agregó un guard que identifica SKU genérico y desactiva cualquier conclusión de precio, manteniendo sólo historial/provenance.
+
+### Valor
+Producto 360 pasa de expediente descriptivo a punto de decisión que junta Bodega + Laudus + Mantención sin mezclar autoridad de fuentes.
+Nivel: L3 Inteligencia.

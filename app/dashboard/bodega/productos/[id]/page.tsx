@@ -42,6 +42,53 @@ export default function ProductTraceabilityPage() {
   const usage: Usage[] = data.maintenanceUsage || [];
   const suppliers: PurchaseOrder[] = data.suppliers || [];
   const assets = data.assets || [];
+  const laudus = data.laudusIntelligence || null;
+  const laudusData = laudus?.laudus || null;
+  const laudusMaintenance = laudus?.maintenance || null;
+  const primarySignal = String(laudus?.interpretation?.primary_signal || 'no_laudus_history');
+  const signalCopy: Record<string, { title: string; detail: string; action: string }> = {
+    active_maintenance_shortage: {
+      title: 'Faltante ligado a mantenimiento activo',
+      detail: 'La demanda registrada por OT supera la disponibilidad actual.',
+      action: 'Revisar cobertura, compra pendiente y fecha requerida antes de ejecutar la OT.',
+    },
+    negative_stock: {
+      title: 'Saldo negativo por conciliar',
+      detail: 'El saldo operativo no es confiable para decidir reposición hasta revisar movimientos y conteo.',
+      action: 'Conciliar stock antes de comprar o comprometer disponibilidad.',
+    },
+    price_above_50pct: {
+      title: 'Precio reciente muy sobre la referencia observada',
+      detail: 'La última compra Laudus supera en al menos 50% la mediana observada para el mismo SKU.',
+      action: 'Validar unidad, especificación y cotización antes de reponer.',
+    },
+    price_above_20pct: {
+      title: 'Precio reciente sobre la referencia observada',
+      detail: 'La última compra Laudus supera en al menos 20% la mediana observada para el mismo SKU.',
+      action: 'Comparar proveedor y condición comercial antes de una nueva compra.',
+    },
+    single_supplier: {
+      title: 'Una sola fuente observada',
+      detail: 'El historial Laudus muestra compras recurrentes concentradas en un proveedor.',
+      action: 'Evaluar alternativa sólo si el producto es recurrente o relevante para operación.',
+    },
+    generic_sku_history_only: {
+      title: 'SKU genérico: usar sólo como contexto',
+      detail: 'Este código agrupa compras heterogéneas. MOTIL conserva historial y proveedores, pero desactiva comparaciones de precio.',
+      action: 'No usar este SKU para concluir variación de precio; resolver productos específicos cuando corresponda.',
+    },
+    purchase_history_available: {
+      title: 'Historial Laudus disponible',
+      detail: 'MOTIL puede contextualizar proveedores, frecuencia y precio observado para este producto.',
+      action: 'Usar la evidencia como referencia antes de una nueva compra.',
+    },
+    no_laudus_history: {
+      title: 'Sin historial Laudus suficiente',
+      detail: 'No existe evidencia Laudus comparable para este SKU en la ventana actual.',
+      action: 'Mantener la decisión basada en inventario y evidencia operacional disponible.',
+    },
+  };
+  const signal = signalCopy[primarySignal] || signalCopy.no_laudus_history;
 
   return (
     <div className="space-y-6">
@@ -63,6 +110,64 @@ export default function ProductTraceabilityPage() {
             <p className="mt-1 text-2xl font-semibold">{money(trace.current_unit_cost || inventory.unit_cost || product.standard_cost)}</p>
             <p className="mt-1 text-xs text-muted-foreground">Promedio histórico {money(trace.weighted_average_unit_cost)}</p>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border bg-card">
+        <div className="border-b p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">MOTIL Intelligence · Producto 360</p>
+          <div className="mt-1 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight">{signal.title}</h2>
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{signal.detail}</p>
+            </div>
+            <Badge variant={laudus?.interpretation?.priority === 'high' ? 'destructive' : 'outline'}>
+              {laudusData?.matched ? 'Evidencia Laudus' : 'Sin vínculo Laudus'}
+            </Badge>
+          </div>
+          <p className="mt-3 text-sm"><span className="font-medium">Siguiente decisión:</span> {signal.action}</p>
+        </div>
+
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card p-4">
+            <p className="text-xs text-muted-foreground">Compras Laudus · 365 días</p>
+            <p className="mt-1 text-xl font-semibold">{number(laudusData?.purchase_lines)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Última: {date(laudusData?.last_purchase_at)}</p>
+          </div>
+          <div className="bg-card p-4">
+            <p className="text-xs text-muted-foreground">Proveedores observados</p>
+            <p className="mt-1 text-xl font-semibold">{number(laudusData?.supplier_count)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{laudusData?.top_supplier_share ? `Principal: ${Math.round(Number(laudusData.top_supplier_share) * 100)}%` : 'Sin concentración calculable'}</p>
+          </div>
+          <div className="bg-card p-4">
+            <p className="text-xs text-muted-foreground">Precio reciente</p>
+            <p className="mt-1 text-xl font-semibold">{laudusData?.price_comparable ? money(laudusData.latest_unit_price) : 'No comparable'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{laudusData?.price_comparable && laudusData?.median_unit_price != null ? `Mediana ${money(laudusData.median_unit_price)}` : 'SKU genérico o evidencia insuficiente'}</p>
+          </div>
+          <div className="bg-card p-4">
+            <p className="text-xs text-muted-foreground">Demanda mantenimiento</p>
+            <p className="mt-1 text-xl font-semibold">{number(laudusMaintenance?.active_work_orders)} OT</p>
+            <p className="mt-1 text-xs text-muted-foreground">{Number(laudusMaintenance?.active_shortage_qty || 0) > 0 ? `Faltante: ${number(laudusMaintenance.active_shortage_qty)}` : 'Sin faltante activo identificado'}</p>
+          </div>
+        </div>
+
+        {Array.isArray(laudusData?.suppliers) && laudusData.suppliers.length ? <div className="border-t p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Principales proveedores Laudus</p>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {laudusData.suppliers.slice(0, 4).map((supplier: any) => (
+              <div key={supplier.supplier_tax_id} className="flex items-start justify-between gap-4 rounded-md border p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{supplier.supplier_name || supplier.supplier_tax_id}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{supplier.line_count} líneas observadas</p>
+                </div>
+                <span className="shrink-0 text-sm">{supplier.share != null ? `${Math.round(Number(supplier.share) * 100)}%` : '—'}</span>
+              </div>
+            ))}
+          </div>
+        </div> : null}
+
+        <div className="border-t bg-muted/20 px-5 py-3 text-xs text-muted-foreground">
+          Laudus aporta historial de compra; no equivale a consumo físico. MOTIL no repone stock ni modifica Laudus desde esta vista.
         </div>
       </section>
 
