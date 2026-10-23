@@ -79,6 +79,26 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {});
 
+  const scoreBands = [
+    { key: '90+', min: 90, max: Infinity },
+    { key: '80-89', min: 80, max: 89 },
+    { key: '70-79', min: 70, max: 79 },
+    { key: '<70', min: -Infinity, max: 69 },
+  ].map((band) => {
+    const reviewed = decisions.filter((row) => {
+      const score = Number(row.score);
+      return Number.isFinite(score) && score >= band.min && score <= band.max;
+    });
+    const approvedInBand = reviewed.filter((row) => row.decision === 'approved').length;
+    return {
+      band: band.key,
+      reviewed: reviewed.length,
+      approved: approvedInBand,
+      rejected: reviewed.length - approvedInBand,
+      acceptanceRate: reviewed.length ? approvedInBand / reviewed.length : null,
+    };
+  });
+
   return NextResponse.json({
     pending,
     reviewed: decisions.slice(0, 8),
@@ -100,6 +120,7 @@ export async function GET(request: NextRequest) {
       measuredReviews: measuredDurations.length,
       averageReviewSeconds,
       rejectionReasons,
+      scoreBands,
       evidenceLevel: measuredDurations.length > 0 ? 'E2' : 'E1',
     },
     sourceModified: false,

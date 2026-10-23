@@ -42,6 +42,13 @@ type QueuePayload = {
     measuredReviews: number;
     averageReviewSeconds: number | null;
     rejectionReasons: Record<string, number>;
+    scoreBands: Array<{
+      band: string;
+      reviewed: number;
+      approved: number;
+      rejected: number;
+      acceptanceRate: number | null;
+    }>;
     evidenceLevel: 'E1' | 'E2';
   };
   learning: {
@@ -272,7 +279,24 @@ export function LaudusMatchReviewInbox() {
                 : '—'}
             </span>
             <span>Evidencia {data?.valueMetrics.evidenceLevel || 'E1'}</span>
+            {typeof data?.learning.acceptanceRate === 'number' ? (
+              <span>Aceptación {Math.round(data.learning.acceptanceRate * 100)}%</span>
+            ) : null}
           </div>
+          {data?.counts.labelled ? (
+            <div className="mt-3 grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-4">
+              {data.valueMetrics.scoreBands.map((band) => (
+                <div key={band.band} className="bg-card px-3 py-2">
+                  <p className="text-xs font-medium">Score {band.band}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {band.reviewed} revisados · {typeof band.acceptanceRate === 'number'
+                      ? Math.round(band.acceptanceRate * 100) + '% acepta'
+                      : 'sin muestra'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <p className="mt-2 text-xs text-muted-foreground">
             Se muestra un caso a la vez. MOTIL prioriza casos ambiguos e informativos; el feedback todavía no altera el score automáticamente.
           </p>

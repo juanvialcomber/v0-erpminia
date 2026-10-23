@@ -133,3 +133,12 @@ Mientras no existan decisiones humanas reales, el valor permanece E1: volumen/co
 
 ### Valor comercial
 Esta instrumentación permite justificar el módulo de decisión asistida con evidencia operacional propia, no con narrativa. El argumento de precio futuro debe basarse en reducción observada de trabajo manual, excepciones detectadas y recurrencia del beneficio.
+
+
+## 2026-10-23 — Calibración observable por score
+
+Desde la primera decisión humana, MOTIL separa las revisiones por tramo de score (<70, 70-79, 80-89, 90+) y calcula revisados, aprobados, rechazados y tasa de aceptación. Esto no modifica el algoritmo; sirve para medir si el score realmente representa confianza.
+
+El gate de 20 etiquetas se mantiene antes de proponer recalibración. La medición temprana permite detectar señales sin confundir una muestra pequeña con precisión global.
+
+Valor comercial: permite demostrar con datos si las recomendaciones de alta confianza requieren menos intervención humana y construir una narrativa de decisión asistida basada en desempeño observado.
