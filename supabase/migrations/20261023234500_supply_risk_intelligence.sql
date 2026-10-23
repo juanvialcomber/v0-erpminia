@@ -165,8 +165,7 @@ select jsonb_build_object(
   'score_model','active OT shortage + current stock vs minimum + supplier concentration + price deviation'
 )
 from summary;
-$function$
-
+$function$;
 
 revoke all on function public.motil_supply_risk_preview(uuid,integer) from public,anon,authenticated;
 grant execute on function public.motil_supply_risk_preview(uuid,integer) to service_role;
