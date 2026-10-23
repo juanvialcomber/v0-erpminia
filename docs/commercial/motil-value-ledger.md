@@ -68,3 +68,29 @@ Autonomía controlada: no activada; requiere feedback humano, evaluación y gate
 
 ### Próximo bloque de valor
 Registrar decisiones humanas sobre matches ambiguos y usar ese feedback para mejorar el ranking sin perder trazabilidad. Medir cuántos casos pasan de revisión manual a recomendación de alta confianza.
+
+
+## 2026-10-23 — Bandeja humana de matching Laudus
+
+### Capacidad
+Finanzas dispone de una bandeja de una decisión a la vez para confirmar o rechazar la OC sugerida para una factura. El rechazo exige motivo; la aprobación registra por defecto que la coincidencia fue verificada por Finanzas.
+
+### Trazabilidad
+Cada decisión conserva organización, factura Laudus, OC candidata, estado del candidato, score, evidencia utilizada, usuario revisor, motivo y timestamp. La decisión es feedback de reconciliación: no modifica Laudus, la factura, la OC ni un pago.
+
+### Valor generado
+- Reduce carga cognitiva: una decisión concreta por vez.
+- Convierte conocimiento de Finanzas en memoria reutilizable por MOTIL.
+- Permite medir tasa de aceptación/rechazo del matcher.
+- Crea dataset supervisado propio de La Patagua para mejorar matching futuro.
+- Permite demostrar cuánto trabajo de conciliación pasa de búsqueda manual a validación asistida.
+
+### Métricas comerciales a incorporar
+- decisiones por usuario/mes;
+- tiempo medio por revisión;
+- tasa de aceptación por nivel de confianza;
+- causas de rechazo más frecuentes;
+- reducción de casos ambiguos después de incorporar feedback;
+- porcentaje de facturas cuya conciliación requiere intervención humana.
+
+Esta capacidad eleva MOTIL desde inteligencia estática a inteligencia que aprende de la operación, manteniendo autoridad humana.
