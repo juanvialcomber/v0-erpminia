@@ -39,11 +39,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: timerState, error: timerStateError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('timer_status')
+      .select('timer_status,materials_required')
       .eq('organization_id', context.organizationId)
       .eq('id', id)
       .single();
     if (timerStateError) throw timerStateError;
+    const { count: activeMaterialRequirements, error: materialRequirementsError } = await context.supabase
+      .from('work_order_material_requirements')
+      .select('id', { head: true, count: 'exact' })
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .neq('status', 'cancelled');
+    if (materialRequirementsError) throw materialRequirementsError;
+
+    if (timerState.materials_required == null) {
+      return NextResponse.json({ error: 'Confirma si la OT utilizó materiales antes de cerrar.' }, { status: 409 });
+    }
+    if (timerState.materials_required === true && Number(activeMaterialRequirements || 0) === 0) {
+      return NextResponse.json({ error: 'La OT está marcada con uso de materiales, pero no tiene materiales requeridos registrados.' }, { status: 409 });
+    }
+    if (timerState.materials_required === false && Number(activeMaterialRequirements || 0) > 0) {
+      return NextResponse.json({ error: 'La OT está marcada sin materiales, pero existen requerimientos activos.' }, { status: 409 });
+    }
+
     if (['running', 'paused'].includes(String(timerState.timer_status || ''))) {
       const { error: terminateError } = await context.supabase.rpc('update_work_order_timer', {
         p_organization_id: context.organizationId,

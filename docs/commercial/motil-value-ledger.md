@@ -474,3 +474,10 @@ La aprobación supervisora queda bloqueada si la declaración sigue en NULL. Si 
 
 ### Valor
 Esto convierte ausencia de datos en una decisión explícita. Desde ahora, las OT pueden alimentar `work_order_parts` cuando corresponda y distinguir cero consumo real de falta de captura. Es prerrequisito para Activo 360 Economics y futuro reparar vs renovar.
+
+
+## 2026-10-23 — Gate de materiales en cierre progresivo
+
+La declaración de materiales se incorporó a la cola de cierre como acción explícita. Una OT no puede cerrarse si `materials_required` sigue NULL. Si declara uso de materiales debe tener al menos un requerimiento activo; si declara no usar materiales no puede mantener requerimientos activos.
+
+Esto evita que la brecha se detecte recién en aprobación y transforma la calidad de datos en parte natural del flujo operacional.

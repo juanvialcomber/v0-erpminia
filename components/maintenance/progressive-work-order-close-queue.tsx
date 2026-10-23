@@ -54,6 +54,8 @@ const ACTION_KEYS: Record<string, keyof CloseQueueT['actionTitles']> = {
   resolve_asset: 'resolveAsset',
   resolve_procurement: 'resolveProcurement',
   resolve_parts: 'resolveParts',
+  declare_materials: 'declareMaterials',
+  define_materials: 'defineMaterials',
   resolve_materials: 'resolveMaterials',
   resolve_external_services: 'resolveExternalServices',
   resolve_labor: 'resolveLabor',
@@ -233,6 +235,27 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     }
   }
 
+  async function declareMaterials(requiresMaterials: boolean) {
+    if (!current) return;
+    setSaving(true);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/maintenance/work-orders/${current.work_order_id}/materials`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ requiresMaterials }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || t.errors.updateFailed);
+      await mutate();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : t.errors.updateFailed);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function performNextAction() {
     if (!current) return;
 
@@ -315,6 +338,7 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     ? { title: t.actionTitles[actionKey], description: t.actionDescriptions[actionKey] }
     : t.fallbackAction;
   const inline = [
+    'declare_materials',
     'complete_standard_plan_step',
     'record_root_cause',
     'record_preventive_actions',
@@ -354,6 +378,16 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
             <h2 className="mt-2 text-xl font-semibold">{copy.title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{copy.description}</p>
           </div>
+
+          {current.next_action === 'declare_materials' ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Confirma si esta intervención utilizó o utilizará repuestos/materiales. La respuesta queda auditada.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => void declareMaterials(true)} disabled={saving}>Sí, usa materiales</Button>
+                <Button variant="outline" onClick={() => void declareMaterials(false)} disabled={saving}>No usa materiales</Button>
+              </div>
+            </div>
+          ) : null}
 
           {current.next_action === 'complete_standard_plan_step' ? (
             <div className="space-y-3">
@@ -477,7 +511,7 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
           ) : null}
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            {inline && data?.canEdit ? (
+            {inline && data?.canEdit && current.next_action !== 'declare_materials' ? (
               <Button className="sm:min-w-48" onClick={() => void performNextAction()} disabled={saving}>
                 {saving
                   ? t.actions.saving

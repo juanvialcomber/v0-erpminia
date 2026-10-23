@@ -46,16 +46,18 @@ const actionRank: Record<string, number> = {
   resolve_asset: 0,
   resolve_procurement: 1,
   resolve_parts: 2,
-  resolve_materials: 3,
-  resolve_external_services: 4,
-  resolve_labor: 5,
-  reconcile_external_cost: 6,
-  complete_standard_plan_step: 7,
-  record_root_cause: 8,
-  record_preventive_actions: 9,
-  record_actual_hours: 10,
-  record_runtime_evidence: 11,
-  close_work_order: 12,
+  declare_materials: 3,
+  define_materials: 4,
+  resolve_materials: 5,
+  resolve_external_services: 6,
+  resolve_labor: 7,
+  reconcile_external_cost: 8,
+  complete_standard_plan_step: 9,
+  record_root_cause: 10,
+  record_preventive_actions: 11,
+  record_actual_hours: 12,
+  record_runtime_evidence: 13,
+  close_work_order: 14,
 };
 
 export async function GET(request: NextRequest) {
@@ -160,8 +162,49 @@ export async function GET(request: NextRequest) {
       for (const asset of (assets || []) as AssetRow[]) assetMap.set(asset.id, asset);
     }
 
+    const workOrderIds = rows.map((row) => row.work_order_id);
+    const materialIntent = new Map<string, boolean | null>();
+    const materialRequirements = new Map<string, number>();
+    if (workOrderIds.length > 0) {
+      const [{ data: intentRows, error: intentError }, { data: requirementRows, error: requirementError }] = await Promise.all([
+        context.supabase
+          .from('maintenance_work_orders')
+          .select('id,materials_required')
+          .eq('organization_id', context.organizationId)
+          .in('id', workOrderIds),
+        context.supabase
+          .from('work_order_material_requirements')
+          .select('work_order_id,status')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', workOrderIds)
+          .neq('status', 'cancelled'),
+      ]);
+      if (intentError) throw intentError;
+      if (requirementError) throw requirementError;
+      for (const item of intentRows || []) materialIntent.set(item.id, item.materials_required);
+      for (const item of requirementRows || []) materialRequirements.set(item.work_order_id, (materialRequirements.get(item.work_order_id) || 0) + 1);
+    }
+
     const queue = rows
-      .map((row) => ({ ...row, asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null }))
+      .map((row) => {
+        const materialsRequired = materialIntent.get(row.work_order_id) ?? null;
+        const materialRequirementCount = materialRequirements.get(row.work_order_id) || 0;
+        const materialGateAction = materialsRequired == null
+          ? 'declare_materials'
+          : materialsRequired === true && materialRequirementCount === 0
+            ? 'define_materials'
+            : materialsRequired === false && materialRequirementCount > 0
+              ? 'resolve_materials'
+              : null;
+        return {
+          ...row,
+          materials_required: materialsRequired,
+          material_requirements_count: materialRequirementCount,
+          ready_to_close: materialGateAction ? false : row.ready_to_close,
+          next_action: materialGateAction || row.next_action,
+          asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
+        };
+      })
       .sort((a, b) => {
         const actionDiff = (actionRank[a.next_action] ?? 99) - (actionRank[b.next_action] ?? 99);
         if (actionDiff !== 0) return actionDiff;
