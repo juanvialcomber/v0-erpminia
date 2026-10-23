@@ -24,7 +24,16 @@ test('inventory readiness API is permission scoped and read-only', () => {
   assert.doesNotMatch(helper, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
 
+test('reconciliation readiness defaults to zero tolerance and waits for verified Laudus data', () => {
+  assert.match(helper, /defaultAbsoluteTolerance: 0/);
+  assert.match(helper, /requiresApprovedTolerance: true/);
+  assert.match(helper, /waiting_laudus/);
+  assert.match(helper, /ready_to_compare/);
+});
+
 test('UI states that Laudus cannot overwrite operational or physical stock automatically', () => {
   assert.match(card, /saldo ERP y movimientos como evidencia/);
   assert.match(card, /no reemplazará automáticamente el stock operacional ni un conteo físico/);
+  assert.match(card, /Tolerancia base 0/);
+  assert.match(card, /sin autoajuste/);
 });
