@@ -37,8 +37,8 @@ test('finance review ranks evidence deterministically', () => {
 });
 
 test('finance review bounds source reads and returns a short queue', () => {
-  assert.match(helper, /\.limit\(2000\)/);
-  assert.match(helper, /\.limit\(5000\)/);
+  assert.match(helper, /batchSize = 500/);
+  assert.match(helper, /\.range\(offset, offset \+ batchSize - 1\)/);
   assert.match(helper, /queue\.slice\(0, 10\)/);
 });
 
