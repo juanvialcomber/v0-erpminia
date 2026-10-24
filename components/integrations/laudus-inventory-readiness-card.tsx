@@ -6,6 +6,11 @@ import { Boxes, GitCompareArrows, History, ScanLine, ShieldCheck } from 'lucide-
 import { Button } from '@/components/ui/button';
 
 type Payload = {
+  laudus: {
+    stockRows: number;
+    negativeRows: number;
+    kardexRows: number;
+  };
   stock: {
     rows: number;
     productCoverage: number;
@@ -17,7 +22,7 @@ type Payload = {
     latestDate: string | null;
     negativeRows: number;
   };
-  movementCount: number;
+  motilMovementCount: number;
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
     defaultAbsoluteTolerance: number;
@@ -64,7 +69,7 @@ export function LaudusInventoryReadinessCard() {
           <h2 className="text-sm font-semibold">Preparación de inventario para Laudus</h2>
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus aporta saldo ERP y movimientos como evidencia. MOTIL no reemplazará automáticamente el stock operacional ni un conteo físico; la comparación queda disponible para revisión.
+          Laudus aporta saldo ERP como evidencia. El historial de movimientos Laudus todavía no está integrado; los movimientos operacionales de MOTIL se mantienen separados.
         </p>
       </div>
 
@@ -81,13 +86,13 @@ export function LaudusInventoryReadinessCard() {
         </div>
         <div className="bg-card p-4">
           <History className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : data.movementCount.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Movimientos registrados</p>
+          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : data.motilMovementCount.toLocaleString('es-CL')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Movimientos MOTIL</p>
         </div>
         <div className="bg-card p-4">
-          <p className="text-xs text-muted-foreground">Último snapshot</p>
-          <p className="mt-2 text-lg font-semibold">{isLoading || !data ? '—' : data.snapshot.latestDate || 'Sin fecha'}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{isLoading || !data ? '—' : data.snapshot.negativeRows.toLocaleString('es-CL')} saldos negativos en snapshot</p>
+          <p className="text-xs text-muted-foreground">Saldo Laudus</p>
+          <p className="mt-2 text-lg font-semibold">{isLoading || !data ? '—' : data.laudus.stockRows.toLocaleString('es-CL')} posiciones</p>
+          <p className="mt-1 text-xs text-muted-foreground">{isLoading || !data ? '—' : data.laudus.negativeRows.toLocaleString('es-CL')} negativas · Kardex ${isLoading || !data ? '—' : data.laudus.kardexRows.toLocaleString('es-CL')}</p>
         </div>
       </div>
 
