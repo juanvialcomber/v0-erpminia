@@ -71,6 +71,43 @@ async function loadLaudusFinancialEvidence(
   }
 }
 
+async function loadLaudusAccountingEvidence(
+  db: SupabaseClient,
+  organizationId: string,
+) {
+  try {
+    const [accountingEntries, bankStatements, pendingDtes, latestEntry] = await Promise.all([
+      count(db.from('laudus_accounting_entries_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      count(db.from('laudus_bank_statements_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      count(db.from('laudus_dtes_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      db.from('laudus_accounting_entries_service_v1')
+        .select('synced_at')
+        .eq('organization_id', organizationId)
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (latestEntry.error) throw new Error(latestEntry.error.message);
+
+    return {
+      available: accountingEntries > 0 || bankStatements > 0 || pendingDtes > 0,
+      accountingEntries,
+      bankStatements,
+      pendingDtes,
+      latestSyncAt: latestEntry.data?.synced_at ?? null,
+    };
+  } catch {
+    return {
+      available: false,
+      accountingEntries: 0,
+      bankStatements: 0,
+      pendingDtes: 0,
+      latestSyncAt: null,
+    };
+  }
+}
+
 export async function loadLaudusFinanceReadiness(
   db: SupabaseClient,
   organizationId: string,
@@ -91,6 +128,7 @@ export async function loadLaudusFinanceReadiness(
     paymentRequests,
     paymentSignatures,
     laudusEvidence,
+    accountingEvidence,
   ] = await Promise.all([
     count(db.from('procurement_accounts_payable').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('procurement_accounts_payable').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('invoice_id', 'is', null)),
@@ -107,6 +145,7 @@ export async function loadLaudusFinanceReadiness(
     count(db.from('finance_payment_requests').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('finance_payment_request_signatures').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     loadLaudusFinancialEvidence(db, organizationId),
+    loadLaudusAccountingEvidence(db, organizationId),
   ]);
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
@@ -127,7 +166,7 @@ export async function loadLaudusFinanceReadiness(
     // Expected before the private service facade is deployed.
   }
 
-  if (laudusEvidence.available && laudusState === 'waiting_laudus') {
+  if ((laudusEvidence.available || accountingEvidence.available) && laudusState === 'waiting_laudus') {
     laudusState = 'ready_to_compare';
   }
 
@@ -153,6 +192,7 @@ export async function loadLaudusFinanceReadiness(
       paymentSignatures,
     },
     laudusEvidence,
+    accountingEvidence,
     reconciliation: {
       state: laudusState,
       autoCreatePayment: false,
