@@ -9,6 +9,7 @@ import { DataSourceStatusStrip } from '@/components/data/data-source-status-stri
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-finance-readiness-card';
+import { LaudusFinanceReviewCard } from '@/components/integrations/laudus-finance-review-card';
 import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-accounting-readiness-card';
 
 type Row = Record<string, string | number | null>;
@@ -64,6 +65,8 @@ export default function FinanzasPage() {
       />
 
       <LaudusFinanceReadinessCard />
+
+      <LaudusFinanceReviewCard />
 
       <LaudusAccountingReadinessCard />
 
