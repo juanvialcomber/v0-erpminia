@@ -45,6 +45,8 @@ type Payload = {
     missingMotilInventoryRows: number;
     latestSyncStatus: string | null;
     latestSyncAt: string | null;
+    motilSnapshotDate: string | null;
+    freshnessComparable: boolean;
   };
   queue: QueueRow[];
   warehouseCandidates: WarehouseCandidate[];
@@ -135,6 +137,16 @@ export default function LaudusInventoryReconciliationPage() {
           ))}
         </div>
       </section>
+
+      {!s.freshnessComparable ? (
+        <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">Fuentes con distinta fecha</p>
+            <p className="mt-1 text-muted-foreground">MOTIL está comparando contra el snapshot {s.motilSnapshotDate ? new Date(`${s.motilSnapshotDate}T00:00:00Z`).toLocaleDateString('es-CL', { timeZone: 'UTC' }) : 'sin fecha'}; Laudus fue actualizado recientemente. Las diferencias sirven para revisión, no para declarar errores de stock.</p>
+          </div>
+        </div>
+      ) : null}
 
       {s.unresolvedWarehouseMappings > 0 ? (
         <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm">
