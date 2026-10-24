@@ -5,6 +5,7 @@ import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import {
   getLaudusConfigurationState,
   LaudusApiError,
+  runLaudusInventoryEndpointDiscovery,
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
 
@@ -33,10 +34,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runLaudusReadOnlySmokeTest();
+    const scope = request.nextUrl.searchParams.get('scope');
+    const result = scope === 'inventory-discovery'
+      ? await runLaudusInventoryEndpointDiscovery()
+      : await runLaudusReadOnlySmokeTest();
+
     return NextResponse.json({
       status: 'ok',
       configured: true,
+      scope: scope === 'inventory-discovery' ? 'inventory-discovery' : 'masters',
       ...result,
     });
   } catch (error) {
@@ -59,7 +65,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 // Temporary authenticated smoke alias. Remove after production validation.
 export const GET = POST;
