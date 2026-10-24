@@ -33,8 +33,7 @@ async function readOpenInvoices(db: SupabaseClient, organizationId: string) {
 
   for (let offset = 0; offset < 5000; offset += batchSize) {
     const result = await db
-      .schema('integration')
-      .from('laudus_purchase_invoice_payment_status_v1')
+      .from('laudus_purchase_invoice_payment_status_service_v1')
       .select(
         'purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,outstanding_amount,payment_status',
       )
@@ -185,8 +184,7 @@ export async function loadLaudusFinanceReview(
 
   if (topQueue.length) {
     const feedbackResult = await db
-      .schema('integration')
-      .from('laudus_finance_review_feedback')
+      .from('laudus_finance_review_feedback_service_v1')
       .select('purchase_invoice_external_id,decision,reason,actor_name,created_at')
       .eq('organization_id', organizationId)
       .in(
