@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { fetchLaudusPurchaseLedgerRange } from '@/lib/integrations/laudus/purchase-ledger';
+import { fetchAllLaudusPurchaseInvoiceTotals } from '@/lib/integrations/laudus/purchase-invoice-totals';
 
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const start = new Date(bounds.first_issued_date);
   const end = new Date(bounds.last_issued_date);
-  const { rows, calls } = await fetchLaudusPurchaseLedgerRange(start, end);
+  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals();
 
   const chunkSize = 500;
   let updated = 0;
