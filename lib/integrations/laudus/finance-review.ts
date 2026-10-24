@@ -77,23 +77,31 @@ function priorityFor(row: LaudusInvoice, supplierMatched: boolean, today: Date) 
   const outstanding = numberValue(row.outstanding_amount);
   const overdueDays = due && due < today ? Math.max(0, daysBetween(due, today)) : 0;
 
-  let score = 0;
-  if (overdueDays >= 90) score += 45;
-  else if (overdueDays >= 30) score += 35;
-  else if (overdueDays > 0) score += 25;
-  else if (due) score += 10;
+  let agePoints = 0;
+  if (overdueDays >= 90) agePoints = 45;
+  else if (overdueDays >= 30) agePoints = 35;
+  else if (overdueDays > 0) agePoints = 25;
+  else if (due) agePoints = 10;
 
-  if (outstanding >= 10_000_000) score += 30;
-  else if (outstanding >= 3_000_000) score += 20;
-  else if (outstanding >= 1_000_000) score += 10;
+  let amountPoints = 0;
+  if (outstanding >= 10_000_000) amountPoints = 30;
+  else if (outstanding >= 3_000_000) amountPoints = 20;
+  else if (outstanding >= 1_000_000) amountPoints = 10;
 
-  if (row.payment_status === 'partially_paid') score += 10;
-  if (!supplierMatched) score += 15;
+  const paymentPoints = row.payment_status === 'partially_paid' ? 10 : 0;
+  const identityPoints = supplierMatched ? 0 : 15;
+  const score = agePoints + amountPoints + paymentPoints + identityPoints;
 
   return {
     score: Math.min(score, 100),
     overdueDays,
     level: score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low',
+    breakdown: {
+      age: agePoints,
+      amount: amountPoints,
+      payment: paymentPoints,
+      identity: identityPoints,
+    },
   } as const;
 }
 
@@ -137,6 +145,7 @@ export async function loadLaudusFinanceReview(
       overdueDays: priority.overdueDays,
       priorityScore: priority.score,
       priority: priority.level,
+      scoreBreakdown: priority.breakdown,
       evidence: [
         matchedSupplier ? 'Proveedor identificado por nombre exacto y único' : 'Proveedor pendiente de identidad',
         row.payment_status === 'partially_paid' ? 'Pago parcial registrado en Laudus' : 'Sin pago aplicado en Laudus',
