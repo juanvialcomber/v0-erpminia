@@ -6,7 +6,8 @@ import { apiFetch } from '@/lib/api-client';
 
 type Supplier = { id: string; tax_id: string; legal_name: string; trade_name?: string | null; business_activity?: string | null; payment_terms?: string | null; email?: string | null; phone?: string | null; region?: string | null; is_active: boolean; validation_status: string };
 type Performance = { operational_score?: number | null; delivery_score?: number | null; quality_score?: number | null; invoice_score?: number | null; evidence_dimensions?: number | null; score_version?: string | null; delivery_scored_orders?: number | null; receipt_count?: number | null; invoice_scored_count?: number | null; returns_count?: number | null; returned_quantity?: number | null };
-type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[] };
+type LaudusDetail = { status: string; observedAt?: string; supplier?: { externalId: string; legalName: string | null; email: string | null; phone: string | null }; orders: { externalId: string; issuedDate: string | null; dueDate: string | null; sourceStatus: string | null; voided: boolean }[]; hasMoreOrders?: boolean };
+type Detail = { laudus?: LaudusDetail; supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[] };
 const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 const pct = (value?: number | null) => value == null ? 'Sin evidencia' : `${Number(value).toFixed(0)}%`;
 
@@ -81,6 +82,16 @@ export default function Suppliers360Page() {
             </div>
             <div className="mt-4 border-t pt-4 text-sm text-muted-foreground">Devoluciones: {Number(detail.performance?.returns_count || 0)} · Cantidad devuelta: {Number(detail.performance?.returned_quantity || 0)} · Versión: {detail.performance?.score_version || 'sin evidencia'}</div>
           </section>
+
+          {detail.laudus && detail.laudus.status !== 'not_configured' && <section className="rounded-lg border bg-card p-5">
+            <h3 className="font-semibold">Antecedentes de Laudus</h3>
+            {detail.laudus.status === 'available' ? <>
+              <p className="mt-1 text-sm text-muted-foreground">{detail.laudus.supplier?.legalName} · Actualizado: {detail.laudus.observedAt ? new Date(detail.laudus.observedAt).toLocaleString('es-CL', { timeZone: 'America/Santiago' }) : 'Sin fecha'}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Las órdenes conservan el estado de Laudus. Las aprobaciones de MOTIL se revisan por separado.</p>
+              <div className="mt-3 divide-y">{detail.laudus.orders.length ? detail.laudus.orders.map(order => <Row key={order.externalId} title={`OC Laudus ${order.externalId}`} meta={order.issuedDate || 'Sin fecha'} value={order.voided ? 'Anulada en Laudus' : `Estado de origen: ${order.sourceStatus || 'No informado'}`} />) : <p className="py-3 text-sm text-muted-foreground">Aún no hay órdenes sincronizadas para este proveedor.</p>}</div>
+              {detail.laudus.hasMoreOrders && <p className="text-xs text-muted-foreground">Se muestran las 20 órdenes más recientes.</p>}
+            </> : <p className="mt-2 text-sm text-muted-foreground">{detail.laudus.status === 'needs_review' ? 'La coincidencia del proveedor requiere revisión.' : detail.laudus.status === 'unavailable' ? 'No se pudieron consultar los antecedentes de Laudus.' : 'Este proveedor aún no tiene datos sincronizados de Laudus.'}</p>}
+          </section>}
 
           <section className="grid gap-5 xl:grid-cols-2">
             <Panel title="Órdenes recientes" empty="No hay órdenes relacionadas.">{[...detail.operationalOrders, ...detail.orders].slice(0, 10).map((row: any) => <Row key={`${row.id}-${row.order_number}`} title={row.order_number} meta={row.order_date || row.issued_at || ''} value={money.format(Number(row.total_amount || 0))}/>)}</Panel>
