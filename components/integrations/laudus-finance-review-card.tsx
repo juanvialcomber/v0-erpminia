@@ -23,6 +23,12 @@ type QueueRow = {
   overdueDays: number;
   priorityScore: number;
   priority: 'high' | 'medium' | 'low';
+  scoreBreakdown: {
+    age: number;
+    amount: number;
+    payment: number;
+    identity: number;
+  };
   evidence: string[];
   nextAction: string;
   feedback: {
@@ -216,6 +222,9 @@ export function LaudusFinanceReviewCard() {
                   Saldo {money(row.outstandingAmount)} · {row.overdueDays > 0 ? row.overdueDays.toLocaleString('es-CL') + ' días vencido' : 'no vencido'} · {row.paymentStatus === 'partially_paid' ? 'pago parcial' : 'sin pago aplicado'}
                 </p>
                 <p className="mt-1 text-xs">{row.nextAction}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Score: antigüedad +{row.scoreBreakdown.age} · monto +{row.scoreBreakdown.amount} · pago +{row.scoreBreakdown.payment} · identidad +{row.scoreBreakdown.identity}
+                </p>
 
                 {canReview && row.supplierMatched && !row.feedback ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
