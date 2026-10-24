@@ -111,6 +111,7 @@ async function request(path: string, init: RequestInit = {}) {
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate, br',
       ...(init.headers || {}),
     },
   });
@@ -231,6 +232,69 @@ export async function runLaudusReadOnlySmokeTest() {
     authenticated: true,
     calls: 5,
     persisted: false,
+    results,
+  };
+}
+
+const INVENTORY_DISCOVERY_TARGETS = [
+  ['stockByProduct', '/production/products/stock/list'],
+  ['stock', '/production/stock/list'],
+  ['inventory', '/production/inventory/list'],
+  ['stockMovements', '/production/stockmovements/list'],
+  ['inventoryMovements', '/production/inventorymovements/list'],
+  ['movements', '/production/movements/list'],
+] as const;
+
+export async function runLaudusInventoryEndpointDiscovery() {
+  await getLaudusAccessToken();
+
+  const results: Record<string, {
+    path: string;
+    status: 'available' | 'not_found' | 'not_permitted' | 'invalid_contract' | 'upstream_error';
+    upstreamStatus: number | null;
+    upstreamCode: string | null;
+    rows: number | null;
+    shape: string | null;
+  }> = {};
+
+  for (const [key, path] of INVENTORY_DISCOVERY_TARGETS) {
+    try {
+      const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
+      const summary = summarizePayload(payload);
+      results[key] = {
+        path,
+        status: 'available',
+        upstreamStatus: 200,
+        upstreamCode: null,
+        rows: summary.rows,
+        shape: summary.shape,
+      };
+    } catch (error) {
+      const apiError = error instanceof LaudusApiError ? error : null;
+      const status =
+        apiError?.status === 404 ? 'not_found'
+          : apiError?.status === 401 || apiError?.status === 403 ? 'not_permitted'
+            : apiError?.status === 400 || apiError?.status === 422 ? 'invalid_contract'
+              : 'upstream_error';
+
+      results[key] = {
+        path,
+        status,
+        upstreamStatus: apiError?.status ?? null,
+        upstreamCode: apiError?.upstreamCode ?? null,
+        rows: null,
+        shape: null,
+      };
+
+      if (status === 'not_permitted') break;
+    }
+  }
+
+  return {
+    authenticated: true,
+    calls: 1 + Object.keys(results).length,
+    persisted: false,
+    discoveryOnly: true,
     results,
   };
 }
