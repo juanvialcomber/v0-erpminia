@@ -55,8 +55,8 @@ parent_match as (
   from active_pending p
   left join canonical.cost_centers c
     on c.organization_id=p_organization_id
-   and lower(regexp_replace(coalesce(c.cost_center_code,''),'[^a-zA-Z0-9]','','g'))
-     = lower(regexp_replace(coalesce(p.parent_operational_code,''),'[^a-zA-Z0-9]','','g'))
+   and lower(btrim(coalesce(c.cost_center_code,'')))
+     = lower(btrim(coalesce(p.parent_operational_code,'')))
 ),
 asset_match as (
   select
