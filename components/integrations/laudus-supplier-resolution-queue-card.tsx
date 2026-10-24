@@ -31,7 +31,7 @@ export function LaudusSupplierResolutionQueueCard() {
   const { data, error, isLoading } = useSWR<Payload>(
     '/api/integrations/laudus/supplier-resolution-queue',
     fetcher,
-    { revalidateOnFocus: false, refreshInterval: 120000 },
+    { revalidateOnFocus: false, refreshInterval: 900000 },
   );
 
   if (error) return null;
