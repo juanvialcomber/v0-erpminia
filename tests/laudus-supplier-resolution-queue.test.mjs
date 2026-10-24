@@ -90,7 +90,7 @@ test('UI distinguishes verified identity from source-quality placeholders', () =
   assert.match(card, /RUT verificado/);
   assert.match(card, /Proveedores reales sin resolver/);
   assert.match(card, /OC placeholder de fuente/);
-  assert.match(card, /no modifica todavía el proveedor/);
+  assert.match(card, /La adopción canónica seguirá siendo un gate separado/);
 });
 
 
