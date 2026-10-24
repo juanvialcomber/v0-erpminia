@@ -51,7 +51,7 @@ export function LaudusInventoryReadinessCard() {
   const { data, error, isLoading } = useSWR<Payload>(
     '/api/integrations/laudus/inventory-readiness',
     fetcher,
-    { revalidateOnFocus: false, refreshInterval: 120000 },
+    { revalidateOnFocus: false, refreshInterval: 900000 },
   );
 
   if (error) return null;
