@@ -1,6 +1,10 @@
 export const dynamic = 'force-dynamic';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { fetchLaudusExtendedFinanceSnapshot } from '@/lib/integrations/laudus/extended-finance';
+
+const QA_ORGANIZATION_ID = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
 
 const PATH_TERMS = [
   'journal',
@@ -24,9 +28,52 @@ const SCHEMA_TERMS = [
   'TaxDocument',
 ] as const;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (process.env.VERCEL_ENV !== 'preview') {
     return new NextResponse(null, { status: 404 });
+  }
+
+  if (request.nextUrl.searchParams.get('execute') === '1') {
+    try {
+      const snapshot = await fetchLaudusExtendedFinanceSnapshot();
+      const db = getSupabaseServerClient();
+      const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
+        p_organization_id: QA_ORGANIZATION_ID,
+        p_accounting_entries: snapshot.journalEntries,
+        p_bank_statements: snapshot.bankStatements,
+        p_dtes: snapshot.dtesPending,
+      });
+      if (error) throw error;
+
+      return NextResponse.json({
+        mode: 'preview_execution',
+        source: 'Laudus',
+        calls: snapshot.calls,
+        journalEntriesRead: snapshot.journalEntries.length,
+        bankStatementsRead: snapshot.bankStatements.length,
+        dtesPendingRead: snapshot.dtesPending.length,
+        result: data,
+        rowsReturned: false,
+        canonicalMutated: false,
+        laudusMutated: false,
+      });
+    } catch (error) {
+      const status =
+        error && typeof error === 'object' && 'status' in error
+          ? Number((error as { status?: unknown }).status) || null
+          : null;
+      return NextResponse.json(
+        {
+          mode: 'preview_execution',
+          status,
+          error: error instanceof Error ? error.message : 'Extended finance probe failed',
+          rowsReturned: false,
+          canonicalMutated: false,
+          laudusMutated: false,
+        },
+        { status: 502 },
+      );
+    }
   }
 
   const response = await fetch('https://api.laudus.cl/swagger/v2/swagger.json', {
