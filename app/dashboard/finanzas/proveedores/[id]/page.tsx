@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ArrowLeft, CalendarDays, FileWarning, Package, ReceiptText } from 'lucide-react';
+import { ArrowLeft, CalendarDays, FileWarning, Package, ReceiptText, TrendingUp, WalletCards } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +31,9 @@ export default function SupplierProfilePage() {
   const orders: PurchaseOrder[] = data?.purchaseOrders || [];
   const products: ProductSummary[] = data?.topProducts || [];
   const quotations: Quotation[] = data?.quotations || [];
+  const laudus = data?.laudusIntelligence;
+  const laudusSummary = laudus?.summary;
+  const priceMovements = Array.isArray(laudus?.price_movements) ? laudus.price_movements : [];
 
   if (isLoading) return <p className="p-6 text-sm text-muted-foreground">Cargando proveedor...</p>;
   if (error) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error.message}</div>;
@@ -47,6 +50,34 @@ export default function SupplierProfilePage() {
       </section>
 
       <CertifiedFinancialSummary entity="supplier" id={params.id} />
+
+      {laudusSummary ? <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><WalletCards className="h-4 w-4" />Exposición Laudus</CardTitle>
+          <CardDescription>Compras y cuentas por pagar observadas en el ERP. Lectura solamente.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Facturas</p><p className="mt-1 text-xl font-semibold">{number(laudusSummary.invoice_count)}</p></div>
+          <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Compras históricas CLP</p><p className="mt-1 text-xl font-semibold">{money(laudusSummary.purchase_spend)}</p></div>
+          <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Saldo abierto</p><p className="mt-1 text-xl font-semibold">{money(laudusSummary.open_amount)}</p><p className="text-xs text-muted-foreground">{number(laudusSummary.open_invoice_count)} factura(s)</p></div>
+          <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Saldo marcado vencido</p><p className="mt-1 text-xl font-semibold">{money(laudusSummary.overdue_amount)}</p><p className="text-xs text-muted-foreground">{number(laudusSummary.overdue_invoice_count)} factura(s)</p></div>
+        </CardContent>
+      </Card> : null}
+
+      {priceMovements.length ? <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4" />Variación de precios</CardTitle>
+          <CardDescription>Último precio unitario versus mediana de compras anteriores para el mismo producto, proveedor y unidad. Una variación no implica anomalía.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {priceMovements.slice(0,10).map((row: any) => <div key={`${row.product_external_id}-${row.unit}`} className="grid gap-2 border-b py-3 last:border-0 lg:grid-cols-[1fr_130px_130px_110px] lg:items-center">
+            <div className="min-w-0"><p className="truncate font-medium">{row.sku || row.description || row.product_external_id}</p><p className="truncate text-xs text-muted-foreground">{row.description || 'Sin descripción'} · {row.purchase_count} compras · unidad {row.unit || 'sin unidad'}</p></div>
+            <div className="text-sm lg:text-right"><p className="font-medium">{money(row.prior_median_unit_price)}</p><p className="text-xs text-muted-foreground">mediana previa</p></div>
+            <div className="text-sm lg:text-right"><p className="font-medium">{money(row.latest_unit_price)}</p><p className="text-xs text-muted-foreground">último precio</p></div>
+            <div className="lg:text-right"><Badge variant="outline">{Number(row.price_change_pct) > 0 ? '+' : ''}{Number(row.price_change_pct).toLocaleString('es-CL',{maximumFractionDigits:1})}%</Badge></div>
+          </div>)}
+        </CardContent>
+      </Card> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Órdenes de compra" value={number(performance?.purchase_order_count)} icon={ReceiptText} />
