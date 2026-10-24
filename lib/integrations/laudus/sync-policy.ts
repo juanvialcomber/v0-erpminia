@@ -2,6 +2,15 @@ import { type LaudusEntityType } from './model';
 
 export type SyncPriority = 'master' | 'transactional' | 'financial_heavy';
 
+export const LAUDUS_AUTHORITY_POLICY = Object.freeze({
+  upstreamMode: 'read_only',
+  autoMergeCanonical: false,
+  autoOverwriteOperationalTruth: false,
+  humanReviewRequiredForConflicts: true,
+  laudusFinancialAuthority: true,
+  motilOperationalAuthority: true,
+} as const);
+
 export type EntitySyncPolicy = {
   priority: SyncPriority;
   pageSize: number;
