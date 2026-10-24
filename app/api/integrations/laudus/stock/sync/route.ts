@@ -29,8 +29,7 @@ export async function POST(request: NextRequest) {
     .replace(' ', 'T');
 
   const { data: warehouses, error: warehouseError } = await supabase
-    .schema('integration')
-    .from('laudus_warehouses')
+    .from('laudus_warehouses_service_v1')
     .select('external_id,laudus_warehouse_id,name')
     .eq('organization_id', access.organizationId)
     .order('laudus_warehouse_id');
