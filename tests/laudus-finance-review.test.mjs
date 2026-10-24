@@ -64,3 +64,10 @@ test('finance review feedback controls are capability and permission gated', () 
   assert.match(card, /Coincide/);
   assert.match(card, /No coincide/);
 });
+
+
+test('finance review quantifies high-priority balance concentration', () => {
+  assert.match(helper, /highPriorityAmount/);
+  assert.match(helper, /highPriorityAmountShare/);
+  assert.match(card, /% del saldo/);
+});
