@@ -52,7 +52,7 @@ test('finance readiness UI separates MOTIL payables from Laudus evidence', () =>
   assert.match(card, /Cobertura operativa/);
   assert.match(card, /Obligaciones con saldo/);
   assert.match(card, /MOTIL propone · humano aprueba/);
-  assert.match(card, /ajustes\/créditos separados del saldo por pagar/);
+  assert.match(card, /Siguiente acción/);
   assert.match(card, /refreshInterval: 900000/);
 });
 
