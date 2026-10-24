@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { fetchLaudusPurchaseLedgerRange } from '@/lib/integrations/laudus/purchase-ledger';
+import { fetchAllLaudusPurchaseInvoiceTotals } from '@/lib/integrations/laudus/purchase-invoice-totals';
 
 const ORGANIZATION_ID = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
 
@@ -32,7 +32,7 @@ export async function GET() {
 
   const start = new Date(bounds.first_issued_date);
   const end = new Date(bounds.last_issued_date);
-  const { rows, calls } = await fetchLaudusPurchaseLedgerRange(start, end);
+  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals();
 
   let updated = 0;
   let missing = 0;
