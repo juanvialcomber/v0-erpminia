@@ -93,7 +93,7 @@ export function LaudusFinanceReviewCard() {
         </div>
         <div className="bg-card p-4">
           <p className="text-2xl font-semibold">{isLoading || !summary ? '—' : summary.supplierCoverage.toLocaleString('es-CL', { maximumFractionDigits: 1 }) + '%'}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Proveedor resuelto por RUT</p>
+          <p className="mt-1 text-xs text-muted-foreground">Proveedor identificado</p>
         </div>
         <div className="bg-card p-4">
           <p className="text-2xl font-semibold">{isLoading || !summary ? '—' : summary.overdueDocuments.toLocaleString('es-CL')}</p>
@@ -132,7 +132,7 @@ export function LaudusFinanceReviewCard() {
                   </p>
                   <Badge variant="outline">{priorityLabel[row.priority]}</Badge>
                   {row.supplierMatched ? (
-                    <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Proveedor verificado</Badge>
+                    <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Proveedor identificado</Badge>
                   ) : (
                     <Badge variant="outline"><AlertTriangle className="mr-1 h-3.5 w-3.5" />Identidad pendiente</Badge>
                   )}
