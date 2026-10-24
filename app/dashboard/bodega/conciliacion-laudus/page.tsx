@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, CheckCircle2, GitCompareArrows, Warehouse } from 'lucide-react';
@@ -74,8 +75,9 @@ const stateLabel: Record<QueueRow['reconciliation_state'], string> = {
 };
 
 export default function LaudusInventoryReconciliationPage() {
+  const [reviewState, setReviewState] = useState<'all' | 'product_unresolved' | 'missing_motil_inventory' | 'difference'>('all');
   const { data, error, isLoading, mutate } = useSWR<Payload>(
-    '/api/integrations/laudus/inventory-reconciliation?limit=100',
+    `/api/integrations/laudus/inventory-reconciliation?limit=100&state=${reviewState}`,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -161,7 +163,27 @@ export default function LaudusInventoryReconciliationPage() {
       ) : null}
 
       <section className="space-y-3">
-        <div><h2 className="text-lg font-semibold">Requiere revisión</h2><p className="text-sm text-muted-foreground">Primero identidad y baseline; después diferencias relativas. La unidad siempre se conserva.</p></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div><h2 className="text-lg font-semibold">Requiere revisión</h2><p className="text-sm text-muted-foreground">Primero identidad y baseline; después diferencias relativas. La unidad siempre se conserva.</p></div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ['all', 'Prioridad'],
+              ['difference', 'Diferencias'],
+              ['missing_motil_inventory', 'Sin posición'],
+              ['product_unresolved', 'Sin resolver'],
+            ].map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={reviewState === value ? 'secondary' : 'outline'}
+                onClick={() => setReviewState(value as typeof reviewState)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
         <div className="overflow-hidden rounded-lg border bg-card">
           <div className="hidden grid-cols-[120px_1fr_120px_120px_130px_170px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
             <span>Código</span><span>Producto</span><span>Laudus</span><span>MOTIL</span><span>Variación</span><span>Estado</span>
