@@ -17,6 +17,9 @@ test('price movement compares latest price with prior median for same product an
   assert.match(migration,/partition by l\.product_external_id,coalesce\(l\.unit,''\)/);
   assert.match(migration,/percentile_cont\(0\.5\)/);
   assert.match(migration,/baseline_count>=2/);
+  assert.match(migration,/inventory_eligibility/);
+  assert.match(migration,/operational_category/);
+  assert.match(migration,/servicios varios/);
   assert.match(migration,/price_change_pct/);
 });
 
