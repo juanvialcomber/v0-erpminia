@@ -159,6 +159,45 @@ export async function loadLaudusFinanceReview(
   const highPriorityDocuments = queue.filter((row) => row.priority === 'high').length;
   const outstandingTotal = queue.reduce((sum, row) => sum + row.outstandingAmount, 0);
 
+  const topQueue = queue.slice(0, 10);
+  let feedbackAvailable = false;
+  const latestFeedback = new Map<
+    string,
+    {
+      decision: string;
+      reason: string | null;
+      actorName: string | null;
+      createdAt: string;
+    }
+  >();
+
+  if (topQueue.length) {
+    const feedbackResult = await db
+      .schema('integration')
+      .from('laudus_finance_review_feedback')
+      .select('purchase_invoice_external_id,decision,reason,actor_name,created_at')
+      .eq('organization_id', organizationId)
+      .in(
+        'purchase_invoice_external_id',
+        topQueue.map((row) => row.id),
+      )
+      .order('created_at', { ascending: false });
+
+    if (!feedbackResult.error) {
+      feedbackAvailable = true;
+      for (const feedback of feedbackResult.data || []) {
+        if (!latestFeedback.has(feedback.purchase_invoice_external_id)) {
+          latestFeedback.set(feedback.purchase_invoice_external_id, {
+            decision: feedback.decision,
+            reason: feedback.reason,
+            actorName: feedback.actor_name,
+            createdAt: feedback.created_at,
+          });
+        }
+      }
+    }
+  }
+
   return {
     summary: {
       openDocuments: queue.length,
@@ -171,7 +210,11 @@ export async function loadLaudusFinanceReview(
         ? Math.round((matchedSupplierDocuments / queue.length) * 1000) / 10
         : 0,
     },
-    queue: queue.slice(0, 10),
+    feedbackAvailable,
+    queue: topQueue.map((row) => ({
+      ...row,
+      feedback: latestFeedback.get(row.id) ?? null,
+    })),
     method: {
       identity: 'exact_unique_normalized_supplier_name',
       ranking: 'deterministic_v1',
