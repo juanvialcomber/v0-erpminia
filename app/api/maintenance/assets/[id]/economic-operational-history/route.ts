@@ -108,7 +108,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       loadAssetLedger(context.supabase, context.organizationId, id),
     ]);
 
-    const sourceError = assetResult.error || reliabilityResult.error || rootCausesResult.error || ordersResult.error || preventiveResult.error || runtimeResult.error || operationalReportsResult.error;
+    const sourceError = assetResult.error || reliabilityResult.error || rootCausesResult.error || ordersResult.error || preventiveResult.error || runtimeResult.error;
     if (sourceError) throw sourceError;
     if (!assetResult.data) return NextResponse.json({ error: 'Equipo no encontrado' }, { status: 404 });
 
@@ -157,7 +157,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const overduePreventives = preventives.filter((row: any) => Boolean(row.alert_due) || String(row.hour_status || '').toLowerCase() === 'overdue');
     const meterConflicts = preventives.filter((row: any) => Boolean(row.meter_basis_conflict)).length;
 
-    const reports = operationalReportsResult.data || [];
+    // Drilling is supplementary evidence: keep economic history available if this source fails.
+    const drillingSourceUnavailable = Boolean(operationalReportsResult.error);
+    const reports = drillingSourceUnavailable ? [] : (operationalReportsResult.data || []);
     let drilledMeters = 0;
     let outOfServiceReports = 0;
     let observedReports = 0;
@@ -245,6 +247,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         truncated: ledgerResult.truncated,
       },
       observedUse: {
+        drilling_source_status: drillingSourceUnavailable ? 'unavailable' : 'available',
         evidence_type: reports.length > 0 ? 'production_drilling_reports' : runtime && Number(runtime.reading_count || 0) > 0 ? 'runtime_meter' : 'none',
         drilling_report_count: reports.length,
         first_report_at: firstOperationalReportAt,
