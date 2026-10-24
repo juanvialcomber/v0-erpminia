@@ -1,0 +1,27 @@
+name: N3uralia local-first QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: QA level
+        required: true
+        default: qa-pr
+        type: choice
+        options: [qa-fast, qa-pr, qa-full]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n3uralia-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    runs-on: [self-hosted, linux, x64, n3uralia]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run local-first gate
+        run: make ${{ inputs.level }}
