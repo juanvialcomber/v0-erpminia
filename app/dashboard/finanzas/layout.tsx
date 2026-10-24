@@ -9,6 +9,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 const operationItems = [
   { href: '/dashboard/finanzas', label: 'Resumen' },
   { href: '/dashboard/finanzas/pagos', label: 'Pagos' },
+  { href: '/dashboard/finanzas/facturacion', label: 'Facturación' },
 ];
 
 const controlItems = [
