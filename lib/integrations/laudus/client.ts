@@ -186,7 +186,9 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
     body: JSON.stringify({
       options: {
         offset: query.options?.offset ?? 0,
-        limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
+        limit: query.options?.limit === 0
+          ? 0
+          : Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
       },
       fields: query.fields ?? [],
       filterBy: query.filterBy ?? [],
