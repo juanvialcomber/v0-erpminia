@@ -53,3 +53,14 @@ test('finance review presents conclusion evidence and next action', () => {
 test('finance dashboard includes the review surface', () => {
   assert.match(page, /LaudusFinanceReviewCard/);
 });
+
+
+test('finance review feedback controls are capability and permission gated', () => {
+  assert.match(helper, /feedbackAvailable/);
+  assert.match(helper, /laudus_finance_review_feedback/);
+  assert.match(card, /useModuleAccess/);
+  assert.match(card, /canEdit\('fin_finanzas'\)/);
+  assert.match(card, /Boolean\(data\?\.feedbackAvailable\)/);
+  assert.match(card, /Coincide/);
+  assert.match(card, /No coincide/);
+});
