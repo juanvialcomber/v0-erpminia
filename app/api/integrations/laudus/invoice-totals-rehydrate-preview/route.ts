@@ -12,27 +12,26 @@ export async function GET() {
   }
 
   const db = getSupabaseServerClient();
-  const { data: first } = await db
-    .schema('integration')
-    .from('laudus_purchase_invoices')
-    .select('issued_date')
-    .eq('organization_id', ORGANIZATION_ID)
-    .order('issued_date', { ascending: true })
-    .limit(1);
-  const { data: last } = await db
-    .schema('integration')
-    .from('laudus_purchase_invoices')
-    .select('issued_date')
-    .eq('organization_id', ORGANIZATION_ID)
-    .order('issued_date', { ascending: false })
-    .limit(1);
+  const { data: bounds, error: boundsError } = await db.rpc('motil_get_laudus_invoice_staging_bounds', {
+    p_organization_id: ORGANIZATION_ID,
+  });
 
-  if (!first?.[0]?.issued_date || !last?.[0]?.issued_date) {
-    return NextResponse.json({ status: 'empty', canonicalMutated: false, laudusMutated: false });
+  if (
+    boundsError ||
+    !bounds?.first_issued_date ||
+    !bounds?.last_issued_date ||
+    Number(bounds?.invoice_count ?? 0) === 0
+  ) {
+    return NextResponse.json({
+      status: 'empty',
+      databaseCode: boundsError?.code ?? null,
+      canonicalMutated: false,
+      laudusMutated: false,
+    });
   }
 
-  const start = new Date(first[0].issued_date);
-  const end = new Date(last[0].issued_date);
+  const start = new Date(bounds.first_issued_date);
+  const end = new Date(bounds.last_issued_date);
   const { rows, calls } = await fetchLaudusPurchaseLedgerRange(start, end);
 
   let updated = 0;
