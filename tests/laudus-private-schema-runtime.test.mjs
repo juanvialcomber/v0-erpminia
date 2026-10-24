@@ -44,3 +44,27 @@ test('Laudus runtime never addresses private integration or canonical schemas th
 
   assert.deepEqual(offenders, []);
 });
+
+
+test('Laudus runtime uses the approved service facades for private evidence', () => {
+  const runtime = roots
+    .flatMap(filesUnder)
+    .map((path) => readFileSync(path, 'utf8'))
+    .join('\n');
+
+  for (const facade of [
+    'laudus_source_status_service_v1',
+    'laudus_purchase_invoice_payment_status_service_v1',
+    'canonical_products_service_v1',
+    'canonical_suppliers_service_v1',
+    'canonical_purchase_orders_service_v1',
+    'canonical_purchase_order_lines_service_v1',
+    'canonical_cost_centers_service_v1',
+    'canonical_assets_service_v1',
+    'laudus_warehouses_service_v1',
+    'purchase_order_reconciliation_preview_service_v1',
+    'supplier_resolution_queue_service_v1',
+  ]) {
+    assert.ok(runtime.includes(facade), `Missing runtime facade: ${facade}`);
+  }
+});
