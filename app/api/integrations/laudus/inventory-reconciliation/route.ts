@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     db.rpc('motil_get_laudus_inventory_reconciliation_summary', {
       p_organization_id: context.organizationId,
     }),
-    db.rpc('motil_get_laudus_inventory_reconciliation_queue', {
+    db.rpc('motil_get_laudus_inventory_reconciliation_queue_v2', {
       p_organization_id: context.organizationId,
       p_limit: limit,
       p_offset: offset,
