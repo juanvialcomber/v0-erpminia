@@ -71,3 +71,13 @@ test('finance review quantifies high-priority balance concentration', () => {
   assert.match(helper, /highPriorityAmountShare/);
   assert.match(card, /% del saldo/);
 });
+
+
+test('finance review score evidence is decomposed for explainability', () => {
+  assert.match(helper, /breakdown:/);
+  assert.match(helper, /age: agePoints/);
+  assert.match(helper, /amount: amountPoints/);
+  assert.match(helper, /payment: paymentPoints/);
+  assert.match(helper, /identity: identityPoints/);
+  assert.match(card, /Score: antigüedad/);
+});
