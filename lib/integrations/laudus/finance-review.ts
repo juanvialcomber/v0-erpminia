@@ -158,6 +158,9 @@ export async function loadLaudusFinanceReview(
   const overdueDocuments = queue.filter((row) => row.overdueDays > 0).length;
   const highPriorityDocuments = queue.filter((row) => row.priority === 'high').length;
   const outstandingTotal = queue.reduce((sum, row) => sum + row.outstandingAmount, 0);
+  const highPriorityAmount = queue
+    .filter((row) => row.priority === 'high')
+    .reduce((sum, row) => sum + row.outstandingAmount, 0);
 
   const topQueue = queue.slice(0, 10);
   let feedbackAvailable = false;
@@ -205,6 +208,10 @@ export async function loadLaudusFinanceReview(
       unresolvedSupplierDocuments: queue.length - matchedSupplierDocuments,
       overdueDocuments,
       highPriorityDocuments,
+      highPriorityAmount,
+      highPriorityAmountShare: outstandingTotal
+        ? Math.round((highPriorityAmount / outstandingTotal) * 1000) / 10
+        : 0,
       outstandingTotal,
       supplierCoverage: queue.length
         ? Math.round((matchedSupplierDocuments / queue.length) * 1000) / 10
