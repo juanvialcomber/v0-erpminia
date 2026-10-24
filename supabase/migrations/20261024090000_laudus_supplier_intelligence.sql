@@ -73,7 +73,7 @@ movements as (
     first_purchase_date,last_purchase_date,
     latest_unit_price,prior_median_unit_price,baseline_count,historical_spend,
     case when prior_median_unit_price is null or prior_median_unit_price=0 then null
-      else round(((latest_unit_price/prior_median_unit_price)-1)*100,2)
+      else round(((((latest_unit_price::numeric/prior_median_unit_price::numeric)-1)*100))::numeric,2)
     end as price_change_pct
   from series
 ),
