@@ -92,3 +92,27 @@ test('UI distinguishes verified identity from source-quality placeholders', () =
   assert.match(card, /OC placeholder de fuente/);
   assert.match(card, /no modifica todavía el proveedor/);
 });
+
+
+test('supplier bridge human review is write-gated and non-canonical', () => {
+  const reviewMigration = readFileSync(
+    new URL('../supabase/migrations/20261024163500_laudus_supplier_bridge_reviews.sql', import.meta.url),
+    'utf8',
+  );
+  const reviewRoute = readFileSync(
+    new URL('../app/api/integrations/laudus/supplier-resolution-queue/review/route.ts', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(reviewMigration, /laudus_supplier_bridge_reviews/);
+  assert.match(reviewMigration, /tax_verified_exact/);
+  assert.match(reviewMigration, /motil_record_laudus_supplier_bridge_review/);
+  assert.doesNotMatch(reviewMigration, /update canonical\.purchase_orders|update canonical\.suppliers/i);
+  assert.match(reviewRoute, /FIN_COMPRAS, true/);
+  assert.match(reviewRoute, /canonicalMutated: false/);
+  assert.match(reviewRoute, /purchaseOrdersMutated: false/);
+  assert.match(reviewRoute, /motil_record_laudus_supplier_bridge_review/);
+  assert.match(card, /Coincide/);
+  assert.match(card, /No coincide/);
+  assert.match(card, /La adopción canónica seguirá siendo un gate separado/);
+});
