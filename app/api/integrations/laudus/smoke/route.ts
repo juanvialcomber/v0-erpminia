@@ -5,7 +5,7 @@ import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import {
   getLaudusConfigurationState,
   LaudusApiError,
-  runLaudusInventoryEndpointDiscovery,
+  runLaudusInventoryReadOnlyProbe,
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       status: 'ok',
       configured: true,
-      scope: scope === 'inventory-discovery' ? 'inventory-discovery' : 'masters',
+      scope: scope === 'inventory-probe' ? 'inventory-probe' : 'masters',
       ...result,
     });
   } catch (error) {
