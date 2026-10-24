@@ -40,6 +40,8 @@ type Payload = {
     unresolvedSupplierDocuments: number;
     overdueDocuments: number;
     highPriorityDocuments: number;
+    highPriorityAmount: number;
+    highPriorityAmountShare: number;
     outstandingTotal: number;
     supplierCoverage: number;
   };
@@ -176,7 +178,9 @@ export function LaudusFinanceReviewCard() {
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            {isLoading || !summary ? '—' : summary.highPriorityDocuments.toLocaleString('es-CL') + ' prioridad alta'}
+            {isLoading || !summary
+              ? '—'
+              : `${summary.highPriorityDocuments.toLocaleString('es-CL')} prioridad alta · ${summary.highPriorityAmountShare.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% del saldo`}
           </p>
         </div>
 
