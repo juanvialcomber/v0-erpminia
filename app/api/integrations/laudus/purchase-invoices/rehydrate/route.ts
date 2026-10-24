@@ -17,31 +17,24 @@ export async function POST(request: NextRequest) {
   }
 
   const db = getSupabaseServerClient();
-  const { data: bounds, error: boundsError } = await db
-    .schema('integration')
-    .from('laudus_purchase_invoices')
-    .select('issued_date')
-    .eq('organization_id', access.organizationId)
-    .order('issued_date', { ascending: true })
-    .limit(1);
+  const { data: bounds, error: boundsError } = await db.rpc('motil_get_laudus_invoice_staging_bounds', {
+    p_organization_id: access.organizationId,
+  });
 
-  const { data: latest, error: latestError } = await db
-    .schema('integration')
-    .from('laudus_purchase_invoices')
-    .select('issued_date')
-    .eq('organization_id', access.organizationId)
-    .order('issued_date', { ascending: false })
-    .limit(1);
-
-  if (boundsError || latestError || !bounds?.[0]?.issued_date || !latest?.[0]?.issued_date) {
+  if (
+    boundsError ||
+    !bounds?.first_issued_date ||
+    !bounds?.last_issued_date ||
+    Number(bounds?.invoice_count ?? 0) === 0
+  ) {
     return NextResponse.json(
       { status: 'empty', calls: 0, canonicalMutated: false, laudusMutated: false },
       { status: 404 },
     );
   }
 
-  const start = new Date(bounds[0].issued_date);
-  const end = new Date(latest[0].issued_date);
+  const start = new Date(bounds.first_issued_date);
+  const end = new Date(bounds.last_issued_date);
   const { rows, calls } = await fetchLaudusPurchaseLedgerRange(start, end);
 
   const chunkSize = 500;
