@@ -4,14 +4,24 @@ import fs from 'node:fs';
 
 const reader = fs.readFileSync('lib/integrations/laudus/purchase-payments.ts', 'utf8');
 const route = fs.readFileSync('app/api/integrations/laudus/purchase-payments/sync/route.ts', 'utf8');
-const migration = fs.readFileSync('supabase/migrations/20261024035000_laudus_purchase_payments_staging.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20261024043000_laudus_purchase_payments_flattened.sql', 'utf8');
 
-test('Laudus purchase payment reader requests invoice allocations explicitly', () => {
-  for (const field of ['paymentId', 'issuedDate', 'dueDate', 'document', 'deposited', 'purchaseInvoices']) {
-    assert.match(reader, new RegExp(`['"]${field}['"]`));
+test('Laudus purchase payment reader requests flattened invoice allocations explicitly', () => {
+  for (const field of [
+    'paymentId',
+    'issuedDate',
+    'dueDate',
+    'document',
+    'deposited',
+    'purchaseInvoices.itemId',
+    'purchaseInvoices.purchaseInvoiceId',
+    'purchaseInvoices.amount',
+  ]) {
+    assert.match(reader, new RegExp(field.replace('.', '\\.')));
   }
   assert.match(reader, /\/purchases\/payments\/list/);
-  assert.match(reader, /pageSize = 25/);
+  assert.match(reader, /limit: 0/);
+  assert.match(reader, /field: 'issuedDate'/);
 });
 
 test('purchase payment sync remains admin scoped and read only', () => {
@@ -24,7 +34,7 @@ test('purchase payment sync remains admin scoped and read only', () => {
 test('Laudus payments stage separately from MOTIL operational payables', () => {
   assert.match(migration, /integration\.laudus_purchase_payments/);
   assert.match(migration, /integration\.laudus_purchase_payment_allocations/);
-  assert.match(migration, /integration\.laudus_purchase_invoice_payment_status_v1/);
+  assert.match(migration, /purchaseInvoices_purchaseInvoiceId/);
   assert.doesNotMatch(migration, /insert into public\.procurement_supplier_payments/i);
   assert.doesNotMatch(migration, /update public\.procurement_accounts_payable/i);
   assert.match(migration, /canonical_mutated', false/);
