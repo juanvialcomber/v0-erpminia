@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 type QueueRow = {
   id: string;
@@ -21,6 +25,12 @@ type QueueRow = {
   priority: 'high' | 'medium' | 'low';
   evidence: string[];
   nextAction: string;
+  feedback: {
+    decision: string;
+    reason: string | null;
+    actorName: string | null;
+    createdAt: string;
+  } | null;
 };
 
 type Payload = {
@@ -33,6 +43,7 @@ type Payload = {
     outstandingTotal: number;
     supplierCoverage: number;
   };
+  feedbackAvailable: boolean;
   queue: QueueRow[];
   method: {
     identity: string;
@@ -63,16 +74,67 @@ const priorityLabel: Record<QueueRow['priority'], string> = {
   low: 'Baja',
 };
 
+const feedbackLabel: Record<string, string> = {
+  accepted: 'Coincide',
+  rejected: 'No coincide',
+  deferred: 'Pendiente',
+};
+
 export function LaudusFinanceReviewCard() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { canEdit, ready } = useModuleAccess();
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/finance-review',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
+  const [activeRejectId, setActiveRejectId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   if (error) return null;
 
   const summary = data?.summary;
+  const canReview = ready && canEdit('fin_finanzas') && Boolean(data?.feedbackAvailable);
+
+  const submitFeedback = async (
+    row: QueueRow,
+    decision: 'accepted' | 'rejected',
+    reason?: string,
+  ) => {
+    setSavingId(row.id);
+    setActionError(null);
+
+    try {
+      const response = await fetch('/api/integrations/laudus/finance-review/feedback', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          purchaseInvoiceExternalId: row.id,
+          suggestedSupplierId: row.motilSupplierId,
+          decision,
+          reason: reason || null,
+          priorityScore: row.priorityScore,
+          outstandingAmount: row.outstandingAmount,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la revisión.');
+
+      setActiveRejectId(null);
+      setRejectReason('');
+      await mutate();
+    } catch (feedbackError) {
+      setActionError(
+        feedbackError instanceof Error
+          ? feedbackError.message
+          : 'No se pudo registrar la revisión.',
+      );
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
@@ -118,6 +180,10 @@ export function LaudusFinanceReviewCard() {
           </p>
         </div>
 
+        {actionError ? (
+          <p className="mt-3 text-xs text-destructive">{actionError}</p>
+        ) : null}
+
         <div className="mt-3 divide-y rounded-lg border">
           {isLoading ? <p className="p-4 text-sm text-muted-foreground">Priorizando evidencia…</p> : null}
           {!isLoading && data?.queue.length === 0 ? (
@@ -136,11 +202,67 @@ export function LaudusFinanceReviewCard() {
                   ) : (
                     <Badge variant="outline"><AlertTriangle className="mr-1 h-3.5 w-3.5" />Identidad pendiente</Badge>
                   )}
+                  {row.feedback ? (
+                    <Badge variant="outline">
+                      {feedbackLabel[row.feedback.decision] || row.feedback.decision}
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Saldo {money(row.outstandingAmount)} · {row.overdueDays > 0 ? row.overdueDays.toLocaleString('es-CL') + ' días vencido' : 'no vencido'} · {row.paymentStatus === 'partially_paid' ? 'pago parcial' : 'sin pago aplicado'}
                 </p>
                 <p className="mt-1 text-xs">{row.nextAction}</p>
+
+                {canReview && row.supplierMatched && !row.feedback ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={savingId === row.id}
+                      onClick={() => submitFeedback(row, 'accepted')}
+                    >
+                      Coincide
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={savingId === row.id}
+                      onClick={() => {
+                        setActiveRejectId(row.id);
+                        setRejectReason('');
+                        setActionError(null);
+                      }}
+                    >
+                      No coincide
+                    </Button>
+                  </div>
+                ) : null}
+
+                {canReview && row.supplierMatched && !row.feedback && activeRejectId === row.id ? (
+                  <div className="mt-2 flex max-w-xl flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={rejectReason}
+                      onChange={(event) => setRejectReason(event.target.value)}
+                      placeholder="Motivo breve"
+                      maxLength={240}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!rejectReason.trim() || savingId === row.id}
+                      onClick={() => submitFeedback(row, 'rejected', rejectReason.trim())}
+                    >
+                      Registrar
+                    </Button>
+                  </div>
+                ) : null}
+
+                {row.feedback ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Revisión registrada
+                    {row.feedback.actorName ? ' por ' + row.feedback.actorName : ''}
+                    {row.feedback.reason ? ' · ' + row.feedback.reason : ''}
+                  </p>
+                ) : null}
               </div>
               <div className="text-left lg:text-right">
                 <p className="text-xs text-muted-foreground">Prioridad</p>
