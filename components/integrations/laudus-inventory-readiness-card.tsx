@@ -92,7 +92,9 @@ export function LaudusInventoryReadinessCard() {
         <div className="bg-card p-4">
           <p className="text-xs text-muted-foreground">Saldo Laudus</p>
           <p className="mt-2 text-lg font-semibold">{isLoading || !data ? '—' : data.laudus.stockRows.toLocaleString('es-CL')} posiciones</p>
-          <p className="mt-1 text-xs text-muted-foreground">{isLoading || !data ? '—' : data.laudus.negativeRows.toLocaleString('es-CL')} negativas · Kardex ${isLoading || !data ? '—' : data.laudus.kardexRows.toLocaleString('es-CL')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isLoading || !data ? '—' : data.laudus.negativeRows.toLocaleString('es-CL')} negativas · Kardex {isLoading || !data ? '—' : data.laudus.kardexRows.toLocaleString('es-CL')}
+          </p>
         </div>
       </div>
 
