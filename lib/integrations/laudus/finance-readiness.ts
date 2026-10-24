@@ -18,9 +18,7 @@ async function loadLaudusFinancialEvidence(
   organizationId: string,
 ) {
   try {
-    const invoices = db
-      .schema('integration')
-      .from('laudus_purchase_invoice_payment_status_v1');
+    const invoices = db.from('laudus_purchase_invoice_payment_status_service_v1');
 
     const [
       payableDocuments,
@@ -32,14 +30,12 @@ async function loadLaudusFinancialEvidence(
       latestInvoiceSync,
     ] = await Promise.all([
       count(invoices.select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0)),
-      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'paid')),
-      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'partially_paid')),
-      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'unpaid')),
-      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).lt('total_amount', 0)),
-      count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-      db
-        .schema('integration')
-        .from('laudus_purchase_invoices')
+      count(db.from('laudus_purchase_invoice_payment_status_service_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'paid')),
+      count(db.from('laudus_purchase_invoice_payment_status_service_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'partially_paid')),
+      count(db.from('laudus_purchase_invoice_payment_status_service_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'unpaid')),
+      count(db.from('laudus_purchase_invoice_payment_status_service_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).lt('total_amount', 0)),
+      count(db.from('laudus_purchase_payments_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      db.from('laudus_purchase_invoices_service_v1')
         .select('synced_at')
         .eq('organization_id', organizationId)
         .order('synced_at', { ascending: false })
@@ -117,30 +113,18 @@ export async function loadLaudusFinanceReadiness(
 
   try {
     const source = await db
-      .schema('integration')
-      .from('external_sources')
-      .select('id,enabled')
+      .from('laudus_source_status_service_v1')
+      .select('enabled,latest_status')
       .eq('organization_id', organizationId)
-      .eq('source_key', 'laudus')
       .maybeSingle();
 
     if (!source.error && source.data?.enabled) {
-      const run = await db
-        .schema('integration')
-        .from('sync_runs')
-        .select('status')
-        .eq('organization_id', organizationId)
-        .eq('source_id', source.data.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const status = String(run.data?.status || '').toLowerCase();
+      const status = String(source.data.latest_status || '').toLowerCase();
       if (status === 'completed') laudusState = 'ready_to_compare';
       if (status === 'partial' || status === 'failed') laudusState = 'review';
     }
   } catch {
-    // Expected before the private integration schema is deployed.
+    // Expected before the private service facade is deployed.
   }
 
   if (laudusEvidence.available && laudusState === 'waiting_laudus') {
