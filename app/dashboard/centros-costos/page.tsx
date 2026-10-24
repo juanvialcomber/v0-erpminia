@@ -1,4 +1,5 @@
 import { CostCenterCoverageQueue } from '@/components/dashboard/cost-center-coverage-queue';
+import { LaudusCostCenterReviewQueue } from '@/components/dashboard/laudus-cost-center-review-queue';
 import { CostCentersWorkspace } from '@/components/dashboard/cost-centers-workspace';
 import {
   PageHeader,
@@ -25,6 +26,7 @@ export default function CostCentersPage() {
           </PageHeaderDescription>
         </PageHeaderContent>
       </PageHeader>
+      <LaudusCostCenterReviewQueue />
       <CostCenterCoverageQueue />
       <CostCentersWorkspace />
     </div>
