@@ -13,6 +13,15 @@ test('finance readiness measures payable and payment completeness', () => {
   assert.match(helper, /reconciliationCoverage/);
 });
 
+test('finance readiness reads Laudus evidence with bounded aggregate counts', () => {
+  assert.match(helper, /laudus_purchase_invoice_payment_status_v1/);
+  assert.match(helper, /laudus_purchase_payments/);
+  assert.match(helper, /count: 'exact', head: true/);
+  assert.match(helper, /\.gt\('total_amount', 0\)/);
+  assert.match(helper, /\.lt\('total_amount', 0\)/);
+  assert.match(helper, /openDocuments: partiallyPaidDocuments \+ unpaidDocuments/);
+});
+
 test('finance readiness keeps human authority and blocks automatic payment actions', () => {
   assert.match(helper, /autoCreatePayment: false/);
   assert.match(helper, /autoReconcilePayment: false/);
@@ -20,13 +29,17 @@ test('finance readiness keeps human authority and blocks automatic payment actio
   assert.match(helper, /motilPaymentApprovalRole: 'human_authority'/);
 });
 
-test('finance readiness API is scoped to finance permissions', () => {
+test('finance readiness API is finance-scoped and reads private evidence server-side', () => {
   assert.match(route, /FIN_FINANZAS/);
+  assert.match(route, /getSupabaseServerClient/);
   assert.doesNotMatch(helper, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
 
-test('finance readiness UI explains Laudus as financial evidence without payment authority', () => {
-  assert.match(card, /Preparación financiera para Laudus/);
-  assert.match(card, /no puede aprobar, crear ni conciliar pagos automáticamente/);
-  assert.match(card, /Aprobación humana obligatoria/);
+test('finance readiness UI separates MOTIL payables from Laudus evidence', () => {
+  assert.match(card, /Laudus · evidencia financiera/);
+  assert.match(card, /CxP canónicas MOTIL/);
+  assert.match(card, /Documentos Laudus/);
+  assert.match(card, /Sin creación automática de pagos/);
+  assert.match(card, /ajustes\/créditos separados del saldo por pagar/);
+  assert.match(card, /refreshInterval: 900000/);
 });
