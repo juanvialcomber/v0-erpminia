@@ -57,7 +57,7 @@ test('finance dashboard includes the review surface', () => {
 
 test('finance review feedback controls are capability and permission gated', () => {
   assert.match(helper, /feedbackAvailable/);
-  assert.match(helper, /laudus_finance_review_feedback/);
+  assert.match(helper, /laudus_finance_review_feedback_service_v1/);
   assert.match(card, /useModuleAccess/);
   assert.match(card, /canEdit\('fin_finanzas'\)/);
   assert.match(card, /Boolean\(data\?\.feedbackAvailable\)/);
@@ -80,4 +80,12 @@ test('finance review score evidence is decomposed for explainability', () => {
   assert.match(helper, /payment: paymentPoints/);
   assert.match(helper, /identity: identityPoints/);
   assert.match(card, /Score: antigüedad/);
+});
+
+
+test('finance review keeps private schemas behind service facades', () => {
+  assert.match(helper, /laudus_purchase_invoice_payment_status_service_v1/);
+  assert.match(helper, /laudus_finance_review_feedback_service_v1/);
+  assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
+  assert.doesNotMatch(helper, /\.schema\(['"]canonical['"]\)/);
 });
