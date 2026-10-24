@@ -486,3 +486,23 @@ Esto evita que la brecha se detecte recién en aprobación y transforma la calid
 ## 2026-10-23 — Guard de cantidad fraccionaria en materiales OT
 
 Se verificó que `work_order_material_requirements.quantity_required` es numérico, pero `warehouse_stock`, `stock_movements` y `work_order_parts` usan cantidades enteras. Para evitar redondeo silencioso, la captura operativa de materiales de OT rechaza cantidades fraccionarias hasta que la cadena completa de stock sea migrada explícitamente a unidades decimales.
+
+
+## 2026-10-23 — Readiness de trazabilidad económica OT → Laudus
+
+### Baseline observado
+- 11 OT modernas.
+- 11 sin declaración explícita de uso de materiales.
+- 1 OT con requerimientos activos.
+- 0 OT con líneas en `work_order_parts`.
+- 0 con entrega o instalación trazada.
+- La única OT con requerimientos tiene 6 productos distintos y 6/6 poseen historial Laudus por SKU.
+- 9 OT completadas tienen una brecha de trazabilidad material/económica.
+
+### Capacidad
+Se agregó `motil_material_traceability_readiness`, que mide secuencialmente intención de materiales, requerimientos, reserva/traza, entrega, instalación y cobertura Laudus. El score describe cobertura del proceso; no calidad del mantenimiento ni ROI.
+
+La cola prioriza OT completadas con brecha y entrega una sola siguiente acción. Laudus permanece como contexto de compra del SKU y nunca como prueba de consumo por activo.
+
+### Valor
+El cuello de botella actual queda localizado: la fuente externa Laudus ya puede contextualizar los SKU observados, pero falta capturar correctamente el paso operacional OT → Bodega → instalación. Esto permite invertir esfuerzo donde aumenta evidencia real, en vez de agregar más dashboards.
