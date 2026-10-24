@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = getSupabaseServerClient(access.user.id);
+  const supabase = getSupabaseServerClient();
   const observedAt = new Date().toISOString();
   const dateTo = new Date()
     .toLocaleString('sv-SE', { timeZone: 'America/Santiago', hour12: false })
