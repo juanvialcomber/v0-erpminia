@@ -32,7 +32,7 @@ export async function GET() {
 
   const start = new Date(bounds.first_issued_date);
   const end = new Date(bounds.last_issued_date);
-  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals();
+  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals(start, end);
 
   let updated = 0;
   let missing = 0;
