@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { fetchLaudusPurchaseInvoiceItemTraces } from '@/lib/integrations/laudus/purchase-invoice-traces';
+import { fetchLaudusPurchaseInvoiceOrigins } from '@/lib/integrations/laudus/purchase-invoice-traces';
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 25;
@@ -45,14 +45,14 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(purchaseInvoiceId) || purchaseInvoiceId <= 0 || !invoiceExternalId) continue;
 
     try {
-      const result = await fetchLaudusPurchaseInvoiceItemTraces(purchaseInvoiceId);
+      const result = await fetchLaudusPurchaseInvoiceOrigins(purchaseInvoiceId);
       calls += result.calls;
 
       const { data, error } = await db.rpc('motil_ingest_laudus_invoice_traces', {
         p_organization_id: access.organizationId,
         p_invoice_external_id: invoiceExternalId,
         p_laudus_purchase_invoice_id: purchaseInvoiceId,
-        p_traces: result.traces,
+        p_traces: result.origins,
       });
 
       if (error) throw error;
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     status: failures.length === 0 ? 'ok' : invoicesProcessed > 0 ? 'partial' : 'failed',
     source: 'Laudus',
+    sourceEndpoint: '/purchases/invoices/{purchaseInvoiceId}/traceTo',
     mode: 'read_only',
     requested: rows.length,
     invoicesProcessed,
