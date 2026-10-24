@@ -1,7 +1,14 @@
 'use client';
 
 import useSWR from 'swr';
-import { Landmark, ShieldCheck, WalletCards } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpenCheck,
+  CheckCircle2,
+  Landmark,
+  ShieldCheck,
+  WalletCards,
+} from 'lucide-react';
 
 type Payload = {
   payables: {
@@ -58,10 +65,22 @@ const fetcher = async (url: string): Promise<Payload> => {
 };
 
 const stateLabel: Record<Payload['reconciliation']['state'], string> = {
-  waiting_laudus: 'Esperando Laudus',
-  ready_to_compare: 'Lista para comparar',
-  review: 'Requiere revisión',
+  waiting_laudus: 'Esperando datos',
+  ready_to_compare: 'Operativo',
+  review: 'Revisar',
 };
+
+function freshness(value: string | null | undefined) {
+  if (!value) return 'Sin sincronización';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Sin sincronización';
+  return new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
 
 export function LaudusFinanceReadinessCard() {
   const { data, error, isLoading } = useSWR<Payload>(
@@ -74,71 +93,96 @@ export function LaudusFinanceReadinessCard() {
 
   const evidence = data?.laudusEvidence;
   const accounting = data?.accountingEvidence;
+  const state = data?.reconciliation.state ?? 'waiting_laudus';
+  const hasOpenDocuments = Boolean(evidence?.openDocuments);
+  const hasPendingDtes = Boolean(accounting?.pendingDtes);
+  const nextAction = hasOpenDocuments
+    ? 'Priorizar obligaciones con saldo y validar proveedor.'
+    : hasPendingDtes
+      ? 'Revisar DTE pendientes antes del cierre.'
+      : accounting?.available
+        ? 'Sin excepciones financieras urgentes.'
+        : 'Completar primera sincronización Laudus.';
 
   return (
-    <section className="overflow-hidden rounded-lg border bg-card">
-      <div className="border-b px-4 py-4">
-        <div className="flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Laudus · evidencia financiera</h2>
+    <section className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="flex flex-col gap-4 border-b px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Landmark className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-base font-semibold">Centro de control financiero</h2>
+            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium">
+              {state === 'ready_to_compare' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+              {isLoading || !data ? 'Cargando' : stateLabel[state]}
+            </span>
+          </div>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            MOTIL cruza operación y evidencia Laudus sin convertir automáticamente documentos externos en deuda, pago o asiento canónico.
+          </p>
         </div>
-        <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          MOTIL conserva las CxP operacionales. Laudus aporta evidencia financiera y contable para comparar, no para crear deuda automáticamente.
-        </p>
+        <div className="text-left lg:text-right">
+          <p className="text-xs text-muted-foreground">Última evidencia</p>
+          <p className="mt-1 text-sm font-medium">{isLoading ? '—' : freshness(accounting?.latestSyncAt || evidence?.latestSyncAt)}</p>
+        </div>
       </div>
 
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-card p-4">
+        <div className="bg-card p-5">
           <WalletCards className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : data.payables.total.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">CxP canónicas MOTIL</p>
-        </div>
-        <div className="bg-card p-4">
-          <p className="text-xs text-muted-foreground">Documentos Laudus</p>
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.payableDocuments.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Sólo documentos positivos</p>
-        </div>
-        <div className="bg-card p-4">
-          <p className="text-xs text-muted-foreground">Con saldo en Laudus</p>
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.openDocuments.toLocaleString('es-CL')}</p>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {isLoading || !evidence?.available ? '—' : evidence.openDocuments.toLocaleString('es-CL')}
+          </p>
+          <p className="mt-1 text-xs font-medium">Obligaciones con saldo</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {isLoading || !evidence?.available ? '—' : `${evidence.partiallyPaidDocuments.toLocaleString('es-CL')} parciales · ${evidence.unpaidDocuments.toLocaleString('es-CL')} sin pago`}
+            {isLoading || !evidence?.available
+              ? 'Sin evidencia'
+              : `${evidence.partiallyPaidDocuments.toLocaleString('es-CL')} parciales · ${evidence.unpaidDocuments.toLocaleString('es-CL')} sin pago`}
           </p>
         </div>
-        <div className="bg-card p-4">
+
+        <div className="bg-card p-5">
+          <BookOpenCheck className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {isLoading || !accounting?.available ? '—' : accounting.accountingEntries.toLocaleString('es-CL')}
+          </p>
+          <p className="mt-1 text-xs font-medium">Comprobantes contables</p>
+          <p className="mt-1 text-xs text-muted-foreground">Evidencia disponible para conciliación.</p>
+        </div>
+
+        <div className="bg-card p-5">
+          <Landmark className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {isLoading || !accounting?.available ? '—' : accounting.bankStatements.toLocaleString('es-CL')}
+          </p>
+          <p className="mt-1 text-xs font-medium">Cartolas bancarias</p>
+          <p className="mt-1 text-xs text-muted-foreground">Fuente bancaria separada de la aprobación MOTIL.</p>
+        </div>
+
+        <div className="bg-card p-5">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.stagedPayments.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Pagos Laudus en staging</p>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {isLoading || !accounting?.available ? '—' : accounting.pendingDtes.toLocaleString('es-CL')}
+          </p>
+          <p className="mt-1 text-xs font-medium">DTE pendientes</p>
+          <p className="mt-1 text-xs text-muted-foreground">Excepción fiscal visible, no acción automática.</p>
         </div>
       </div>
 
-      <div className="grid gap-px border-t bg-border sm:grid-cols-3">
-        <div className="bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">Comprobantes contables</p>
-          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.accountingEntries.toLocaleString('es-CL')}</p>
+      <div className="grid gap-px border-t bg-border lg:grid-cols-[1.3fr_1fr_1fr]">
+        <div className="bg-card px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Siguiente acción</p>
+          <p className="mt-2 text-sm font-medium">{isLoading ? 'Calculando…' : nextAction}</p>
         </div>
-        <div className="bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">Cartolas bancarias</p>
-          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.bankStatements.toLocaleString('es-CL')}</p>
-        </div>
-        <div className="bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">DTE pendientes</p>
-          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.pendingDtes.toLocaleString('es-CL')}</p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium">
-            Integración financiera: {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {evidence?.available
-              ? `${evidence.creditAdjustments.toLocaleString('es-CL')} ajustes/créditos separados del saldo por pagar.`
-              : 'La evidencia Laudus aún no está disponible para esta organización.'}
+        <div className="bg-card px-5 py-4">
+          <p className="text-xs text-muted-foreground">Cobertura operativa</p>
+          <p className="mt-1 text-sm font-medium">
+            {isLoading || !data ? '—' : `${data.payables.total.toLocaleString('es-CL')} CxP MOTIL · ${evidence?.payableDocuments.toLocaleString('es-CL') ?? '—'} documentos Laudus`}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Sin creación automática de pagos</p>
+        <div className="bg-card px-5 py-4">
+          <p className="text-xs text-muted-foreground">Autoridad</p>
+          <p className="mt-1 text-sm font-medium">MOTIL propone · humano aprueba</p>
+        </div>
       </div>
     </section>
   );
