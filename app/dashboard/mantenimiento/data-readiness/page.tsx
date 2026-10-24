@@ -9,7 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageHeader, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { MaterialTraceabilityReadiness } from '@/components/maintenance/material-traceability-readiness';
-import { MaintenanceMaterialTraceabilityReadiness } from '@/components/maintenance/material-traceability-readiness';
 
 type RecoveryCandidate = {
   authority: 'reference_candidate_pending_validation';
@@ -97,8 +96,6 @@ export default function MaintenanceDataReadinessPage() {
         ].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>)}
       </CardContent>
     </Card>
-
-    <MaintenanceMaterialTraceabilityReadiness />
 
     <MaterialTraceabilityReadiness />
 
