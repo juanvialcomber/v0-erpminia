@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const start = new Date(bounds.first_issued_date);
   const end = new Date(bounds.last_issued_date);
-  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals();
+  const { rows, calls } = await fetchAllLaudusPurchaseInvoiceTotals(start, end);
 
   const chunkSize = 500;
   let updated = 0;
