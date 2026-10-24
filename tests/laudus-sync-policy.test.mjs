@@ -25,3 +25,13 @@ test('delta windows deliberately overlap to tolerate late-arriving provider upda
   assert.match(source, /overlapMinutes:/);
   assert.match(source, /fullSnapshotHours:/);
 });
+
+
+test('Laudus authority policy always requires human review before canonical overwrite', () => {
+  assert.match(source, /upstreamMode: 'read_only'/);
+  assert.match(source, /autoMergeCanonical: false/);
+  assert.match(source, /autoOverwriteOperationalTruth: false/);
+  assert.match(source, /humanReviewRequiredForConflicts: true/);
+  assert.match(source, /laudusFinancialAuthority: true/);
+  assert.match(source, /motilOperationalAuthority: true/);
+});
