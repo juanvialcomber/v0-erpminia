@@ -30,10 +30,12 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({
-      status: 'ok',
+      status: snapshot.errors.length ? 'partial' : 'ok',
       source: 'Laudus',
       mode: 'read_only',
       calls: snapshot.calls,
+      availableDomains: snapshot.availableDomains,
+      upstreamErrors: snapshot.errors,
       journalEntriesRead: snapshot.journalEntries.length,
       bankStatementsRead: snapshot.bankStatements.length,
       dtesPendingRead: snapshot.dtesPending.length,
