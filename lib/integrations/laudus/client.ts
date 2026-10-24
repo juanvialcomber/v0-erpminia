@@ -195,6 +195,28 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
   });
 }
 
+export async function listLaudusSerialized(path: string, query: LaudusListQuery = {}) {
+  const token = await getLaudusAccessToken();
+  const payload = JSON.stringify({
+    options: {
+      offset: query.options?.offset ?? 0,
+      limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
+    },
+    fields: query.fields ?? [],
+    filterBy: query.filterBy ?? [],
+    orderBy: query.orderBy ?? [],
+  });
+
+  return request(path, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
 
 export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
