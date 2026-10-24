@@ -14,8 +14,8 @@ test('finance readiness measures payable and payment completeness', () => {
 });
 
 test('finance readiness reads Laudus evidence with bounded aggregate counts', () => {
-  assert.match(helper, /laudus_purchase_invoice_payment_status_v1/);
-  assert.match(helper, /laudus_purchase_payments/);
+  assert.match(helper, /laudus_purchase_invoice_payment_status_service_v1/);
+  assert.match(helper, /laudus_purchase_payments_service_v1/);
   assert.match(helper, /count: 'exact', head: true/);
   assert.match(helper, /\.gt\('total_amount', 0\)/);
   assert.match(helper, /\.lt\('total_amount', 0\)/);
@@ -42,4 +42,13 @@ test('finance readiness UI separates MOTIL payables from Laudus evidence', () =>
   assert.match(card, /Sin creación automática de pagos/);
   assert.match(card, /ajustes\/créditos separados del saldo por pagar/);
   assert.match(card, /refreshInterval: 900000/);
+});
+
+
+test('finance readiness uses service facades instead of private schemas', () => {
+  assert.match(helper, /laudus_purchase_invoice_payment_status_service_v1/);
+  assert.match(helper, /laudus_purchase_invoices_service_v1/);
+  assert.match(helper, /laudus_purchase_payments_service_v1/);
+  assert.match(helper, /laudus_source_status_service_v1/);
+  assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
 });
