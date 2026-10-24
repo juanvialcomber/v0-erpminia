@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const reader = fs.readFileSync('lib/integrations/laudus/purchase-invoice-totals.ts', 'utf8');
 const client = fs.readFileSync('lib/integrations/laudus/client.ts', 'utf8');
 const route = fs.readFileSync('app/api/integrations/laudus/purchase-invoices/rehydrate/route.ts', 'utf8');
-const migration = fs.readFileSync('supabase/migrations/20261024040000_laudus_invoice_totals_rehydrate.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20261024042000_laudus_invoice_totals_list_source.sql', 'utf8');
 
 test('invoice totals rehydrate uses one documented Laudus list call', () => {
   assert.match(reader, /\/purchases\/invoices\/list/);
