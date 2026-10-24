@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { loadLaudusInventoryReadiness } from '@/lib/integrations/laudus/inventory-readiness';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const readiness = await loadLaudusInventoryReadiness(context.supabase, context.organizationId);
+    const readiness = await loadLaudusInventoryReadiness(getSupabaseServerClient(), context.organizationId);
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       ...readiness,
