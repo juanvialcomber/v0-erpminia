@@ -76,7 +76,26 @@ export async function loadLaudusInventoryReadiness(
     // Expected before the private integration schema is deployed.
   }
 
+  let laudusStockRows = 0;
+  let laudusNegativeRows = 0;
+  let laudusKardexRows = 0;
+
+  try {
+    [laudusStockRows, laudusNegativeRows, laudusKardexRows] = await Promise.all([
+      count(db.schema('integration').from('laudus_product_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      count(db.schema('integration').from('laudus_product_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).lt('stock', 0)),
+      count(db.schema('integration').from('laudus_product_kardex').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    ]);
+  } catch {
+    // Keep readiness available if the private Laudus staging schema is not deployed yet.
+  }
+
   return {
+    laudus: {
+      stockRows: laudusStockRows,
+      negativeRows: laudusNegativeRows,
+      kardexRows: laudusKardexRows,
+    },
     stock: {
       rows: stockRows,
       productCoverage: pct(stockProductLinks, stockRows),
@@ -88,7 +107,7 @@ export async function loadLaudusInventoryReadiness(
       latestDate: latestSnapshot.data?.snapshot_date || null,
       negativeRows: snapshotNegative,
     },
-    movementCount: movements,
+    motilMovementCount: movements,
     reconciliation: {
       state: laudusState,
       defaultAbsoluteTolerance: 0,
