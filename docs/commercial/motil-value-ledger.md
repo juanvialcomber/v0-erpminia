@@ -506,3 +506,10 @@ La cola prioriza OT completadas con brecha y entrega una sola siguiente acción.
 
 ### Valor
 El cuello de botella actual queda localizado: la fuente externa Laudus ya puede contextualizar los SKU observados, pero falta capturar correctamente el paso operacional OT → Bodega → instalación. Esto permite invertir esfuerzo donde aumenta evidencia real, en vez de agregar más dashboards.
+
+
+## 2026-10-23 — Serie histórica de trazabilidad material
+
+Se creó un snapshot diario por organización, capturado junto al Value Scorecard con fecha de negocio `America/Santiago`. El baseline de La Patagua quedó registrado el 2026-10-23: score de cobertura 0, 11 OT modernas, 11 sin declaración de materiales, 9 OT completadas con brecha, 1 OT con requerimientos y 1 con cobertura Laudus completa de esos requerimientos.
+
+La tendencia mide mejora de cobertura operacional, no ahorro ni calidad de mantenimiento. Se requiere al menos un segundo día para hablar de evolución observada.

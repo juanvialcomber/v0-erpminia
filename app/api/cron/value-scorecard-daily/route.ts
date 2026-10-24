@@ -31,23 +31,34 @@ async function capture(request: NextRequest) {
     return NextResponse.json({ error: 'No fue posible listar organizaciones.' }, { status: 500 });
   }
 
-  const results: Array<{ organizationId: string; evidenceLevel: string; scaleGate: string }> = [];
+  const results: Array<{ organizationId: string; evidenceLevel: string; scaleGate: string; materialTraceabilityScore: number | null }> = [];
 
   for (const organization of organizations || []) {
-    const { data, error } = await supabase.rpc('motil_capture_value_scorecard_snapshot', {
-      p_organization_id: organization.id,
-      p_snapshot_date: snapshotDate,
-    });
+    const [{ data, error }, { data: materialTraceability, error: materialTraceabilityError }] = await Promise.all([
+      supabase.rpc('motil_capture_value_scorecard_snapshot', {
+        p_organization_id: organization.id,
+        p_snapshot_date: snapshotDate,
+      }),
+      supabase.rpc('motil_capture_material_traceability_snapshot', {
+        p_organization_id: organization.id,
+        p_snapshot_date: snapshotDate,
+      }),
+    ]);
 
     if (error) {
       console.error('[value-scorecard-snapshot]', organization.id, error);
       return NextResponse.json({ error: 'No fue posible capturar Valor MOTIL.' }, { status: 500 });
+    }
+    if (materialTraceabilityError) {
+      console.error('[material-traceability-snapshot]', organization.id, materialTraceabilityError);
+      return NextResponse.json({ error: 'No fue posible capturar trazabilidad material.' }, { status: 500 });
     }
 
     results.push({
       organizationId: organization.id,
       evidenceLevel: data?.evidenceLevel || 'E1',
       scaleGate: data?.scaleGate || 'CONDITIONAL',
+      materialTraceabilityScore: materialTraceability?.summary?.overall_traceability_score ?? null,
     });
   }
 

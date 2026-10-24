@@ -10,14 +10,22 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const { data, error } = await context.supabase.rpc('motil_material_traceability_readiness', {
-    p_organization_id: context.organizationId,
-    p_limit: 25,
-  });
+  const [{ data, error }, { data: history, error: historyError }] = await Promise.all([
+    context.supabase.rpc('motil_material_traceability_readiness', {
+      p_organization_id: context.organizationId,
+      p_limit: 25,
+    }),
+    context.supabase.rpc('motil_material_traceability_history', {
+      p_organization_id: context.organizationId,
+      p_days: 30,
+    }),
+  ]);
   if (error) return NextResponse.json({ error: 'No fue posible medir la trazabilidad económica de las OT.' }, { status: 500 });
+  if (historyError) return NextResponse.json({ error: 'No fue posible cargar la tendencia de trazabilidad.' }, { status: 500 });
 
   return NextResponse.json({
     ...data,
+    history,
     source: 'MOTIL OT + materials + warehouse trace + Laudus SKU history',
     generatedAt: new Date().toISOString(),
   });

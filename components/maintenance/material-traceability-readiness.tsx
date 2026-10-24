@@ -41,6 +41,12 @@ type Payload = {
   };
   queue: Row[];
   semantics: Record<string,string>;
+  history?: {
+    snapshotCount: number;
+    first: Record<string,number|string|null> | null;
+    latest: Record<string,number|string|null> | null;
+    semantics: string;
+  };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -68,6 +74,14 @@ export function MaintenanceMaterialTraceabilityReadiness() {
   if (error || !data) return <StatePanel tone="error" title="No fue posible medir trazabilidad económica" description={error instanceof Error ? error.message : 'Sin datos disponibles.'} actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} />;
 
   const s = data.summary;
+  const first = data.history?.first || null;
+  const latest = data.history?.latest || null;
+  const scoreDelta = first && latest && first.overall_traceability_score != null && latest.overall_traceability_score != null
+    ? Number(latest.overall_traceability_score) - Number(first.overall_traceability_score)
+    : null;
+  const gapDelta = first && latest
+    ? Number(latest.completed_with_trace_gap || 0) - Number(first.completed_with_trace_gap || 0)
+    : null;
   const metrics = [
     ['OT modernas', s.modern_work_orders, Wrench],
     ['Sin declarar materiales', s.material_intent_missing, TriangleAlert],
@@ -96,6 +110,14 @@ export function MaintenanceMaterialTraceabilityReadiness() {
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Entregadas</p><p className="mt-1 text-xl font-semibold">{n(s.with_issued_materials)}</p></div>
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Instaladas</p><p className="mt-1 text-xl font-semibold">{n(s.with_installed_materials)}</p></div>
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Completadas con brecha</p><p className="mt-1 text-xl font-semibold">{n(s.completed_with_trace_gap)}</p></div>
+        </div>
+
+        <div className="rounded-lg border bg-muted/20 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Evolución 30 días</p><p className="mt-1 text-sm font-medium">{(data.history?.snapshotCount || 0) < 2 ? 'Baseline capturado; falta un segundo día para medir tendencia.' : 'Cambio observado desde el primer snapshot disponible.'}</p></div>
+            {(data.history?.snapshotCount || 0) >= 2 ? <div className="flex gap-4 text-sm"><span>Score {scoreDelta == null ? '—' : (scoreDelta >= 0 ? '+' : '') + scoreDelta.toFixed(1)}</span><span>Brechas completadas {gapDelta == null ? '—' : (gapDelta >= 0 ? '+' : '') + gapDelta}</span></div> : null}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">{data.history?.semantics || 'Tendencia de cobertura observada; no equivale a ahorro.'}</p>
         </div>
 
         <p className="text-xs leading-5 text-muted-foreground">{data.semantics?.score} {data.semantics?.laudus_history}</p>
