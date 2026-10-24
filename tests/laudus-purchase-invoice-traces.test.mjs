@@ -6,12 +6,11 @@ const reader = fs.readFileSync('lib/integrations/laudus/purchase-invoice-traces.
 const route = fs.readFileSync('app/api/integrations/laudus/purchase-invoice-traces/sync/route.ts', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/20261024074500_laudus_purchase_invoice_item_traces.sql', 'utf8');
 
-test('invoice trace reader uses the official individual purchase invoice endpoint', () => {
-  assert.match(reader, /\/purchases\/invoices\/\$\{purchaseInvoiceId\}/);
-  assert.match(reader, /traceFrom/);
-  assert.match(reader, /traceId/);
-  assert.match(reader, /fromStep/);
-  assert.match(reader, /fromId/);
+test('invoice trace reader uses the official Laudus traceTo endpoint', () => {
+  assert.match(reader, /\/purchases\/invoices\/\$\{purchaseInvoiceId\}\/traceTo/);
+  assert.match(reader, /toStep/);
+  assert.match(reader, /toId/);
+  assert.match(reader, /toDocNumber/);
 });
 
 test('invoice trace sync is bounded, admin scoped and read only', () => {
