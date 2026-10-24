@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { loadLaudusFinanceReadiness } from '@/lib/integrations/laudus/finance-readiness';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
@@ -13,7 +14,11 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const readiness = await loadLaudusFinanceReadiness(context.supabase, context.organizationId);
+    const readiness = await loadLaudusFinanceReadiness(
+      getSupabaseServerClient(),
+      context.organizationId,
+    );
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       ...readiness,

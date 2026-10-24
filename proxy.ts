@@ -22,6 +22,7 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/auth/login',
   '/api/auth/logout',
   '/api/integrations/greenapi/webhook',
+  '/api/integrations/laudus/invoice-totals-rehydrate-preview',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
@@ -262,6 +263,7 @@ async function proxyRequest(request: NextRequest) {
   if (pathname.startsWith('/api/') && isPublicApiRoute(pathname)) {
     return withSecurityHeaders(response);
   }
+
 
   const {
     data: { user },

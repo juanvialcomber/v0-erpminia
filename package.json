@@ -17,7 +17,8 @@
     "ci": "pnpm build",
     "canonical:products": "node scripts/import-canonical-products.mjs",
     "canonical:drilling": "node scripts/import-canonical-drilling.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "qa:fast": "pnpm migrations:check && pnpm typecheck && pnpm test && pnpm lint:eslint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

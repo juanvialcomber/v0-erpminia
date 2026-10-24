@@ -111,6 +111,7 @@ async function request(path: string, init: RequestInit = {}) {
     cache: 'no-store',
     headers: {
       Accept: 'application/json',
+      'Accept-Encoding': 'gzip, deflate, br',
       ...(init.headers || {}),
     },
   });
@@ -185,12 +186,36 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
     body: JSON.stringify({
       options: {
         offset: query.options?.offset ?? 0,
-        limit: Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
+        limit: query.options?.limit === 0
+          ? 0
+          : Math.min(Math.max(query.options?.limit ?? 5, 1), 25),
       },
       fields: query.fields ?? [],
       filterBy: query.filterBy ?? [],
       orderBy: query.orderBy ?? [],
     }),
+  });
+}
+
+type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
+
+export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
+  const token = await getLaudusAccessToken();
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === null || value === undefined || value === '') continue;
+    params.set(key, String(value));
+  }
+
+  const queryString = params.toString();
+  const requestPath = queryString ? `${path}?${queryString}` : path;
+
+  return request(requestPath, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -232,5 +257,92 @@ export async function runLaudusReadOnlySmokeTest() {
     calls: 5,
     persisted: false,
     results,
+  };
+}
+
+export function describeLaudusPayloadShape(payload: unknown) {
+  if (Array.isArray(payload)) {
+    const first = payload.find((item) => item && typeof item === 'object' && !Array.isArray(item));
+    return {
+      shape: 'array' as const,
+      rows: payload.length,
+      topLevelKeys: [],
+      itemKeys: first ? Object.keys(first as Record<string, unknown>).slice(0, 40) : [],
+    };
+  }
+
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    const arrayKey = ['data', 'items', 'results', 'rows'].find((key) => Array.isArray(record[key]));
+    const rows = arrayKey ? record[arrayKey] as unknown[] : [];
+    const first = rows.find((item) => item && typeof item === 'object' && !Array.isArray(item));
+
+    return {
+      shape: arrayKey || 'object',
+      rows: arrayKey ? rows.length : null,
+      topLevelKeys: Object.keys(record).slice(0, 40),
+      itemKeys: first ? Object.keys(first as Record<string, unknown>).slice(0, 40) : [],
+    };
+  }
+
+  return {
+    shape: typeof payload,
+    rows: null,
+    topLevelKeys: [],
+    itemKeys: [],
+  };
+}
+
+export async function getLaudusStockSnapshot(args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  productCategoryId?: string | number;
+} = {}) {
+  return getLaudus('/production/products/stock', args);
+}
+
+export async function getLaudusProductStock(productId: number, args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  lot?: string;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/stock`, args);
+}
+
+export async function getLaudusProductStockByWarehouses(productId: number, args: {
+  dateTo?: string;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/stockByWarehouses`, args);
+}
+
+export async function getLaudusProductKardex(productId: number, args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  valorizationMethod?: string;
+  calculateTransformations?: boolean;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/kardex`, args);
+}
+
+export async function runLaudusInventoryReadOnlyProbe(productId = 1) {
+  const dateTo = new Date().toISOString();
+  const productStock = await getLaudusProductStock(productId, { dateTo });
+  const stockByWarehouses = await getLaudusProductStockByWarehouses(productId, { dateTo });
+
+  return {
+    authenticated: true,
+    calls: 3,
+    persisted: false,
+    productId,
+    endpoints: {
+      productStock: {
+        path: `/production/products/${productId}/stock`,
+        ...describeLaudusPayloadShape(productStock),
+      },
+      stockByWarehouses: {
+        path: `/production/products/${productId}/stockByWarehouses`,
+        ...describeLaudusPayloadShape(stockByWarehouses),
+      },
+    },
   };
 }

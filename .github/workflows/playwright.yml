@@ -1,20 +1,22 @@
 name: Playwright Chromium smoke
 on:
   workflow_dispatch:
-
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'playwright.config.ts'
+      - 'package.json'
+      - '.github/workflows/playwright.yml'
 permissions:
   contents: read
-
-concurrency:
-  group: motil-playwright-smoke
-  cancel-in-progress: true
-
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.28.0
@@ -28,3 +30,9 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: https://motil.app
         run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

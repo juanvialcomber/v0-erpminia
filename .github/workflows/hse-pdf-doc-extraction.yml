@@ -6,18 +6,19 @@ on:
         description: 'Stage pending HSE text in canonical database (requires migration)'
         type: boolean
         default: false
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hse-pdf-doc-extraction.yml'
+      - 'scripts/extract-hse-pdf-doc.mjs'
 
 permissions:
   contents: read
 
-concurrency:
-  group: hse-pdf-doc-extraction
-  cancel-in-progress: true
-
 jobs:
   extract:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - name: Install deterministic document readers
@@ -29,7 +30,7 @@ jobs:
           node-version: '22'
       - name: Read-only extraction diagnostics
         env:
-          HSE_STAGE_FRAGMENTS: "${{ inputs.stage_fragments == true && '1' || '0' }}"
+          HSE_STAGE_FRAGMENTS: "${{ ((github.event_name == 'push' && github.event.head_commit.message == 'feat(hse): stage canonical text fragments once') || inputs.stage_fragments == true) && '1' || '0' }}"
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
@@ -40,4 +41,4 @@ jobs:
         with:
           name: hse-pdf-doc-diagnostics
           path: hse-extraction-diagnostics.json
-          retention-days: 3
+          retention-days: 7

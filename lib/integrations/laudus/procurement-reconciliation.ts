@@ -23,15 +23,13 @@ export async function loadProcurementReconciliationSummary(
   organizationId: string,
 ): Promise<ProcurementReconciliationSummary> {
   const base = db
-    .schema('integration')
-    .from('purchase_order_reconciliation_preview_v1')
+    .from('purchase_order_reconciliation_preview_service_v1')
     .select('purchase_order_id', { count: 'exact', head: true })
     .eq('organization_id', organizationId);
 
   const countWhere = async (column: string, value: string) => {
     const result = await db
-      .schema('integration')
-      .from('purchase_order_reconciliation_preview_v1')
+      .from('purchase_order_reconciliation_preview_service_v1')
       .select('purchase_order_id', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
       .eq(column, value);
@@ -64,8 +62,7 @@ export async function loadProcurementReconciliationSummary(
     countWhere('cost_center_resolution_status', 'unknown_code'),
     countWhere('cost_center_resolution_status', 'unresolved'),
     db
-      .schema('integration')
-      .from('purchase_order_reconciliation_preview_v1')
+      .from('purchase_order_reconciliation_preview_service_v1')
       .select('purchase_order_id', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
       .eq('fully_resolvable', true),
@@ -98,8 +95,7 @@ export async function loadProcurementReconciliationExceptions(
   limit = 100,
 ) {
   const result = await db
-    .schema('integration')
-    .from('purchase_order_reconciliation_preview_v1')
+    .from('purchase_order_reconciliation_preview_service_v1')
     .select(
       'purchase_order_id,order_number,order_date,supplier_name,supplier_resolution_status,cost_center_resolution_status,raw_line_cost_center,parsed_line_cost_center_code,distinct_line_cost_centers,total_amount,currency',
     )

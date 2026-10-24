@@ -36,13 +36,12 @@ async function linkedCount(
   try {
     return await count(
       db
-        .schema('integration')
-        .from('external_entity_links')
+        .from('laudus_external_entity_links_service_v1')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .eq('source_id', sourceId)
         .eq('entity_type', entityType)
-        .in('link_status', ['matched', 'confirmed']),
+        .eq('link_status', 'matched'),
     );
   } catch {
     return 0;
@@ -58,15 +57,13 @@ export async function loadLaudusMasterReadiness(
 
   try {
     const source = await db
-      .schema('integration')
-      .from('external_sources')
-      .select('id,enabled')
+      .from('laudus_source_status_service_v1')
+      .select('source_id,enabled')
       .eq('organization_id', organizationId)
-      .eq('source_key', 'laudus')
       .maybeSingle();
 
     if (!source.error && source.data) {
-      sourceId = String(source.data.id);
+      sourceId = String(source.data.source_id);
       sourceEnabled = Boolean(source.data.enabled);
     }
   } catch {
@@ -88,19 +85,19 @@ export async function loadLaudusMasterReadiness(
     assetsIdentity,
     assetsCostCenter,
   ] = await Promise.all([
-    count(db.schema('canonical').from('products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('product_code', 'is', null).neq('product_code', '')),
-    count(db.schema('canonical').from('products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit', 'is', null).neq('unit', '')),
-    count(db.schema('canonical').from('suppliers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('suppliers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('tax_id', 'is', null).neq('tax_id', '')),
-    count(db.schema('canonical').from('suppliers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('legal_name', 'is', null).neq('legal_name', '')),
+    count(db.from('canonical_products_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_products_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('product_code', 'is', null).neq('product_code', '')),
+    count(db.from('canonical_products_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit', 'is', null).neq('unit', '')),
+    count(db.from('canonical_suppliers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_suppliers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('tax_id', 'is', null).neq('tax_id', '')),
+    count(db.from('canonical_suppliers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('legal_name', 'is', null).neq('legal_name', '')),
     count(db.from('warehouses').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('warehouses').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('code', 'is', null).neq('code', '')),
-    count(db.schema('canonical').from('cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('asset_code', 'is', null).neq('asset_code', '')),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
+    count(db.from('canonical_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('asset_code', 'is', null).neq('asset_code', '')),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
   ]);
 
   const [productLinks, supplierLinks, warehouseLinks, costCenterLinks, assetLinks] = await Promise.all([
