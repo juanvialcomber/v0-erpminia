@@ -75,12 +75,18 @@ export default function FinanceAssetReviewPage(){
               <div>
                 <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{row.laudus_name}</p><Badge variant="outline">{row.evidence_level}</Badge></div>
                 <p className="mt-1 text-xs text-muted-foreground">Laudus #{row.laudus_external_id} · {row.laudus_manufacturer||'sin fabricante'} · {row.laudus_model||'sin modelo'} · serie {row.laudus_serial_number||'no informada'}</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {row.exact_plate_support?<Badge variant="secondary">Patente exacta</Badge>:null}
+                  {row.exact_serial_support?<Badge variant="secondary">Serie exacta</Badge>:null}
+                  {row.model_support?<Badge variant="outline">Modelo consistente</Badge>:null}
+                  {row.manufacturer_support?<Badge variant="outline">Fabricante consistente</Badge>:null}
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">{row.acquisition_date||'sin fecha'} · {money(row.acquisition_cost)} · {row.supplier_name||'sin proveedor'} · factura {row.invoice_number||'no informada'}</p>
               </div>
               <div className="hidden items-center justify-center xl:flex"><Link2 className="h-4 w-4 text-muted-foreground"/></div>
               <div>
                 <p className="font-semibold">{row.canonical_asset_name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{row.canonical_asset_code} · {row.canonical_manufacturer||'sin fabricante'} · {row.canonical_model||'sin modelo'} · serie {row.canonical_serial_number||'no informada'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{row.canonical_asset_code} · {row.canonical_manufacturer||'sin fabricante'} · {row.canonical_model||'sin modelo'} · serie {row.canonical_serial_number||'no informada'} · patente {row.canonical_license_plate||'no informada'}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Similitud nombre {Number(row.best_name_similarity||0).toLocaleString('es-CL',{style:'percent',maximumFractionDigits:1})} · brecha {Number(row.score_gap||0).toLocaleString('es-CL',{style:'percent',maximumFractionDigits:1})} · {row.laudus_rows_for_candidate} fila(s) Laudus hacia este candidato</p>
               </div>
               <div className="flex flex-wrap gap-2 xl:justify-end">
