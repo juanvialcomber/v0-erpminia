@@ -49,3 +49,11 @@ test('feedback RPC is security invoker and cannot mutate canonical finance', () 
   assert.equal(/update public\.procurement_/i.test(migration), false);
   assert.equal(/update public\.suppliers/i.test(migration), false);
 });
+
+
+test('private service migration keeps forward-compatible canonical facade columns', () => {
+  assert.ok(migration.includes('select id, organization_id, cost_center_code'));
+  assert.ok(migration.includes('expected_lifespan_years,'));
+  assert.ok(migration.includes('asset_code,'));
+  assert.ok(migration.includes('cost_center_code'));
+});
