@@ -2,11 +2,10 @@ import { getLaudus } from './client';
 
 type JsonRecord = Record<string, unknown>;
 
-export type LaudusInvoiceTrace = {
-  itemId: number | null;
-  traceId: number | null;
-  fromStep: string | null;
-  fromId: number | null;
+export type LaudusInvoiceOrigin = {
+  originStep: string | null;
+  originId: number | null;
+  originDocNumber: number | null;
 };
 
 function asRecord(value: unknown): JsonRecord | null {
@@ -25,36 +24,26 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-export function extractLaudusInvoiceItemTraces(payload: unknown): LaudusInvoiceTrace[] {
-  const invoice = asRecord(payload);
-  if (!invoice || !Array.isArray(invoice.items)) return [];
+export function extractLaudusPurchaseInvoiceOrigins(payload: unknown): LaudusInvoiceOrigin[] {
+  if (!Array.isArray(payload)) return [];
 
-  const traces: LaudusInvoiceTrace[] = [];
-
-  for (const rawItem of invoice.items) {
-    const item = asRecord(rawItem);
-    if (!item || !Array.isArray(item.traceFrom)) continue;
-    const itemId = asInt(item.itemId);
-
-    for (const rawTrace of item.traceFrom) {
-      const trace = asRecord(rawTrace);
-      if (!trace) continue;
-      traces.push({
-        itemId,
-        traceId: asInt(trace.traceId),
-        fromStep: asString(trace.fromStep),
-        fromId: asInt(trace.fromId),
-      });
-    }
-  }
-
-  return traces;
+  return payload
+    .map((raw) => {
+      const row = asRecord(raw);
+      if (!row) return null;
+      return {
+        originStep: asString(row.toStep),
+        originId: asInt(row.toId),
+        originDocNumber: asInt(row.toDocNumber),
+      };
+    })
+    .filter((row): row is LaudusInvoiceOrigin => row !== null);
 }
 
-export async function fetchLaudusPurchaseInvoiceItemTraces(purchaseInvoiceId: number) {
-  const payload = await getLaudus(`/purchases/invoices/${purchaseInvoiceId}`);
+export async function fetchLaudusPurchaseInvoiceOrigins(purchaseInvoiceId: number) {
+  const payload = await getLaudus(`/purchases/invoices/${purchaseInvoiceId}/traceTo`);
   return {
-    traces: extractLaudusInvoiceItemTraces(payload),
+    origins: extractLaudusPurchaseInvoiceOrigins(payload),
     calls: 1,
   };
 }
