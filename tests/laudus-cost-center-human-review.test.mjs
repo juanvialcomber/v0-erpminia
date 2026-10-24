@@ -14,6 +14,8 @@ test('cost center review excludes discontinued history from active proposals',()
 
 test('cost center proposals preserve hierarchy and exact asset evidence',()=>{
   assert.match(migration,/parent_operational_code/);
+  assert.match(migration,/lower\(btrim\(coalesce\(c\.cost_center_code,''\)\)\)/);
+  assert.doesNotMatch(migration,/regexp_replace\(coalesce\(c\.cost_center_code/);
   assert.match(migration,/canonical_parent_id/);
   assert.match(migration,/exact_plate_asset_support/);
   assert.match(migration,/suggested_center_type/);
