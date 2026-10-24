@@ -14,6 +14,9 @@ test('invoice totals rehydrate uses one documented Laudus list call', () => {
     assert.match(reader, new RegExp(field.replace('.', '\\.')));
   }
   assert.match(client, /query\.options\?\.limit === 0/);
+  assert.match(reader, /field: 'issuedDate'/);
+  assert.match(reader, /operator: '>='/);
+  assert.match(reader, /operator: '<='/);
 });
 
 test('invoice totals rehydrate is admin scoped and staging only', () => {
