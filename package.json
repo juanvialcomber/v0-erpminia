@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "pnpm migrations:check && pnpm test && pnpm lint:eslint",
+    "prebuild": "pnpm qa:fast",
     "build": "next build",
     "start": "next start",
     "lint": "pnpm lint:eslint && pnpm typecheck",
@@ -17,7 +17,8 @@
     "ci": "pnpm build",
     "canonical:products": "node scripts/import-canonical-products.mjs",
     "canonical:drilling": "node scripts/import-canonical-drilling.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "qa:fast": "pnpm migrations:check && pnpm typecheck && pnpm test && pnpm lint:eslint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
