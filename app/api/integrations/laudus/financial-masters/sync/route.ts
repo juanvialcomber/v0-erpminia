@@ -84,7 +84,32 @@ export async function POST(request: NextRequest) {
     p_fixed_assets: fixedAssets,
   });
 
-  const calls = costCenters.calls + fixedAssetCalls + 1;
+  let reconciliation: unknown = null;
+  if (!error) {
+    const reconciliationResult = await supabase.rpc('motil_reconcile_laudus_financial_masters', {
+      p_organization_id: access.organizationId,
+    });
+    if (reconciliationResult.error) {
+      console.error('[laudus/financial-masters/reconcile]', reconciliationResult.error.message);
+      return NextResponse.json(
+        {
+          status: 'partial',
+          source: 'Laudus',
+          mode: 'read_only',
+          calls: costCenters.calls + fixedAssetCalls + 2,
+          costCentersRead: costCenters.rows.length,
+          fixedAssetsRead: fixedAssets.length,
+          canonicalMutated: false,
+          laudusMutated: false,
+          error: 'Los maestros fueron staged, pero la conciliación requiere revisión.',
+        },
+        { status: 500 },
+      );
+    }
+    reconciliation = reconciliationResult.data;
+  }
+
+  const calls = costCenters.calls + fixedAssetCalls + 2;
 
   if (error) {
     console.error('[laudus/financial-masters/sync]', error.message);
@@ -113,6 +138,7 @@ export async function POST(request: NextRequest) {
     fixedAssetsRead: fixedAssets.length,
     acquisitionCostStrategy: 'targeted_detail_after_identity_match',
     result: data,
+    reconciliation,
     canonicalMutated: false,
     laudusMutated: false,
   });
