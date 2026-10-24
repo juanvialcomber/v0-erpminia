@@ -96,3 +96,19 @@ When enough reviewed labels exist:
 - evaluate anomaly ranking against manually confirmed exceptions;
 - preserve a holdout set before using learned models;
 - consider L4 decision assistance only after measurable precision and review-time gains.
+
+
+## Priority concentration baseline
+
+Measured on the current Laudus open-balance corpus:
+- 1,183 open positive documents.
+- 118 high-priority documents under deterministic v1.
+- Those 118 documents represent CLP 864,746,032, or 45.2% of the source-derived outstanding balance.
+- Top 10 ranked documents represent 7.8% of outstanding balance.
+- Top 25 represent 21.6%.
+- Top 50 represent 31.2%.
+
+Interpretation:
+- the queue is materially concentrating financial review effort;
+- this is not a credit-risk, fraud, or default probability score;
+- the measured value proposition is review prioritization and attention compression, not autonomous financial judgment.
