@@ -22,14 +22,14 @@ Relevant design evidence:
 - Binette & Steorts, "(Almost) All of Entity Resolution", arXiv:2008.04443.
 - Schreyer et al., "Detection of Anomalies in Large Scale Accounting Data using Deep Autoencoder Networks", arXiv:1709.05254.
 - Zeng et al., "Similar Data Points Identification with LLM: A Human-in-the-loop Strategy Using Summarization and Hidden State Insights", arXiv:2404.04281.
-- Pyo & Chiang, "Leveraging Large Language Models for Generating Labeled Mineral Site Record Linkage Data", arXiv:2412.03575.
+- Pyo & Chiang, "Leveraging Large Language Models for Generating Labeled Mineral Site Record Linkage Data", arXiv:2412.03575.\n- Wang et al., "Dynamic Anomaly Identification in Accounting Transactions via Multi-Head Self-Attention Networks", arXiv:2511.12122.\n- Na et al., "Human-Centered LLM-Agent System for Detecting Anomalous Digital Asset Transactions", arXiv:2510.20102.
 
 Design implication for MOTIL:
 1. Use deterministic identity rules first where evidence is strong.
 2. Rank ambiguous or high-impact cases instead of presenting the full corpus.
 3. Keep human review on consequential financial promotion.
 4. Capture future approve/reject labels before training or calibrating a learned matcher.
-5. Treat anomaly models as prioritizers, not as payment authority.
+5. Treat anomaly models as prioritizers, not as payment authority.\n6. Prefer explanation + analyst action capture over opaque autonomous decisions; newer financial-agent work reinforces this human-centered pattern.
 
 ## Product decision
 
