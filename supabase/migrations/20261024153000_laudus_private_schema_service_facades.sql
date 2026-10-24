@@ -103,7 +103,7 @@ where s.source_key = 'laudus';
 create or replace view public.canonical_cost_centers_service_v1
 with (security_invoker = true)
 as
-select id, organization_id
+select id, organization_id, cost_center_code
 from canonical.cost_centers;
 
 create or replace view public.canonical_assets_service_v1
@@ -114,7 +114,9 @@ select
   organization_id,
   acquisition_date,
   acquisition_cost,
-  expected_lifespan_years
+  expected_lifespan_years,
+  asset_code,
+  cost_center_code
 from canonical.assets;
 
 create or replace view public.laudus_finance_review_feedback_service_v1
