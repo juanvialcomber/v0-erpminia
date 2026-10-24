@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { fetchAllLaudusPurchasePayments } from '@/lib/integrations/laudus/purchase-payments';
+import { fetchAllLaudusPurchasePayments, LAUDUS_PAYMENT_FIELDS } from '@/lib/integrations/laudus/purchase-payments';
+import { describeLaudusPayloadShape, listLaudus } from '@/lib/integrations/laudus/client';
 
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
@@ -50,5 +51,25 @@ export async function POST(request: NextRequest) {
     result: data,
     canonicalMutated: false,
     laudusMutated: false,
+  });
+}
+
+
+export async function GET() {
+  if (process.env.VERCEL_ENV !== 'preview') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const payload = await listLaudus('/purchases/payments/list', {
+    options: { offset: 0, limit: 5 },
+    fields: [...LAUDUS_PAYMENT_FIELDS],
+  });
+
+  return NextResponse.json({
+    status: 'ok',
+    mode: 'read_only_contract_probe',
+    persisted: false,
+    calls: 2,
+    ...describeLaudusPayloadShape(payload),
   });
 }
