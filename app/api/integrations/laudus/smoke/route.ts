@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const scope = request.nextUrl.searchParams.get('scope');
-    const result = scope === 'inventory-discovery'
-      ? await runLaudusInventoryEndpointDiscovery()
+    const result = scope === 'inventory-probe'
+      ? await runLaudusInventoryReadOnlyProbe()
       : await runLaudusReadOnlySmokeTest();
 
     return NextResponse.json({
