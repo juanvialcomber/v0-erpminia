@@ -64,7 +64,7 @@ export function LaudusInventoryReadinessCard() {
           <h2 className="text-sm font-semibold">Preparación de inventario para Laudus</h2>
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus aporta saldo ERP como evidencia. MOTIL lo compara con el inventario operacional sin reemplazar automáticamente stock ni conteos físicos.
+          Laudus aporta saldo ERP y movimientos como evidencia. MOTIL los compara con el inventario operacional sin reemplazar automáticamente stock ni conteos físicos.
         </p>
       </div>
 
