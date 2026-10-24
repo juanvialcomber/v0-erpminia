@@ -11,16 +11,18 @@ on:
         description: "HTTPS target for read-only browser smoke (defaults to motil.app)"
         required: false
         type: string
-  pull_request:
-    paths:
-      - 'qa/playwright/**'
-      - '.github/workflows/playwright-browser-qa.yml'
+
 permissions:
   contents: read
+
+concurrency:
+  group: motil-browser-qa
+  cancel-in-progress: true
+
 jobs:
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -30,20 +32,12 @@ jobs:
         run: npm install --prefix qa/playwright --no-audit --no-fund --ignore-scripts
       - name: Install Chromium
         run: ./qa/playwright/node_modules/.bin/playwright install --with-deps chromium
-      - name: Browser smoke (no production writes)
+      - name: Browser smoke
         env:
           MOTIL_QA_URL: ${{ inputs.target_url || 'https://motil.app' }}
         run: node qa/playwright/smoke.cjs
-      - name: Keep screenshots on failure
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: motil-playwright-screenshots
-          path: qa/playwright/artifacts/
-          if-no-files-found: ignore
-          retention-days: 7
   authenticated-read-only:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_authenticated == true && github.ref == 'refs/heads/main'
+    if: inputs.run_authenticated == true && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: motil-qa
@@ -56,7 +50,7 @@ jobs:
         run: npm install --prefix qa/playwright --no-audit --no-fund --ignore-scripts
       - name: Install Chromium
         run: ./qa/playwright/node_modules/.bin/playwright install --with-deps chromium
-      - name: Authorized login smoke (no writes or captures)
+      - name: Authorized login smoke
         env:
           MOTIL_QA_EMAIL: ${{ secrets.MOTIL_QA_EMAIL }}
           MOTIL_QA_PASSWORD: ${{ secrets.MOTIL_QA_PASSWORD }}
