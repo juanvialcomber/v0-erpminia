@@ -195,6 +195,28 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
   });
 }
 
+type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
+
+export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
+  const token = await getLaudusAccessToken();
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === null || value === undefined || value === '') continue;
+    params.set(key, String(value));
+  }
+
+  const queryString = params.toString();
+  const requestPath = queryString ? `${path}?${queryString}` : path;
+
+  return request(requestPath, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 function summarizePayload(payload: unknown) {
   if (Array.isArray(payload)) return { rows: payload.length, shape: 'array' as const };
 
@@ -236,65 +258,89 @@ export async function runLaudusReadOnlySmokeTest() {
   };
 }
 
-const INVENTORY_DISCOVERY_TARGETS = [
-  ['stockByProduct', '/production/products/stock/list'],
-  ['stock', '/production/stock/list'],
-  ['inventory', '/production/inventory/list'],
-  ['stockMovements', '/production/stockmovements/list'],
-  ['inventoryMovements', '/production/inventorymovements/list'],
-  ['movements', '/production/movements/list'],
-] as const;
+export function describeLaudusPayloadShape(payload: unknown) {
+  if (Array.isArray(payload)) {
+    const first = payload.find((item) => item && typeof item === 'object' && !Array.isArray(item));
+    return {
+      shape: 'array' as const,
+      rows: payload.length,
+      topLevelKeys: [],
+      itemKeys: first ? Object.keys(first as Record<string, unknown>).slice(0, 40) : [],
+    };
+  }
 
-export async function runLaudusInventoryEndpointDiscovery() {
-  await getLaudusAccessToken();
+  if (payload && typeof payload === 'object') {
+    const record = payload as Record<string, unknown>;
+    const arrayKey = ['data', 'items', 'results', 'rows'].find((key) => Array.isArray(record[key]));
+    const rows = arrayKey ? record[arrayKey] as unknown[] : [];
+    const first = rows.find((item) => item && typeof item === 'object' && !Array.isArray(item));
 
-  const results: Record<string, {
-    path: string;
-    status: 'available' | 'not_found' | 'not_permitted' | 'invalid_contract' | 'upstream_error';
-    upstreamStatus: number | null;
-    upstreamCode: string | null;
-    rows: number | null;
-    shape: string | null;
-  }> = {};
-
-  for (const [key, path] of INVENTORY_DISCOVERY_TARGETS) {
-    try {
-      const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
-      const summary = summarizePayload(payload);
-      results[key] = {
-        path,
-        status: 'available',
-        upstreamStatus: 200,
-        upstreamCode: null,
-        rows: summary.rows,
-        shape: summary.shape,
-      };
-    } catch (error) {
-      const apiError = error instanceof LaudusApiError ? error : null;
-      const status =
-        apiError?.status === 404 ? 'not_found'
-          : apiError?.status === 401 || apiError?.status === 403 ? 'not_permitted'
-            : apiError?.status === 400 || apiError?.status === 422 ? 'invalid_contract'
-              : 'upstream_error';
-
-      results[key] = {
-        path,
-        status,
-        upstreamStatus: apiError?.status ?? null,
-        upstreamCode: apiError?.upstreamCode ?? null,
-        rows: null,
-        shape: null,
-      };
-
-      if (status === 'not_permitted') break;
-    }
+    return {
+      shape: arrayKey || 'object',
+      rows: arrayKey ? rows.length : null,
+      topLevelKeys: Object.keys(record).slice(0, 40),
+      itemKeys: first ? Object.keys(first as Record<string, unknown>).slice(0, 40) : [],
+    };
   }
 
   return {
+    shape: typeof payload,
+    rows: null,
+    topLevelKeys: [],
+    itemKeys: [],
+  };
+}
+
+export async function getLaudusStockSnapshot(args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  productCategoryId?: string | number;
+} = {}) {
+  return getLaudus('/production/products/stock', args);
+}
+
+export async function getLaudusProductStock(productId: number, args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  lot?: string;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/stock`, args);
+}
+
+export async function getLaudusProductStockByWarehouses(productId: number, args: {
+  dateTo?: string;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/stockByWarehouses`, args);
+}
+
+export async function getLaudusProductKardex(productId: number, args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  valorizationMethod?: string;
+  calculateTransformations?: boolean;
+} = {}) {
+  return getLaudus(`/production/products/${productId}/kardex`, args);
+}
+
+export async function runLaudusInventoryReadOnlyProbe(productId = 1) {
+  const dateTo = new Date().toISOString();
+  const productStock = await getLaudusProductStock(productId, { dateTo });
+  const stockByWarehouses = await getLaudusProductStockByWarehouses(productId, { dateTo });
+
+  return {
     authenticated: true,
-    calls: 1 + Object.keys(results).length,
+    calls: 3,
     persisted: false,
-    discoveryOnly: true,
-    results,
+    productId,
+    endpoints: {
+      productStock: {
+        path: `/production/products/${productId}/stock`,
+        ...describeLaudusPayloadShape(productStock),
+      },
+      stockByWarehouses: {
+        path: `/production/products/${productId}/stockByWarehouses`,
+        ...describeLaudusPayloadShape(stockByWarehouses),
+      },
+    },
   };
 }
