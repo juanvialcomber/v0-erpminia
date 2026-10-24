@@ -11,7 +11,7 @@ set search_path = public, integration, canonical, pg_temp
 as $$
 with candidates as (
   select *
-  from public.motil_get_laudus_fixed_asset_candidates(
+  from public.motil_get_laudus_fixed_asset_candidates_v2(
     p_organization_id,
     least(greatest(coalesce(p_limit,100),1),500)
   )
