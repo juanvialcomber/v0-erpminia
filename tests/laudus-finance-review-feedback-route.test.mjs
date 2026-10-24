@@ -13,7 +13,7 @@ test('finance review feedback requires finance write access', () => {
 });
 
 test('finance review feedback validates invoice and supplier scope', () => {
-  assert.match(route, /laudus_purchase_invoice_payment_status_v1/);
+  assert.match(route, /laudus_purchase_invoice_payment_status_service_v1/);
   assert.match(route, /\.eq\('organization_id', context\.organizationId\)/);
   assert.match(route, /\.from\('suppliers'\)/);
   assert.match(route, /Proveedor sugerido fuera de alcance/);
@@ -25,9 +25,15 @@ test('rejected feedback requires a reason', () => {
 });
 
 test('feedback endpoint never writes canonical payables or payments', () => {
-  assert.match(route, /laudus_finance_review_feedback/);
+  assert.match(route, /motil_record_laudus_finance_review_feedback/);
   assert.doesNotMatch(route, /procurement_accounts_payable/);
   assert.doesNotMatch(route, /procurement_supplier_payments/);
   assert.match(route, /canonicalMutated: false/);
   assert.match(route, /paymentMutated: false/);
+});
+
+
+test('feedback route never addresses the private integration schema directly', () => {
+  assert.match(route, /motil_record_laudus_finance_review_feedback/);
+  assert.doesNotMatch(route, /\.schema\(['"]integration['"]\)/);
 });
