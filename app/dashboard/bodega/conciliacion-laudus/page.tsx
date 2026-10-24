@@ -17,6 +17,18 @@ type QueueRow = {
   reconciliation_state: 'product_unresolved' | 'missing_motil_inventory' | 'quantity_difference';
 };
 
+type WarehouseCandidate = {
+  laudus_warehouse_external_id: string;
+  laudus_warehouse_name: string;
+  motil_warehouse_id: string;
+  motil_warehouse_name: string;
+  comparable_products: number;
+  both_nonzero: number;
+  exact_nonzero: number;
+  exact_nonzero_pct: number | null;
+  evidence_level: 'strong_candidate' | 'candidate' | 'insufficient_evidence';
+};
+
 type Payload = {
   generatedAt: string;
   summary: {
@@ -35,6 +47,7 @@ type Payload = {
     latestSyncAt: string | null;
   };
   queue: QueueRow[];
+  warehouseCandidates: WarehouseCandidate[];
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -103,6 +116,23 @@ export default function LaudusInventoryReconciliationPage() {
           <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" /><p className="text-sm font-medium">Sin posición MOTIL</p></div>
           <p className="mt-2 text-2xl font-semibold">{n(s.missingMotilInventoryRows)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Producto identificado en Laudus, pero sin fila vigente de inventario MOTIL.</p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div><h2 className="text-lg font-semibold">Equivalencia de bodegas</h2><p className="text-sm text-muted-foreground">Evidencia para revisión humana; ninguna equivalencia se confirma automáticamente.</p></div>
+        <div className="overflow-hidden rounded-lg border bg-card">
+          {data.warehouseCandidates.map((row) => (
+            <div key={row.laudus_warehouse_external_id} className="grid gap-2 border-b px-4 py-4 last:border-0 lg:grid-cols-[140px_1fr_180px_140px_180px] lg:items-center lg:gap-4">
+              <p className="font-mono text-sm">{row.laudus_warehouse_external_id}</p>
+              <div><p className="text-sm font-medium">{row.laudus_warehouse_name}</p><p className="text-xs text-muted-foreground">Candidata MOTIL: {row.motil_warehouse_name}</p></div>
+              <p className="text-sm tabular-nums">{n(row.both_nonzero)} productos comparables</p>
+              <p className="text-sm font-medium tabular-nums">{row.exact_nonzero_pct == null ? '—' : `${n(row.exact_nonzero_pct)}%`} exactos</p>
+              <Badge variant={row.evidence_level === 'strong_candidate' ? 'secondary' : 'outline'}>
+                {row.evidence_level === 'strong_candidate' ? 'Candidata fuerte' : row.evidence_level === 'candidate' ? 'Candidata' : 'Evidencia insuficiente'}
+              </Badge>
+            </div>
+          ))}
         </div>
       </section>
 
