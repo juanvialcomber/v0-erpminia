@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const offset = Math.max(0, Number.isFinite(offsetParam) ? offsetParam : 0);
 
   const db = getSupabaseServerClient();
-  const [{ data: summary, error: summaryError }, { data: queue, error: queueError }] = await Promise.all([
+  const [{ data: summary, error: summaryError }, { data: queue, error: queueError }, { data: warehouseCandidates, error: warehouseError }] = await Promise.all([
     db.rpc('motil_get_laudus_inventory_reconciliation_summary', {
       p_organization_id: context.organizationId,
     }),
@@ -27,12 +27,16 @@ export async function GET(request: NextRequest) {
       p_limit: limit,
       p_offset: offset,
     }),
+    db.rpc('motil_get_laudus_warehouse_reconciliation_candidates', {
+      p_organization_id: context.organizationId,
+    }),
   ]);
 
-  if (summaryError || queueError) {
+  if (summaryError || queueError || warehouseError) {
     console.error('[laudus/inventory-reconciliation]', {
       summary: summaryError?.message,
       queue: queueError?.message,
+      warehouses: warehouseError?.message,
     });
     return NextResponse.json(
       { error: 'No fue posible cargar la conciliación Laudus.' },
@@ -44,6 +48,7 @@ export async function GET(request: NextRequest) {
     generatedAt: new Date().toISOString(),
     summary: summary || {},
     queue: queue || [],
+    warehouseCandidates: warehouseCandidates || [],
     pagination: { limit, offset },
     policy: {
       source: 'Laudus',
