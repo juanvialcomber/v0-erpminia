@@ -1,0 +1,22 @@
+{
+  "20260824000002_production_geology_external_context_model.sql:public.production_geology_external_context": {
+    "grantMigration": "20260824013000_secure_production_geology_external_context.sql"
+  },
+  "20260823003522_add_mine_sector_alias_reconciliation_v1.sql:public.production_mine_sector_aliases": {
+    "grantMigration": "20260823010747_harden_mine_sector_aliases.sql"
+  },
+  "20260824223225_add_canonical_asset_availability_daily.sql:canonical.asset_availability_daily": {
+    "grantMigration": "20260906174500_grant_service_role_asset_availability.sql"
+  },
+  "20260822233106_drill_hole_location_evidence.sql:public.production_drill_hole_location_evidence": {
+    "grantMigration": "20260827145500_close_client_grants_rls_no_policy.sql"
+  },
+  "20260824224602_merge_approved_drill_asset_identities.sql:canonical.asset_identity_aliases": {
+    "sha256": "d590a06c810d5b400ed92325aab8ce549c2a32f11773637553b953fd6ebc8777",
+    "status": "HOLD: historical canonical/internal table; API consumer contract not verified. No permissions added."
+  },
+  "20260824224602_merge_approved_drill_asset_identities.sql:canonical.asset_identity_merge_audit": {
+    "sha256": "d590a06c810d5b400ed92325aab8ce549c2a32f11773637553b953fd6ebc8777",
+    "status": "HOLD: historical canonical/internal table; API consumer contract not verified. No permissions added."
+  }
+}

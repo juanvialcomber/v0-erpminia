@@ -95,3 +95,11 @@ comment on table public.motil_ai_messages is
   'Non-canonical user/assistant transcript scoped by organization, user and specialist domain.';
 comment on table public.motil_ai_user_memory is
   'Optional durable working memory for MOTIL Intelligence Core. Never canonical operational evidence.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: lib/intelligence/core-conversation.ts
+grant select, insert, update on table public.motil_ai_conversations to service_role;
+-- Consumer: lib/intelligence/core-conversation.ts
+grant select, insert on table public.motil_ai_messages to service_role;
+-- Consumer: lib/intelligence/core-conversation.ts; app/api/intelligence/memory/route.ts
+grant select, insert, update on table public.motil_ai_user_memory to service_role;

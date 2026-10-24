@@ -24,3 +24,7 @@ create index if not exists legal_ai_document_reviews_lookup
 alter table public.legal_ai_document_reviews enable row level security;
 revoke all on public.legal_ai_document_reviews from anon,authenticated;
 comment on table public.legal_ai_document_reviews is 'Immutable AI-origin analysis for manual Legal review. No approval or EECC status changes.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/legal/asistente/history/route.ts; app/api/legal/asistente/analyze-document/route.ts
+grant select, insert, update on table public.legal_ai_document_reviews to service_role;

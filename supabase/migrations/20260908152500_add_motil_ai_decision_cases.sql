@@ -60,3 +60,7 @@ comment on column public.motil_ai_decision_cases.evidence_refs is
   'Server-derived evidence references copied from the grounded assistant message; clients cannot establish provenance by supplying this field.';
 comment on column public.motil_ai_decision_cases.recommended_workflow_key is
   'Optional existing human workflow/task key. A reference only; creating a case never executes or mutates that workflow.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/intelligence/decision-cases/route.ts
+grant select, insert, update on table public.motil_ai_decision_cases to service_role;

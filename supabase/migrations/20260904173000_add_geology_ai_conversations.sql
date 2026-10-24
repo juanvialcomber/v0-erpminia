@@ -52,3 +52,11 @@ alter table public.geology_ai_user_memory enable row level security;
 comment on table public.geology_ai_conversations is 'Server-managed conversational sessions for the La Patagua geology AI agent.';
 comment on table public.geology_ai_messages is 'Tenant-scoped conversation history. Canonical source references are stored separately from generated prose.';
 comment on table public.geology_ai_user_memory is 'Durable user-specific working context learned only from user-authored conversation turns.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/produccion/geologia/assistant/route.ts
+grant select, insert, update on table public.geology_ai_conversations to service_role;
+-- Consumer: app/api/produccion/geologia/assistant/route.ts
+grant select, insert on table public.geology_ai_messages to service_role;
+-- Consumer: app/api/intelligence/memory/route.ts
+grant select, insert, update on table public.geology_ai_user_memory to service_role;
