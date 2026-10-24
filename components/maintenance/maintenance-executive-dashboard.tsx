@@ -114,6 +114,7 @@ export function MaintenanceExecutiveDashboard() {
   const { data: tiresData, mutate: mutateTires } = useSWR('/api/maintenance/neumaticos', fetcher);
   const { data: componentsData, mutate: mutateComponents } = useSWR('/api/maintenance/componentes-mayores', fetcher);
   const { data: fuelData, mutate: mutateFuel } = useSWR('/api/bodega/inventory?category=Combustible&pageSize=100', fetcher);
+  const { data: traceabilityData, mutate: mutateTraceability } = useSWR('/api/maintenance/material-traceability-readiness', fetcher);
 
   const machinery = (Array.isArray(assetsData?.machinery) ? assetsData.machinery : []) as Array<AssetRow & { code?: string | null }>;
   const assets = machinery as AssetRow[];
@@ -167,12 +168,20 @@ export function MaintenanceExecutiveDashboard() {
     { label: 'OT críticas', value: number(criticalOrders.length), tone: criticalOrders.length > 0 ? 'text-destructive' : 'text-green-500' },
   ];
 
+  const traceabilitySummary = traceabilityData?.summary || {
+    overall_traceability_score: 0,
+    completed_with_trace_gap: 0,
+    material_intent_missing: 0,
+    economic_trace_ready: 0,
+  };
+
   const executiveWarnings = [
     overdueOrders > 0 ? `${overdueOrders} órdenes atrasadas requieren atención.` : null,
     preventiveSummary.overdue > 0 ? `${preventiveSummary.overdue} mantenimientos preventivos están vencidos.` : null,
     tireSummary.lowStock > 0 ? `${tireSummary.lowStock} repuestos de neumáticos están bajo mínimo.` : null,
     fuelSummary.lowStock > 0 ? `${fuelSummary.lowStock} ítems de combustible están bajo mínimo.` : null,
     componentSummary.failures > 0 ? `${componentSummary.failures} componentes mayores están en falla.` : null,
+    Number(traceabilitySummary.completed_with_trace_gap || 0) > 0 ? `${traceabilitySummary.completed_with_trace_gap} OT completadas aún tienen una brecha de trazabilidad material.` : null,
   ].filter(Boolean) as string[];
 
   if (isLoading) {
@@ -231,6 +240,7 @@ export function MaintenanceExecutiveDashboard() {
               void mutateTires();
               void mutateComponents();
               void mutateFuel();
+              void mutateTraceability();
             }}
             className="gap-2"
           >
@@ -402,6 +412,13 @@ export function MaintenanceExecutiveDashboard() {
               <span className="text-muted-foreground">OT críticas activas</span>
               <Badge variant={criticalOrders.length > 0 ? 'destructive' : 'outline'}>{criticalOrders.length}</Badge>
             </div>
+            <Link href="/dashboard/mantenimiento/data-readiness" className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/30">
+              <span className="text-muted-foreground">Trazabilidad material</span>
+              <span className="flex items-center gap-2">
+                <Badge variant={Number(traceabilitySummary.completed_with_trace_gap || 0) > 0 ? 'secondary' : 'outline'}>{Number(traceabilitySummary.overall_traceability_score || 0).toFixed(0)}/100</Badge>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </span>
+            </Link>
           </CardContent>
         </Card>
       </div>

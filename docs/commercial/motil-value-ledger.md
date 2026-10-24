@@ -538,3 +538,10 @@ La cola prioriza dónde se corta cada OT y entrega una sola siguiente acción. E
 ### Valor
 La brecha deja de estar escondida en varias tablas. Ariel puede ver qué OT están construyendo economía de activo y cuál es el paso faltante para hacer el costo defendible.
 Nivel actual: L2/L3 según cobertura. El valor económico sólo se acredita cuando existan consumos trazados y resultados observados.
+
+
+## 2026-10-23 — Tendencia y visibilidad gerencial de trazabilidad
+
+La cobertura material dejó de ser sólo un diagnóstico puntual. El endpoint ahora incorpora 30 días de snapshots y separa baseline, delta de cobertura y delta de OT completadas con brecha. El dashboard gerencial de Ariel muestra el score y la alerta cuando existen OT completadas con trazabilidad material incompleta.
+
+El indicador no equivale a ahorro, confiabilidad ni calidad de mantenimiento; sólo mide cuánto de la cadena necesaria para economía de activo tiene evidencia materializada.

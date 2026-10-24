@@ -42,6 +42,13 @@ type Payload = {
   };
   queue: Row[];
   semantics: Record<string,string>;
+  history?: {
+    snapshots?: Array<{ snapshot_date: string; overall_traceability_score: number | null; completed_with_trace_gap: number; economic_trace_ready: number }>;
+    first?: { snapshot_date: string; overall_traceability_score: number | null; completed_with_trace_gap: number; economic_trace_ready: number } | null;
+    latest?: { snapshot_date: string; overall_traceability_score: number | null; completed_with_trace_gap: number; economic_trace_ready: number } | null;
+    snapshotCount?: number;
+    semantics?: string;
+  };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -82,6 +89,15 @@ export function MaterialTraceabilityReadiness() {
   if (error || !data) return <StatePanel tone="error" title="No fue posible medir la trazabilidad" description={error instanceof Error ? error.message : 'Sin datos disponibles.'} actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} />;
 
   const s = data.summary;
+  const first = data.history?.first || null;
+  const latest = data.history?.latest || null;
+  const scoreDelta = first && latest && first.overall_traceability_score != null && latest.overall_traceability_score != null
+    ? Number(latest.overall_traceability_score) - Number(first.overall_traceability_score)
+    : null;
+  const gapDelta = first && latest
+    ? Number(latest.completed_with_trace_gap || 0) - Number(first.completed_with_trace_gap || 0)
+    : null;
+
   return <Card className="shadow-none overflow-hidden">
     <CardHeader className="border-b">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -99,6 +115,24 @@ export function MaterialTraceabilityReadiness() {
         <Metric label="Con requerimientos" value={s.with_requirements} icon={Link2} />
         <Metric label="Con instalación" value={s.with_installed_materials} icon={CheckCircle2} />
         <Metric label="Economía trazable" value={s.economic_trace_ready} icon={CheckCircle2} />
+      </div>
+
+      <div className="grid gap-px border-t bg-border md:grid-cols-2">
+        <div className="bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Baseline capturado</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">{first?.overall_traceability_score ?? s.overall_traceability_score ?? 0}/100</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {first?.snapshot_date ? `Desde ${first.snapshot_date}` : 'Primer punto de control disponible'} · {first?.completed_with_trace_gap ?? s.completed_with_trace_gap} OT completadas con brecha.
+          </p>
+        </div>
+        <div className="bg-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Evolución 30 días</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">{scoreDelta == null ? '—' : `${scoreDelta >= 0 ? '+' : ''}${scoreDelta.toFixed(1)} pts`}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {gapDelta == null ? 'Aún no hay dos snapshots para comparar.' : `${gapDelta >= 0 ? '+' : ''}${gapDelta} OT completadas con brecha.`}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">Esta evolución mide cobertura de evidencia; no equivale a ahorro ni a calidad del mantenimiento.</p>
+        </div>
       </div>
 
       <div className="border-t p-5">
