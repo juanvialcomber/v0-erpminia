@@ -23,7 +23,10 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabaseServerClient(access.user.id);
-  const dateTo = new Date().toISOString();
+  const observedAt = new Date().toISOString();
+  const dateTo = new Date()
+    .toLocaleString('sv-SE', { timeZone: 'America/Santiago', hour12: false })
+    .replace(' ', 'T');
 
   const { data: warehouses, error: warehouseError } = await supabase
     .schema('integration')
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
 
   for (let warehouseIndex = 0; warehouseIndex < rows.length; warehouseIndex += 1) {
     const warehouse = rows[warehouseIndex];
-    const apiWarehouseId = String(warehouse.laudus_warehouse_id);
+    const apiWarehouseId = warehouse.external_id;
     const payload = await getLaudusStockSnapshot({
       dateTo,
       warehouseId: apiWarehouseId,
@@ -80,7 +83,7 @@ export async function POST(request: NextRequest) {
       const { data, error } = await supabase.rpc('motil_ingest_laudus_product_stock', {
         p_organization_id: access.organizationId,
         p_warehouse_external_id: warehouse.external_id,
-        p_date_to: normalized.dateTo || dateTo,
+        p_date_to: observedAt,
         p_rows: chunks[chunkIndex],
         p_run_id: runId,
         p_finalize: isLastWarehouse && isLastChunk,
