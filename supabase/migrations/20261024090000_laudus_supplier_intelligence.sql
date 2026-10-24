@@ -45,10 +45,19 @@ line_base as (
     ) as recency_rank
   from integration.laudus_purchase_invoice_lines l
   join invoices i on i.external_id=l.invoice_external_id
+  join integration.laudus_products p
+    on p.organization_id=l.organization_id
+   and p.external_id=l.product_external_id
   where l.organization_id=p_organization_id
     and l.product_external_id is not null
     and coalesce(l.unit_price,0)>0
     and coalesce(l.quantity,0)>0
+    and coalesce(p.inventory_eligibility,'review') <> 'exclude'
+    and coalesce(p.operational_category,'') <> 'service'
+    and lower(coalesce(p.description,'')) not in (
+      'servicios varios',
+      'genérico de servicio ( cambiar descripción )'
+    )
 ),
 series as (
   select
