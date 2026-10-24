@@ -52,7 +52,7 @@ best as (
     max(laudus_manufacturer) as laudus_manufacturer,
     max(laudus_model) as laudus_model,
     max(laudus_serial_number) as laudus_serial_number,
-    max(canonical_asset_id) filter (where rn=1) as canonical_asset_id,
+    (max(canonical_asset_id::text) filter (where rn=1))::uuid as canonical_asset_id,
     max(canonical_asset_code) filter (where rn=1) as canonical_asset_code,
     max(canonical_asset_name) filter (where rn=1) as canonical_asset_name,
     max(name_similarity) filter (where rn=1) as best_score,
