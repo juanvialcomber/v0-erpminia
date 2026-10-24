@@ -53,7 +53,7 @@ export function LaudusProcurementReadinessCard() {
   const { data, error, isLoading } = useSWR<Payload>(
     '/api/integrations/laudus/procurement-readiness',
     fetcher,
-    { revalidateOnFocus: false, refreshInterval: 120000 },
+    { revalidateOnFocus: false, refreshInterval: 900000 },
   );
 
   if (error) return null;
