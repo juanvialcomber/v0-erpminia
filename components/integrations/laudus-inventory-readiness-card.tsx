@@ -1,7 +1,9 @@
 'use client';
 
 import useSWR from 'swr';
+import Link from 'next/link';
 import { Boxes, GitCompareArrows, History, ScanLine, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type Payload = {
   stock: {
@@ -62,7 +64,7 @@ export function LaudusInventoryReadinessCard() {
           <h2 className="text-sm font-semibold">Preparación de inventario para Laudus</h2>
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus aportará saldo ERP y movimientos como evidencia. MOTIL no reemplazará automáticamente el stock operacional ni un conteo físico.
+          Laudus aporta saldo ERP y movimientos como evidencia. MOTIL no reemplazará automáticamente el stock operacional ni un conteo físico; la comparación queda disponible para revisión.
         </p>
       </div>
 
@@ -101,9 +103,14 @@ export function LaudusInventoryReadinessCard() {
             </p>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Conteo físico se usa como evidencia de desempate · sin autoajuste
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-muted-foreground">Conteo físico como evidencia · sin autoajuste</p>
+          {data?.reconciliation.state !== 'waiting_laudus' ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/bodega/conciliacion-laudus">Ver conciliación</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
     </section>
   );

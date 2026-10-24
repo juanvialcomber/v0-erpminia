@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 type SourceState = 'updated' | 'syncing' | 'review' | 'offline' | 'pending';
 
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
   const canMaintenance = maintenanceAccess.authorized;
   const canSeeExternalErp = canInventory || canProcurement || canFinance || canMaintenance;
   const org = context.organizationId;
+  const integrationDb = getSupabaseServerClient();
 
   try {
     const [inventoryOverview, inventorySnapshot, procurementQuality, procurementExceptions, financeOverview] = await Promise.all([
@@ -136,12 +138,12 @@ export async function GET(request: NextRequest) {
         key: 'laudus',
         label: 'Laudus',
         state: 'pending',
-        detail: 'Pendiente de habilitación comercial de API.',
+        detail: 'Conector Laudus disponible; verificando sincronización.',
         updatedAt: null,
       };
 
       try {
-        const source = await context.supabase
+        const source = await integrationDb
           .schema('integration')
           .from('external_sources')
           .select('id,enabled,mode,updated_at')
@@ -157,8 +159,8 @@ export async function GET(request: NextRequest) {
               updatedAt: latestDate(source.data.updated_at),
             };
           } else {
-            const [latestRun, reviewCount] = await Promise.all([
-              context.supabase
+            const [latestRun, reconciliationSummary] = await Promise.all([
+              integrationDb
                 .schema('integration')
                 .from('sync_runs')
                 .select('status,finished_at,started_at,error_summary')
@@ -167,17 +169,16 @@ export async function GET(request: NextRequest) {
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle(),
-              context.supabase
-                .schema('integration')
-                .from('reconciliation_items')
-                .select('id', { count: 'exact', head: true })
-                .eq('organization_id', org)
-                .eq('source_id', source.data.id)
-                .in('resolution_status', ['pending', 'conflict', 'new_candidate']),
+              integrationDb.rpc('motil_get_laudus_inventory_reconciliation_summary', {
+                p_organization_id: org,
+              }),
             ]);
 
             const run = latestRun.data;
-            const unresolved = reviewCount.count ?? 0;
+            const summary = (reconciliationSummary.data || {}) as Record<string, unknown>;
+            const unresolved = Number(summary.quantityDifferences || 0)
+              + Number(summary.missingMotilInventoryRows || 0)
+              + Number(summary.unresolvedProductsWithStock || 0);
             if (run?.status === 'running' || run?.status === 'queued') {
               laudus = {
                 key: 'laudus',
@@ -203,7 +204,7 @@ export async function GET(request: NextRequest) {
                 key: 'laudus',
                 label: 'Laudus',
                 state: 'updated',
-                detail: 'ERP sincronizado y sin excepciones abiertas.',
+                detail: unresolved > 0 ? `${unresolved} posición(es) requieren conciliación.` : 'ERP actualizado y sin diferencias abiertas.',
                 updatedAt: latestDate(run.finished_at),
                 reviewCount: 0,
               };

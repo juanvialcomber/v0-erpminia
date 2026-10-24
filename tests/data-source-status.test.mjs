@@ -16,8 +16,9 @@ test('Laudus UI state derives from sync runs and reconciliation instead of a har
   for (const status of ['running', 'queued', 'failed', 'partial', 'completed']) {
     assert.match(route, new RegExp("'" + status + "'"));
   }
-  assert.match(route, /resolution_status/);
+  assert.match(route, /motil_get_laudus_inventory_reconciliation_summary/);
   assert.match(route, /reviewCount/);
+  assert.doesNotMatch(route, /from\('reconciliation_items'\)/);
 });
 
 test('clients share one source-status contract and degrade honestly', () => {
