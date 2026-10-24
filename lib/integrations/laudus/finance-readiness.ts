@@ -13,6 +13,68 @@ function pct(part: number, total: number) {
   return Math.round((part / total) * 1000) / 10;
 }
 
+async function loadLaudusFinancialEvidence(
+  db: SupabaseClient,
+  organizationId: string,
+) {
+  try {
+    const invoices = db
+      .schema('integration')
+      .from('laudus_purchase_invoice_payment_status_v1');
+
+    const [
+      payableDocuments,
+      paidDocuments,
+      partiallyPaidDocuments,
+      unpaidDocuments,
+      creditAdjustments,
+      stagedPayments,
+      latestInvoiceSync,
+    ] = await Promise.all([
+      count(invoices.select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0)),
+      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'paid')),
+      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'partially_paid')),
+      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('total_amount', 0).eq('payment_status', 'unpaid')),
+      count(db.schema('integration').from('laudus_purchase_invoice_payment_status_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', organizationId).lt('total_amount', 0)),
+      count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+      db
+        .schema('integration')
+        .from('laudus_purchase_invoices')
+        .select('synced_at')
+        .eq('organization_id', organizationId)
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (latestInvoiceSync.error) throw new Error(latestInvoiceSync.error.message);
+
+    return {
+      available: true,
+      payableDocuments,
+      paidDocuments,
+      partiallyPaidDocuments,
+      unpaidDocuments,
+      openDocuments: partiallyPaidDocuments + unpaidDocuments,
+      creditAdjustments,
+      stagedPayments,
+      latestSyncAt: latestInvoiceSync.data?.synced_at ?? null,
+    };
+  } catch {
+    return {
+      available: false,
+      payableDocuments: 0,
+      paidDocuments: 0,
+      partiallyPaidDocuments: 0,
+      unpaidDocuments: 0,
+      openDocuments: 0,
+      creditAdjustments: 0,
+      stagedPayments: 0,
+      latestSyncAt: null,
+    };
+  }
+}
+
 export async function loadLaudusFinanceReadiness(
   db: SupabaseClient,
   organizationId: string,
@@ -32,6 +94,7 @@ export async function loadLaudusFinanceReadiness(
     paymentsReconciled,
     paymentRequests,
     paymentSignatures,
+    laudusEvidence,
   ] = await Promise.all([
     count(db.from('procurement_accounts_payable').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('procurement_accounts_payable').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('invoice_id', 'is', null)),
@@ -47,6 +110,7 @@ export async function loadLaudusFinanceReadiness(
     count(db.from('procurement_supplier_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('reconciled_at', 'is', null)),
     count(db.from('finance_payment_requests').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('finance_payment_request_signatures').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    loadLaudusFinancialEvidence(db, organizationId),
   ]);
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
@@ -79,6 +143,10 @@ export async function loadLaudusFinanceReadiness(
     // Expected before the private integration schema is deployed.
   }
 
+  if (laudusEvidence.available && laudusState === 'waiting_laudus') {
+    laudusState = 'ready_to_compare';
+  }
+
   return {
     payables: {
       total: payables,
@@ -100,6 +168,7 @@ export async function loadLaudusFinanceReadiness(
       paymentRequests,
       paymentSignatures,
     },
+    laudusEvidence,
     reconciliation: {
       state: laudusState,
       autoCreatePayment: false,
