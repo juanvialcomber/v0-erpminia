@@ -47,7 +47,7 @@ test('finance review presents conclusion evidence and next action', () => {
   assert.match(card, /Proveedor resuelto por RUT/);
   assert.match(card, /Primero revisar/);
   assert.match(card, /row\.nextAction/);
-  assert.match(card, /Sin creación automática/);
+  assert.match(card, /No crea CxP automáticamente/);
 });
 
 test('finance dashboard includes the review surface', () => {
