@@ -5,51 +5,14 @@ export async function loadSupplierResolutionQueue(
   organizationId: string,
   limit = 20,
 ) {
-  const base = db
-    .from('laudus_supplier_bridge_candidates_service_v1')
-    .select('supplier_name_key', { count: 'exact', head: true })
-    .eq('organization_id', organizationId);
-
-  const countStatus = async (status: string) => {
-    const result = await db
-      .from('laudus_supplier_bridge_candidates_service_v1')
-      .select('supplier_name_key', { count: 'exact', head: true })
+  const [summaryResult, rowsResult] = await Promise.all([
+    db
+      .from('laudus_supplier_bridge_summary_service_v1')
+      .select(
+        'total_names,verified_names,placeholder_names,unresolved_names,ambiguous_names,verified_orders,placeholder_orders,evaluated_at',
+      )
       .eq('organization_id', organizationId)
-      .eq('resolution_status', status);
-    if (result.error) throw new Error(result.error.message);
-    return result.count ?? 0;
-  };
-
-  const sumOrders = async (status: string) => {
-    const result = await db
-      .from('laudus_supplier_bridge_candidates_service_v1')
-      .select('purchase_order_count')
-      .eq('organization_id', organizationId)
-      .eq('resolution_status', status);
-    if (result.error) throw new Error(result.error.message);
-    return (result.data || []).reduce(
-      (sum, row) => sum + Number(row.purchase_order_count || 0),
-      0,
-    );
-  };
-
-  const [
-    totalResult,
-    verifiedNames,
-    placeholderNames,
-    unresolvedNames,
-    ambiguousNames,
-    verifiedOrders,
-    placeholderOrders,
-    rowsResult,
-  ] = await Promise.all([
-    base,
-    countStatus('tax_verified_exact'),
-    countStatus('source_placeholder'),
-    countStatus('unresolved'),
-    countStatus('ambiguous'),
-    sumOrders('tax_verified_exact'),
-    sumOrders('source_placeholder'),
+      .maybeSingle(),
     db
       .from('laudus_supplier_bridge_candidates_service_v1')
       .select(
@@ -60,17 +23,20 @@ export async function loadSupplierResolutionQueue(
       .limit(Math.min(Math.max(limit, 1), 100)),
   ]);
 
-  if (totalResult.error) throw new Error(totalResult.error.message);
+  if (summaryResult.error) throw new Error(summaryResult.error.message);
   if (rowsResult.error) throw new Error(rowsResult.error.message);
 
+  const summary = summaryResult.data;
+
   return {
-    totalNames: totalResult.count ?? 0,
-    verifiedNames,
-    placeholderNames,
-    unresolvedNames,
-    ambiguousNames,
-    verifiedOrders,
-    placeholderOrders,
+    totalNames: Number(summary?.total_names || 0),
+    verifiedNames: Number(summary?.verified_names || 0),
+    placeholderNames: Number(summary?.placeholder_names || 0),
+    unresolvedNames: Number(summary?.unresolved_names || 0),
+    ambiguousNames: Number(summary?.ambiguous_names || 0),
+    verifiedOrders: Number(summary?.verified_orders || 0),
+    placeholderOrders: Number(summary?.placeholder_orders || 0),
+    evaluatedAt: summary?.evaluated_at || null,
     rows: rowsResult.data || [],
     method: 'exact_name_to_laudus_plus_exact_tax_id_to_canonical',
     canonicalMutated: false,
