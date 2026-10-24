@@ -11,10 +11,14 @@ type QueueRow = {
   product_external_id: string;
   sku: string | null;
   product_name: string;
+  category: string | null;
+  unit_of_measure: string | null;
   laudus_quantity: number;
   motil_quantity: number | null;
   difference: number | null;
-  reconciliation_state: 'product_unresolved' | 'missing_motil_inventory' | 'quantity_difference';
+  relative_difference_pct: number | null;
+  reconciliation_state: 'product_unresolved' | 'missing_motil_inventory' | 'motil_zero_baseline' | 'quantity_difference';
+  review_reason: string;
 };
 
 type WarehouseCandidate = {
@@ -65,6 +69,7 @@ const n = (value: number | null | undefined) =>
 const stateLabel: Record<QueueRow['reconciliation_state'], string> = {
   product_unresolved: 'Producto sin resolver',
   missing_motil_inventory: 'Sin inventario MOTIL',
+  motil_zero_baseline: 'Baseline MOTIL en cero',
   quantity_difference: 'Cantidad distinta',
 };
 
@@ -156,19 +161,31 @@ export default function LaudusInventoryReconciliationPage() {
       ) : null}
 
       <section className="space-y-3">
-        <div><h2 className="text-lg font-semibold">Requiere revisión</h2><p className="text-sm text-muted-foreground">Prioriza identidad faltante, posiciones ausentes y luego diferencias de cantidad.</p></div>
+        <div><h2 className="text-lg font-semibold">Requiere revisión</h2><p className="text-sm text-muted-foreground">Primero identidad y baseline; después diferencias relativas. La unidad siempre se conserva.</p></div>
         <div className="overflow-hidden rounded-lg border bg-card">
-          <div className="hidden grid-cols-[130px_1fr_150px_150px_150px_160px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
-            <span>Código</span><span>Producto</span><span>Laudus</span><span>MOTIL</span><span>Diferencia</span><span>Estado</span>
+          <div className="hidden grid-cols-[120px_1fr_120px_120px_130px_170px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
+            <span>Código</span><span>Producto</span><span>Laudus</span><span>MOTIL</span><span>Variación</span><span>Estado</span>
           </div>
           {data.queue.map((row) => (
-            <div key={row.product_external_id} className="grid gap-2 border-b px-4 py-4 last:border-0 lg:grid-cols-[130px_1fr_150px_150px_150px_160px] lg:items-center lg:gap-4">
+            <div key={row.product_external_id} className="grid gap-2 border-b px-4 py-4 last:border-0 lg:grid-cols-[120px_1fr_120px_120px_130px_170px] lg:items-center lg:gap-4">
               <p className="font-mono text-sm">{row.sku || row.product_external_id}</p>
-              <p className="text-sm font-medium">{row.product_name}</p>
-              <p className="text-sm tabular-nums"><span className="text-muted-foreground lg:hidden">Laudus: </span>{n(row.laudus_quantity)}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">{row.product_name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {[row.category, row.unit_of_measure].filter(Boolean).join(' · ') || 'Sin unidad declarada'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground lg:hidden">{row.review_reason}</p>
+              </div>
+              <p className="text-sm tabular-nums"><span className="text-muted-foreground lg:hidden">Laudus: </span>{n(row.laudus_quantity)}{row.unit_of_measure ? ` ${row.unit_of_measure}` : ''}</p>
               <p className="text-sm tabular-nums"><span className="text-muted-foreground lg:hidden">MOTIL: </span>{n(row.motil_quantity)}</p>
-              <p className="text-sm font-medium tabular-nums"><span className="text-muted-foreground lg:hidden">Diferencia: </span>{n(row.difference)}</p>
-              <Badge variant={row.reconciliation_state === 'quantity_difference' ? 'secondary' : 'outline'}>{stateLabel[row.reconciliation_state]}</Badge>
+              <div>
+                <p className="text-sm font-medium tabular-nums"><span className="text-muted-foreground lg:hidden">Diferencia: </span>{n(row.difference)}</p>
+                {row.relative_difference_pct != null ? <p className="text-xs text-muted-foreground">{n(row.relative_difference_pct)}%</p> : null}
+              </div>
+              <div>
+                <Badge variant={row.reconciliation_state === 'quantity_difference' ? 'secondary' : 'outline'}>{stateLabel[row.reconciliation_state]}</Badge>
+                <p className="mt-1 hidden text-xs leading-4 text-muted-foreground lg:block">{row.review_reason}</p>
+              </div>
             </div>
           ))}
         </div>
