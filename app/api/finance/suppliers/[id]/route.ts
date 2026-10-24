@@ -12,14 +12,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const canonical = context.supabase.schema('canonical');
     const intelligence = context.supabase.schema('intelligence');
 
-    const [supplierResult, performanceResult, ordersResult, quotationsResult] = await Promise.all([
+    const [supplierResult, performanceResult, ordersResult, quotationsResult, laudusIntelligenceResult] = await Promise.all([
       canonical.from('suppliers').select('*').eq('organization_id', context.organizationId).eq('id', id).maybeSingle(),
       intelligence.from('supplier_performance').select('*').eq('organization_id', context.organizationId).eq('supplier_id', id).maybeSingle(),
       canonical.from('purchase_orders').select('id, order_number, order_date, currency, net_amount, tax_amount, total_amount, status, operational_status, validation_status, expected_delivery_date').eq('organization_id', context.organizationId).eq('canonical_supplier_id', id).order('order_date', { ascending: false }).limit(100),
       canonical.from('supplier_quotations').select('id, request_id, quotation_number, quotation_date, currency, total_amount, lead_time_days, payment_terms, status, valid_until, created_at').eq('organization_id', context.organizationId).eq('supplier_id', id).order('created_at', { ascending: false }).limit(100),
+      context.supabase.rpc('motil_laudus_supplier_intelligence', { p_organization_id: context.organizationId, p_canonical_supplier_id: id }),
     ]);
 
     const error = supplierResult.error || performanceResult.error || ordersResult.error || quotationsResult.error;
+    if (laudusIntelligenceResult.error) console.warn('[finance/supplier/laudus-intelligence]', laudusIntelligenceResult.error.message);
     if (error) throw error;
     if (!supplierResult.data) return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 });
 
@@ -44,6 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       purchaseOrders: ordersResult.data || [],
       quotations: quotationsResult.data || [],
       topProducts: [...products.values()].sort((a, b) => b.spend - a.spend).slice(0, 25),
+      laudusIntelligence: laudusIntelligenceResult.error ? null : laudusIntelligenceResult.data,
       source: 'canonical.suppliers',
       canonical: true,
     });
