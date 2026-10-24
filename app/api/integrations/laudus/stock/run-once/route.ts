@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }> = [];
 
     for (const warehouse of WAREHOUSES) {
-      const apiWarehouseId = String(warehouse.laudus_warehouse_id);
+      const apiWarehouseId = warehouse.external_id;
       const payload = await getLaudusStockSnapshot({ dateTo, warehouseId: apiWarehouseId });
       calls += 1;
       const normalized = toLaudusStockStageRows(payload, apiWarehouseId);
