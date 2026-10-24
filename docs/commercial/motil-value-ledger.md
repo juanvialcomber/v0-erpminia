@@ -522,3 +522,19 @@ La información Laudus se distribuye ahora en la decisión donde aporta valor: e
 Caso verificado: OT-2026-0011, mantención de 250 h del Scoop ST-1030. Tiene 6 productos requeridos y los 6 poseen historial Laudus. Cada SKU tiene entre 4 y 8 líneas de compra y entre 2 y 4 proveedores observados. La moneda no está materializada en esas OC, por lo que MOTIL muestra `precio fuente` y variación relativa, no CLP.
 
 La capacidad es READ/L3 contextual: no escribe en Laudus y no interpreta compra como consumo del activo.
+
+
+## 2026-10-23 — Cobertura de trazabilidad económica OT
+
+### Baseline observado
+11 OT modernas; 11 con declaración de materiales aún pendiente; 1 OT con requerimientos; 0 con work_order_parts; 0 con entrega; 0 con instalación. La OT-2026-0011 tiene 6 productos requeridos, todos con historial Laudus disponible, pero sin traza de repuesto/entrega/instalación.
+
+### Capacidad
+Se agregó `motil_material_traceability_readiness` y una vista en Mantenimiento > Calidad de datos que mide la cadena:
+`intención -> requerimiento -> repuesto -> entrega -> instalación -> contexto Laudus`.
+
+La cola prioriza dónde se corta cada OT y entrega una sola siguiente acción. El score es cobertura de evidencia, no calidad del mantenimiento ni ROI.
+
+### Valor
+La brecha deja de estar escondida en varias tablas. Ariel puede ver qué OT están construyendo economía de activo y cuál es el paso faltante para hacer el costo defendible.
+Nivel actual: L2/L3 según cobertura. El valor económico sólo se acredita cuando existan consumos trazados y resultados observados.

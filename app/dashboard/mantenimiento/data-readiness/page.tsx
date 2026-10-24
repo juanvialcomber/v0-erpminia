@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
+import { MaterialTraceabilityReadiness } from '@/components/maintenance/material-traceability-readiness';
 import { MaintenanceMaterialTraceabilityReadiness } from '@/components/maintenance/material-traceability-readiness';
 
 type RecoveryCandidate = {
@@ -98,6 +99,8 @@ export default function MaintenanceDataReadinessPage() {
     </Card>
 
     <MaintenanceMaterialTraceabilityReadiness />
+
+    <MaterialTraceabilityReadiness />
 
     <StatePanel tone="neutral" title="Frontera de confianza" description={`${data.semantics} ${data.policy}`} className="min-h-0 py-5" />
 
