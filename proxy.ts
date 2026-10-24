@@ -23,7 +23,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/auth/logout',
   '/api/integrations/greenapi/webhook',
   '/api/integrations/laudus/invoice-totals-rehydrate-preview',
-  '/api/integrations/laudus/capability-probe',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
