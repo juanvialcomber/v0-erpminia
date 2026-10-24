@@ -27,6 +27,7 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-history',
   '/api/cron/whatsapp-media',
   '/api/cron/whatsapp-vision',
+  '/api/integrations/laudus/domain-probe-preview',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
