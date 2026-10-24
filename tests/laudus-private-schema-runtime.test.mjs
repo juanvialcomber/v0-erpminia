@@ -63,7 +63,6 @@ test('Laudus runtime uses the approved service facades for private evidence', ()
     'canonical_assets_service_v1',
     'laudus_warehouses_service_v1',
     'purchase_order_reconciliation_preview_service_v1',
-    'supplier_resolution_queue_service_v1',
     'laudus_supplier_bridge_candidates_service_v1',
     'laudus_supplier_bridge_summary_service_v1',
   ]) {
