@@ -1,37 +1,46 @@
-import { extractLaudusListRows, hasLaudusPageMore } from './financial-masters';
+import { extractLaudusListRows } from './financial-masters';
 import { listLaudus } from './client';
 
 export const LAUDUS_PAYMENT_FIELDS = [
   'paymentId',
-  'paymentType',
+  'paymentType.code',
+  'paymentType.description',
   'issuedDate',
   'dueDate',
   'document',
   'deposited',
-  'bank',
-  'accountOther',
-  'journalEntryIssued',
-  'journalEntryDeposited',
+  'bank.bankId',
+  'bank.name',
   'notes',
-  'purchaseInvoices',
+  'purchaseInvoices.itemId',
+  'purchaseInvoices.purchaseInvoiceId',
+  'purchaseInvoices.docNumber',
+  'purchaseInvoices.supplier.supplierId',
+  'purchaseInvoices.supplier.name',
+  'purchaseInvoices.originalAmount',
+  'purchaseInvoices.currencyCode',
+  'purchaseInvoices.parityToMainCurrency',
+  'purchaseInvoices.amount',
+  'purchaseInvoices.costCenter.costCenterId',
 ] as const;
 
-export async function fetchAllLaudusPurchasePayments() {
-  const rows: Record<string, unknown>[] = [];
-  const pageSize = 25;
-  const maxPages = 1000;
-  let calls = 0;
+function day(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
 
-  for (let page = 0; page < maxPages; page += 1) {
-    const payload = await listLaudus('/purchases/payments/list', {
-      options: { offset: page * pageSize, limit: pageSize },
-      fields: [...LAUDUS_PAYMENT_FIELDS],
-    });
-    calls += 1;
-    const batch = extractLaudusListRows(payload);
-    rows.push(...batch);
-    if (!hasLaudusPageMore(batch, pageSize)) break;
-  }
+export async function fetchAllLaudusPurchasePayments(start: Date, end: Date) {
+  const payload = await listLaudus('/purchases/payments/list', {
+    options: { offset: 0, limit: 0 },
+    fields: [...LAUDUS_PAYMENT_FIELDS],
+    filterBy: [
+      { field: 'issuedDate', operator: '>=', value: `${day(start)}T00:00:00` },
+      { field: 'issuedDate', operator: '<=', value: `${day(end)}T23:59:59` },
+    ],
+    orderBy: [{ field: 'paymentId', direction: 'ASC' }],
+  });
 
-  return { rows, calls };
+  return {
+    rows: extractLaudusListRows(payload),
+    calls: 2,
+  };
 }
