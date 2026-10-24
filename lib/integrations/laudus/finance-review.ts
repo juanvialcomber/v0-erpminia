@@ -11,19 +11,13 @@ type LaudusInvoice = {
   payment_status: string | null;
 };
 
-type LaudusInvoiceSource = {
-  external_id: string;
-  supplier_tax_id: string | null;
-};
-
 type MotilSupplier = {
   id: string;
   name: string | null;
-  rut: string | null;
 };
 
-const normalizeTaxId = (value: string | null | undefined) =>
-  String(value || '').toLowerCase().replace(/[^0-9k]/g, '');
+const normalizeName = (value: string | null | undefined) =>
+  String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const numberValue = (value: number | string | null | undefined) => {
   const parsed = Number(value ?? 0);
@@ -32,6 +26,51 @@ const numberValue = (value: number | string | null | undefined) => {
 
 const daysBetween = (from: Date, to: Date) =>
   Math.floor((to.getTime() - from.getTime()) / 86400000);
+
+async function readOpenInvoices(db: SupabaseClient, organizationId: string) {
+  const rows: LaudusInvoice[] = [];
+  const batchSize = 500;
+
+  for (let offset = 0; offset < 5000; offset += batchSize) {
+    const result = await db
+      .schema('integration')
+      .from('laudus_purchase_invoice_payment_status_v1')
+      .select(
+        'purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,outstanding_amount,payment_status',
+      )
+      .eq('organization_id', organizationId)
+      .gt('total_amount', 0)
+      .gt('outstanding_amount', 0)
+      .range(offset, offset + batchSize - 1);
+
+    if (result.error) throw new Error(result.error.message);
+    const batch = (result.data || []) as LaudusInvoice[];
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
+
+  return rows;
+}
+
+async function readSuppliers(db: SupabaseClient, organizationId: string) {
+  const rows: MotilSupplier[] = [];
+  const batchSize = 500;
+
+  for (let offset = 0; offset < 5000; offset += batchSize) {
+    const result = await db
+      .from('suppliers')
+      .select('id,name')
+      .eq('organization_id', organizationId)
+      .range(offset, offset + batchSize - 1);
+
+    if (result.error) throw new Error(result.error.message);
+    const batch = (result.data || []) as MotilSupplier[];
+    rows.push(...batch);
+    if (batch.length < batchSize) break;
+  }
+
+  return rows;
+}
 
 function priorityFor(row: LaudusInvoice, supplierMatched: boolean, today: Date) {
   const due = row.due_date ? new Date(row.due_date) : null;
@@ -62,53 +101,25 @@ export async function loadLaudusFinanceReview(
   db: SupabaseClient,
   organizationId: string,
 ) {
-  const [statusResult, sourceResult, suppliersResult] = await Promise.all([
-    db
-      .schema('integration')
-      .from('laudus_purchase_invoice_payment_status_v1')
-      .select(
-        'purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,outstanding_amount,payment_status',
-      )
-      .eq('organization_id', organizationId)
-      .gt('total_amount', 0)
-      .gt('outstanding_amount', 0)
-      .limit(2000),
-    db
-      .schema('integration')
-      .from('laudus_purchase_invoices')
-      .select('external_id,supplier_tax_id')
-      .eq('organization_id', organizationId)
-      .limit(2000),
-    db
-      .from('suppliers')
-      .select('id,name,rut')
-      .eq('organization_id', organizationId)
-      .not('rut', 'is', null)
-      .limit(5000),
+  const [rows, suppliers] = await Promise.all([
+    readOpenInvoices(db, organizationId),
+    readSuppliers(db, organizationId),
   ]);
 
-  if (statusResult.error) throw new Error(statusResult.error.message);
-  if (sourceResult.error) throw new Error(sourceResult.error.message);
-  if (suppliersResult.error) throw new Error(suppliersResult.error.message);
-
-  const rows = (statusResult.data || []) as LaudusInvoice[];
-  const sourceRows = (sourceResult.data || []) as LaudusInvoiceSource[];
-  const suppliers = (suppliersResult.data || []) as MotilSupplier[];
-
-  const sourceByExternalId = new Map(
-    sourceRows.map((row) => [row.external_id, row]),
-  );
-  const supplierByTaxId = new Map<string, MotilSupplier>();
+  const supplierCandidates = new Map<string, MotilSupplier[]>();
   for (const supplier of suppliers) {
-    const key = normalizeTaxId(supplier.rut);
-    if (key && !supplierByTaxId.has(key)) supplierByTaxId.set(key, supplier);
+    const key = normalizeName(supplier.name);
+    if (!key) continue;
+    const matches = supplierCandidates.get(key) || [];
+    matches.push(supplier);
+    supplierCandidates.set(key, matches);
   }
 
   const today = new Date();
   const queue = rows.map((row) => {
-    const source = sourceByExternalId.get(row.purchase_invoice_external_id);
-    const taxId = normalizeTaxId(source?.supplier_tax_id);
-    const matchedSupplier = taxId ? supplierByTaxId.get(taxId) : undefined;
+    const supplierKey = normalizeName(row.supplier_name);
+    const matches = supplierKey ? supplierCandidates.get(supplierKey) || [] : [];
+    const matchedSupplier = matches.length === 1 ? matches[0] : undefined;
     const priority = priorityFor(row, Boolean(matchedSupplier), today);
 
     return {
@@ -127,7 +138,7 @@ export async function loadLaudusFinanceReview(
       priorityScore: priority.score,
       priority: priority.level,
       evidence: [
-        matchedSupplier ? 'Proveedor verificado por RUT' : 'Proveedor pendiente de identidad',
+        matchedSupplier ? 'Proveedor identificado por nombre exacto y único' : 'Proveedor pendiente de identidad',
         row.payment_status === 'partially_paid' ? 'Pago parcial registrado en Laudus' : 'Sin pago aplicado en Laudus',
         priority.overdueDays > 0 ? `${priority.overdueDays} días vencido` : 'No vencido',
       ],
@@ -162,7 +173,7 @@ export async function loadLaudusFinanceReview(
     },
     queue: queue.slice(0, 10),
     method: {
-      identity: 'exact_supplier_tax_id',
+      identity: 'exact_unique_normalized_supplier_name',
       ranking: 'deterministic_v1',
       poMatching: 'deferred_until_canonical_coverage_improves',
       automaticPromotion: false,
