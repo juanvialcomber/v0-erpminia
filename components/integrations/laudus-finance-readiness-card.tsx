@@ -35,6 +35,13 @@ type Payload = {
     stagedPayments: number;
     latestSyncAt: string | null;
   };
+  accountingEvidence: {
+    available: boolean;
+    accountingEntries: number;
+    bankStatements: number;
+    pendingDtes: number;
+    latestSyncAt: string | null;
+  };
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
     autoCreatePayment: false;
@@ -66,6 +73,7 @@ export function LaudusFinanceReadinessCard() {
   if (error) return null;
 
   const evidence = data?.laudusEvidence;
+  const accounting = data?.accountingEvidence;
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
@@ -75,7 +83,7 @@ export function LaudusFinanceReadinessCard() {
           <h2 className="text-sm font-semibold">Laudus · evidencia financiera</h2>
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          MOTIL conserva las CxP operacionales. Laudus aporta evidencia financiera para comparar, no para crear deuda automáticamente.
+          MOTIL conserva las CxP operacionales. Laudus aporta evidencia financiera y contable para comparar, no para crear deuda automáticamente.
         </p>
       </div>
 
@@ -101,6 +109,21 @@ export function LaudusFinanceReadinessCard() {
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.stagedPayments.toLocaleString('es-CL')}</p>
           <p className="mt-1 text-xs text-muted-foreground">Pagos Laudus en staging</p>
+        </div>
+      </div>
+
+      <div className="grid gap-px border-t bg-border sm:grid-cols-3">
+        <div className="bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">Comprobantes contables</p>
+          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.accountingEntries.toLocaleString('es-CL')}</p>
+        </div>
+        <div className="bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">Cartolas bancarias</p>
+          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.bankStatements.toLocaleString('es-CL')}</p>
+        </div>
+        <div className="bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">DTE pendientes</p>
+          <p className="mt-1 text-lg font-semibold">{isLoading || !accounting?.available ? '—' : accounting.pendingDtes.toLocaleString('es-CL')}</p>
         </div>
       </div>
 
