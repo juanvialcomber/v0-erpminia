@@ -2,7 +2,7 @@
 -- Exact plate embedded in Laudus name or exact serial raises evidence only.
 -- No candidate is auto-promoted to canonical identity.
 
-create or replace function public.motil_get_laudus_fixed_asset_candidates(
+create or replace function public.motil_get_laudus_fixed_asset_candidates_v2(
   p_organization_id uuid,
   p_limit integer default 100
 )
@@ -166,10 +166,10 @@ order by
 limit greatest(1,least(coalesce(p_limit,100),500));
 $function$;
 
-revoke all on function public.motil_get_laudus_fixed_asset_candidates(uuid,integer)
+revoke all on function public.motil_get_laudus_fixed_asset_candidates_v2(uuid,integer)
   from public,anon,authenticated;
-grant execute on function public.motil_get_laudus_fixed_asset_candidates(uuid,integer)
+grant execute on function public.motil_get_laudus_fixed_asset_candidates_v2(uuid,integer)
   to service_role;
 
-comment on function public.motil_get_laudus_fixed_asset_candidates(uuid,integer)
+comment on function public.motil_get_laudus_fixed_asset_candidates_v2(uuid,integer)
   is 'Read-only fixed-asset candidates. Exact plate/serial and model/manufacturer are evidence only; all identity promotion requires human review.';
