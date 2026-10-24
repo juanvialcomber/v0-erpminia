@@ -112,3 +112,10 @@ Interpretation:
 - the queue is materially concentrating financial review effort;
 - this is not a credit-risk, fraud, or default probability score;
 - the measured value proposition is review prioritization and attention compression, not autonomous financial judgment.
+
+
+## QA cost discipline
+
+- `pnpm qa:fast` is the local/self-hosted L1 entrypoint and includes migration uniqueness, TypeScript typecheck, unit tests and targeted ESLint.
+- Vercel `prebuild` stays lightweight to avoid repeating the full TypeScript pass on every preview.
+- Intermediate commits may use `[skip vercel]`; one final exact-SHA preview must still complete before release.
