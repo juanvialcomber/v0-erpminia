@@ -24,6 +24,17 @@ type Payload = {
     paymentRequests: number;
     paymentSignatures: number;
   };
+  laudusEvidence: {
+    available: boolean;
+    payableDocuments: number;
+    paidDocuments: number;
+    partiallyPaidDocuments: number;
+    unpaidDocuments: number;
+    openDocuments: number;
+    creditAdjustments: number;
+    stagedPayments: number;
+    latestSyncAt: string | null;
+  };
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
     autoCreatePayment: false;
@@ -39,8 +50,6 @@ const fetcher = async (url: string): Promise<Payload> => {
   return payload;
 };
 
-const pct = (value: number) => `${value.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%`;
-
 const stateLabel: Record<Payload['reconciliation']['state'], string> = {
   waiting_laudus: 'Esperando Laudus',
   ready_to_compare: 'Lista para comparar',
@@ -51,20 +60,22 @@ export function LaudusFinanceReadinessCard() {
   const { data, error, isLoading } = useSWR<Payload>(
     '/api/integrations/laudus/finance-readiness',
     fetcher,
-    { revalidateOnFocus: false, refreshInterval: 120000 },
+    { revalidateOnFocus: false, refreshInterval: 900000 },
   );
 
   if (error) return null;
+
+  const evidence = data?.laudusEvidence;
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="border-b px-4 py-4">
         <div className="flex items-center gap-2">
           <Landmark className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Preparación financiera para Laudus</h2>
+          <h2 className="text-sm font-semibold">Laudus · evidencia financiera</h2>
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus podrá aportar CxP, pagos y evidencia contable. MOTIL conserva aprobación humana y conciliación trazable.
+          MOTIL conserva las CxP operacionales. Laudus aporta evidencia financiera para comparar, no para crear deuda automáticamente.
         </p>
       </div>
 
@@ -72,22 +83,24 @@ export function LaudusFinanceReadinessCard() {
         <div className="bg-card p-4">
           <WalletCards className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : data.payables.total.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Cuentas por pagar</p>
+          <p className="mt-1 text-xs text-muted-foreground">CxP canónicas MOTIL</p>
         </div>
         <div className="bg-card p-4">
-          <p className="text-xs text-muted-foreground">CxP con vencimiento</p>
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : pct(data.payables.dueDateCoverage)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">No se infiere fecha faltante</p>
+          <p className="text-xs text-muted-foreground">Documentos Laudus</p>
+          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.payableDocuments.toLocaleString('es-CL')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Sólo documentos positivos</p>
         </div>
         <div className="bg-card p-4">
-          <p className="text-xs text-muted-foreground">Pagos registrados</p>
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : data.payments.total.toLocaleString('es-CL')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{isLoading || !data ? '—' : pct(data.payments.payableCoverage)} enlazados a CxP</p>
+          <p className="text-xs text-muted-foreground">Con saldo en Laudus</p>
+          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.openDocuments.toLocaleString('es-CL')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isLoading || !evidence?.available ? '—' : `${evidence.partiallyPaidDocuments.toLocaleString('es-CL')} parciales · ${evidence.unpaidDocuments.toLocaleString('es-CL')} sin pago`}
+          </p>
         </div>
         <div className="bg-card p-4">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : pct(data.payments.reconciliationCoverage)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Pagos conciliados</p>
+          <p className="mt-2 text-2xl font-semibold">{isLoading || !evidence?.available ? '—' : evidence.stagedPayments.toLocaleString('es-CL')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Pagos Laudus en staging</p>
         </div>
       </div>
 
@@ -97,10 +110,12 @@ export function LaudusFinanceReadinessCard() {
             Integración financiera: {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Laudus puede informar hechos financieros; no puede aprobar, crear ni conciliar pagos automáticamente.
+            {evidence?.available
+              ? `${evidence.creditAdjustments.toLocaleString('es-CL')} ajustes/créditos separados del saldo por pagar.`
+              : 'La evidencia Laudus aún no está disponible para esta organización.'}
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Aprobación humana obligatoria</p>
+        <p className="text-xs text-muted-foreground">Sin creación automática de pagos</p>
       </div>
     </section>
   );
