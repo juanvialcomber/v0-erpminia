@@ -36,8 +36,7 @@ export async function POST(request: NextRequest) {
     const db = getSupabaseServerClient(context.authUserId || context.userId);
 
     const invoice = await db
-      .schema('integration')
-      .from('laudus_purchase_invoice_payment_status_v1')
+      .from('laudus_purchase_invoice_payment_status_service_v1')
       .select('purchase_invoice_external_id')
       .eq('organization_id', context.organizationId)
       .eq('purchase_invoice_external_id', purchaseInvoiceExternalId)
@@ -62,28 +61,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const inserted = await db
-      .schema('integration')
-      .from('laudus_finance_review_feedback')
-      .insert({
-        organization_id: context.organizationId,
-        purchase_invoice_external_id: purchaseInvoiceExternalId,
-        suggested_supplier_id: suggestedSupplierId,
-        decision,
-        reason,
-        priority_score: Number.isFinite(priorityScore) ? priorityScore : null,
-        outstanding_amount: Number.isFinite(outstandingAmount) ? outstandingAmount : null,
-        actor_user_id: context.authUserId || context.userId,
-        actor_name: context.userName || context.userEmail || null,
-      })
-      .select('id,decision,created_at')
-      .single();
+    const inserted = await db.rpc('motil_record_laudus_finance_review_feedback', {
+      p_organization_id: context.organizationId,
+      p_purchase_invoice_external_id: purchaseInvoiceExternalId,
+      p_suggested_supplier_id: suggestedSupplierId,
+      p_decision: decision,
+      p_reason: reason,
+      p_priority_score: Number.isFinite(priorityScore) ? priorityScore : null,
+      p_outstanding_amount: Number.isFinite(outstandingAmount) ? outstandingAmount : null,
+      p_actor_user_id: context.authUserId || context.userId,
+      p_actor_name: context.userName || context.userEmail || null,
+    });
 
     if (inserted.error) throw inserted.error;
 
     return NextResponse.json({
       ok: true,
-      feedback: inserted.data,
+      feedback: {
+        id: inserted.data,
+        decision,
+      },
       canonicalMutated: false,
       paymentMutated: false,
     });
