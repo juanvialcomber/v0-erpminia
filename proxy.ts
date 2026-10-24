@@ -263,14 +263,6 @@ async function proxyRequest(request: NextRequest) {
     return withSecurityHeaders(response);
   }
 
-  const isLaudusInventoryPreviewProbe =
-    pathname === '/api/integrations/laudus/inventory-probe' &&
-    process.env.VERCEL_ENV === 'preview' &&
-    process.env.VERCEL_GIT_COMMIT_REF === 'feat/laudus-inventory-discovery-20261023';
-
-  if (isLaudusInventoryPreviewProbe) {
-    return withSecurityHeaders(response);
-  }
 
   const {
     data: { user },
