@@ -58,7 +58,7 @@ export default function FinanzasPage() {
         sources={[
           sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'updated', detail: 'ERP financiero conectado; datos disponibles para conciliación y revisión.' }),
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
@@ -73,7 +73,7 @@ export default function FinanzasPage() {
           { label: 'Centros de costo', ready: true, detail: 'Dimensión canónica disponible.' },
           { label: 'Compras y CxP', ready: true, detail: 'Vistas operacionales y tesorería disponibles.' },
           { label: 'Trazabilidad', ready: true, detail: 'Eventos y fuentes auditables.' },
-          { label: 'Laudus contable', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Contabilidad y ERP sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+          { label: 'Laudus contable', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP financiero conectado; revisar excepciones y conciliación.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Fuente temporalmente sin actualización.' },
         ]}
       />
 
