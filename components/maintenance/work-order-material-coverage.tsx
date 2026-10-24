@@ -43,6 +43,19 @@ type CatalogRow = {
   warehouses: string[];
 };
 
+type LaudusContextRow = {
+  canonical_product_id: string;
+  purchase_lines: number;
+  supplier_count: number;
+  last_purchase_at?: string | null;
+  latest_supplier?: string | null;
+  latest_unit_price?: number | null;
+  median_unit_price?: number | null;
+  price_ratio?: number | null;
+  source_currency?: string | null;
+  currency_status?: string | null;
+};
+
 type SupplyStatus = {
   supply_need_id?: string | null;
   procurement_request_id?: string | null;
@@ -75,6 +88,8 @@ export function WorkOrderMaterialCoverage({ workOrderId, executionMode = false }
   const materialDeclaration = data?.materialDeclaration || null;
   const requiresMaterials = materialDeclaration?.requiresMaterials as boolean | null | undefined;
   const rows = Array.isArray(status.materials) ? status.materials : [];
+  const laudusRows = Array.isArray(data?.laudusContext?.rows) ? data.laudusContext.rows as LaudusContextRow[] : [];
+  const laudusByProduct = new Map(laudusRows.map((row) => [row.canonical_product_id, row]));
   const shortageCount = rows.filter((row) => shortage(row) > 0).length;
   const reservedTotal = rows.reduce((sum, row) => sum + reserved(row), 0);
   const issuedTotal = rows.reduce((sum, row) => sum + issued(row), 0);
@@ -261,11 +276,23 @@ export function WorkOrderMaterialCoverage({ workOrderId, executionMode = false }
         {!isLoading && !error && requiresMaterials === false ? <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed p-4 text-sm"><span className="text-muted-foreground">Declaración guardada: esta OT no requiere materiales.</span><Button size="sm" variant="ghost" onClick={() => void declareMaterials(true)} disabled={declaring}>Cambiar</Button></div> : null}
         {rows.length > 0 ? <div className="divide-y rounded-lg border">{rows.map((row) => {
           const missing = shortage(row);
+          const laudus = row.product_id ? laudusByProduct.get(row.product_id) : undefined;
+          const priceDelta = laudus?.price_ratio == null ? null : Math.round((Number(laudus.price_ratio) - 1) * 100);
           const reservedQty = reserved(row);
           const issuedQty = issued(row);
           const purchasingQty = inProcurement(row);
           return <div key={String(rowKey(row))} className="p-4">
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{row.product_name || 'Producto'}</p><p className="text-xs text-muted-foreground">{row.product_code || 'Sin código'}</p></div>{missing > 0 ? <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-destructive" /> : <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}</div>
+            {laudus?.purchase_lines ? <div className="mt-3 rounded-md border bg-muted/20 p-3">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                <span className="font-medium">Laudus · {laudus.purchase_lines} compra(s)</span>
+                <span className="text-muted-foreground">{laudus.supplier_count} proveedor(es)</span>
+                {laudus.last_purchase_at ? <span className="text-muted-foreground">Última {new Date(laudus.last_purchase_at).toLocaleDateString('es-CL')}</span> : null}
+                {laudus.latest_supplier ? <span className="text-muted-foreground">{laudus.latest_supplier}</span> : null}
+              </div>
+              {laudus.latest_unit_price != null && laudus.median_unit_price != null ? <p className="mt-2 text-xs text-muted-foreground">Precio fuente último {Number(laudus.latest_unit_price).toLocaleString('es-CL')} · mediana {Number(laudus.median_unit_price).toLocaleString('es-CL')}{priceDelta == null ? '' : ' · ' + (priceDelta >= 0 ? '+' : '') + priceDelta + '%'}{laudus.currency_status === 'currency_not_materialized' ? ' · moneda no materializada' : laudus.source_currency ? ' · ' + laudus.source_currency : ''}</p> : null}
+              <p className="mt-1 text-[11px] text-muted-foreground">Contexto de compra del SKU; no prueba consumo por esta OT.</p>
+            </div> : null}
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
               <div><p className="text-xs text-muted-foreground">Requerido</p><p className="font-medium tabular-nums">{required(row)}</p></div>
               <div><p className="text-xs text-muted-foreground">Reservado</p><p className="font-medium tabular-nums">{reservedQty}</p></div>

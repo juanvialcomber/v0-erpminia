@@ -513,3 +513,12 @@ El cuello de botella actual queda localizado: la fuente externa Laudus ya puede 
 Se creó un snapshot diario por organización, capturado junto al Value Scorecard con fecha de negocio `America/Santiago`. El baseline de La Patagua quedó registrado el 2026-10-23: score de cobertura 0, 11 OT modernas, 11 sin declaración de materiales, 9 OT completadas con brecha, 1 OT con requerimientos y 1 con cobertura Laudus completa de esos requerimientos.
 
 La tendencia mide mejora de cobertura operacional, no ahorro ni calidad de mantenimiento. Se requiere al menos un segundo día para hablar de evolución observada.
+
+
+## 2026-10-23 — Contexto Laudus dentro de materiales de OT
+
+La información Laudus se distribuye ahora en la decisión donde aporta valor: el requerimiento de materiales de la OT. Por cada SKU requerido MOTIL puede mostrar historial de compra, cantidad de proveedores, última compra, proveedor más reciente y último precio frente a la mediana histórica.
+
+Caso verificado: OT-2026-0011, mantención de 250 h del Scoop ST-1030. Tiene 6 productos requeridos y los 6 poseen historial Laudus. Cada SKU tiene entre 4 y 8 líneas de compra y entre 2 y 4 proveedores observados. La moneda no está materializada en esas OC, por lo que MOTIL muestra `precio fuente` y variación relativa, no CLP.
+
+La capacidad es READ/L3 contextual: no escribe en Laudus y no interpreta compra como consumo del activo.

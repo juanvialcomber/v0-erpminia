@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
 
   try {
     const { id } = await contextRoute.params;
-    const [{ data, error }, { data: workOrder, error: workOrderError }] = await Promise.all([
+    const [{ data, error }, { data: workOrder, error: workOrderError }, { data: laudusContext, error: laudusContextError }] = await Promise.all([
       context.supabase.rpc('get_work_order_supply_status_v1', {
         p_organization_id: context.organizationId,
         p_work_order_id: id,
@@ -42,11 +42,18 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
         .eq('organization_id', context.organizationId)
         .eq('id', id)
         .maybeSingle(),
+      context.supabase.rpc('motil_work_order_material_laudus_context', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+        p_scope_days: 730,
+      }),
     ]);
     if (error) throw error;
     if (workOrderError) throw workOrderError;
+    if (laudusContextError) throw laudusContextError;
     return NextResponse.json({
       data,
+      laudusContext,
       materialDeclaration: workOrder ? {
         requiresMaterials: workOrder.materials_required,
         reviewedAt: workOrder.materials_reviewed_at,
