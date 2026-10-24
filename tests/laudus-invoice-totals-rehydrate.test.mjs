@@ -32,5 +32,5 @@ test('rehydrate preserves source evidence and monetary fields', () => {
   for (const field of ['net_amount', 'tax_amount', 'total_amount', 'currency']) {
     assert.match(migration, new RegExp(field));
   }
-  assert.match(migration, /\{ledger\}/);
+  assert.match(migration, /\{totals_list\}/);
 });
