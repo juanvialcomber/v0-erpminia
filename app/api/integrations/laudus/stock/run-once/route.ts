@@ -25,7 +25,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = getSupabaseServerClient();
-    const dateTo = new Date().toISOString();
+    const observedAt = new Date().toISOString();
+    const dateTo = new Date()
+      .toLocaleString('sv-SE', { timeZone: 'America/Santiago', hour12: false })
+      .replace(' ', 'T');
     let runId: string | null = null;
     let calls = 0;
     let staged = 0;
@@ -58,7 +61,7 @@ export async function GET(request: NextRequest) {
         const { data, error } = await supabase.rpc('motil_ingest_laudus_product_stock', {
           p_organization_id: ORGANIZATION_ID,
           p_warehouse_external_id: snapshot.warehouse.external_id,
-          p_date_to: snapshot.dateTo || dateTo,
+          p_date_to: observedAt,
           p_rows: chunks[chunkIndex],
           p_run_id: runId,
           p_finalize: finalize,
