@@ -28,7 +28,7 @@ test('finance review stays read-only and finance scoped', () => {
 });
 
 test('finance review ranks evidence deterministically', () => {
-  assert.match(helper, /exact_supplier_tax_id/);
+  assert.match(helper, /exact_unique_normalized_supplier_name/);
   assert.match(helper, /deterministic_v1/);
   assert.match(helper, /priorityScore/);
   assert.match(helper, /overdueDays/);
@@ -44,7 +44,7 @@ test('finance review bounds source reads and returns a short queue', () => {
 
 test('finance review presents conclusion evidence and next action', () => {
   assert.match(card, /Revisión priorizada de obligaciones/);
-  assert.match(card, /Proveedor resuelto por RUT/);
+  assert.match(card, /Proveedor identificado/);
   assert.match(card, /Primero revisar/);
   assert.match(card, /row\.nextAction/);
   assert.match(card, /No crea CxP automáticamente/);
