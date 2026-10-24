@@ -16,8 +16,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { rows, calls } = await fetchAllLaudusPurchasePayments();
   const db = getSupabaseServerClient();
+  const { data: bounds, error: boundsError } = await db.rpc('motil_get_laudus_invoice_staging_bounds', {
+    p_organization_id: access.organizationId,
+  });
+  if (boundsError || !bounds?.first_issued_date) {
+    return NextResponse.json(
+      { status: 'empty', calls: 0, canonicalMutated: false, laudusMutated: false },
+      { status: 404 },
+    );
+  }
+
+  const start = new Date(bounds.first_issued_date);
+  const end = new Date();
+  const { rows, calls } = await fetchAllLaudusPurchasePayments(start, end);
 
   const { data, error } = await db.rpc('motil_ingest_laudus_purchase_payments', {
     p_organization_id: access.organizationId,
