@@ -1,3 +1,17 @@
+create or replace view public.canonical_cost_centers_service_v1
+with (security_invoker = true)
+as
+select id,organization_id,cost_center_code
+from canonical.cost_centers;
+
+create or replace view public.canonical_assets_service_v1
+with (security_invoker = true)
+as
+select
+  id,organization_id,acquisition_date,acquisition_cost,expected_lifespan_years,
+  asset_code,cost_center_code
+from canonical.assets;
+
 -- Complete service-role-only facades for Laudus readiness and reconciliation.
 -- Keeps canonical/integration schemas private from Data API clients.
 
@@ -81,3 +95,9 @@ grant select on public.laudus_warehouses_service_v1 to service_role;
 grant select on public.laudus_external_entity_links_service_v1 to service_role;
 grant select on public.purchase_order_reconciliation_preview_service_v1 to service_role;
 grant select on public.supplier_resolution_queue_service_v1 to service_role;
+
+
+revoke all on public.canonical_cost_centers_service_v1 from public,anon,authenticated;
+revoke all on public.canonical_assets_service_v1 from public,anon,authenticated;
+grant select on public.canonical_cost_centers_service_v1 to service_role;
+grant select on public.canonical_assets_service_v1 to service_role;
