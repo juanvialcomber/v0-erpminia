@@ -27,8 +27,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-history',
   '/api/cron/whatsapp-media',
   '/api/cron/whatsapp-vision',
-  // Temporary one-shot Laudus stock runner; route validates its own high-entropy token.
-  '/api/integrations/laudus/stock/run-once',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
