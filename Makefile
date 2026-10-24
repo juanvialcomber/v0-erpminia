@@ -1,4 +1,4 @@
-.PHONY: qa qa-fast qa-pr qa-full
+.PHONY: qa-runner-preflight qa qa-fast qa-pr qa-full
 
 qa: qa-fast
 
@@ -13,3 +13,6 @@ qa-pr: qa-fast
 
 qa-full: qa-pr
 	pnpm test:e2e
+
+qa-runner-preflight:
+	bash qa/runner-preflight.sh
