@@ -10,6 +10,10 @@ const bridgeMigration = readFileSync(
   new URL('../supabase/migrations/20261024162000_laudus_supplier_bridge_candidates.sql', import.meta.url),
   'utf8',
 );
+const summaryMigration = readFileSync(
+  new URL('../supabase/migrations/20261024162500_laudus_supplier_bridge_summary.sql', import.meta.url),
+  'utf8',
+);
 const helper = readFileSync(
   new URL('../lib/integrations/laudus/supplier-resolution-queue.ts', import.meta.url),
   'utf8',
@@ -61,12 +65,19 @@ test('bridge facade and refresh are service-role only', () => {
   );
 });
 
-test('queue helper reads only the precomputed bridge and stays bounded', () => {
+test('queue helper reads bounded rows plus a one-row aggregate summary', () => {
   assert.match(helper, /laudus_supplier_bridge_candidates_service_v1/);
-  assert.match(helper, /tax_verified_exact/);
-  assert.match(helper, /source_placeholder/);
+  assert.match(helper, /laudus_supplier_bridge_summary_service_v1/);
+  assert.match(helper, /maybeSingle\(\)/);
   assert.match(helper, /Math\.min\(Math\.max\(limit, 1\), 100\)/);
   assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
+});
+
+test('supplier bridge summary aggregates in Postgres instead of application memory', () => {
+  assert.match(summaryMigration, /count\(\*\) filter \(where resolution_status = 'tax_verified_exact'\)/);
+  assert.match(summaryMigration, /sum\(purchase_order_count\) filter/);
+  assert.match(summaryMigration, /group by organization_id/);
+  assert.match(summaryMigration, /grant select on public\.laudus_supplier_bridge_summary_service_v1 to service_role/);
 });
 
 test('queue API is permission scoped and review only', () => {
