@@ -69,7 +69,7 @@ test('queue helper reads bounded rows plus a one-row aggregate summary', () => {
   assert.match(helper, /laudus_supplier_bridge_candidates_service_v1/);
   assert.match(helper, /laudus_supplier_bridge_summary_service_v1/);
   assert.match(helper, /maybeSingle\(\)/);
-  assert.match(helper, /Math\.min\(Math\.max\(limit, 1\), 100\)/);
+  assert.match(helper, /Math\.min\(Math\.max\(limit, 1\), 50\)/);
   assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
 });
 
