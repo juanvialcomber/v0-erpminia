@@ -38,5 +38,5 @@ test('finance payables API is finance-authorized and tenant scoped',()=>{
 test('finance navigation exposes the payments workspace with honest empty states',()=>{
   assert.match(layout,/\/dashboard\/finanzas\/pagos/);
   assert.match(page,/No hay CxP pendientes en MOTIL/);
-  assert.match(page,/No hay pagos registrados/);
+  assert.match(page,/Aún no hay pagos para conciliar/);
 });
