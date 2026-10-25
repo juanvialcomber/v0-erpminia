@@ -57,7 +57,7 @@ test('real plan candidates open the standard-plan form with evidence-backed pref
   assert.match(plansPage, /searchParams\.get\('durationHours'\)/);
   assert.match(plansPage, /searchParams\.get\('evidence'\)/);
   assert.match(plansPage, /MOTIL prellena sólo campos sustentados/);
-  assert.match(plansPage, /Ariel debe completar pasos, controles, personas y materiales antes de aprobar/);
+  assert.match(plansPage, /Ariel debe completar pasos, controles y personas, y confirmar o quitar materiales antes de aprobar/);
 });
 
 
@@ -67,7 +67,7 @@ test('real plan pilot carries all canonical OT material requirements as reviewab
   assert.match(api, /materialSemantics/);
   assert.match(page, /materiales son evidencia observada, no una promesa de tiempo ni consumo futuro/);
   assert.match(plansPage, /parsePrefilledMaterials/);
-  assert.match(plansPage, /materiales requeridos en la OT fuente fueron cargados para revisión/);
+  assert.match(plansPage, /material\(es\) requeridos en la OT fuente fueron cargados para revisión/);
   assert.match(plansPage, /confirmar o quitar materiales antes de aprobar/);
   assert.match(plansPage, /materials:materialPayload/);
 });
