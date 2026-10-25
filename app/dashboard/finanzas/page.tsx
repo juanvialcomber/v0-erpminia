@@ -47,6 +47,36 @@ type ReviewFeedbackResponse = {
   uniqueInvoices?: number;
 };
 
+type InvoicePoCandidate = {
+  invoiceExternalId?: string;
+  docNumber?: string | null;
+  supplierName?: string | null;
+  outstandingAmount?: number;
+  currency?: string | null;
+  orderNumber?: string | null;
+  score?: number;
+  confidence?: 'strong' | 'review';
+  matchedProducts?: number;
+  invoiceProducts?: number;
+  exactQuantityProducts?: number;
+  exactPriceProducts?: number;
+};
+
+type InvoicePoControlResponse = {
+  summary?: {
+    openTotal?: number;
+    examined?: number;
+    withLines?: number;
+    withCandidate?: number;
+    strong?: number;
+    review?: number;
+    exposureExamined?: number;
+    candidateExposure?: number;
+  };
+  candidates?: InvoicePoCandidate[];
+  readOnly?: boolean;
+};
+
 type Response = {
   overview?: Row | null;
   topAssets?: Row[];
@@ -129,6 +159,16 @@ export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
+  const poControl = useSWR<InvoicePoControlResponse>(
+    '/api/integrations/laudus/invoice-po-control',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el control previo al pago.');
+      return payload;
+    },
+    { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
+  );
   const reviewState = useSWR<ReviewFeedbackResponse>(
     '/api/integrations/laudus/finance-review-feedback',
     async (url: string) => {
@@ -282,6 +322,77 @@ export default function FinanzasPage() {
             <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
           </div>
         ))}
+      </section>
+
+      <section className="rounded-lg border">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control antes de pagar</p>
+            <h2 className="mt-1 text-lg font-semibold">Factura ↔ orden de compra</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              MOTIL busca una OC candidata con evidencia Laudus. Es una ayuda de revisión, no una aprobación de pago.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">Solo lectura</span>
+        </div>
+        {poControl.error ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">
+            El control previo al pago no está disponible en este momento.
+          </p>
+        ) : !poControl.data ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">Analizando obligaciones prioritarias…</p>
+        ) : (
+          <div>
+            <div className="grid gap-px border-b bg-border sm:grid-cols-4">
+              {[
+                ['Analizadas', number(poControl.data.summary?.examined || 0)],
+                ['Con detalle', number(poControl.data.summary?.withLines || 0)],
+                ['Con OC candidata', number(poControl.data.summary?.withCandidate || 0)],
+                ['Exposición candidata', money(poControl.data.summary?.candidateExposure || 0)],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-card px-4 py-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-lg font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+            {(poControl.data.candidates || []).slice(0, 5).length === 0 ? (
+              <p className="px-5 py-5 text-sm text-muted-foreground">
+                No hay candidatas suficientes en las obligaciones analizadas. MOTIL no fuerza una coincidencia.
+              </p>
+            ) : (
+              <div>
+                {(poControl.data.candidates || []).slice(0, 5).map((candidate, index) => (
+                  <div
+                    key={candidate.invoiceExternalId || index}
+                    className="grid gap-2 border-b px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_150px_120px_150px] lg:items-center"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {candidate.supplierName || 'Proveedor'} · Factura {candidate.docNumber || 's/n'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        OC candidata {candidate.orderNumber || 's/n'} · {number(candidate.matchedProducts || 0)}/{number(candidate.invoiceProducts || 0)} productos · {number(candidate.exactPriceProducts || 0)} precios exactos
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {candidate.confidence === 'strong' ? 'Candidata fuerte' : 'Requiere revisión'}
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums lg:text-right">
+                      Evidencia {number(candidate.score || 0)}/100
+                    </span>
+                    <span className="text-sm font-semibold tabular-nums lg:text-right">
+                      {currencyMoney(candidate.outstandingAmount, candidate.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="border-t px-5 py-3 text-xs text-muted-foreground">
+              La exposición candidata no es ahorro. Una diferencia sólo genera valor E3 cuando una revisión humana demuestra una corrección antes del pago.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="rounded-lg border">
