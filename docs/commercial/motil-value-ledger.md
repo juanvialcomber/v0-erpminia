@@ -158,3 +158,14 @@ Estos umbrales habilitan escala inicial, no E4.
 - No demostrado todavía: horas ahorradas, downtime evitado, ahorro CLP, mejora MTTR atribuible o costo evitado.
 - Gate E3: comparar outcomes reales entre cohortes/períodos con evidencia suficiente (MTTR, reincidencia, downtime, costo posterior o tiempo administrativo) y registrar la intervención MOTIL que precedió al cambio.
 - Siguiente medición: capturar baseline de gestión manual/administrativa y outcome post-cierre por activo/OT; priorizar reincidencia y tiempo desde creación → inicio → cierre por ser variables ya trazables.
+
+
+## 2026-10-25 — Mantención: cobertura inter-área
+
+- Flujo observado: 11 OT presentes en `work_order_supply_chain_v1`.
+- Evidencia Bodega: 1 OT con requerimiento de material; 1 con shortage.
+- Evidencia Compras: 0 solicitudes de compra y 0 OC originadas desde el flujo observado.
+- Evidencia Finanzas: 0 compromiso de compra trazado desde OT en esta muestra.
+- Lectura C interna: Mantención y Bodega ya comparten evidencia real; Compras y Finanzas aún no forman una cadena operativa cerrada.
+- Regla: un dominio sólo cuenta como conectado cuando existe evidencia transaccional real. Tener el módulo o la integración disponible no eleva C.
+- Siguiente salto de valor: material shortage de OT -> solicitud de compra -> OC -> recepción/instalación -> costo final de OT -> validación financiera.
