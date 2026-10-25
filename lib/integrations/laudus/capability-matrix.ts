@@ -17,6 +17,7 @@ export type LaudusCapabilityRow = LaudusCapability & {
   motilModule: 'Finanzas' | 'Compras' | 'Bodega' | 'Activos' | 'Personas' | 'Comercial' | 'Tributario' | 'Por evaluar';
   value: string;
   status: 'connector_ready' | 'available' | 'evaluate';
+  priority: number;
 };
 
 const READY_PATHS = new Set([
@@ -44,6 +45,21 @@ function moduleFor(capability: LaudusCapability): LaudusCapabilityRow['motilModu
     }
     default: return 'Por evaluar';
   }
+}
+
+function priorityFor(capability: LaudusCapability): number {
+  const text = (capability.path + ' ' + capability.tags.join(' ')).toLowerCase();
+  if (/reconciliation\/bankstatementnotinjournal|reconciliation\/journalnotinbankstatement/.test(text)) return 100;
+  if (/purchases\/invoices\/.+(payments|tracefrom|traceto)|purchases\/invoices\/ledger/.test(text)) return 98;
+  if (/profitandloss|balancesheet|accounting\/ledger/.test(text)) return 96;
+  if (/bankstatements\/list/.test(text)) return 95;
+  if (/products\/.+kardex|products\/stock|stockbywarehouses|stocktransfers/.test(text)) return 94;
+  if (/purchases\/orders\/.+(traceto|tracefrom|quantitydelivered)|purchases\/waybills\/.+(traceto|tracefrom|quantitydelivered)/.test(text)) return 92;
+  if (/fixedassets\/depreciation|fixedassets\/list/.test(text)) return 90;
+  if (/dte\/(status|pending)/.test(text)) return 88;
+  if (/costcenters\/list|suppliers\/list|products\/list|warehouses\/list/.test(text)) return 80;
+  if (/recipes\/list|inventories\/list/.test(text)) return 72;
+  return 40;
 }
 
 function valueFor(capability: LaudusCapability): string {
@@ -123,7 +139,8 @@ export async function loadLaudusCapabilityMatrix() {
       : capability.domain === 'unknown'
         ? 'evaluate'
         : 'available',
-  }));
+    priority: priorityFor(capability),
+  })).sort((a, b) => b.priority - a.priority || a.path.localeCompare(b.path));
 
   const byDomain = rows.reduce<Record<string, number>>((acc, row) => {
     acc[row.domain] = (acc[row.domain] || 0) + 1;
