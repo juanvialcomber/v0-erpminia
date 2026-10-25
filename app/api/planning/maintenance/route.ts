@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
 
   const weeklySummary = {
     total: weeklyDecisions.length,
-    critical: weeklyDecisions.filter((row: any) => row.priority === 'P1 - VENCIDO' || row.priority === 'P2 - INMEDIATO').length,
+    critical: weeklyDecisions.filter((row: any) => row.evidenceFreshness !== 'stale' && (row.priority === 'P1 - VENCIDO' || row.priority === 'P2 - INMEDIATO')).length,
     scheduled: weeklyDecisions.filter((row: any) => row.state === 'scheduled').length,
     blockedMaterials: weeklyDecisions.filter((row: any) => row.state === 'blocked_materials').length,
     ready: weeklyDecisions.filter((row: any) => row.state === 'ready').length,
