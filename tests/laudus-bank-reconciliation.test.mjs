@@ -9,6 +9,7 @@ test('bank reconciliation uses Laudus read-only reconciliation endpoints', () =>
   assert.match(client, /bankStatementNotInJournal/);
   assert.match(client, /journalNotInBankStatement/);
   assert.match(client, /includeOtherBankStatements/);
+  assert.match(client, /dateTo.*DESC/s);
   assert.match(client, /persisted: false/);
 });
 
