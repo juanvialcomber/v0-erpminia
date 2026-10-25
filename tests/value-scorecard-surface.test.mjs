@@ -138,3 +138,13 @@ test('internal maintenance value page shows L E C gates', () => {
   assert.match(page, /L4 en calibración/);
   assert.match(page, /Cadena incompleta/);
 });
+
+
+test('maintenance value gates link to the workflow that produces the missing evidence', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Generar evidencia L/);
+  assert.match(page, /Completar outcomes E/);
+  assert.match(page, /Cerrar cadena C/);
+  assert.match(page, /dashboard\/mantenimiento\/planificacion/);
+  assert.match(page, /dashboard\/compras/);
+});
