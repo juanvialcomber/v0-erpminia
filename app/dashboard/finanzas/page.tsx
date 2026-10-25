@@ -89,6 +89,18 @@ const currencyMoney = (value: unknown, currency: unknown) => {
 const number = (value: unknown) =>
   amount(value) === null ? '—' : new Intl.NumberFormat('es-CL').format(amount(value)!);
 
+const shortDate = (value: unknown) => {
+  if (typeof value !== 'string' || !value) return 'Sin vencimiento';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Fecha por revisar';
+  return new Intl.DateTimeFormat('es-CL', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'America/Santiago',
+  }).format(date);
+};
+
 const concentrationConfig: Record<
   ConcentrationKey,
   { label: string; labelKey: string; amountKey: string }
@@ -230,7 +242,7 @@ export default function FinanzasPage() {
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground md:text-right">
-                  {item.due_date ? `Vence ${item.due_date}` : 'Sin vencimiento'}
+                  {item.due_date ? `Vence ${shortDate(item.due_date)}` : 'Sin vencimiento'}
                 </span>
                 <span className="text-sm font-semibold tabular-nums md:text-right">
                   {currencyMoney(item.outstanding_amount, item.currency)}
