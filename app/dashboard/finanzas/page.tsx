@@ -316,22 +316,22 @@ export default function FinanzasPage() {
     { label: 'Prioridad', amount: pendingAttentionAmount },
   ];
   const nextDueDate = typeof primaryForecast?.next_due_date === 'string' ? primaryForecast.next_due_date : null;
+  const bankStatementDate = bankReconciliation.data?.bankStatement?.dateTo || null;
+  const bankStatementAgeDays = bankStatementDate ? Math.max(0, -Number(daysUntil(bankStatementDate) || 0)) : null;
+  const bankStatementIsHistorical = bankStatementAgeDays !== null && bankStatementAgeDays > 90;
+
   const nextDueDays = daysUntil(nextDueDate);
   const overdueRatio =
     Number(laudusSummary.open_amount || 0) > 0
       ? Number(laudusSummary.overdue_amount || 0) / Number(laudusSummary.open_amount || 0)
       : null;
+  const forecastOpenPayables = Number(primaryForecast?.open_payables || 0);
+  const forecastNoDueDateCount = Number(primaryForecast?.no_due_date_count || 0);
   const forecastCoverage =
-    Number(laudusSummary.open_count || 0) > 0
-      ? Math.max(
-          0,
-          Math.min(
-            1,
-            (Number(laudusSummary.open_count || 0) - Number(laudusSummary.no_due_date_count || 0)) /
-              Number(laudusSummary.open_count || 0),
-          ),
-        )
+    forecastOpenPayables > 0
+      ? Math.max(0, Math.min(1, (forecastOpenPayables - forecastNoDueDateCount) / forecastOpenPayables))
       : null;
+  const hasCashProjection = cashProjection.some((row) => Number(row.amount || 0) > 0);
 
   const intelligenceSignal =
     Number(laudusSummary.no_due_date_count || 0) > 0
@@ -528,13 +528,25 @@ export default function FinanzasPage() {
           <div className="rounded-lg border p-5">
             <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">ETA financiero</p></div>
             <p className="mt-3 text-3xl font-semibold tracking-tight">
-              {nextDueDays === null ? '—' : nextDueDays < 0 ? `${number(Math.abs(nextDueDays))} días vencido` : nextDueDays === 0 ? 'Hoy' : `${number(nextDueDays)} días`}
+              {forecastOpenPayables === 0
+                ? 'Sin CxP abiertas'
+                : nextDueDays === null
+                  ? 'Fecha pendiente'
+                  : nextDueDays < 0
+                    ? `${number(Math.abs(nextDueDays))} días vencido`
+                    : nextDueDays === 0
+                      ? 'Hoy'
+                      : `${number(nextDueDays)} días`}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {nextDueDate ? `Próximo vencimiento registrado: ${shortDate(nextDueDate)}` : 'Sin próximo vencimiento disponible en el forecast.'}
+              {forecastOpenPayables === 0
+                ? 'No hay CxP aprobadas pendientes en MOTIL para proyectar.'
+                : nextDueDate
+                  ? `Próximo vencimiento registrado: ${shortDate(nextDueDate)}`
+                  : 'Hay obligaciones abiertas sin próximo vencimiento utilizable.'}
             </p>
             <p className="mt-3 text-xs text-muted-foreground">
-              Cobertura de fechas: {forecastCoverage === null ? '—' : new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(forecastCoverage)}
+              Cobertura de fechas: {forecastCoverage === null ? 'Sin universo proyectable' : new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(forecastCoverage)}
             </p>
           </div>
 
@@ -611,10 +623,10 @@ export default function FinanzasPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyección</p>
             <h2 className="mt-1 text-lg font-semibold">Caja a 90 días</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Obligaciones por horizonte de vencimiento · {forecastCurrency}. Es forecast contractual, no predicción estadística.</p>
+            <p className="mt-1 text-xs text-muted-foreground">CxP aprobadas en MOTIL por horizonte de vencimiento · {forecastCurrency}. Separadas de la exposición histórica Laudus.</p>
           </div>
-          {cashProjection.length === 0 ? (
-            <p className="py-10 text-sm text-muted-foreground">Sin obligaciones con vencimiento suficiente para proyectar.</p>
+          {!hasCashProjection ? (
+            <p className="py-10 text-sm text-muted-foreground">Sin CxP aprobadas pendientes en MOTIL para proyectar a 90 días.</p>
           ) : (
             <div className="mt-4 h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -887,6 +899,7 @@ export default function FinanzasPage() {
             {bankReconciliation.data.bankStatement ? (
               <p className="border-t px-5 py-3 text-xs text-muted-foreground">
                 Fuente: Laudus · última cartola disponible · {shortDate(bankReconciliation.data.bankStatement.dateFrom)} → {shortDate(bankReconciliation.data.bankStatement.dateTo)}.
+                {bankStatementIsHistorical ? ' Evidencia histórica: no representa el saldo bancario actual.' : ''}
               </p>
             ) : null}
           </div>
