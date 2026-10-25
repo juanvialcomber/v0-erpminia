@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history] = await Promise.all([
+    const [current, history, financeReviews] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -25,13 +25,30 @@ export async function GET(request: NextRequest) {
         p_organization_id: context.organizationId,
         p_limit: 90,
       }),
+      context.supabase
+        .from('laudus_finance_review_feedback_service_v1')
+        .select('decision,created_at')
+        .eq('organization_id', context.organizationId)
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
     if (current.error) throw current.error;
     if (history.error) throw history.error;
+    if (financeReviews.error) throw financeReviews.error;
+
+    const financeRows = financeReviews.data || [];
+    const financeReview = {
+      total: financeRows.length,
+      reviewed: financeRows.filter((row: any) => row.decision === 'accepted').length,
+      deferred: financeRows.filter((row: any) => row.decision === 'deferred').length,
+      rejected: financeRows.filter((row: any) => row.decision === 'rejected').length,
+      latestAt: financeRows[0]?.created_at || null,
+    };
 
     return NextResponse.json({
       current: current.data || null,
+      financeReview,
       history: history.data || null,
       definitions: {
         workflow: {
