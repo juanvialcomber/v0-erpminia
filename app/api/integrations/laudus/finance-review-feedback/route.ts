@@ -6,6 +6,37 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 const decisions = new Set(['accepted', 'rejected', 'deferred']);
 
+export async function GET(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (!access.authorized) return access.response;
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const result = await context.supabase
+    .from('laudus_finance_review_feedback_service_v1')
+    .select('purchase_invoice_external_id,decision,reason,actor_name,created_at')
+    .eq('organization_id', context.organizationId)
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (result.error) {
+    console.error('[laudus/finance-review-feedback:get]', result.error);
+    return NextResponse.json({ error: 'No fue posible cargar las revisiones.' }, { status: 500 });
+  }
+
+  const latestByInvoice = new Map<string, any>();
+  for (const row of result.data || []) {
+    const key = String(row.purchase_invoice_external_id || '');
+    if (key && !latestByInvoice.has(key)) latestByInvoice.set(key, row);
+  }
+
+  return NextResponse.json({
+    reviews: Array.from(latestByInvoice.values()),
+    uniqueInvoices: latestByInvoice.size,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
   if (!access.authorized) return access.response;
