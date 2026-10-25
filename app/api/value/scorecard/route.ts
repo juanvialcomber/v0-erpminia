@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         .from('audit_log')
         .select('action,resource_identifier,new_values,created_at,user_id')
         .eq('organization_id', context.organizationId)
-        .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened'])
+        .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened','maintenance_standard_plan_decision'])
         .order('created_at', { ascending: false })
         .limit(2000),
     ]);
@@ -271,6 +271,24 @@ export async function GET(request: NextRequest) {
       0,
     );
 
+    const standardPlanDecisionRows = planningEvidenceRows.filter(
+      (row: any) => row.action === 'maintenance_standard_plan_decision',
+    );
+    const motilStandardPlanDecisions = standardPlanDecisionRows.filter(
+      (row: any) => row.new_values?.proposal_source === 'motil',
+    );
+    const standardPlanDecisionCycles = motilStandardPlanDecisions
+      .map((row: any) => Number(row.new_values?.decision_cycle_seconds))
+      .filter((value: number) => Number.isFinite(value) && value >= 0)
+      .sort((a: number, b: number) => a - b);
+    const standardPlanCycleMidpoint = Math.floor(standardPlanDecisionCycles.length / 2);
+    const medianStandardPlanDecisionSeconds =
+      standardPlanDecisionCycles.length === 0
+        ? null
+        : standardPlanDecisionCycles.length % 2 === 0
+          ? Math.round((standardPlanDecisionCycles[standardPlanCycleMidpoint - 1] + standardPlanDecisionCycles[standardPlanCycleMidpoint]) / 2)
+          : standardPlanDecisionCycles[standardPlanCycleMidpoint];
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -315,6 +333,22 @@ export async function GET(request: NextRequest) {
         latestAt: planningEvidenceRows[0]?.created_at || null,
         evidenceLevel: planningDecisions.length >= 20 ? 'E2' : planningDecisions.length > 0 ? 'E1' : 'E0',
         semantics: 'human engagement with weekly decisions prepared by MOTIL; not acceptance, saved time, or economic impact',
+      },
+      standardPlanLearning: {
+        motilDecisions: motilStandardPlanDecisions.length,
+        approved: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'approved').length,
+        rejected: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'rejected').length,
+        acceptanceRatePct:
+          motilStandardPlanDecisions.length > 0
+            ? Math.round(
+                (motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'approved').length /
+                  motilStandardPlanDecisions.length) *
+                  100,
+              )
+            : null,
+        medianDecisionCycleSeconds: medianStandardPlanDecisionSeconds,
+        evidenceLevel: motilStandardPlanDecisions.length >= 20 ? 'E2' : motilStandardPlanDecisions.length > 0 ? 'E1' : 'E0',
+        semantics: 'human outcome on MOTIL-generated standard plan proposals; acceptance is calibration evidence, not economic impact',
       },
       supplyChain: {
         workOrders: supplyRows.length,
