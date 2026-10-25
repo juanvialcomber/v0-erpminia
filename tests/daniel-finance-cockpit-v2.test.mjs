@@ -57,3 +57,12 @@ test('Daniel sees decision-grade aging and pressure charts instead of decorative
   assert.match(page,/No supone pagos ni es una predicción estadística/);
   assert.match(page,/adicionales pasarían a vencido dentro de 60 días si no cambia el estado actual/);
 });
+
+
+test('asset economics keeps depreciation monetary values gated by verified acquisition cost',()=>{
+  assert.match(page,/Economía del activo/);
+  assert.match(page,/Vida útil vs costo de mantenimiento/);
+  assert.match(page,/Depreciación CLP bloqueada/);
+  assert.match(page,/MOTIL no reparte el total de una factura entre activos sin evidencia/);
+  assert.match(page,/vida útil calendario consumida/);
+});
