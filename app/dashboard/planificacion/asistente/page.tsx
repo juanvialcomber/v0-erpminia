@@ -25,7 +25,7 @@ type AssistantResponse = {
 const QUICK = [
   '¿Qué debo atender hoy?',
   '¿Qué equipos P1 o P2 debo programar primero?',
-  '¿Qué datos de mi plan todavía requieren reconciliación?',
+  'Proponme hasta 3 planes estándar que valga la pena preparar esta semana, usando sólo evidencia real de planificación e historial de OT.',
   '¿Qué bloqueos de materiales o compras afectan mantenimiento?',
 ];
 
@@ -65,7 +65,7 @@ export default function PlanningAssistantPage() {
       <PageHeaderContent>
         <PageHeaderEyebrow>Planning Intelligence · Ariel López</PageHeaderEyebrow>
         <PageHeaderTitle>Asistente de planificación</PageHeaderTitle>
-        <PageHeaderDescription>Copiloto transversal con datos reales de Mantenimiento, Producción, Bodega y Compras. Recomienda qué revisar y programar; Ariel mantiene la decisión final.</PageHeaderDescription>
+        <PageHeaderDescription>Copiloto transversal con datos reales de Mantenimiento, Producción, Bodega y Compras. Recomienda qué revisar, programar y convertir en plan estándar; Ariel mantiene la decisión final.</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
         <Button variant="outline" asChild><Link href="/dashboard/planificacion"><ArrowLeft className="h-4 w-4"/>Planificación</Link></Button>
@@ -93,6 +93,13 @@ export default function PlanningAssistantPage() {
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Consultas rápidas</h2>
           <div className="mt-3 space-y-2">{QUICK.map((item) => <Button key={item} variant="outline" className="h-auto w-full justify-start whitespace-normal py-2 text-left" onClick={() => void ask(item)} disabled={loading}>{item}</Button>)}</div>
+        </section>
+        <section className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">Planes estándar</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Cuando una propuesta tenga sentido, Ariel puede abrir el registro de planes, completar los datos faltantes y aprobarla antes de usarla.</p>
+          <Button variant="outline" className="mt-3 w-full" asChild>
+            <Link href="/dashboard/mantenimiento/planes-estandar">Abrir planes estándar</Link>
+          </Button>
         </section>
         <section className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Calidad de datos</h2>
