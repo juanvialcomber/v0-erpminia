@@ -87,6 +87,26 @@ type ApiResponse = {
     workflowLevel?: number;
     connectedDomains?: string[];
     connectedDomainCount?: number;
+    weeklyPlanning?: {
+      sessions?: number;
+      decisionsOpened?: number;
+      uniqueAssetsEngaged?: number;
+      preparedDecisionCount?: number;
+      medianDecisionLatencySeconds?: number | null;
+      actions?: Record<string, number>;
+      latestAt?: string | null;
+      evidenceLevel?: string;
+      semantics?: string;
+    };
+    standardPlanLearning?: {
+      motilDecisions?: number;
+      approved?: number;
+      rejected?: number;
+      acceptanceRatePct?: number | null;
+      medianDecisionCycleSeconds?: number | null;
+      evidenceLevel?: string;
+      semantics?: string;
+    };
     supplyChain?: {
       workOrders?: number;
       withMaterials?: number;
@@ -96,6 +116,17 @@ type ApiResponse = {
       withPartsInstalled?: number;
       procurementCommitment?: number;
       tracedPartsCost?: number;
+      funnel?: {
+        workOrdersObserved?: number;
+        withRequirements?: number;
+        withShortage?: number;
+        withRequest?: number;
+        withOrder?: number;
+        withDeliveredOrder?: number;
+        withInstalledParts?: number;
+        closedWithOpenShortage?: number;
+        semantics?: string;
+      };
     };
     semantics?: string;
   } | null;
@@ -179,6 +210,9 @@ export default function ValueScorecardPage() {
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
+  const weeklyPlanning = maintenanceValue.weeklyPlanning || {};
+  const standardPlanLearning = maintenanceValue.standardPlanLearning || {};
+  const supplyFunnel = maintenanceValue.supplyChain?.funnel || {};
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -326,6 +360,71 @@ export default function ValueScorecardPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
+        </div>
+      </section>
+
+      <section aria-label="Planificación semanal asistida" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Ariel · decisión asistida</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Planificación semanal aprendiendo con uso real</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mide interacción y calibración humana. No convierte apertura, aprobación o velocidad de decisión en ahorro.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ['Sesiones', weeklyPlanning.sessions || 0],
+            ['Decisiones abiertas', weeklyPlanning.decisionsOpened || 0],
+            ['Activos revisados', weeklyPlanning.uniqueAssetsEngaged || 0],
+            ['Planes MOTIL decididos', standardPlanLearning.motilDecisions || 0],
+            ['Aceptación planes MOTIL', standardPlanLearning.acceptanceRatePct == null ? null : standardPlanLearning.acceptanceRatePct],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="bg-card px-5 py-5">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {value == null ? '—' : label === 'Aceptación planes MOTIL' ? `${number(value)}%` : number(value)}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-px border-t bg-border md:grid-cols-2">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Mediana hasta siguiente acción</p>
+            <p className="mt-1 text-xl font-semibold">{weeklyPlanning.medianDecisionLatencySeconds == null ? '—' : `${number(weeklyPlanning.medianDecisionLatencySeconds)} s`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Desde apertura de Planificación semanal hasta que Ariel abre una acción preparada por MOTIL.</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Mediana propuesta MOTIL → decisión</p>
+            <p className="mt-1 text-xl font-semibold">{standardPlanLearning.medianDecisionCycleSeconds == null ? '—' : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(Number(standardPlanLearning.medianDecisionCycleSeconds) / 3600)} h`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Aprobación o descarte humano. Evidencia de calibración L4, no impacto económico.</p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Funnel inter-área de Mantención" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">C · criticidad conectada</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Mantención → Compras → recepción → instalación</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Cuenta eventos reales de la cadena. Un módulo disponible no cuenta como conexión.</p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-7">
+          {[
+            ['OT observadas', supplyFunnel.workOrdersObserved || 0],
+            ['Con requerimientos', supplyFunnel.withRequirements || 0],
+            ['Con shortage', supplyFunnel.withShortage || 0],
+            ['Con solicitud', supplyFunnel.withRequest || 0],
+            ['Con OC', supplyFunnel.withOrder || 0],
+            ['Con recepción', supplyFunnel.withDeliveredOrder || 0],
+            ['Con instalación', supplyFunnel.withInstalledParts || 0],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="bg-card px-4 py-4">
+              <p className="text-[11px] text-muted-foreground">{label}</p>
+              <p className="mt-1 text-xl font-semibold">{number(value)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="border-t px-5 py-4 text-xs text-muted-foreground">
+          Deuda histórica detectada: {number(supplyFunnel.closedWithOpenShortage || 0)} OT cerrada(s) conservan shortages abiertos. Se muestran como deuda de calidad de datos, no como cumplimiento actual.
         </div>
       </section>
 
