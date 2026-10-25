@@ -52,27 +52,12 @@ export default function FinanzasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end"><Link href="/dashboard/finanzas/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Calendario del área →</Link></div>
       <section className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Finanzas</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Costo, compromisos y caja en una sola vista, sin mezclar conceptos.</p></div>
-        <Link href="/dashboard/finanzas/trazabilidad" className="inline-flex h-9 w-fit items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"><FileSearch className="h-4 w-4"/>Ver trazabilidad</Link>
+        <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Decisiones financieras</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Primero lo que requiere acción. Evidencia y contexto técnico quedan disponibles sin ocupar el primer vistazo.</p></div>
+        <div className="flex flex-wrap gap-2"><a href="#prioridades-financieras" className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Revisar prioridades</a><Link href="/dashboard/finanzas/calendario" className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm font-medium text-foreground hover:bg-muted">Calendario</Link></div>
       </section>
 
-      <DataSourceStatusStrip
-        reviewHref="/dashboard/calidad-datos"
-        sources={[
-          sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
-          sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: conexión en verificación; el estado se actualiza con evidencia real.' }),
-          { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
-        ]}
-      />
-
-      <LaudusFinanceReadinessCard />
-
-      <LaudusAccountingReadinessCard />
-
-      <section className="space-y-3 border-t pt-5" aria-label="Prioridades financieras">
+      <section id="prioridades-financieras" className="space-y-3 pt-1" aria-label="Prioridades financieras">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Qué requiere atención</h2>
@@ -131,6 +116,21 @@ export default function FinanzasPage() {
           </div>)}
         </div> : null}
         {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && bankReconciliation.bankStatement ? <p className="text-xs text-muted-foreground">Cartola evaluada: {bankReconciliation.bankStatement.dateFrom || 'sin inicio'} → {bankReconciliation.bankStatement.dateTo || 'sin cierre'} · Laudus.</p> : null}
+      </section>
+
+      <section className="space-y-4 border-t pt-5" aria-label="Fuentes y preparación financiera">
+        <div><h2 className="text-lg font-semibold">Fuentes y preparación</h2><p className="text-sm text-muted-foreground">Detalle técnico y cobertura para auditoría. No bloquea el primer vistazo.</p></div>
+        <DataSourceStatusStrip
+          reviewHref="/dashboard/calidad-datos"
+          sources={[
+            sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
+            sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
+            sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: estado calculado con evidencia real.' }),
+            { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
+          ]}
+        />
+        <div className="grid gap-4 xl:grid-cols-2"><LaudusFinanceReadinessCard /><LaudusAccountingReadinessCard /></div>
+        <div className="flex flex-wrap gap-4 text-sm"><Link href="/dashboard/finanzas/trazabilidad" className="font-medium text-primary hover:underline"><FileSearch className="mr-1 inline h-4 w-4"/>Ver trazabilidad</Link><Link href="/dashboard/finanzas/fuentes" className="font-medium text-primary hover:underline">Ver fuentes</Link></div>
       </section>
 
       <DataReceptionReadiness
