@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
 
 type Row = Record<string, string | number | null>;
@@ -140,6 +140,18 @@ type Response = {
     maintenanceMovements?: number | null;
     lastMaintenanceCostDate?: string | null;
   }>;
+  assetReconciliationOpportunities?: Array<{
+    canonicalAssetId?: string | null;
+    canonicalAssetCode?: string | null;
+    canonicalAssetName?: string | null;
+    candidateCount?: number;
+    exactIdentifierCount?: number;
+    evidenceLevels?: string[];
+    laudusNames?: string[];
+    maintenanceCost?: number;
+    maintenanceMovements?: number;
+    lastMaintenanceCostDate?: string | null;
+  }>;
   assetEconomicsSummary?: {
     laudusAssets?: number;
     candidateRows?: number;
@@ -149,6 +161,8 @@ type Response = {
     depreciationBlocked?: number;
     withMaintenanceHistory?: number;
     fullyConsumedByCalendar?: number;
+    reconciliationOpportunities?: number;
+    reconciliationOpportunityMaintenanceCost?: number;
   };
 };
 
@@ -404,6 +418,21 @@ export default function FinanzasPage() {
     exactPlateSupport: Boolean(row.exactPlateSupport),
   }));
   const assetEconomicsSummary = data?.assetEconomicsSummary || {};
+  const assetReconciliationOpportunities = (data?.assetReconciliationOpportunities || [])
+    .map((row) => ({
+      canonicalAssetId: String(row.canonicalAssetId || ''),
+      code: String(row.canonicalAssetCode || ''),
+      name: String(row.canonicalAssetName || 'Activo por revisar'),
+      candidateCount: Number(row.candidateCount || 0),
+      exactIdentifierCount: Number(row.exactIdentifierCount || 0),
+      evidenceLevels: Array.isArray(row.evidenceLevels) ? row.evidenceLevels.map(String) : [],
+      laudusNames: Array.isArray(row.laudusNames) ? row.laudusNames.map(String) : [],
+      maintenanceCost: Number(row.maintenanceCost || 0),
+      maintenanceMovements: Number(row.maintenanceMovements || 0),
+      lastMaintenanceCostDate: row.lastMaintenanceCostDate || null,
+    }))
+    .filter((row) => row.maintenanceCost > 0)
+    .slice(0, 6);
   const todayMs = Date.now();
   const retirementHorizon = (months: number) =>
     assetEconomics.filter((row) => {
@@ -844,92 +873,79 @@ export default function FinanzasPage() {
           ))}
         </div>
 
-        {assetEconomics.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-muted-foreground">
-            Aún no hay candidatos con evidencia suficiente para cruzar vida útil y mantenimiento.
-          </p>
-        ) : (
-          <div className="grid gap-4 p-5 xl:grid-cols-[1.5fr_1fr]">
-            <div>
-              <div className="h-80">
+        <div className="grid gap-4 p-5 xl:grid-cols-[1.2fr_1fr]">
+          <div>
+            <div className="mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Identidad fuerte</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Vida útil calendario de los activos con mejor evidencia de identidad. No se mezcla con costos de activos todavía ambiguos.
+              </p>
+            </div>
+            {assetEconomics.length === 0 ? (
+              <p className="py-10 text-sm text-muted-foreground">Aún no hay matches fuertes suficientes.</p>
+            ) : (
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart margin={{ top: 12, right: 18, bottom: 12, left: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      dataKey="lifeConsumedPct"
-                      name="Vida consumida"
-                      unit="%"
-                      domain={[0, 150]}
-                      tickLine={false}
-                      axisLine={false}
-                      fontSize={11}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="maintenanceCost"
-                      name="Mantención acumulada"
-                      tickFormatter={(value) => compactClp(Number(value))}
-                      tickLine={false}
-                      axisLine={false}
-                      width={68}
-                      fontSize={11}
-                    />
-                    <ZAxis type="number" dataKey="maintenanceMovements" range={[70, 300]} name="Movimientos" />
+                  <BarChart data={assetEconomics} layout="vertical" margin={{ top: 8, right: 12, left: 26, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" domain={[0, 150]} tickFormatter={(value) => `${number(Number(value))}%`} tickLine={false} axisLine={false} fontSize={11} />
+                    <YAxis type="category" dataKey="name" width={165} tickLine={false} axisLine={false} fontSize={10} />
                     <Tooltip
-                      cursor={{ strokeDasharray: '3 3' }}
-                      formatter={(value, name) => {
-                        if (name === 'Vida consumida') return [`${number(Number(value))}%`, name];
-                        if (name === 'Mantención acumulada') return [money(Number(value)), name];
-                        return [number(Number(value)), name];
-                      }}
-                      labelFormatter={(_, payload) => {
-                        const point = payload?.[0]?.payload as { name?: string; code?: string } | undefined;
-                        return point ? [point.name, point.code].filter(Boolean).join(' · ') : '';
+                      formatter={(value) => [`${number(Math.round(Number(value)))}%`, 'Vida útil consumida']}
+                      labelFormatter={(label) => {
+                        const row = assetEconomics.find((item) => item.name === label);
+                        return row ? [label, row.code].filter(Boolean).join(' · ') : String(label);
                       }}
                     />
                     <ReferenceLine x={100} strokeDasharray="5 4" />
-                    <Scatter name="Activos candidatos" data={assetEconomics} fill="var(--primary)" />
-                  </ScatterChart>
+                    <Bar dataKey="lifeConsumedPct" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Derecha de 100% = vida útil calendario consumida. Más arriba = mayor costo histórico de mantenimiento en MOTIL. El tamaño refleja cantidad de movimientos de costo.
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              La línea de 100% marca el fin de vida útil calendario según Laudus. No significa automáticamente reemplazo.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Destrabar valor primero</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Activos MOTIL con mayor costo histórico y múltiples candidatos Laudus. Resolver identidad habilita depreciación y reparar vs reemplazar.
               </p>
             </div>
-
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Casos a revisar</p>
-              {[...assetEconomics]
-                .sort((a, b) => (b.lifeConsumedPct * Math.max(b.maintenanceCost, 1)) - (a.lifeConsumedPct * Math.max(a.maintenanceCost, 1)))
-                .slice(0, 5)
-                .map((row) => (
-                  <div key={`${row.code}-${row.name}`} className="rounded-md border px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.code || 'Sin código'} · {row.exactPlateSupport ? 'patente exacta' : 'candidato fuerte'}
-                        </p>
-                      </div>
-                      <span className="text-sm font-semibold">{number(Math.round(row.lifeConsumedPct))}%</span>
+            {assetReconciliationOpportunities.length === 0 ? (
+              <p className="py-6 text-sm text-muted-foreground">Sin conciliaciones económicas priorizables.</p>
+            ) : (
+              assetReconciliationOpportunities.slice(0, 5).map((row) => (
+                <div key={row.canonicalAssetId || `${row.code}-${row.name}`} className="rounded-md border px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{row.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {row.code || 'Sin código'} · {number(row.candidateCount)} candidatos Laudus
+                      </p>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>Mantención histórica</span>
-                      <span className="font-medium text-foreground">{money(row.maintenanceCost)}</span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>Retiro calendario</span>
-                      <span>{row.estimatedRetirementDate ? shortDate(row.estimatedRetirementDate) : 'Por revisar'}</span>
-                    </div>
+                    <span className="text-sm font-semibold tabular-nums">{money(row.maintenanceCost)}</span>
                   </div>
-                ))}
-              <div className="rounded-md bg-muted/40 px-3 py-3 text-xs leading-5 text-muted-foreground">
-                <span className="font-medium text-foreground">Depreciación CLP bloqueada.</span> Falta costo de adquisición verificable y confirmación de identidad por activo. MOTIL no reparte el total de una factura entre activos sin evidencia.
-              </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span>Costo histórico MOTIL</span>
+                    <span>{number(row.maintenanceMovements)} movimientos</span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {row.exactIdentifierCount > 0
+                      ? `${number(row.exactIdentifierCount)} candidato(s) con identificador exacto`
+                      : 'Identidad requiere revisión humana'}
+                  </div>
+                </div>
+              ))
+            )}
+            <div className="rounded-md bg-muted/40 px-3 py-3 text-xs leading-5 text-muted-foreground">
+              <span className="font-medium text-foreground">Depreciación CLP bloqueada.</span> Falta costo de adquisición verificable y confirmación de identidad por activo. MOTIL no reparte el total de una factura entre activos sin evidencia.
             </div>
           </div>
-        )}
+        </div>
       </section>
 
       <section id="revisar-prioridades" className="rounded-lg border">
