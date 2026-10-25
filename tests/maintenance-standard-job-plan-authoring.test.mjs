@@ -75,3 +75,18 @@ test('standard plan application during OT creation is idempotent and keeps mater
   assert.match(apply,/activeApplication/);
   assert.match(apply,/existingIds/);
 });
+
+
+test('standard plan is validated before a new OT can be inserted', () => {
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts','utf8');
+  const approvalCheck = route.indexOf("plan.status !== 'approved'");
+  const assetCheck = route.indexOf("plan.canonical_asset_id && plan.canonical_asset_id !== canonicalAssetId");
+  const insertOrder = route.indexOf(".from('maintenance_work_orders')\n        .insert({");
+  assert.ok(approvalCheck >= 0);
+  assert.ok(assetCheck >= 0);
+  assert.ok(insertOrder >= 0);
+  assert.ok(approvalCheck < insertOrder);
+  assert.ok(assetCheck < insertOrder);
+  assert.match(route, /planEstimatedHours/);
+  assert.match(route, /plannedHours = Number/);
+});
