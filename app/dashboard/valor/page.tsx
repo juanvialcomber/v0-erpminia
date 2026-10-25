@@ -427,20 +427,20 @@ export default function ValueScorecardPage() {
             Mide interacción y calibración humana. No convierte apertura, aprobación o velocidad de decisión en ahorro.
           </p>
         </div>
-        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
-          {[
-            ['Sesiones', weeklyPlanning.sessions || 0],
-            ['Decisiones abiertas', weeklyPlanning.decisionsOpened || 0],
-            ['Activos revisados', weeklyPlanning.uniqueAssetsEngaged || 0],
-            ['Planes MOTIL decididos', standardPlanLearning.motilDecisions || 0],
-            ['Planes corregidos', standardPlanLearning.editedPlans || 0],
-            ['Aceptación planes MOTIL', standardPlanLearning.acceptanceRatePct == null ? null : standardPlanLearning.acceptanceRatePct],
-            ['Corrección planes MOTIL', standardPlanLearning.correctionRatePct == null ? null : standardPlanLearning.correctionRatePct],
-          ].map(([label, value]) => (
-            <div key={String(label)} className="bg-card px-5 py-5">
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-7">
+          {([
+            { label: 'Sesiones', value: weeklyPlanning.sessions || 0, percent: false },
+            { label: 'Decisiones abiertas', value: weeklyPlanning.decisionsOpened || 0, percent: false },
+            { label: 'Activos revisados', value: weeklyPlanning.uniqueAssetsEngaged || 0, percent: false },
+            { label: 'Planes MOTIL decididos', value: standardPlanLearning.motilDecisions || 0, percent: false },
+            { label: 'Planes corregidos', value: standardPlanLearning.editedPlans || 0, percent: false },
+            { label: 'Aceptación planes MOTIL', value: standardPlanLearning.acceptanceRatePct, percent: true },
+            { label: 'Corrección planes MOTIL', value: standardPlanLearning.correctionRatePct, percent: true },
+          ] as Array<{ label: string; value: number | null | undefined; percent: boolean }>).map(({ label, value, percent }) => (
+            <div key={label} className="bg-card px-5 py-5">
               <p className="text-xs text-muted-foreground">{label}</p>
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {value == null ? '—' : label.includes('planes MOTIL') && (label.startsWith('Aceptación') || label.startsWith('Corrección')) ? `${number(value)}%` : number(value)}
+                {value == null ? '—' : percent ? `${number(value)}%` : number(value)}
               </p>
             </div>
           ))}
