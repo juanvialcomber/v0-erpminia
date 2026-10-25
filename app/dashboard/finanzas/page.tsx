@@ -847,7 +847,7 @@ export default function FinanzasPage() {
         <div className="flex flex-col gap-2 border-b px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Economía del activo</p>
-            <h2 className="mt-1 text-lg font-semibold">Vida útil vs costo de mantenimiento</h2>
+            <h2 className="mt-1 text-lg font-semibold">Vida útil y conciliación económica</h2>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
               Cruce read-only entre candidatos fuertes de activos fijos Laudus y Activo 360. El costo de adquisición aún no está disponible, por lo que MOTIL no calcula valor libro ni depreciación monetaria.
             </p>
@@ -857,13 +857,14 @@ export default function FinanzasPage() {
           </span>
         </div>
 
-        <div className="grid gap-px border-b bg-border sm:grid-cols-5">
+        <div className="grid gap-px border-b bg-border sm:grid-cols-3 xl:grid-cols-6">
           {[
+            ['Matches fuertes', number(assetEconomicsSummary.strongCandidates || 0), 'identidad suficiente para analizar vida útil'],
             ['Vida útil agotada', number(retiredByCalendar), 'según calendario Laudus'],
-            ['Retiro ≤ 12 meses', number(retirementHorizon(12)), 'candidatos fuertes'],
-            ['Retiro ≤ 24 meses', number(retirementHorizon(24)), 'candidatos fuertes'],
+            ['Retiro ≤ 24 meses', number(retirementHorizon(24)), 'matches fuertes'],
             ['Costo base disponible', number(assetEconomicsSummary.withAcquisitionCost || 0), 'requerido para depreciación CLP'],
-            ['Depreciación preparada', number(assetEconomicsSummary.depreciationReady || 0), 'cálculo sólo con costo verificable'],
+            ['Conciliaciones prioritarias', number(assetEconomicsSummary.reconciliationOpportunities || 0), 'con costo histórico MOTIL'],
+            ['Costo histórico por conciliar', money(assetEconomicsSummary.reconciliationOpportunityMaintenanceCost || 0), 'no es ahorro ni valor libro'],
           ].map(([label, value, detail]) => (
             <div key={label} className="bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">{label}</p>
