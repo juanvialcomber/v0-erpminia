@@ -54,3 +54,13 @@ El scorecard existente está preparado para L4, pero la evidencia permanece en E
 - al menos 3 evidencias E3.
 
 Estos umbrales habilitan escala inicial, no E4.
+
+
+## 2026-10-24 — Cockpit Finanzas / Daniel
+
+- Problema previo: la portada mezclaba readiness técnico, calidad de fuentes, regulación, caja, forecast, concentración y trazabilidad en una sola secuencia.
+- Cambio: la portada de Finanzas se reduce a exposición Laudus, vencido, costo reconocido, compras comprometidas, top de revisión, CxP aprobadas en MOTIL y concentración.
+- Regla semántica: exposición Laudus y CxP aprobadas en MOTIL se muestran como universos distintos. Ninguno se presenta como ahorro.
+- Evidencia habilitada: el cockpit usa `motil_laudus_finance_review_queue` para priorizar obligaciones abiertas sin mutar Laudus ni canonicalizar deuda.
+- Adopción: el acceso a `/dashboard/valor` se habilita a usuarios con acceso financiero real, incluido el cargo financiero restringido.
+- Métrica siguiente: registrar decisiones humanas, tiempo de revisión, outcomes y E3 observados.
