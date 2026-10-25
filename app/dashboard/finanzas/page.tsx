@@ -34,6 +34,19 @@ type LaudusReview = {
   reviews?: LaudusReviewItem[];
 };
 
+type ReviewFeedback = {
+  purchase_invoice_external_id?: string;
+  decision?: 'accepted' | 'rejected' | 'deferred';
+  reason?: string | null;
+  actor_name?: string | null;
+  created_at?: string | null;
+};
+
+type ReviewFeedbackResponse = {
+  reviews?: ReviewFeedback[];
+  uniqueInvoices?: number;
+};
+
 type Response = {
   overview?: Row | null;
   topAssets?: Row[];
@@ -116,6 +129,16 @@ export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
+  const reviewState = useSWR<ReviewFeedbackResponse>(
+    '/api/integrations/laudus/finance-review-feedback',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar las revisiones.');
+      return payload;
+    },
+    { revalidateOnFocus: false },
+  );
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -127,6 +150,9 @@ export default function FinanzasPage() {
   const laudus = error ? null : data?.laudusReview || null;
   const laudusSummary = laudus?.summary || {};
   const attention = (laudus?.reviews || []).slice(0, 5);
+  const latestReviewByInvoice = new Map(
+    (reviewState.data?.reviews || []).map((row) => [row.purchase_invoice_external_id, row]),
+  );
 
   const motilOutstanding = treasury.reduce(
     (sum, row) => sum + Number(row.outstanding_amount || 0),
@@ -188,6 +214,7 @@ export default function FinanzasPage() {
             ? 'Caso diferido.'
             : 'Caso marcado como no aplicable.',
       );
+      await reviewState.mutate();
     } catch (cause) {
       setReviewNotice(cause instanceof Error ? cause.message : 'No se pudo registrar la revisión.');
     } finally {
@@ -276,7 +303,11 @@ export default function FinanzasPage() {
           </p>
         ) : (
           <div>
-            {attention.map((item, index) => (
+            {attention.map((item, index) => {
+              const priorReview = item.purchase_invoice_external_id
+                ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
+                : undefined;
+              return (
               <div
                 key={item.purchase_invoice_external_id || `${item.doc_number}-${index}`}
                 className="grid gap-3 border-b px-5 py-4 last:border-b-0 xl:grid-cols-[28px_minmax(0,1fr)_130px_140px_auto] xl:items-center"
@@ -299,14 +330,20 @@ export default function FinanzasPage() {
                   {currencyMoney(item.outstanding_amount, item.currency)}
                 </span>
                 <div className="flex flex-wrap gap-1.5 xl:justify-end">
-                  <button
+                  {priorReview?.decision === 'accepted' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Revisado</span>
+                  ) : null}
+                  {priorReview?.decision === 'rejected' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">No aplica</span>
+                  ) : null}
+                  {priorReview?.decision !== 'accepted' && priorReview?.decision !== 'rejected' ? <button
                     type="button"
                     onClick={() => void recordReview(item, 'accepted')}
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
                     className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                   >
                     Revisado
-                  </button>
+                  </button> : null}
                   <button
                     type="button"
                     onClick={() => void recordReview(item, 'deferred')}
@@ -328,7 +365,8 @@ export default function FinanzasPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
