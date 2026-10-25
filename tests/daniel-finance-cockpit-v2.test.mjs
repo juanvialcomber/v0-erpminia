@@ -64,7 +64,7 @@ test('asset economics keeps depreciation monetary values gated by verified acqui
   assert.match(page,/Vida útil y conciliación económica/);
   assert.match(page,/Depreciación CLP bloqueada/);
   assert.match(page,/MOTIL no reparte el total de una factura entre activos sin evidencia/);
-  assert.match(page,/vida útil calendario consumida/);
+  assert.match(page,/fin de vida útil calendario según Laudus/);
 });
 
 
