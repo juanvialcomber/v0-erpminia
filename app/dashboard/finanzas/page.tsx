@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 6572)
-Total output lines: 629
-
 'use client';
 
 import { useRef, useState } from 'react';
@@ -294,10 +291,140 @@ export default function FinanzasPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Finanzas
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Cuentas por revisar</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Decisiones financieras</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {pendingAttention.length > 0
-              ? 'Revisa las factu…1572 tokens truncated…hase_invoice_external_id || null);
+              ? `${number(pendingAttention.length)} prioridades requieren revisión.`
+              : 'No hay prioridades pendientes en la muestra actual.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="#revisar-prioridades"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+          >
+            Revisar prioridades <ArrowRight className="h-4 w-4" />
+          </a>
+          <Link
+            href="/dashboard/valor"
+            className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
+          >
+            Valor MOTIL
+          </Link>
+        </div>
+      </section>
+
+      {error ? (
+        <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">
+          {error.message}
+        </div>
+      ) : null}
+
+      <section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
+        {[
+          [
+            'Saldo abierto',
+            money(laudusSummary.open_amount),
+            `Laudus · ${number(laudusSummary.open_count)} facturas abiertas`,
+          ],
+          [
+            'Vencido',
+            money(laudusSummary.overdue_amount),
+            `${number(laudusSummary.overdue_count)} facturas`,
+          ],
+          [
+            'Prioridad inmediata',
+            pendingAttentionValue,
+            `${number(pendingAttention.length)} facturas en esta lista`,
+          ],
+        ].map(([label, value, detail]) => (
+          <div key={label} className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              {isLoading || error ? '—' : value}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+          </div>
+        ))}
+      </section>
+
+      <section id="revisar-prioridades" className="rounded-lg border">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Revisar ahora</h2>
+            <p className="text-sm text-muted-foreground">
+              Las tres prioridades de mayor impacto que requieren una decisión.
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-muted-foreground">{number(pendingAttention.length)} pendientes</span>
+            {reviewNotice ? <p className="mt-1 text-xs text-foreground">{reviewNotice}</p> : null}
+          </div>
+        </div>
+        {isLoading ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando facturas...</p>
+        ) : pendingAttention.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">
+            No hay facturas abiertas de Laudus para revisar.
+          </p>
+        ) : (
+          <div>
+            {pendingAttention.map((item, index) => {
+              const priorReview = item.purchase_invoice_external_id
+                ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
+                : undefined;
+              return (
+              <div
+                key={item.purchase_invoice_external_id || `${item.doc_number}-${index}`}
+                className="grid gap-3 border-b px-5 py-4 last:border-b-0 xl:grid-cols-[28px_minmax(0,1fr)_130px_140px_auto] xl:items-center"
+              >
+                <span className="text-xs font-semibold text-muted-foreground">{index + 1}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {item.supplier_name || 'Proveedor sin identificar'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {item.doc_number ? `Factura ${item.doc_number} · ` : ''}
+                    {Number(item.days_overdue || 0) > 0
+                      ? `Atrasada ${number(item.days_overdue)} días`
+                      : !item.due_date
+                        ? 'Falta fecha de vencimiento'
+                        : 'Saldo pendiente de revisión'}
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground md:text-right">
+                  {item.due_date ? `Vence ${shortDate(item.due_date)}` : 'Sin vencimiento'}
+                </span>
+                <span className="text-sm font-semibold tabular-nums xl:text-right">
+                  {currencyMoney(item.outstanding_amount, item.currency)}
+                </span>
+                <div className="flex flex-wrap gap-1.5 xl:justify-end">
+                  {priorReview?.decision === 'accepted' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Ya revisada</span>
+                  ) : null}
+                  {priorReview?.decision === 'rejected' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Sin seguimiento</span>
+                  ) : null}
+                  {priorReview?.decision !== 'accepted' && priorReview?.decision !== 'rejected' ? <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'accepted')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  >
+                    Marcar revisada
+                  </button> : null}
+                  <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'deferred')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    Posponer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingId(item.purchase_invoice_external_id || null);
                       void recordReview(item, 'rejected');
                     }}
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}

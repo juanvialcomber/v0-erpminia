@@ -29,9 +29,9 @@ test('finance executive API exposes forecast tenant scoped through organization 
 });
 
 test('finance cockpit keeps short-term treasury visible without expanding the full forecast',()=>{
-  assert.match(page,/CxP aprobadas en MOTIL/);
-  assert.match(page,/Vence ≤ 7 días/);
-  assert.match(page,/Este universo es distinto de la exposición histórica observada en Laudus/);
+  assert.match(page,/Facturas aprobadas en MOTIL/);
+  assert.match(page,/Vence en 7 días o menos/);
+  assert.match(page,/Estas facturas se gestionan en MOTIL\. Las facturas antiguas de Laudus se muestran por separado\./);
   assert.doesNotMatch(page,/Próx\. 30 días/);
   assert.doesNotMatch(page,/Próx\. 60 días/);
   assert.doesNotMatch(page,/Próx\. 90 días/);

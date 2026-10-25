@@ -8,9 +8,10 @@ const valueApi = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
 const valuePage = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
 
 test('Daniel can record finance review feedback without mutating Laudus or canonical finance',()=>{
-  assert.match(finance,/Revisado/);
+  assert.match(finance,/Ya revisada/);
+  assert.match(finance,/Marcar revisada/);
   assert.match(finance,/Posponer/);
-  assert.match(finance,/No aplica/);
+  assert.match(finance,/Sin seguimiento/);
   assert.match(route,/motil_record_laudus_finance_review_feedback/);
   assert.match(route,/canonicalMutationExecuted: false/);
   assert.match(route,/laudusMutationExecuted: false/);
@@ -19,7 +20,7 @@ test('Daniel can record finance review feedback without mutating Laudus or canon
 
 test('rejected finance review requires a human reason',()=>{
   assert.match(route,/decision === 'rejected' && !reason/);
-  assert.match(finance,/¿Por qué esta prioridad no aplica\?/);
+  assert.match(finance,/¿Por qué esta factura no requiere seguimiento\?/);
 });
 
 test('value scorecard surfaces real finance review adoption separately from ROI',()=>{

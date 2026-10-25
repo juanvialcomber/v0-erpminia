@@ -19,6 +19,6 @@ test('finance quality tasks route to the relevant existing finance workflows', (
   assert.match(inbox, /zero_amount_lines/);
   assert.match(inbox, /finance.*validation|validation.*finance/s);
   assert.match(inbox, /dashboard\/finanzas\/importar\?issue=/);
-  assert.match(financeImport, /Revisar líneas con monto cero/);
-  assert.match(financeImport, /Resolver validación financiera/);
+  assert.match(financeImport, /Hay movimientos con monto cero/);
+  assert.match(financeImport, /Revisar datos financieros/);
 });

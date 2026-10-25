@@ -44,11 +44,11 @@ test('native trace API is Finance scoped and cached briefly',()=>{
 });
 
 test('finance presents native Laudus evidence without overclaiming PO confirmation',()=>{
-  assert.match(page,/Evidencia de factura/);
-  assert.match(page,/Con líneas/);
-  assert.match(page,/Con traza Laudus/);
-  assert.match(page,/Traza Laudus disponible/);
-  assert.match(page,/Sin líneas en la respuesta/);
-  assert.match(page,/no se interpreta automáticamente como orden de compra ni como aprobación de pago/);
+  assert.match(page,/Información de las facturas/);
+  assert.match(page,/Con detalle/);
+  assert.match(page,/Con documentos relacionados/);
+  assert.match(page,/Hay documentos relacionados en Laudus/);
+  assert.match(page,/Laudus no entregó el detalle de los conceptos/);
+  assert.match(page,/Que exista un documento relacionado no significa que la compra o el pago estén aprobados/);
   assert.doesNotMatch(page,/OC confirmada/);
 });

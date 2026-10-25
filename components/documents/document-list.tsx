@@ -345,7 +345,7 @@ export function DocumentList({
                       )}
                       {doc.provenance_status === 'canonical' && (
                         <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-                          Fuente canónica
+                          Documento de referencia
                         </Badge>
                       )}
                       {doc.canonical_section && (

@@ -32,6 +32,6 @@ test('finance executive preserves treasury and aging data while the cockpit stay
   assert.match(executiveRoute,/procurement_accounts_payable_aging_summary_v1/);
   assert.match(executiveRoute,/treasuryAging/);
   assert.match(financePage,/currencyMoney/);
-  assert.match(financePage,/CxP aprobadas en MOTIL/);
+  assert.match(financePage,/Facturas aprobadas en MOTIL/);
   assert.doesNotMatch(financePage,/Aging por proveedor/);
 });

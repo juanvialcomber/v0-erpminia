@@ -8,8 +8,8 @@ test('finance cockpit separates Laudus exposure from canonical MOTIL payables', 
 
   assert.match(api, /motil_laudus_finance_review_queue/);
   assert.match(page, /Saldo abierto/);
-  assert.match(page, /CxP aprobadas en MOTIL/);
-  assert.match(page, /Las obligaciones históricas de Laudus se mantienen separadas de las CxP aprobadas en MOTIL/);
+  assert.match(page, /Facturas aprobadas en MOTIL/);
+  assert.match(page, /Estas facturas se gestionan en MOTIL\. Las facturas antiguas de Laudus se muestran por separado\./);
   assert.match(page, /Revisar ahora/);
   assert.doesNotMatch(page, /Preparado para nuevas fuentes/);
   assert.doesNotMatch(page, /Trazabilidad económica y SERNAGEOMIN/);

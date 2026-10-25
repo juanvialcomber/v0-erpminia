@@ -48,7 +48,7 @@ test('matcher refuses incompatible currencies and uses weighted aggregate price'
 test('finance cockpit keeps deterministic PO matcher out of the interactive surface',()=>{
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
   assert.match(page,/Antes de pagar/);
-  assert.match(page,/Evidencia de factura/);
+  assert.match(page,/Información de las facturas/);
   assert.doesNotMatch(page,/invoice-po-control/);
   assert.doesNotMatch(page,/OC candidata/);
 });
@@ -65,6 +65,6 @@ test('candidate exposure keeps currency boundaries inside the offline matcher on
 
 test('finance cockpit exposes missing source evidence honestly',()=>{
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
-  assert.match(page,/Falta evidencia/);
-  assert.match(page,/Detalle no disponible en la consulta actual/);
+  assert.match(page,/No hay documentos relacionados/);
+  assert.match(page,/No se pudo consultar el detalle/);
 });

@@ -8,17 +8,17 @@ const route = fs.readFileSync('app/api/finance/payables/route.ts','utf8');
 test('treasury exposes one explicit next action',()=>{
   assert.match(page,/Siguiente acción/);
   assert.match(page,/Definir vencimiento/);
-  assert.match(page,/Registrar pago vencido/);
-  assert.match(page,/Conciliar pago/);
+  assert.match(page,/Pagar factura atrasada/);
+  assert.match(page,/Confirmar pago con el banco/);
   assert.match(page,/Sin acción pendiente/);
 });
 
 test('treasury replaces browser prompts with traceable dialogs',()=>{
   assert.doesNotMatch(page,/window\.prompt/);
   assert.match(page,/Referencia de pago/);
-  assert.match(page,/Referencia de conciliación/);
-  assert.match(page,/Notas de conciliación/);
-  assert.match(page,/Confirmar conciliación/);
+  assert.match(page,/Referencia del banco o de contabilidad/);
+  assert.match(page,/Busca el pago en la cartola bancaria o en el registro contable/);
+  assert.match(page,/Confirmar pago/);
 });
 
 test('treasury keeps currencies separate and uses Chile local payment date',()=>{
