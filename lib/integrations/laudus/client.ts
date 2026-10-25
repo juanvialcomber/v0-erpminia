@@ -195,19 +195,57 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
 }
 
 function summarizePayload(payload: unknown) {
-  if (Array.isArray(payload)) return { rows: payload.length, shape: 'array' as const };
+  const fieldsOf = (row: unknown) =>
+    row && typeof row === 'object' && !Array.isArray(row)
+      ? Object.keys(row as Record<string, unknown>).slice(0, 40)
+      : [];
+
+  if (Array.isArray(payload)) {
+    return { rows: payload.length, shape: 'array' as const, sampleFields: fieldsOf(payload[0]) };
+  }
 
   if (payload && typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
     for (const key of ['data', 'items', 'results', 'rows']) {
       if (Array.isArray(record[key])) {
-        return { rows: record[key].length, shape: key };
+        const rows = record[key] as unknown[];
+        return { rows: rows.length, shape: key, sampleFields: fieldsOf(rows[0]) };
       }
     }
-    return { rows: null, shape: 'object' as const };
+    return { rows: null, shape: 'object' as const, sampleFields: Object.keys(record).slice(0, 40) };
   }
 
-  return { rows: null, shape: typeof payload };
+  return { rows: null, shape: typeof payload, sampleFields: [] as string[] };
+}
+
+export async function runLaudusReadOnlyValueProbe() {
+  await getLaudusAccessToken();
+
+  const targets = [
+    ['purchaseInvoices', '/purchases/invoices/list'],
+    ['purchaseOrders', '/purchases/orders/list'],
+    ['purchasePayments', '/purchases/payments/list'],
+    ['bankStatements', '/accounting/bankStatements/list'],
+    ['journalEntries', '/accounting/journal/entries/list'],
+    ['fixedAssets', '/purchases/fixedAssets/list'],
+    ['inventories', '/production/inventories/list'],
+    ['stockTransfers', '/production/stockTransfers/list'],
+  ] as const;
+
+  const results: Record<string, { rows: number | null; shape: string; sampleFields: string[] }> = {};
+
+  for (const [key, path] of targets) {
+    const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
+    results[key] = summarizePayload(payload);
+  }
+
+  return {
+    authenticated: true,
+    calls: 9,
+    persisted: false,
+    redacted: true,
+    results,
+  };
 }
 
 export async function runLaudusReadOnlySmokeTest() {
