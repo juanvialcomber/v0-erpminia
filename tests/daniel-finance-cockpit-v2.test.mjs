@@ -66,3 +66,10 @@ test('asset economics keeps depreciation monetary values gated by verified acqui
   assert.match(page,/MOTIL no reparte el total de una factura entre activos sin evidencia/);
   assert.match(page,/vida útil calendario consumida/);
 });
+
+
+test('asset economics exposes depreciation readiness without fabricating book value',()=>{
+  assert.match(page,/Depreciación preparada/);
+  assert.match(page,/cálculo sólo con costo verificable/);
+  assert.match(page,/Qué activo revisar/);
+});
