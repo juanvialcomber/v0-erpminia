@@ -239,6 +239,7 @@ export default function FinanzasPage() {
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiSources, setAiSources] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -345,22 +346,33 @@ export default function FinanzasPage() {
   const config = concentrationConfig[activeConcentration];
   const rows = rowsByType[activeConcentration].slice(0, 5);
 
-  const analyzeWithMotil = async () => {
+  const analyzeWithMotil = async (message: string) => {
     if (aiLoading) return;
     setAiLoading(true);
     setAiError(null);
+    setAiSources([]);
     try {
       const response = await fetch('/api/intelligence/executive-assistant', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Analiza exclusivamente Finanzas. Resume máximo 3 asuntos de mayor valor para el gerente de finanzas. Para cada uno indica dato observado, por qué importa, incertidumbre o evidencia faltante y siguiente validación humana. No ejecutes acciones y no inventes predicciones.',
-        }),
+        body: JSON.stringify({ message }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudo ejecutar el análisis MOTIL.');
       setAiInsight(typeof payload?.answer === 'string' ? payload.answer : 'Sin análisis disponible.');
+      setAiSources(
+        Array.isArray(payload?.sources)
+          ? payload.sources
+              .map((source: unknown) =>
+                source && typeof source === 'object' && 'source' in source
+                  ? String((source as { source?: unknown }).source || '')
+                  : '',
+              )
+              .filter(Boolean)
+              .slice(0, 6)
+          : [],
+      );
     } catch (cause) {
       setAiError(cause instanceof Error ? cause.message : 'No se pudo ejecutar el análisis MOTIL.');
     } finally {
@@ -511,18 +523,32 @@ export default function FinanzasPage() {
             <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
             <p className="mt-3 text-xs text-muted-foreground">Señal explicable · recalculada desde evidencia financiera</p>
-            <button
-              type="button"
-              onClick={() => void analyzeWithMotil()}
-              disabled={aiLoading}
-              className="mt-4 inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
-            >
-              {aiLoading ? 'Analizando…' : 'Analizar con MOTIL'}
-            </button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {[
+                ['Qué revisar', 'Analiza exclusivamente Finanzas y dime qué 3 asuntos debería revisar primero el gerente de finanzas. Usa sólo evidencia MOTIL/Laudus autorizada. Para cada asunto: monto o hecho, por qué importa, evidencia/fuente y siguiente validación humana.'],
+                ['Qué viene', 'Analiza exclusivamente Finanzas y dime qué viene en los próximos 7, 30, 60 y 90 días usando forecast contractual y aging. No inventes predicción estadística ni confianza. Señala brechas de fechas o evidencia.'],
+                ['Fuera de patrón', 'Analiza exclusivamente Finanzas y señala concentraciones, excepciones o faltantes de evidencia que merezcan atención. No llames anomalía estadística a algo que no tenga modelo validado. Prioriza máximo 3.'],
+              ].map(([label, prompt]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => void analyzeWithMotil(prompt)}
+                  disabled={aiLoading}
+                  className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                >
+                  {aiLoading ? 'Analizando…' : label}
+                </button>
+              ))}
+            </div>
             {aiError ? <p className="mt-2 text-xs text-destructive">{aiError}</p> : null}
             {aiInsight ? (
-              <div className="mt-3 whitespace-pre-line rounded-md bg-muted/40 p-3 text-xs leading-5 text-foreground">
-                {aiInsight}
+              <div className="mt-3 rounded-md bg-muted/40 p-3">
+                <p className="whitespace-pre-line text-xs leading-5 text-foreground">{aiInsight}</p>
+                {aiSources.length > 0 ? (
+                  <p className="mt-3 border-t pt-2 text-[11px] text-muted-foreground">
+                    Evidencia: {aiSources.join(' · ')}
+                  </p>
+                ) : null}
               </div>
             ) : null}
             <div className="mt-4 border-t pt-3">
