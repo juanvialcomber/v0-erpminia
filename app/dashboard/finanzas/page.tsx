@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, CircleDollarSign, TriangleAlert } from 'lucide-react';
@@ -141,6 +141,7 @@ export default function FinanzasPage() {
   );
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
+  const reviewSessionStartedAt = useRef(Date.now());
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -203,6 +204,7 @@ export default function FinanzasPage() {
           decision,
           reason: reason || null,
           outstandingAmount: amount(item.outstanding_amount),
+          decisionLatencyMs: Date.now() - reviewSessionStartedAt.current,
         }),
       });
       const payload = await response.json().catch(() => null);
