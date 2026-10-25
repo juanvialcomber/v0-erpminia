@@ -28,3 +28,15 @@ test('handoff preserves traceability back to the source work order', () => {
   assert.match(handoff, /asset_code/);
   assert.match(handoff, /shortage_lines/);
 });
+
+
+test('closed maintenance shortages are data-quality debt and cannot create procurement intake', () => {
+  const route = fs.readFileSync('app/api/procurement/supply-needs/route.ts','utf8');
+  const handoff = fs.readFileSync('components/procurement/maintenance-supply-handoffs.tsx','utf8');
+  assert.match(route, /inactiveStatuses/);
+  assert.match(route, /historicalDebt/);
+  assert.match(route, /only active maintenance work orders can be converted into procurement intake/);
+  assert.match(handoff, /Deuda histórica/);
+  assert.match(handoff, /nunca habilitan una compra nueva/);
+  assert.match(handoff, /Revisar OT/);
+});
