@@ -2,6 +2,7 @@ import { discoverLaudusCapabilities, type LaudusCapability } from './openapi-dis
 
 const LAUDUS_ORIGIN = 'https://api.laudus.cl';
 const SPEC_CANDIDATES = [
+  '/swagger/v2/swagger.json',
   '/swagger/v1/swagger.json',
   '/swagger/swagger.json',
   '/openapi.json',
