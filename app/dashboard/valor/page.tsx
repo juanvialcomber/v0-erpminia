@@ -54,18 +54,6 @@ type ApiResponse = {
     reviewedAmountClp?: number;
     acceptedAmountClp?: number;
     semantics?: string;
-    connectedDomains?: string[];
-    connectedDomainCount?: number;
-    supplyChain?: {
-      workOrders?: number;
-      withMaterials?: number;
-      withShortages?: number;
-      withProcurementRequests?: number;
-      withPurchaseOrders?: number;
-      withPartsInstalled?: number;
-      procurementCommitment?: number;
-      tracedPartsCost?: number;
-    };
   } | null;
   financeReviewTiming?: {
     sample?: number;
@@ -97,6 +85,18 @@ type ApiResponse = {
     };
     evidenceLevel?: string;
     workflowLevel?: number;
+    connectedDomains?: string[];
+    connectedDomainCount?: number;
+    supplyChain?: {
+      workOrders?: number;
+      withMaterials?: number;
+      withShortages?: number;
+      withProcurementRequests?: number;
+      withPurchaseOrders?: number;
+      withPartsInstalled?: number;
+      procurementCommitment?: number;
+      tracedPartsCost?: number;
+    };
     semantics?: string;
   } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
