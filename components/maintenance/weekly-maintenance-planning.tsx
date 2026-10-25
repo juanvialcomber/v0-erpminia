@@ -47,6 +47,7 @@ type WeeklyDecision = {
 
 type WeeklyResponse = {
   period: { from: string; until: string };
+  weekPeriod: { from: string; until: string };
   weeklyDecisions: WeeklyDecision[];
   weeklySummary: {
     total: number;
@@ -94,8 +95,9 @@ export function WeeklyMaintenancePlanning() {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mantenimiento · Ariel</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">Planificación semanal</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          MOTIL prepara las decisiones de mayor prioridad. Ariel valida qué se programa, qué se corrige y qué queda bloqueado.
+          MOTIL prepara las decisiones de mayor prioridad para los próximos 7 días. Ariel valida qué se programa, qué se corrige y qué queda bloqueado.
         </p>
+        {data?.weekPeriod ? <p className="mt-1 text-xs text-muted-foreground">Semana operativa: {new Date(data.weekPeriod.from + 'T12:00:00').toLocaleDateString('es-CL')}–{new Date(data.weekPeriod.until + 'T12:00:00').toLocaleDateString('es-CL')}</p> : null}
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar</Button>
