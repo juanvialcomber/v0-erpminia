@@ -14,9 +14,10 @@ import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-
 type Row = Record<string, string | number | null>;
 type FinanceAlert = { alert_code?: string; title?: string; severity?: string; exception_count?: number; description?: string };
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; alerts?: FinanceAlert[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
+type BankReconciliation = { status: 'available' | 'empty' | 'unavailable'; bankStatement: { dateFrom: string | null; dateTo: string | null; initialBalance: number | null } | null; bankOnly: { count: number; amount: number }; journalOnly: { count: number; amount: number }; persisted: false };
 type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
 
-const fetcher = async (url: string): Promise<Response> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload; };
+const fetcher = async <T,>(url: string): Promise<T> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload as T; };
 const amount = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
 const money = (value: unknown) => amount(value) === null ? '—' : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount(value)!);
 const currencyMoney = (value: unknown, currency: unknown) => { const numeric = amount(value); if (numeric === null) return '—'; const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : null; if (!code) return '—'; try { return new Intl.NumberFormat('es-CL', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(numeric); } catch { return `${code} ${new Intl.NumberFormat('es-CL').format(numeric)}`; } };
@@ -33,6 +34,7 @@ const agingLabels: Record<string, string> = { no_due_date: 'Sin vencimiento', cu
 
 export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher);
+  const { data: bankReconciliation, error: bankReconciliationError, isLoading: bankReconciliationLoading } = useSWR<BankReconciliation>('/api/integrations/laudus/bank-reconciliation', fetcher, { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 });
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
   const sourceStatus = useDataSourceStatus();
@@ -89,6 +91,32 @@ export default function FinanzasPage() {
             </div>
           </div>)}
         </div>}
+      </section>
+
+      <section className="space-y-3 border-t pt-5" aria-label="Conciliación bancaria Laudus">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Conciliación bancaria</h2>
+            <p className="text-sm text-muted-foreground">Diferencias entre cartola y contabilidad Laudus. Sólo lectura; MOTIL no concilia ni contabiliza automáticamente.</p>
+          </div>
+          <Link href="/dashboard/finanzas/fuentes" className="text-sm font-medium text-primary hover:underline">Ver fuente</Link>
+        </div>
+        {bankReconciliationLoading ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Comparando cartola y contabilidad…</div> : null}
+        {bankReconciliationError || bankReconciliation?.status === 'unavailable' ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">La conciliación Laudus no está disponible en este momento. No se asume que las diferencias sean cero.</div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'empty' ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">No hay cartolas disponibles para comparar.</div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' ? <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(bankReconciliation.bankOnly.count)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.bankOnly.amount)} por revisar</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(bankReconciliation.journalOnly.count)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.journalOnly.amount)} por revisar</p>
+          </div>
+        </div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && bankReconciliation.bankStatement ? <p className="text-xs text-muted-foreground">Cartola evaluada: {bankReconciliation.bankStatement.dateFrom || 'sin inicio'} → {bankReconciliation.bankStatement.dateTo || 'sin cierre'} · Laudus.</p> : null}
       </section>
 
       <DataReceptionReadiness
