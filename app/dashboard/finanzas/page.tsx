@@ -319,6 +319,18 @@ export default function FinanzasPage() {
     Number(laudusSummary.open_amount || 0) > 0
       ? Number(laudusSummary.overdue_amount || 0) / Number(laudusSummary.open_amount || 0)
       : null;
+  const forecastCoverage =
+    Number(laudusSummary.open_count || 0) > 0
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            (Number(laudusSummary.open_count || 0) - Number(laudusSummary.no_due_date_count || 0)) /
+              Number(laudusSummary.open_count || 0),
+          ),
+        )
+      : null;
+
   const intelligenceSignal =
     Number(laudusSummary.no_due_date_count || 0) > 0
       ? {
@@ -515,6 +527,9 @@ export default function FinanzasPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {nextDueDate ? `Próximo vencimiento registrado: ${shortDate(nextDueDate)}` : 'Sin próximo vencimiento disponible en el forecast.'}
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Cobertura de fechas: {forecastCoverage === null ? '—' : new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(forecastCoverage)}
             </p>
           </div>
 
