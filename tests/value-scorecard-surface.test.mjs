@@ -56,3 +56,17 @@ test('maintenance internal value is evidence-based and never equates traced exec
   assert.match(page, /no se interpreta como horas ahorradas/);
   assert.match(page, /L4 significa flujo instrumentado con decisión humana; E2, desempeño medido/);
 });
+
+
+test('maintenance cross-domain coverage counts only domains with real evidence', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /work_order_supply_chain_v1/);
+  assert.match(api, /connectedDomains/);
+  assert.match(api, /withProcurementRequests/);
+  assert.match(api, /withPurchaseOrders/);
+  assert.match(page, /Cobertura inter-área/);
+  assert.match(page, /Mantención → Bodega → Compras → Finanzas/);
+  assert.match(page, /Sólo cuenta un dominio cuando existe un evento real/);
+});
