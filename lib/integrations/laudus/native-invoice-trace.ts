@@ -169,6 +169,7 @@ export async function loadLaudusNativeInvoiceTrace(
     summary: {
       examined: openRows.length,
       detailRecovered: invoices.filter((row) => row.sourceDetailAvailable).length,
+      withLines: invoices.filter((row) => row.itemCount > 0).length,
       withNativeTrace: invoices.filter((row) => row.nativeTraceCount > 0).length,
       missingEvidence: invoices.filter(
         (row) => !row.sourceDetailAvailable || row.nativeTraceCount === 0,
