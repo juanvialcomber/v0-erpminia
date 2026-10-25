@@ -3,7 +3,8 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, CircleDollarSign, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
 
 type Row = Record<string, string | number | null>;
@@ -144,6 +145,23 @@ const currencyMoney = (value: unknown, currency: unknown) => {
 const number = (value: unknown) =>
   amount(value) === null ? '—' : new Intl.NumberFormat('es-CL').format(amount(value)!);
 
+const compactClp = (value: unknown) =>
+  amount(value) === null
+    ? '—'
+    : new Intl.NumberFormat('es-CL', { notation: 'compact', maximumFractionDigits: 1 }).format(amount(value)!);
+
+const daysUntil = (value: unknown) => {
+  if (typeof value !== 'string' || !value) return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const target = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0)
+    : new Date(value);
+  if (Number.isNaN(target.getTime())) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+};
+
 const shortDate = (value: unknown) => {
   if (typeof value !== 'string' || !value) return 'Sin vencimiento';
   const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -267,6 +285,52 @@ export default function FinanzasPage() {
     0,
   );
 
+  const cashForecast = error ? [] : data?.cashForecast || [];
+  const primaryForecast =
+    cashForecast.find((row) => String(row.currency || '').toUpperCase() === 'CLP') ||
+    cashForecast[0] ||
+    null;
+  const forecastCurrency = String(primaryForecast?.currency || 'CLP').toUpperCase();
+  const cashProjection = primaryForecast
+    ? [
+        { horizon: 'Vencido', amount: Number(primaryForecast.overdue_amount || 0) },
+        { horizon: '≤ 7 días', amount: Number(primaryForecast.due_next_7_amount || 0) },
+        { horizon: '≤ 30 días', amount: Number(primaryForecast.due_next_30_amount || 0) },
+        { horizon: '≤ 60 días', amount: Number(primaryForecast.due_next_60_amount || 0) },
+        { horizon: '≤ 90 días', amount: Number(primaryForecast.due_next_90_amount || 0) },
+      ]
+    : [];
+  const supplierConcentration = (data?.topSuppliers || []).slice(0, 5).map((row) => ({
+    supplier: String(row.supplier_name || 'Sin identificar'),
+    amount: Number(row.committed_clp || 0),
+  }));
+  const exposureChart = [
+    { label: 'Saldo abierto', amount: Number(laudusSummary.open_amount || 0) },
+    { label: 'Vencido', amount: Number(laudusSummary.overdue_amount || 0) },
+    { label: 'Prioridad', amount: pendingAttentionAmount },
+  ];
+  const nextDueDate = typeof primaryForecast?.next_due_date === 'string' ? primaryForecast.next_due_date : null;
+  const nextDueDays = daysUntil(nextDueDate);
+  const overdueRatio =
+    Number(laudusSummary.open_amount || 0) > 0
+      ? Number(laudusSummary.overdue_amount || 0) / Number(laudusSummary.open_amount || 0)
+      : null;
+  const intelligenceSignal =
+    Number(laudusSummary.no_due_date_count || 0) > 0
+      ? {
+          title: 'Forecast incompleto',
+          detail: `${number(laudusSummary.no_due_date_count || 0)} obligaciones no tienen vencimiento. Completar esas fechas mejora la proyección de caja.`,
+        }
+      : overdueRatio !== null && overdueRatio >= 0.5
+        ? {
+            title: 'Exposición vencida alta',
+            detail: `${new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(overdueRatio)} del saldo abierto está vencido. Priorizar concentración y respaldo antes de pagar.`,
+          }
+        : {
+            title: 'Sin señal crítica adicional',
+            detail: 'MOTIL seguirá recalculando exposición, vencimientos y evidencia con cada actualización de Laudus.',
+          };
+
   const rowsByType: Record<ConcentrationKey, Row[]> = error
     ? { assets: [], products: [], suppliers: [], costCenters: [] }
     : {
@@ -380,6 +444,97 @@ export default function FinanzasPage() {
             <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
           </div>
         ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]" aria-label="Control financiero ejecutivo">
+        <div className="rounded-lg border p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control financiero</p>
+              <h2 className="mt-1 text-lg font-semibold">Exposición y prioridad</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Lectura ejecutiva sobre datos Laudus. No reemplaza la contabilidad.</p>
+            </div>
+            <Sparkles className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="mt-4 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={exposureChart} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} width={64} fontSize={11} />
+                <Tooltip formatter={(value) => [money(Number(value)), 'Monto']} />
+                <Bar dataKey="amount" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="rounded-lg border p-5">
+            <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">ETA financiero</p></div>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">
+              {nextDueDays === null ? '—' : nextDueDays < 0 ? `${number(Math.abs(nextDueDays))} días vencido` : nextDueDays === 0 ? 'Hoy' : `${number(nextDueDays)} días`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {nextDueDate ? `Próximo vencimiento registrado: ${shortDate(nextDueDate)}` : 'Sin próximo vencimiento disponible en el forecast.'}
+            </p>
+          </div>
+
+          <div className="rounded-lg border p-5">
+            <div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inteligencia MOTIL</p></div>
+            <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
+            <p className="mt-3 text-xs text-muted-foreground">Señal explicable · recalculada desde evidencia financiera</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2" aria-label="Proyecciones financieras">
+        <div className="rounded-lg border p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyección</p>
+            <h2 className="mt-1 text-lg font-semibold">Caja a 90 días</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Obligaciones por horizonte de vencimiento · {forecastCurrency}. Es forecast contractual, no predicción estadística.</p>
+          </div>
+          {cashProjection.length === 0 ? (
+            <p className="py-10 text-sm text-muted-foreground">Sin obligaciones con vencimiento suficiente para proyectar.</p>
+          ) : (
+            <div className="mt-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={cashProjection} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="horizon" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} width={64} fontSize={11} />
+                  <Tooltip formatter={(value) => [currencyMoney(Number(value), forecastCurrency), 'Obligaciones']} />
+                  <Bar dataKey="amount" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración</p>
+            <h2 className="mt-1 text-lg font-semibold">Compromiso por proveedor</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Top 5 por compromiso registrado en MOTIL.</p>
+          </div>
+          {supplierConcentration.length === 0 ? (
+            <p className="py-10 text-sm text-muted-foreground">Sin concentración de proveedores disponible.</p>
+          ) : (
+            <div className="mt-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={supplierConcentration} layout="vertical" margin={{ top: 8, right: 8, left: 12, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis type="category" dataKey="supplier" width={120} tickLine={false} axisLine={false} fontSize={11} />
+                  <Tooltip formatter={(value) => [money(Number(value)), 'Compromiso']} />
+                  <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </section>
 
       <section id="revisar-prioridades" className="rounded-lg border">
