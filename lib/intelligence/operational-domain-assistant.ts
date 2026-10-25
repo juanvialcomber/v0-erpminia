@@ -144,13 +144,14 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
     context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
     context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
     context.supabase.from('procurement_accounts_payable_aging_summary_v1').select('supplier_id,supplier_name,currency,aging_bucket,payable_count,outstanding_amount').eq('organization_id', organizationId).order('outstanding_amount', { ascending: false }).limit(50),
     context.supabase.from('procurement_cash_forecast_summary_v1').select('currency,open_payables,total_outstanding_amount,overdue_amount,due_next_7_amount,due_next_30_amount,due_next_60_amount,due_next_90_amount,due_after_90_amount,no_due_date_amount,no_due_date_count,next_due_date').eq('organization_id', organizationId).order('currency', { ascending: true }),
     context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: organizationId, p_limit: 10 }),
+    context.supabase.rpc('motil_laudus_fixed_asset_review_queue', { p_organization_id: organizationId, p_limit: 1000 }),
     context.supabase
       .from('laudus_purchase_invoice_payment_status_service_v1')
       .select('supplier_name,outstanding_amount,due_date')
@@ -168,7 +169,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(40),
     context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
   ]);
-  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
@@ -213,6 +214,70 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     .sort((a, b) => b.outstanding - a.outstanding)
     .slice(0, 12);
 
+  const fixedAssetPayload = (fixedAssetReview.data || {}) as {
+    summary?: Record<string, unknown>;
+    queue?: Array<Record<string, unknown>>;
+  };
+  const fixedAssetQueue = Array.isArray(fixedAssetPayload.queue) ? fixedAssetPayload.queue : [];
+  const fixedAssetStrong = fixedAssetQueue.filter((row) =>
+    ['strong_identifier_candidate', 'strong_candidate'].includes(String(row.evidence_level || '')),
+  );
+  const fixedAssetIds = [...new Set(
+    fixedAssetStrong.map((row) => String(row.canonical_asset_id || '')).filter(Boolean),
+  )];
+  const maintenanceEconomics = fixedAssetIds.length > 0
+    ? await context.supabase
+        .from('maintenance_asset_economic_history_v1')
+        .select('canonical_asset_id,asset_code,asset_name,fiscal_year,movement_count,historical_total_cost,last_cost_date')
+        .eq('organization_id', organizationId)
+        .in('canonical_asset_id', fixedAssetIds)
+    : { data: [], error: null };
+  if (maintenanceEconomics.error) throw maintenanceEconomics.error;
+
+  const maintenanceByAsset = new Map<string, { cost: number; movements: number; lastCostDate: string | null }>();
+  for (const row of maintenanceEconomics.data || []) {
+    const id = String(row.canonical_asset_id || '');
+    if (!id) continue;
+    const current = maintenanceByAsset.get(id) || { cost: 0, movements: 0, lastCostDate: null };
+    current.cost += Number(row.historical_total_cost || 0);
+    current.movements += Number(row.movement_count || 0);
+    const date = typeof row.last_cost_date === 'string' ? row.last_cost_date : null;
+    if (date && (!current.lastCostDate || date > current.lastCostDate)) current.lastCostDate = date;
+    maintenanceByAsset.set(id, current);
+  }
+
+  const now = new Date();
+  const assetEconomics = fixedAssetStrong.map((row) => {
+    const acquisitionDate = typeof row.acquisition_date === 'string' ? row.acquisition_date : null;
+    const acquisition = acquisitionDate ? new Date(acquisitionDate) : null;
+    const usefulLifeYears = Number(row.useful_life || 0);
+    const elapsedYears = acquisition && !Number.isNaN(acquisition.getTime())
+      ? Math.max(0, (now.getTime() - acquisition.getTime()) / (365.25 * 86400000))
+      : null;
+    const lifeConsumedPct =
+      elapsedYears !== null && usefulLifeYears > 0
+        ? Math.max(0, Math.min(1.5, elapsedYears / usefulLifeYears))
+        : null;
+    const maintenance = maintenanceByAsset.get(String(row.canonical_asset_id || '')) || { cost: 0, movements: 0, lastCostDate: null };
+    return {
+      laudus_name: row.laudus_name || null,
+      canonical_asset_id: row.canonical_asset_id || null,
+      canonical_asset_code: row.canonical_asset_code || null,
+      canonical_asset_name: row.canonical_asset_name || null,
+      evidence_level: row.evidence_level || null,
+      exact_plate_support: Boolean(row.exact_plate_support),
+      acquisition_date: acquisitionDate,
+      useful_life_years: usefulLifeYears,
+      life_consumed_pct: lifeConsumedPct,
+      depreciation_type: row.depreciation_type || null,
+      acquisition_cost: Number(row.acquisition_cost || 0) > 0 ? Number(row.acquisition_cost) : null,
+      depreciation_status: Number(row.acquisition_cost || 0) > 0 ? 'cost_available_for_review' : 'blocked_missing_acquisition_cost',
+      maintenance_cost: maintenance.cost,
+      maintenance_movements: maintenance.movements,
+      last_maintenance_cost_date: maintenance.lastCostDate,
+    };
+  });
+
   return {
     capability: 'finance',
     sources: [
@@ -222,6 +287,8 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       'procurement_accounts_payable_aging_summary_v1',
       'procurement_cash_forecast_summary_v1',
       'motil_laudus_finance_review_queue',
+      'motil_laudus_fixed_asset_review_queue',
+      'maintenance_asset_economic_history_v1',
       'laudus_purchase_invoice_payment_status_service_v1',
       'finance_asset_reconciliation_v1',
       'maintenance_cost_by_cost_center_v1',
@@ -249,6 +316,13 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       laudus_review: laudusReview.data || null,
       laudus_aging: laudusAging,
       laudus_supplier_pressure: laudusSupplierPressure,
+      asset_economics: assetEconomics,
+      asset_economics_summary: {
+        laudus_assets: Number(fixedAssetPayload.summary?.laudus_assets || 0),
+        strong_candidates: assetEconomics.length,
+        with_acquisition_cost: assetEconomics.filter((row) => Number(row.acquisition_cost || 0) > 0).length,
+        with_maintenance_history: assetEconomics.filter((row) => row.maintenance_cost > 0).length,
+      },
       unresolved_asset_reconciliation: reconciliation.data || [],
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
       semantics: {
@@ -258,6 +332,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento. No es predicción estadística ni probabilidad futura.',
         aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio. Para exposición actual Laudus, usa laudus_aging y laudus_supplier_pressure antes que un aging MOTIL vacío.',
         statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
+        asset_economics: 'Para depreciación o reemplazo, usa asset_economics. No calcules valor libro ni ahorro de reposición si falta acquisition_cost o la identidad sigue siendo candidata. Vida útil calendario y costo histórico de mantenimiento sí pueden orientar una revisión humana.',
         cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
       },
     },
