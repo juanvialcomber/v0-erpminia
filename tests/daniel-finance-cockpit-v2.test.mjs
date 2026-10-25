@@ -70,9 +70,10 @@ test('asset economics stays compact, native to MOTIL and evidence-gated',()=>{
 });
 
 test('asset photos are identification thumbnails, not hero content',()=>{
-  assert.match(page,/getEquipmentImage/);
+  assert.match(page,/row\.imageUrl/);
   assert.match(page,/h-10 w-12/);
   assert.match(page,/Fotos referenciales · identificación rápida/);
+  assert.doesNotMatch(page,/getEquipmentImage/);
   assert.doesNotMatch(page,/h-44 w-full object-cover/);
 });
 
