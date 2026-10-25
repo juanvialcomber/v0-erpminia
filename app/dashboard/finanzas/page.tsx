@@ -331,12 +331,6 @@ export default function FinanzasPage() {
           >
             Revisar prioridades <ArrowRight className="h-4 w-4" />
           </a>
-          <Link
-            href="/dashboard/valor"
-            className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
-          >
-            Valor MOTIL
-          </Link>
         </div>
       </section>
 
