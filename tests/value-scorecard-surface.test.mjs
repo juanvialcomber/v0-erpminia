@@ -115,3 +115,18 @@ test('internal value page exposes weekly planning learning without calling it RO
   assert.match(page, /Mantención → Compras → recepción → instalación/);
   assert.match(page, /deuda de calidad de datos/);
 });
+
+
+test('internal value page exposes measured cross-domain cycle timing', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  assert.match(api, /crossDomainCycle/);
+  assert.match(api, /intakeToOrder/);
+  assert.match(api, /orderToReceipt/);
+  assert.match(api, /receiptToInstall/);
+  assert.match(api, /empty stages are not estimated/);
+  assert.match(page, /Solicitud → OC/);
+  assert.match(page, /OC → recepción/);
+  assert.match(page, /Recepción → instalación/);
+  assert.match(page, /Sin muestra/);
+});
