@@ -81,3 +81,9 @@ test('high-maintenance ambiguous assets are shown as reconciliation priorities, 
   assert.match(page,/no es ahorro ni valor libro/);
   assert.match(page,/No se mezcla con costos de activos todavía ambiguos/);
 });
+
+
+test('asset economics explains historical invoice coverage before depreciation',()=>{
+  assert.match(page,/Backfill histórico/);
+  assert.match(page,/histórico de facturas disponible comienza/);
+});
