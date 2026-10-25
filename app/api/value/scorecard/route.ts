@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenancePlanningEvidence, maintenanceProcurementIntakes, maintenanceProcurementOrders, maintenanceProcurementReceipts, maintenanceParts] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenancePlanningEvidence, maintenanceProcurementIntakes, maintenanceProcurementOrders, maintenanceProcurementReceipts, maintenanceParts, maintenancePlanApplications, maintenanceStandardPlans] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         .limit(500),
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,canonical_asset_id,status,total_timer_seconds,actual_duration_hours,closed_at,created_at')
+        .select('id,canonical_asset_id,status,total_timer_seconds,actual_duration_hours,scheduled_date,closed_at,created_at')
         .eq('organization_id', context.organizationId)
         .limit(5000),
       context.supabase
@@ -80,6 +80,17 @@ export async function GET(request: NextRequest) {
         .select('id,work_order_id,installed_at,quantity_installed,status')
         .eq('organization_id', context.organizationId)
         .limit(10000),
+      context.supabase
+        .from('maintenance_standard_job_plan_applications')
+        .select('id,plan_id,work_order_id,status,applied_at')
+        .eq('organization_id', context.organizationId)
+        .not('work_order_id', 'is', null)
+        .limit(5000),
+      context.supabase
+        .from('maintenance_standard_job_plans')
+        .select('id,estimated_duration_hours')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     if (current.error) throw current.error;
@@ -94,6 +105,8 @@ export async function GET(request: NextRequest) {
     if (maintenanceProcurementOrders.error) throw maintenanceProcurementOrders.error;
     if (maintenanceProcurementReceipts.error) throw maintenanceProcurementReceipts.error;
     if (maintenanceParts.error) throw maintenanceParts.error;
+    if (maintenancePlanApplications.error) throw maintenancePlanApplications.error;
+    if (maintenanceStandardPlans.error) throw maintenanceStandardPlans.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
