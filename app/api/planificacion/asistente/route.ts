@@ -136,7 +136,13 @@ export async function POST(request: NextRequest) {
     for (const row of recentWorkOrders.data || []) {
       const assetId = String((row as any).canonical_asset_id || '');
       if (!assetId || String((row as any).work_type || '').toLowerCase() !== 'preventive' || !(row as any).closed_at) continue;
-      if (!latestPreventiveByAsset.has(assetId)) latestPreventiveByAsset.set(assetId, row);
+      const title = String((row as any).title || '').toLowerCase();
+      const candidateScore = /mantenci[oó]n|250\s*h|500\s*h|1000\s*h|servicio/.test(title) ? 2 : 1;
+      const current = latestPreventiveByAsset.get(assetId);
+      const currentScore = Number(current?._candidateScore || 0);
+      if (!current || candidateScore > currentScore) {
+        latestPreventiveByAsset.set(assetId, { ...row, _candidateScore: candidateScore });
+      }
     }
     const planningRank = new Map([
       ['P1 - VENCIDO', 1],
