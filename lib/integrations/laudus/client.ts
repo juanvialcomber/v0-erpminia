@@ -232,11 +232,34 @@ export async function runLaudusReadOnlyValueProbe() {
     ['stockTransfers', '/production/stockTransfers/list'],
   ] as const;
 
-  const results: Record<string, { rows: number | null; shape: string; sampleFields: string[] }> = {};
+  const results: Record<string, {
+    status: 'data' | 'empty' | 'unavailable';
+    rows: number | null;
+    shape: string | null;
+    sampleFields: string[];
+    upstreamStatus?: number | null;
+  }> = {};
 
   for (const [key, path] of targets) {
-    const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
-    results[key] = summarizePayload(payload);
+    try {
+      const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
+      const summary = summarizePayload(payload);
+      results[key] = {
+        status: Number(summary.rows || 0) > 0 ? 'data' : 'empty',
+        rows: summary.rows,
+        shape: summary.shape,
+        sampleFields: summary.sampleFields,
+      };
+    } catch (error) {
+      const laudusError = error instanceof LaudusApiError ? error : null;
+      results[key] = {
+        status: 'unavailable',
+        rows: null,
+        shape: null,
+        sampleFields: [],
+        upstreamStatus: laudusError?.status || null,
+      };
+    }
   }
 
   return {
