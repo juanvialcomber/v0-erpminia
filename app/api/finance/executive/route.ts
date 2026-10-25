@@ -88,6 +88,34 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.outstanding - a.outstanding)
       .slice(0, 12);
 
+    const pressureHorizons = [
+      { label: 'Hoy', days: 0 },
+      { label: '+7 días', days: 7 },
+      { label: '+30 días', days: 30 },
+      { label: '+60 días', days: 60 },
+    ];
+    const laudusPressureTrajectory = pressureHorizons.map(({ label, days }) => {
+      const horizonUtc = todayUtc + days * 86400000;
+      let current = 0;
+      let overdue = 0;
+      let olderThan90 = 0;
+      let noDueDate = 0;
+      for (const row of laudusOpen) {
+        const outstanding = Number(row.outstanding_amount || 0);
+        const due = typeof row.due_date === 'string' && row.due_date ? new Date(row.due_date) : null;
+        if (!due || Number.isNaN(due.getTime())) {
+          noDueDate += outstanding;
+          continue;
+        }
+        const dueUtc = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+        const daysOverdueAtHorizon = Math.floor((horizonUtc - dueUtc) / 86400000);
+        if (daysOverdueAtHorizon <= 0) current += outstanding;
+        else overdue += outstanding;
+        if (daysOverdueAtHorizon > 90) olderThan90 += outstanding;
+      }
+      return { label, days, current, overdue, olderThan90, noDueDate };
+    });
+
     return NextResponse.json({
       overview: overview.data || null,
       topAssets: assets.data || [],
@@ -105,6 +133,7 @@ export async function GET(request: NextRequest) {
       laudusReview: laudusReview.data || null,
       laudusAging,
       laudusSupplierPressure,
+      laudusPressureTrajectory,
       certification: {
         origin: 'CANONICAL+ERP',
         currency: 'CLP',
