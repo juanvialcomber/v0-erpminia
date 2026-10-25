@@ -48,3 +48,11 @@ test('weekly planning separates stale evidence from live material shortages', ()
   assert.match(workspace, /Actualizar lectura/);
   assert.match(workspace, /estado materiales en fuente/);
 });
+
+
+test('stale weekly signals cannot be scheduled until their reading is refreshed', () => {
+  assert.match(api, /row\.evidenceFreshness !== 'stale'/);
+  assert.match(workspace, /row\.state === 'stale_evidence'/);
+  assert.match(workspace, /Actualizar lectura/);
+  assert.match(workspace, /dashboard\/mantenimiento\/horometros\?asset=/);
+});
