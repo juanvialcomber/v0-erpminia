@@ -20,7 +20,7 @@ export default function FinanzasDocumentosImportarPage() {
         <div>
           <h1 className="text-3xl font-bold">Subir documentos de Finanzas</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Sube políticas, procedimientos y respaldos para que queden asociados a Finanzas.
+            Sube políticas, procedimientos y respaldos para tenerlos a mano.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
