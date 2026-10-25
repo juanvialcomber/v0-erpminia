@@ -860,41 +860,68 @@ export default function FinanzasPage() {
           <p className="px-5 py-5 text-sm text-muted-foreground">La conciliación Laudus no está disponible.</p>
         ) : (
           <div>
-            <div className="grid gap-px border-b bg-border sm:grid-cols-2">
-              <div className="bg-card px-5 py-4">
-                <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
-                <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.bankOnly.count)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.bankOnly.amount)} por revisar</p>
+            {bankStatementIsHistorical ? (
+              <div className="px-5 py-5">
+                <p className="text-sm font-semibold">Conciliación histórica disponible</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  La última cartola entregada por Laudus termina el {bankReconciliation.data.bankStatement?.dateTo ? shortDate(bankReconciliation.data.bankStatement.dateTo) : '—'}.
+                  MOTIL conserva sus diferencias como evidencia, pero no las presenta como pendientes actuales.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">Cartola sin contabilidad · histórico</p>
+                    <p className="mt-1 text-lg font-semibold">{number(bankReconciliation.data.bankOnly.count)} movimientos</p>
+                    <p className="text-xs text-muted-foreground">{money(bankReconciliation.data.bankOnly.amount)} en la cartola histórica</p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="text-xs text-muted-foreground">Contabilidad sin cartola · histórico</p>
+                    <p className="mt-1 text-lg font-semibold">{number(bankReconciliation.data.journalOnly.count)} movimientos</p>
+                    <p className="text-xs text-muted-foreground">{money(bankReconciliation.data.journalOnly.amount)} en la cartola histórica</p>
+                  </div>
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">
+                  Acción: incorporar una cartola vigente en Laudus o conectar una fuente bancaria actual antes de usar conciliación para decisiones de caja.
+                </p>
               </div>
-              <div className="bg-card px-5 py-4">
-                <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
-                <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.journalOnly.count)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.journalOnly.amount)} por revisar</p>
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="grid gap-px border-b bg-border sm:grid-cols-2">
+                  <div className="bg-card px-5 py-4">
+                    <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
+                    <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.bankOnly.count)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.bankOnly.amount)} por revisar</p>
+                  </div>
+                  <div className="bg-card px-5 py-4">
+                    <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
+                    <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.journalOnly.count)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.journalOnly.amount)} por revisar</p>
+                  </div>
+                </div>
 
-            {(bankReconciliation.data.bankOnly.items.length > 0 || bankReconciliation.data.journalOnly.items.length > 0) ? (
-              <div className="grid gap-px bg-border lg:grid-cols-2">
-                {[
-                  ['Cartola sin contabilidad', bankReconciliation.data.bankOnly.items],
-                  ['Contabilidad sin cartola', bankReconciliation.data.journalOnly.items],
-                ].map(([title, items]) => (
-                  <div key={String(title)} className="bg-card">
-                    <div className="border-b px-5 py-3"><h3 className="text-sm font-semibold">{String(title)}</h3></div>
-                    {(items as ReconciliationItem[]).map((item, index) => (
-                      <div key={`${String(title)}-${index}`} className="grid gap-1 border-b px-5 py-3 last:border-b-0 sm:grid-cols-[90px_1fr_130px] sm:items-center">
-                        <span className="text-xs text-muted-foreground">{item.date ? shortDate(item.date) : 'Sin fecha'}</span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{item.description || 'Sin descripción'}</p>
-                          <p className="truncate text-xs text-muted-foreground">{item.document || 'Sin documento'}</p>
-                        </div>
-                        <span className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount)}</span>
+                {(bankReconciliation.data.bankOnly.items.length > 0 || bankReconciliation.data.journalOnly.items.length > 0) ? (
+                  <div className="grid gap-px bg-border lg:grid-cols-2">
+                    {[
+                      ['Cartola sin contabilidad', bankReconciliation.data.bankOnly.items],
+                      ['Contabilidad sin cartola', bankReconciliation.data.journalOnly.items],
+                    ].map(([title, items]) => (
+                      <div key={String(title)} className="bg-card">
+                        <div className="border-b px-5 py-3"><h3 className="text-sm font-semibold">{String(title)}</h3></div>
+                        {(items as ReconciliationItem[]).map((item, index) => (
+                          <div key={`${String(title)}-${index}`} className="grid gap-1 border-b px-5 py-3 last:border-b-0 sm:grid-cols-[90px_1fr_130px] sm:items-center">
+                            <span className="text-xs text-muted-foreground">{item.date ? shortDate(item.date) : 'Sin fecha'}</span>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{item.description || 'Sin descripción'}</p>
+                              <p className="truncate text-xs text-muted-foreground">{item.document || 'Sin documento'}</p>
+                            </div>
+                            <span className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount)}</span>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
-                ))}
-              </div>
-            ) : null}
+                ) : null}
+              </>
+            )}
 
             {bankReconciliation.data.bankStatement ? (
               <p className="border-t px-5 py-3 text-xs text-muted-foreground">
