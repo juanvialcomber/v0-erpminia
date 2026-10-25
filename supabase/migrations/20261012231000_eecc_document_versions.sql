@@ -42,3 +42,7 @@ drop trigger if exists trg_archive_eecc_document_version on public.carpeta_docum
 create trigger trg_archive_eecc_document_version before update of file_path
 on public.carpeta_documentos for each row execute function public.archive_eecc_document_version();
 comment on table public.carpeta_documento_versiones is 'Immutable snapshots of replaced EECC files and their reviews. Historical objects must not be deleted from Storage.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/carpeta-arranque/[id]/versions/route.ts
+grant select on table public.carpeta_documento_versiones to service_role;

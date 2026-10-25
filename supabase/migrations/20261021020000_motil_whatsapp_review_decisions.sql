@@ -15,3 +15,7 @@ create table if not exists public.motil_whatsapp_review_decisions (
 create index if not exists motil_wa_review_org_message_idx on public.motil_whatsapp_review_decisions(organization_id,message_id);
 alter table public.motil_whatsapp_review_decisions enable row level security;
 revoke all on public.motil_whatsapp_review_decisions from anon,authenticated;
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/maintenance/whatsapp/review-decisions/route.ts
+grant select, insert on table public.motil_whatsapp_review_decisions to service_role;

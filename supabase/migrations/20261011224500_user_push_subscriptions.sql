@@ -16,3 +16,7 @@ create index if not exists user_push_subscriptions_user_idx on public.user_push_
 alter table public.user_push_subscriptions enable row level security;
 revoke all on public.user_push_subscriptions from anon, authenticated;
 comment on table public.user_push_subscriptions is 'Private Web Push endpoints and encryption material; only accessed by trusted MOTIL server via organization-scoped session.';
+
+-- Explicit Data API contract; no new client access. RLS is unchanged.
+-- Consumer: app/api/notifications/push/route.ts
+grant select, insert, update, delete on table public.user_push_subscriptions to service_role;

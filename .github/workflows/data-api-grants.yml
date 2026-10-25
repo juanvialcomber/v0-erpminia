@@ -1,0 +1,19 @@
+name: Explicit Data API migration contracts
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  permissions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-data-api-grants.mjs
+      - run: node --test tests/data-api-grants-source.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund --prefix tests/db
+      - run: npm test --prefix tests/db
