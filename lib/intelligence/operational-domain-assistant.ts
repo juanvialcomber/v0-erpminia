@@ -144,20 +144,75 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, reconciliation, maintenanceCost] = await Promise.all([
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
     context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
     context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
     context.supabase.from('procurement_accounts_payable_aging_summary_v1').select('supplier_id,supplier_name,currency,aging_bucket,payable_count,outstanding_amount').eq('organization_id', organizationId).order('outstanding_amount', { ascending: false }).limit(50),
     context.supabase.from('procurement_cash_forecast_summary_v1').select('currency,open_payables,total_outstanding_amount,overdue_amount,due_next_7_amount,due_next_30_amount,due_next_60_amount,due_next_90_amount,due_after_90_amount,no_due_date_amount,no_due_date_count,next_due_date').eq('organization_id', organizationId).order('currency', { ascending: true }),
     context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: organizationId, p_limit: 10 }),
+    context.supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('supplier_name,outstanding_amount,due_date')
+      .eq('organization_id', organizationId)
+      .gt('outstanding_amount', 0)
+      .order('outstanding_amount', { ascending: false })
+      .range(0, 999),
+    context.supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('supplier_name,outstanding_amount,due_date')
+      .eq('organization_id', organizationId)
+      .gt('outstanding_amount', 0)
+      .order('outstanding_amount', { ascending: false })
+      .range(1000, 1999),
     context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(40),
     context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
   ]);
-  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
+
+  const laudusOpen = [...(laudusOpenPage1.data || []), ...(laudusOpenPage2.data || [])];
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const agingBuckets = new Map<string, { bucket: string; invoices: number; amount: number }>();
+  const supplierPressure = new Map<string, { supplier: string; invoices: number; outstanding: number; overdue: number; maxDaysOverdue: number }>();
+  for (const row of laudusOpen) {
+    const outstanding = Number(row.outstanding_amount || 0);
+    const due = typeof row.due_date === 'string' && row.due_date ? new Date(row.due_date) : null;
+    const dueUtc = due && !Number.isNaN(due.getTime()) ? Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate()) : null;
+    const daysOverdue = dueUtc === null ? null : Math.floor((todayUtc - dueUtc) / 86400000);
+    const bucket =
+      daysOverdue === null ? 'Sin fecha' :
+      daysOverdue <= 0 ? 'Por vencer' :
+      daysOverdue <= 30 ? '1–30 días' :
+      daysOverdue <= 60 ? '31–60 días' :
+      daysOverdue <= 90 ? '61–90 días' :
+      '>90 días';
+
+    const age = agingBuckets.get(bucket) || { bucket, invoices: 0, amount: 0 };
+    age.invoices += 1;
+    age.amount += outstanding;
+    agingBuckets.set(bucket, age);
+
+    const supplier = String(row.supplier_name || '').trim() || 'Sin identificar';
+    const pressure = supplierPressure.get(supplier) || { supplier, invoices: 0, outstanding: 0, overdue: 0, maxDaysOverdue: 0 };
+    pressure.invoices += 1;
+    pressure.outstanding += outstanding;
+    if (daysOverdue !== null && daysOverdue > 0) {
+      pressure.overdue += outstanding;
+      pressure.maxDaysOverdue = Math.max(pressure.maxDaysOverdue, daysOverdue);
+    }
+    supplierPressure.set(supplier, pressure);
+  }
+  const laudusAging = ['Por vencer', '1–30 días', '31–60 días', '61–90 días', '>90 días', 'Sin fecha']
+    .map((bucket) => agingBuckets.get(bucket))
+    .filter(Boolean);
+  const laudusSupplierPressure = [...supplierPressure.values()]
+    .sort((a, b) => b.outstanding - a.outstanding)
+    .slice(0, 12);
+
   return {
     capability: 'finance',
     sources: [
@@ -167,6 +222,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       'procurement_accounts_payable_aging_summary_v1',
       'procurement_cash_forecast_summary_v1',
       'motil_laudus_finance_review_queue',
+      'laudus_purchase_invoice_payment_status_service_v1',
       'finance_asset_reconciliation_v1',
       'maintenance_cost_by_cost_center_v1',
     ],
@@ -191,6 +247,8 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       payable_aging: aging.data || [],
       cash_forecast: cashForecast.data || [],
       laudus_review: laudusReview.data || null,
+      laudus_aging: laudusAging,
+      laudus_supplier_pressure: laudusSupplierPressure,
       unresolved_asset_reconciliation: reconciliation.data || [],
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
       semantics: {
@@ -198,7 +256,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         budget: 'Un presupuesto cero o ausente no debe interpretarse como presupuesto aprobado igual a cero sin validar la fuente contractual/financiera correspondiente.',
         commitments: 'Compromisos de compra son compromisos registrados; no equivalen a gasto reconocido, pagado o devengado salvo evidencia explícita.',
         cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento. No es predicción estadística ni probabilidad futura.',
-        aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio.',
+        aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio. Para exposición actual Laudus, usa laudus_aging y laudus_supplier_pressure antes que un aging MOTIL vacío.',
         statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
         cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
       },
