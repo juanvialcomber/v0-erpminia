@@ -15,13 +15,14 @@ test('finance cockpit separates Laudus exposure from canonical MOTIL payables', 
   assert.doesNotMatch(page, /Trazabilidad económica y SERNAGEOMIN/);
 });
 
-test('finance manager can reach value scorecard and its API', () => {
-  const proxy = fs.readFileSync('proxy.ts', 'utf8');
+test('value scorecard stays internal and invisible to finance users', () => {
   const sidebar = fs.readFileSync('components/layout/sidebar.tsx', 'utf8');
   const route = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const finance = fs.readFileSync('app/dashboard/finanzas/page.tsx', 'utf8');
 
-  assert.match(proxy, /path === '\/dashboard\/valor'/);
-  assert.match(proxy, /path === '\/api\/value\/scorecard'/);
-  assert.match(sidebar, /href: '\/dashboard\/valor'.*moduleKey: 'fin_finanzas'/);
-  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.FIN_FINANZAS\)/);
+  assert.match(sidebar, /href: '\/dashboard\/valor'.*group: 'admin'.*roles: \['superadmin','admin'\]/);
+  assert.doesNotMatch(sidebar, /href: '\/dashboard\/valor'.*moduleKey: 'fin_finanzas'/);
+  assert.doesNotMatch(finance, />Valor MOTIL</);
+  assert.match(route, /const managementRoles = new Set\(\['superadmin', 'admin'\]\)/);
+  assert.match(route, /return NextResponse\.json\(\{ error: 'No autorizado' \}, \{ status: 403 \}\)/);
 });
