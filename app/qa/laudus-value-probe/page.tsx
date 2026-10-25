@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { runLaudusReadOnlyValueProbe } from '@/lib/integrations/laudus/client';
+import { runLaudusBankReconciliationSummary, runLaudusReadOnlyValueProbe } from '@/lib/integrations/laudus/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,8 @@ export default async function LaudusValueProbePage() {
 
   let result: unknown;
   try {
-    result = await runLaudusReadOnlyValueProbe();
+    const [coverage, reconciliation] = await Promise.all([runLaudusReadOnlyValueProbe(), runLaudusBankReconciliationSummary()]);
+    result = { coverage, reconciliation };
   } catch (error) {
     const status = error && typeof error === 'object' && 'status' in error
       ? Number((error as { status?: number }).status) || 502
