@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     const planId = text(body?.planId);
     if (!planId) return NextResponse.json({ error: 'Falta planId.' }, { status: 400 });
-    const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id,status').eq('organization_id', context.organizationId).eq('id', planId).maybeSingle();
+    const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id,status,plan_code,proposed_by').eq('organization_id', context.organizationId).eq('id', planId).maybeSingle();
     if (!plan) return NextResponse.json({ error: 'Plan estándar no encontrado.' }, { status: 404 });
 
     if (action === 'add_step') {
@@ -91,6 +91,87 @@ export async function POST(request: NextRequest) {
       });
       if (error) throw error;
       return NextResponse.json({ ok: true, stepId: data });
+    }
+
+    if (action === 'update_step') {
+      if (plan.status !== 'proposed') return NextResponse.json({ error: 'Sólo se editan planes propuestos.' }, { status: 409 });
+      const stepId = text(body?.stepId);
+      const title = text(body?.title);
+      if (!stepId || !title) return NextResponse.json({ error: 'Paso y título son obligatorios.' }, { status: 400 });
+      const { data: currentStep } = await context.supabase
+        .from('maintenance_standard_job_plan_steps')
+        .select('id,title,instructions,control_requirement,estimated_minutes')
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', stepId)
+        .maybeSingle();
+      if (!currentStep) return NextResponse.json({ error: 'Paso no encontrado.' }, { status: 404 });
+      const nextValues = {
+        title,
+        instructions: text(body?.instructions) || null,
+        control_requirement: text(body?.controlRequirement) || null,
+        estimated_minutes: body?.estimatedMinutes ? num(body.estimatedMinutes) : null,
+      };
+      const { error } = await context.supabase
+        .from('maintenance_standard_job_plan_steps')
+        .update(nextValues)
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', stepId);
+      if (error) throw error;
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        old_values: { step: currentStep },
+        new_values: { edit_type: 'update_step', step: nextValues, proposal_source: plan.proposed_by ? 'human' : 'motil' },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'remove_step') {
+      if (plan.status !== 'proposed') return NextResponse.json({ error: 'Sólo se editan planes propuestos.' }, { status: 409 });
+      const stepId = text(body?.stepId);
+      if (!stepId) return NextResponse.json({ error: 'Falta stepId.' }, { status: 400 });
+      const { data: currentStep } = await context.supabase
+        .from('maintenance_standard_job_plan_steps')
+        .select('id,title,instructions,control_requirement,estimated_minutes')
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', stepId)
+        .maybeSingle();
+      if (!currentStep) return NextResponse.json({ error: 'Paso no encontrado.' }, { status: 404 });
+      const { count } = await context.supabase
+        .from('maintenance_standard_job_plan_steps')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId);
+      if ((count || 0) <= 1) return NextResponse.json({ error: 'El plan debe conservar al menos un paso.' }, { status: 409 });
+      const { error } = await context.supabase
+        .from('maintenance_standard_job_plan_steps')
+        .delete()
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', stepId);
+      if (error) throw error;
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        old_values: { step: currentStep },
+        new_values: { edit_type: 'remove_step', proposal_source: plan.proposed_by ? 'human' : 'motil' },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      return NextResponse.json({ ok: true });
     }
 
     if (action === 'add_material') {
@@ -110,6 +191,79 @@ export async function POST(request: NextRequest) {
       });
       if (error) throw error;
       return NextResponse.json({ ok: true, product });
+    }
+
+    if (action === 'update_material') {
+      if (plan.status !== 'proposed') return NextResponse.json({ error: 'Sólo se editan planes propuestos.' }, { status: 409 });
+      const materialId = text(body?.materialId);
+      const quantity = num(body?.quantityRequired);
+      if (!materialId || !Number.isFinite(quantity) || quantity <= 0) return NextResponse.json({ error: 'Material y cantidad válida son obligatorios.' }, { status: 400 });
+      const { data: currentMaterial } = await context.supabase
+        .from('maintenance_standard_job_plan_materials')
+        .select('id,canonical_product_id,quantity_required,notes')
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', materialId)
+        .maybeSingle();
+      if (!currentMaterial) return NextResponse.json({ error: 'Material no encontrado.' }, { status: 404 });
+      const nextValues = {
+        quantity_required: quantity,
+        notes: text(body?.notes) || null,
+      };
+      const { error } = await context.supabase
+        .from('maintenance_standard_job_plan_materials')
+        .update(nextValues)
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', materialId);
+      if (error) throw error;
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        old_values: { material: currentMaterial },
+        new_values: { edit_type: 'update_material', material: nextValues, proposal_source: plan.proposed_by ? 'human' : 'motil' },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === 'remove_material') {
+      if (plan.status !== 'proposed') return NextResponse.json({ error: 'Sólo se editan planes propuestos.' }, { status: 409 });
+      const materialId = text(body?.materialId);
+      if (!materialId) return NextResponse.json({ error: 'Falta materialId.' }, { status: 400 });
+      const { data: currentMaterial } = await context.supabase
+        .from('maintenance_standard_job_plan_materials')
+        .select('id,canonical_product_id,quantity_required,notes')
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', materialId)
+        .maybeSingle();
+      if (!currentMaterial) return NextResponse.json({ error: 'Material no encontrado.' }, { status: 404 });
+      const { error } = await context.supabase
+        .from('maintenance_standard_job_plan_materials')
+        .delete()
+        .eq('organization_id', context.organizationId)
+        .eq('plan_id', planId)
+        .eq('id', materialId);
+      if (error) throw error;
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        old_values: { material: currentMaterial },
+        new_values: { edit_type: 'remove_material', proposal_source: plan.proposed_by ? 'human' : 'motil' },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      return NextResponse.json({ ok: true });
     }
 
     if (action === 'approve') {
