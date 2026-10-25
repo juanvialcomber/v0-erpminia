@@ -81,6 +81,16 @@ function productKey(row: { product_external_id?: string | null; sku?: string | n
   return sku ? `sku:${sku}` : null;
 }
 
+function amountsByCurrency(rows: Array<{ currency?: string | null; outstandingAmount?: number; outstanding_amount?: number | string | null }>) {
+  const totals: Record<string, number> = {};
+  for (const row of rows) {
+    const currency = String(row.currency || '').trim().toUpperCase() || 'UNKNOWN';
+    const raw = row.outstandingAmount ?? row.outstanding_amount;
+    totals[currency] = (totals[currency] || 0) + num(raw);
+  }
+  return totals;
+}
+
 function chunk<T>(rows: T[], size = QUERY_CHUNK) {
   const result: T[][] = [];
   for (let i = 0; i < rows.length; i += size) result.push(rows.slice(i, i + size));
@@ -199,7 +209,7 @@ export async function loadLaudusInvoicePoControl(
   const openInvoices = (openQuery.data || []) as OpenInvoice[];
   if (!openInvoices.length) {
     return {
-      summary: { openTotal: openQuery.count || 0, examined: 0, withLines: 0, withCandidate: 0, strong: 0, review: 0, exposureExamined: 0, candidateExposure: 0 },
+      summary: { openTotal: openQuery.count || 0, examined: 0, withLines: 0, withCandidate: 0, strong: 0, review: 0, exposureExaminedByCurrency: {}, candidateExposureByCurrency: {} },
       candidates: [] as InvoicePoCandidate[],
       readOnly: true,
     };
@@ -236,8 +246,8 @@ export async function loadLaudusInvoicePoControl(
         withCandidate: 0,
         strong: 0,
         review: 0,
-        exposureExamined: openInvoices.reduce((sum, row) => sum + num(row.outstanding_amount), 0),
-        candidateExposure: 0,
+        exposureExaminedByCurrency: amountsByCurrency(openInvoices),
+        candidateExposureByCurrency: {},
       },
       candidates: [] as InvoicePoCandidate[],
       readOnly: true,
@@ -368,8 +378,8 @@ export async function loadLaudusInvoicePoControl(
       withCandidate: candidates.length,
       strong: candidates.filter((row) => row.confidence === 'strong').length,
       review: candidates.filter((row) => row.confidence === 'review').length,
-      exposureExamined: openInvoices.reduce((sum, row) => sum + num(row.outstanding_amount), 0),
-      candidateExposure: candidates.reduce((sum, row) => sum + row.outstandingAmount, 0),
+      exposureExaminedByCurrency: amountsByCurrency(openInvoices),
+      candidateExposureByCurrency: amountsByCurrency(candidates),
     },
     candidates: candidates.slice(0, 10),
     readOnly: true,
