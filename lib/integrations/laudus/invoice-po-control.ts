@@ -108,9 +108,12 @@ function aggregateProducts<T extends { product_external_id?: string | null; sku?
     const current = map.get(key) || { quantity: 0, lineTotal: 0, unitPrice: null };
     current.quantity += num(row.quantity);
     current.lineTotal += num(row.line_total);
-    const unitPrice = num(row.unit_price);
-    if (unitPrice > 0) current.unitPrice = unitPrice;
     map.set(key, current);
+  }
+  for (const value of map.values()) {
+    value.unitPrice = value.quantity > 0 && value.lineTotal > 0
+      ? value.lineTotal / value.quantity
+      : null;
   }
   return map;
 }
@@ -288,6 +291,7 @@ export async function loadLaudusInvoicePoControl(
     const relevantOrders = orderHeaders.filter(
       (order) =>
         order.supplier_external_id === invoice.supplier_external_id &&
+        (!invoice.currency || !order.currency || invoice.currency.toUpperCase() === order.currency.toUpperCase()) &&
         withinWindow(order.issued_date, invoice.issued_date),
     );
 
