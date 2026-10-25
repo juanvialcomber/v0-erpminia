@@ -238,6 +238,7 @@ export async function runLaudusReadOnlyValueProbe() {
     shape: string | null;
     sampleFields: string[];
     upstreamStatus?: number | null;
+    upstreamCode?: string | null;
   }> = {};
 
   for (const [key, path, fields] of targets) {
@@ -258,6 +259,7 @@ export async function runLaudusReadOnlyValueProbe() {
         shape: null,
         sampleFields: [],
         upstreamStatus: laudusError?.status || null,
+        upstreamCode: laudusError?.upstreamCode || null,
       };
     }
   }
