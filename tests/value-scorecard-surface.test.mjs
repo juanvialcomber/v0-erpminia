@@ -105,3 +105,13 @@ test('maintenance shortage handoff measures only a real human-confirmed procurem
   assert.match(page, /Shortage → solicitud operativa/);
   assert.match(page, /la creación de la solicitud sigue requiriendo acción humana/);
 });
+
+
+test('internal value page exposes weekly planning learning without calling it ROI', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Planificación semanal aprendiendo con uso real/);
+  assert.match(page, /Aceptación planes MOTIL/);
+  assert.match(page, /calibración L4, no impacto económico/);
+  assert.match(page, /Mantención → Compras → recepción → instalación/);
+  assert.match(page, /deuda de calidad de datos/);
+});
