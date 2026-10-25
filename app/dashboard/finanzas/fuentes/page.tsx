@@ -30,6 +30,7 @@ type LaudusResponse = {
   generatedAt: string;
   version: string | null;
   summary: { endpoints: number; connectorReady: number; writeCapable: number; domains: number };
+  sourceGroups: Record<string, number>;
   rows: LaudusCapability[];
 };
 
@@ -81,6 +82,16 @@ export default function FinanceSourcesPage() {
             </div>
             {!laudusLoading && !laudusError && laudus ? <p className="text-xs text-muted-foreground">{laudus.summary.endpoints.toLocaleString('es-CL')} capacidades detectadas</p> : null}
           </div>
+          {!laudusLoading && !laudusError && laudus ? <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {[
+              ['Contabilidad', laudus.sourceGroups.accounting],
+              ['Compras', laudus.sourceGroups.purchases],
+              ['Producción', laudus.sourceGroups.production],
+              ['DTE', laudus.sourceGroups.DTE],
+              ['Personas', laudus.sourceGroups.HR],
+              ['Reportes', laudus.sourceGroups.reports],
+            ].filter(([, value]) => Number(value || 0) > 0).map(([label, value]) => <span key={String(label)} className="rounded-md border px-2 py-1">{label} · {Number(value).toLocaleString('es-CL')}</span>)}
+          </div> : null}
         </div>
         {laudusLoading ? <div className="p-4 text-sm text-muted-foreground">Verificando capacidades de Laudus…</div> : null}
         {laudusError ? <div className="p-4 text-sm text-muted-foreground">No fue posible verificar el catálogo Laudus en este momento.</div> : null}
