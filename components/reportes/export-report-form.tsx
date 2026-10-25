@@ -42,9 +42,9 @@ export function ExportReportForm() {
       } else {
         setError('No se pudo generar el reporte');
       }
-    } catch {
+    } catch (err) {
       console.error('[v0] Export error:', err);
-        setError('No se pudo descargar el archivo. Inténtalo de nuevo.');
+      setError('No se pudo descargar el archivo. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
