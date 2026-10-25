@@ -55,6 +55,16 @@ function depreciationShape(value: unknown) {
   return { kind: value === null ? 'null' : 'missing' };
 }
 
+function objectShape(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { kind: value === null ? 'null' : typeof value, fields: [] as string[] };
+  }
+  return {
+    kind: 'object',
+    fields: Object.keys(value as Record<string, unknown>).slice(0, 80),
+  };
+}
+
 function depreciationSummary(value: unknown) {
   if (!Array.isArray(value)) return null;
   const rows = value.filter(
@@ -139,6 +149,7 @@ export async function readLaudusFixedAssetEconomics(candidates: FixedAssetCandid
         depreciationShape: depreciationShape(detail.depreciation),
         depreciationSummary: depreciationSummary(detail.depreciation),
         purchaseInvoiceLinked: Boolean(detail.purchaseInvoice),
+        purchaseInvoiceShape: objectShape(detail.purchaseInvoice),
         invoiceNumber: stringOrNull(detail.invoiceNumber),
       });
     } catch (error) {
