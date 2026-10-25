@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { Database, FileText } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -31,7 +31,7 @@ type Response = {
 const fetcher = async (url: string): Promise<Response> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar las fuentes de Finanzas');
+  if (!response.ok) throw new Error('No se pudo cargar el origen de los datos. Inténtalo de nuevo.');
   return payload as Response;
 };
 
@@ -39,28 +39,42 @@ function date(value: string | null) {
   return value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(new Date(value)) : 'Sin fecha';
 }
 
+function sourceTitle(source: Source) {
+  if (source.sourceTable === 'canonical.asset_costs') return 'Gastos asociados a equipos';
+  if (source.sourceTable === 'canonical.purchase_order_lines') return 'Órdenes de compra';
+  return source.label;
+}
+
+function sourceStatus(source: Source) {
+  return source.recognitionStatus === 'recognized' ? 'Gasto registrado' : 'Compra ordenada';
+}
+
+function currencyName(currency: string) {
+  return currency === 'CLP' ? 'pesos chilenos' : currency;
+}
+
 export default function FinanceSourcesPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
 
-  if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Leyendo la trazabilidad canónica certificada." />;
-  if (error || !data) return <StatePanel tone="error" title="Fuentes financieras no disponibles" description="No se reemplaza provenance faltante por una lista vacía." />;
+  if (isLoading) return <StatePanel tone="loading" title="Cargando el origen de los datos" description="Revisando los registros de compras y gastos." />;
+  if (error || !data) return <StatePanel tone="error" title="No se pudo cargar el origen de los datos" description="Inténtalo de nuevo más tarde." />;
 
   return (
     <div className="space-y-5">
       <header className="border-b border-border/70 pb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Provenance</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fuentes</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Origen de los datos</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">De dónde salen los montos</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Origen certificado del costo reconocido y de las compras comprometidas. MOTIL mantiene separada la tabla canónica de los archivos documentales nuevos.
+          Aquí puedes ver qué registros respaldan los gastos y las órdenes de compra. Los archivos que subas se guardan por separado y no cambian este historial.
         </p>
       </header>
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
-          ['Eventos auditables', data.summary.auditEvents],
-          ['Costo reconocido', data.summary.recognizedEvents],
-          ['Compra comprometida', data.summary.committedEvents],
-          ['Documentos Finanzas', data.summary.documentCoreRecords],
+          ['Registros de compras y gastos', data.summary.auditEvents],
+          ['Gastos registrados', data.summary.recognizedEvents],
+          ['Órdenes de compra', data.summary.committedEvents],
+          ['Archivos de Finanzas', data.summary.documentCoreRecords],
         ].map(([label, value], index) => (
           <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -71,9 +85,9 @@ export default function FinanceSourcesPage() {
 
       {data.summary.documentCoreRecords === 0 ? (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
-          <p className="text-sm font-medium">La trazabilidad histórica está certificada por tablas canónicas, no por archivos preservados en el Document Core.</p>
+          <p className="text-sm font-medium">El historial anterior proviene de registros de compras y gastos, no de archivos cargados aquí.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Los archivos que se suban desde ahora a Finanzas quedarán en el núcleo documental sin alterar los eventos históricos certificados.
+            Los archivos nuevos se guardan por separado y no modifican los movimientos anteriores.
           </p>
         </div>
       ) : null}
@@ -85,20 +99,15 @@ export default function FinanceSourcesPage() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Database className="h-4 w-4 text-muted-foreground" />
-                  <h2 className="text-sm font-semibold">{source.label}</h2>
-                  <Badge variant="secondary">Tabla canónica</Badge>
-                  <Badge variant="outline">{source.meaning}</Badge>
+                  <h2 className="text-sm font-semibold">{sourceTitle(source)}</h2>
+                  <Badge variant="secondary">{sourceStatus(source)}</Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {source.sourceTable} · {source.records.toLocaleString('es-CL')} eventos · {source.currency}
+                  {source.records.toLocaleString('es-CL')} registros · montos en {currencyName(source.currency)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Cobertura: {date(source.firstEventAt)} → {date(source.lastEventAt)}
+                  Desde {date(source.firstEventAt)} hasta {date(source.lastEventAt)}
                 </p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <FileText className="h-4 w-4" />
-                <span>No se presenta como archivo Excel original</span>
               </div>
             </div>
           </article>

@@ -28,7 +28,7 @@ type Response = { costCenter: CostCenter; actualCosts: ActualCost[]; purchaseOrd
 const fetcher = async (url: string): Promise<Response> => {
   const response = await fetch(url, { credentials: 'include' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el centro de costo');
+  if (!response.ok) throw new Error('No se pudo cargar la información del centro de costo. Inténtalo de nuevo.');
   return payload;
 };
 
@@ -59,7 +59,7 @@ export default function CostCenterProfilePage() {
           <div>
             <p className="font-mono text-xs text-muted-foreground">{center.cost_center_code}</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{center.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{center.full_path || 'Centro de costo canónico'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{center.full_path || 'Centro de costo'}</p>
           </div>
           <Badge variant="outline">{center.financial_status}</Badge>
         </div>
@@ -78,14 +78,14 @@ export default function CostCenterProfilePage() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section>
-          <h2 className="mb-3 text-sm font-semibold">Movimientos reconocidos</h2>
+          <h2 className="mb-3 text-sm font-semibold">Gastos registrados</h2>
           <div className="divide-y divide-border/70 border-t border-border/70">
             {data.actualCosts.length ? data.actualCosts.map((row) => (
               <div key={row.id} className="flex items-start justify-between gap-4 py-3">
                 <div><p className="text-sm font-medium">{row.description || row.category || 'Movimiento'}</p><p className="text-xs text-muted-foreground">{date(row.transaction_date)} · {row.asset_code || row.document_number || 'Sin referencia'}</p></div>
                 <p className="text-sm font-medium tabular-nums">{money(row.total_cost)}</p>
               </div>
-            )) : <p className="py-3 text-sm text-muted-foreground">Sin movimientos reconocidos asociados.</p>}
+            )) : <p className="py-3 text-sm text-muted-foreground">No hay gastos asociados a este centro de costo.</p>}
           </div>
         </section>
 

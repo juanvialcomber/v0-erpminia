@@ -3,13 +3,12 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el detalle financiero');
+  if (!response.ok) throw new Error('No se pudo cargar el detalle financiero. Inténtalo de nuevo.');
   return payload;
 };
 
@@ -36,28 +35,24 @@ export default function CertifiedFinanceDetailPage() {
       <section className="border-b pb-5">
         <p className="text-sm text-muted-foreground">Finanzas · {labels[entity] || 'Entidad'}</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{id}</h1>
-        <div className="mt-3 flex items-center gap-2">
-          <Badge variant="secondary">CANONICAL</Badge>
-          <Badge variant="outline">CLP</Badge>
-        </div>
       </section>
 
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando detalle...</p> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Costo reconocido</p><p className="mt-1 text-xl font-semibold">{money(summary.recognized_clp)}</p></CardContent></Card>
-        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Comprometido</p><p className="mt-1 text-xl font-semibold">{money(summary.committed_clp)}</p></CardContent></Card>
-        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Eventos</p><p className="mt-1 text-xl font-semibold">{number(Number(summary.recognized_event_count || 0) + Number(summary.committed_event_count || 0))}</p></CardContent></Card>
-        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Período</p><p className="mt-1 text-sm font-medium">{date(summary.first_event_at)}</p><p className="text-xs text-muted-foreground">hasta {date(summary.last_event_at)}</p></CardContent></Card>
+        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Gastos registrados</p><p className="mt-1 text-xl font-semibold">{money(summary.recognized_clp)}</p></CardContent></Card>
+        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Órdenes de compra</p><p className="mt-1 text-xl font-semibold">{money(summary.committed_clp)}</p></CardContent></Card>
+        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Movimientos</p><p className="mt-1 text-xl font-semibold">{number(Number(summary.recognized_event_count || 0) + Number(summary.committed_event_count || 0))}</p></CardContent></Card>
+        <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Fechas registradas</p><p className="mt-1 text-sm font-medium">{date(summary.first_event_at)}</p><p className="text-xs text-muted-foreground">hasta {date(summary.last_event_at)}</p></CardContent></Card>
       </div>
 
       <div className="rounded-lg border p-4 text-sm">
-        <p className="font-medium">Lectura correcta</p>
-        <p className="mt-1 text-muted-foreground">El costo reconocido y el compromiso de compra son conceptos separados y nunca se suman automáticamente.</p>
+        <p className="font-medium">Cómo leer estos montos</p>
+        <p className="mt-1 text-muted-foreground">Los gastos registrados y las órdenes de compra aparecen por separado. No los sumes: una orden puede convertirse en gasto cuando se recibe la compra.</p>
       </div>
 
-      <Link href={`/dashboard/finanzas/trazabilidad?q=${encodeURIComponent(id)}`} className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted">Ver registros de origen</Link>
+      <Link href={`/dashboard/finanzas/trazabilidad?q=${encodeURIComponent(id)}`} className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted">Ver movimientos de origen</Link>
     </div>
   );
 }

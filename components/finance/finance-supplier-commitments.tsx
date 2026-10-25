@@ -56,48 +56,48 @@ export function FinanceSupplierCommitments() {
       <Card className="shadow-none">
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Concentración financiera</p>
-            <CardTitle id="supplier-commitments-title" className="text-lg">Compras comprometidas por proveedor de origen</CardTitle>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Compras por proveedor</p>
+            <CardTitle id="supplier-commitments-title" className="text-lg">Proveedores con mayores compras</CardTitle>
             <CardDescription className="max-w-3xl">
-              Montos asociados a órdenes de compra. No representan CxP aprobadas ni saldo por pagar.
+              El monto corresponde a órdenes de compra; no significa que la factura esté aprobada ni que el pago se haya realizado.
             </CardDescription>
           </div>
           {!isLoading && !error && sourceRows.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">Mostrando {ranked.length} de {sourceRows.length}</Badge>
-              {unlinked > 0 ? <Badge variant="outline">{unlinked} de {sourceRows.length} sin vínculo</Badge> : null}
+              <Badge variant="outline">{ranked.length} proveedores</Badge>
+              {unlinked > 0 ? <Badge variant="outline">{unlinked} sin ficha</Badge> : null}
             </div>
           ) : null}
         </CardHeader>
         <CardContent className="space-y-3">
-          {isLoading ? <p className="py-3 text-sm text-muted-foreground">Cargando compromisos...</p> : null}
+          {isLoading ? <p className="py-3 text-sm text-muted-foreground">Cargando compras...</p> : null}
           {error ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-              <p className="text-sm text-destructive">No fue posible cargar la concentración de compras.</p>
+              <p className="text-sm text-destructive">No fue posible cargar los datos de compras.</p>
               <Button variant="outline" size="sm" onClick={() => void mutate()}>Reintentar</Button>
             </div>
           ) : null}
           {!isLoading && !error && ranked.length === 0 ? (
-            <p className="py-3 text-sm text-muted-foreground">Sin compras comprometidas disponibles para esta vista.</p>
+            <p className="py-3 text-sm text-muted-foreground">No hay compras para mostrar.</p>
           ) : null}
           {ranked.map((row, index) => {
             const linked = Boolean(row.supplier_id);
-            const supplierName = row.supplier_name || 'Proveedor sin nombre en origen';
+            const supplierName = row.supplier_name || 'Proveedor sin nombre en la orden';
             const content = (
               <div className="grid gap-2 rounded-md border px-3 py-3 transition-colors sm:grid-cols-[32px_minmax(0,1fr)_auto] sm:items-center">
                 <span className="text-sm tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{supplierName}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {number(row.purchase_order_count)} OC · {number(row.line_count)} líneas ·{' '}
+                    {number(row.purchase_order_count)} órdenes · {number(row.line_count)} líneas ·{' '}
                     {row.supplier_tax_id && row.supplier_tax_id !== 'SIN-RUT'
                       ? `RUT ${row.supplier_tax_id}`
-                      : 'RUT no disponible en la fuente'}
+                      : 'RUT no disponible'}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <Badge variant={linked ? 'secondary' : 'outline'}>
-                    {linked ? 'Vinculado al maestro' : 'Sin vínculo canónico'}
+                    {linked ? 'Tiene ficha de proveedor' : 'Falta ficha de proveedor'}
                   </Badge>
                   <p className="text-sm font-semibold tabular-nums">{money(row.committed_clp)}</p>
                 </div>
@@ -117,7 +117,7 @@ export function FinanceSupplierCommitments() {
           })}
           {!isLoading && !error && sourceRows.length > 0 ? (
             <p className="pt-1 text-xs text-muted-foreground">
-              Los nombres sin vínculo se muestran como origen y no se asocian automáticamente a una ficha MOTIL.
+              Los nombres que aún no tienen ficha se mantienen separados para evitar unir proveedores distintos por error.
             </p>
           ) : null}
         </CardContent>

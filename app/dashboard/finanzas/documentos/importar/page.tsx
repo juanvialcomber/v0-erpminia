@@ -20,12 +20,12 @@ export default function FinanzasDocumentosImportarPage() {
         <div>
           <h1 className="text-3xl font-bold">Importar documentos de finanzas</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Ruta dedicada para cargar politicas, procedimientos, respaldos y anexos documentales del modulo financiero.
+            Sube políticas, procedimientos y respaldos para que queden asociados a Finanzas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Importador tabular</Link>
+            <Link href="/dashboard/finanzas/importar">Importar movimientos</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/dashboard/finanzas/documentos">
@@ -43,14 +43,14 @@ export default function FinanzasDocumentosImportarPage() {
             Subir documento financiero
           </CardTitle>
           <CardDescription>
-            Acepta PDF, Word y Excel. El archivo queda asociado al módulo finanzas para revisión y trazabilidad.
+            Puedes subir archivos PDF, Word y Excel. Quedarán guardados en Finanzas para que puedas consultarlos después.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={handleUploadSuccess} />
           {uploadedName ? (
             <div className="rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-              Ultimo archivo cargado: <span className="font-medium text-foreground">{uploadedName}</span>
+              Último archivo cargado: <span className="font-medium text-foreground">{uploadedName}</span>
             </div>
           ) : null}
         </CardContent>

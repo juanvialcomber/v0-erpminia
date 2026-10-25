@@ -56,12 +56,12 @@ export default function ReportesPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 border-b border-border pb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Gestión transversal · Análisis y exportación
+          Documentos y reportes
         </p>
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Reportes</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground md:text-base">
-            Exporta información operacional y revisa pendientes documentales antes de descargar.
+            Descarga información de distintas áreas y revisa los documentos pendientes.
           </p>
         </div>
       </header>
@@ -72,8 +72,8 @@ export default function ReportesPage() {
             <div className="flex items-start gap-3 text-sm">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
               <div>
-                <p className="font-medium">No fue posible cargar el resumen documental.</p>
-                <p className="text-muted-foreground">El generador de reportes sigue disponible. Los conteos permanecen sin dato hasta recuperar la fuente.</p>
+                <p className="font-medium">No se pudo consultar el estado de los documentos.</p>
+                <p className="text-muted-foreground">Puedes descargar reportes. Los totales volverán a aparecer cuando se recupere la información.</p>
               </div>
             </div>
             <Button variant="outline" onClick={() => void loadSummary()}>Reintentar</Button>
@@ -91,7 +91,7 @@ export default function ReportesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">{summaryValue('total')}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Disponibles para reporte</p>
+              <p className="mt-1 text-xs text-muted-foreground">Disponibles para descargar</p>
           </CardContent>
         </Card>
 
@@ -109,12 +109,12 @@ export default function ReportesPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <ShieldCheck className="h-4 w-4 text-secondary" />
-              Fuente
+              Estado de documentos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-semibold">{isLoading ? 'Sincronizando' : summary?.status || 'No disponible'}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Estado del resumen documental</p>
+            <div className="text-2xl font-semibold">{isLoading ? 'Consultando...' : summary?.status || 'No disponible'}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Estado de los archivos guardados</p>
           </CardContent>
         </Card>
       </div>

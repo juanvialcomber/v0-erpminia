@@ -55,10 +55,10 @@ interface DocumentListProps {
 
 const statusConfig: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   draft: { label: 'Borrador', color: 'bg-muted text-muted-foreground border border-border', icon: Clock },
-  pending_l1: { label: 'Revisión L1', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/30', icon: Clock },
-  pending_l2: { label: 'Revisión L2', color: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30', icon: Clock },
-  en_revision_l1: { label: 'Revisión L1', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/30', icon: Clock },
-  en_revision_l2: { label: 'Revisión L2', color: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30', icon: Clock },
+  pending_l1: { label: 'Primera revisión', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/30', icon: Clock },
+  pending_l2: { label: 'Segunda revisión', color: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30', icon: Clock },
+  en_revision_l1: { label: 'Primera revisión', color: 'bg-blue-500/10 text-blue-400 border border-blue-500/30', icon: Clock },
+  en_revision_l2: { label: 'Segunda revisión', color: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30', icon: Clock },
   active: { label: 'Vigente', color: 'bg-green-500/10 text-green-400 border border-green-500/30', icon: CheckCircle2 },
   aprobado: { label: 'Vigente', color: 'bg-green-500/10 text-green-400 border border-green-500/30', icon: CheckCircle2 },
   rejected: { label: 'Rechazado', color: 'bg-red-500/10 text-red-400 border border-red-500/30', icon: AlertCircle },
@@ -165,7 +165,7 @@ export function DocumentList({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Buscar por nombre, código (ej: DPRMA-007), tipo de documento..."
+                placeholder="Buscar por nombre, número o tipo de documento..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 pr-9"
