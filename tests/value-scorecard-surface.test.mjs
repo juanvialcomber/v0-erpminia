@@ -148,3 +148,17 @@ test('maintenance value gates link to the workflow that produces the missing evi
   assert.match(page, /dashboard\/mantenimiento\/planificacion/);
   assert.match(page, /dashboard\/compras/);
 });
+
+
+test('internal value page shows observed standard plan execution quality without estimates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  assert.match(api, /standardPlanOutcomeQuality/);
+  assert.match(api, /medianDurationErrorPct/);
+  assert.match(api, /scheduleAdherencePct/);
+  assert.match(api, /no sample is estimated/);
+  assert.match(page, /Error mediano de duración/);
+  assert.match(page, /Dentro de ±20% del plan/);
+  assert.match(page, /Inicio en fecha programada/);
+  assert.match(page, /Sin muestra/);
+});
