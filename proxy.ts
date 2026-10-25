@@ -133,6 +133,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
     '/api/integrations/laudus/bank-reconciliation',
     '/api/integrations/laudus/finance-review-feedback',
     '/api/integrations/laudus/fixed-asset-readiness',
+    '/api/integrations/laudus/fixed-asset-economics',
   ]);
   if (financeIntegrationRoutes.has(path)) {
     return path === '/api/integrations/laudus/finance-review-feedback' ? true : readOnly;
