@@ -59,31 +59,34 @@ test('Daniel sees decision-grade aging and pressure charts instead of decorative
 });
 
 
-test('asset economics keeps depreciation monetary values gated by verified acquisition cost',()=>{
-  assert.match(page,/Economía del activo/);
-  assert.match(page,/Vida útil y conciliación económica/);
+test('asset economics stays compact, native to MOTIL and evidence-gated',()=>{
+  assert.match(page,/Qué conviene destrabar primero/);
+  assert.match(page,/Prioridades de conciliación/);
+  assert.match(page,/Readiness de depreciación/);
   assert.match(page,/Depreciación CLP bloqueada/);
-  assert.match(page,/MOTIL no reparte el total de una factura entre activos sin evidencia/);
-  assert.match(page,/fin de vida útil calendario según Laudus/);
-});
-
-
-test('asset economics exposes depreciation readiness without fabricating book value',()=>{
+  assert.match(page,/MOTIL no reparte montos de factura entre activos sin evidencia/);
   assert.match(page,/Costo histórico por conciliar/);
   assert.match(page,/no es ahorro ni valor libro/);
-  assert.match(page,/Qué activo revisar/);
 });
 
-
-test('high-maintenance ambiguous assets are shown as reconciliation priorities, not confirmed economics',()=>{
-  assert.match(page,/Destrabar valor primero/);
-  assert.match(page,/múltiples candidatos Laudus/);
-  assert.match(page,/no es ahorro ni valor libro/);
-  assert.match(page,/No se mezcla con costos de activos todavía ambiguos/);
+test('asset photos are identification thumbnails, not hero content',()=>{
+  assert.match(page,/getEquipmentImage/);
+  assert.match(page,/h-10 w-12/);
+  assert.match(page,/Fotos referenciales · identificación rápida/);
+  assert.doesNotMatch(page,/h-44 w-full object-cover/);
 });
 
+test('asset economics separates strong matches from reconciliation opportunities',()=>{
+  assert.match(page,/Activos Laudus/);
+  assert.match(page,/Matches fuertes/);
+  assert.match(page,/Por conciliar/);
+  assert.match(page,/Identidad requiere revisión humana/);
+  assert.match(page,/Vida útil · matches fuertes/);
+});
 
-test('asset economics explains historical invoice coverage before depreciation',()=>{
-  assert.match(page,/Backfill histórico/);
-  assert.match(page,/histórico de facturas disponible comienza/);
+test('finance charts respect Patagua semantic colors',()=>{
+  assert.match(page,/var\(--primary\)/);
+  assert.match(page,/var\(--secondary\)/);
+  assert.match(page,/var\(--destructive\)/);
+  assert.doesNotMatch(page,/blue-|purple-|violet-|bg-gradient|from-|to-/);
 });
