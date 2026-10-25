@@ -108,7 +108,10 @@ type ApiResponse = {
       motilDecisions?: number;
       approved?: number;
       rejected?: number;
+      editedPlans?: number;
+      editEvents?: number;
       acceptanceRatePct?: number | null;
+      correctionRatePct?: number | null;
       medianDecisionCycleSeconds?: number | null;
       evidenceLevel?: string;
       semantics?: string;
@@ -424,18 +427,20 @@ export default function ValueScorecardPage() {
             Mide interacción y calibración humana. No convierte apertura, aprobación o velocidad de decisión en ahorro.
           </p>
         </div>
-        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
           {[
             ['Sesiones', weeklyPlanning.sessions || 0],
             ['Decisiones abiertas', weeklyPlanning.decisionsOpened || 0],
             ['Activos revisados', weeklyPlanning.uniqueAssetsEngaged || 0],
             ['Planes MOTIL decididos', standardPlanLearning.motilDecisions || 0],
+            ['Planes corregidos', standardPlanLearning.editedPlans || 0],
             ['Aceptación planes MOTIL', standardPlanLearning.acceptanceRatePct == null ? null : standardPlanLearning.acceptanceRatePct],
+            ['Corrección planes MOTIL', standardPlanLearning.correctionRatePct == null ? null : standardPlanLearning.correctionRatePct],
           ].map(([label, value]) => (
             <div key={String(label)} className="bg-card px-5 py-5">
               <p className="text-xs text-muted-foreground">{label}</p>
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {value == null ? '—' : label === 'Aceptación planes MOTIL' ? `${number(value)}%` : number(value)}
+                {value == null ? '—' : label.includes('planes MOTIL') && (label.startsWith('Aceptación') || label.startsWith('Corrección')) ? `${number(value)}%` : number(value)}
               </p>
             </div>
           ))}
