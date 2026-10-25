@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const organizationId = context.organizationId;
-    const [overview, assets, products, suppliers, costCenters, validation, recent, alerts, operationalProcurement, operationalEvents, treasury, treasuryAging, cashForecast, laudusReview, laudusFixedAssetReview, laudusOpenPage1, laudusOpenPage2] = await Promise.all([
+    const [overview, assets, products, suppliers, costCenters, validation, recent, alerts, operationalProcurement, operationalEvents, treasury, treasuryAging, cashForecast, laudusReview, laudusFixedAssetReview, laudusInvoiceCoverageStart, laudusOpenPage1, laudusOpenPage2] = await Promise.all([
       context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
       context.supabase.from('canonical_finance_assets').select('*').eq('organization_id', organizationId).order('recognized_clp', { ascending: false }).limit(10),
       context.supabase.from('canonical_finance_products').select('*').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(10),
@@ -27,6 +27,14 @@ export async function GET(request: NextRequest) {
       context.supabase.rpc('motil_laudus_fixed_asset_review_queue', { p_organization_id: organizationId, p_limit: 1000 }),
       context.supabase
         .from('laudus_purchase_invoice_payment_status_service_v1')
+        .select('issued_date')
+        .eq('organization_id', organizationId)
+        .not('issued_date', 'is', null)
+        .order('issued_date', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      context.supabase
+        .from('laudus_purchase_invoice_payment_status_service_v1')
         .select('supplier_name,outstanding_amount,due_date')
         .eq('organization_id', organizationId)
         .gt('outstanding_amount', 0)
@@ -41,7 +49,7 @@ export async function GET(request: NextRequest) {
         .range(1000, 1999),
     ]);
 
-    const error = overview.error || assets.error || products.error || suppliers.error || costCenters.error || validation.error || recent.error || alerts.error || operationalProcurement.error || operationalEvents.error || treasury.error || treasuryAging.error || cashForecast.error || laudusReview.error || laudusFixedAssetReview.error || laudusOpenPage1.error || laudusOpenPage2.error;
+    const error = overview.error || assets.error || products.error || suppliers.error || costCenters.error || validation.error || recent.error || alerts.error || operationalProcurement.error || operationalEvents.error || treasury.error || treasuryAging.error || cashForecast.error || laudusReview.error || laudusFixedAssetReview.error || laudusInvoiceCoverageStart.error || laudusOpenPage1.error || laudusOpenPage2.error;
     if (error) throw error;
 
     const laudusOpen = [...(laudusOpenPage1.data || []), ...(laudusOpenPage2.data || [])];
@@ -153,6 +161,11 @@ export async function GET(request: NextRequest) {
     }
 
     const now = new Date();
+    const invoiceCoverageStart =
+      typeof laudusInvoiceCoverageStart.data?.issued_date === 'string'
+        ? laudusInvoiceCoverageStart.data.issued_date.slice(0, 10)
+        : null;
+
     const assetEconomics = strongAssetCandidates.map((row) => {
       const acquisitionDate = typeof row.acquisition_date === 'string' ? row.acquisition_date : null;
       const usefulLifeYears = Number(row.useful_life || 0);
@@ -210,6 +223,12 @@ export async function GET(request: NextRequest) {
         acquisitionCost: acquisitionCost > 0 ? acquisitionCost : null,
         realizableValue,
         depreciationStatus: depreciationReady ? 'estimated_from_verified_cost' : 'blocked_missing_acquisition_cost',
+        costRecoveryStatus:
+          acquisitionCost > 0
+            ? 'cost_available'
+            : acquisitionDate && invoiceCoverageStart && acquisitionDate < invoiceCoverageStart
+              ? 'historical_backfill_required'
+              : 'document_lookup_required',
         annualDepreciation,
         accumulatedDepreciation,
         estimatedBookValue,
@@ -276,6 +295,9 @@ export async function GET(request: NextRequest) {
       depreciationBlocked: assetEconomics.filter((row) => row.depreciationStatus === 'blocked_missing_acquisition_cost').length,
       withMaintenanceHistory: assetEconomics.filter((row) => row.maintenanceCost > 0).length,
       fullyConsumedByCalendar: assetEconomics.filter((row) => Number(row.lifeConsumedPct || 0) >= 1).length,
+      historicalBackfillRequired: assetEconomics.filter((row) => row.costRecoveryStatus === 'historical_backfill_required').length,
+      documentLookupRequired: assetEconomics.filter((row) => row.costRecoveryStatus === 'document_lookup_required').length,
+      invoiceCoverageStart,
       reconciliationOpportunities: assetReconciliationOpportunities.length,
       reconciliationOpportunityMaintenanceCost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenanceCost, 0),
     };
