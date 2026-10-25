@@ -37,3 +37,14 @@ test('weekly planning uses an explicit seven-day operating window', () => {
   assert.match(workspace, /próximos 7 días/);
   assert.match(workspace, /Semana operativa/);
 });
+
+
+test('weekly planning separates stale evidence from live material shortages', () => {
+  assert.match(api, /work_order_material_requirements/);
+  assert.match(api, /actualMaterialShortage/);
+  assert.match(api, /evidenceFreshness/);
+  assert.match(api, /readingAgeDays <= 30/);
+  assert.match(workspace, /Faltante real en OT/);
+  assert.match(workspace, /Actualizar lectura/);
+  assert.match(workspace, /estado materiales en fuente/);
+});
