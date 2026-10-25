@@ -31,6 +31,7 @@ test('canonical upload and reads are organization scoped and preserve provenance
   assert.match(uploadRoute, /organization_id: auth\.organizationId/);
   assert.match(uploadRoute, /provenance_status: 'operational'/);
   assert.match(uploadRoute, /\.eq\('organization_id', auth\.organizationId\)/);
-  assert.match(listRoute, /\.eq\('organization_id', auth\.organizationId\)/);
+  assert.match(listRoute, /const organizationId = auth\.organizationId/);
+  assert.match(listRoute, /\.eq\('organization_id', organizationId\)/);
   assert.match(listComponent, /Fuente canónica/);
 });
