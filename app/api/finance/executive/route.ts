@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
       ['strong_identifier_candidate', 'strong_candidate'].includes(String(row.evidence_level || '')),
     );
     const candidateAssetIds = [...new Set(
-      strongAssetCandidates
+      fixedAssetQueue
         .map((row) => String(row.canonical_asset_id || ''))
         .filter(Boolean),
     )];
@@ -219,6 +219,54 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const reconciliationGroups = new Map<string, {
+      canonicalAssetId: string;
+      canonicalAssetCode: string | null;
+      canonicalAssetName: string | null;
+      candidateCount: number;
+      exactIdentifierCount: number;
+      evidenceLevels: Set<string>;
+      laudusNames: Set<string>;
+    }>();
+    for (const row of fixedAssetQueue) {
+      const canonicalAssetId = String(row.canonical_asset_id || '');
+      if (!canonicalAssetId) continue;
+      const group = reconciliationGroups.get(canonicalAssetId) || {
+        canonicalAssetId,
+        canonicalAssetCode: row.canonical_asset_code ? String(row.canonical_asset_code) : null,
+        canonicalAssetName: row.canonical_asset_name ? String(row.canonical_asset_name) : null,
+        candidateCount: 0,
+        exactIdentifierCount: 0,
+        evidenceLevels: new Set<string>(),
+        laudusNames: new Set<string>(),
+      };
+      group.candidateCount += 1;
+      if (Boolean(row.exact_plate_support) || Boolean(row.exact_serial_support)) group.exactIdentifierCount += 1;
+      if (row.evidence_level) group.evidenceLevels.add(String(row.evidence_level));
+      if (row.laudus_name) group.laudusNames.add(String(row.laudus_name));
+      reconciliationGroups.set(canonicalAssetId, group);
+    }
+
+    const assetReconciliationOpportunities = [...reconciliationGroups.values()]
+      .map((group) => {
+        const maintenance = maintenanceByAsset.get(group.canonicalAssetId) || { cost: 0, movements: 0, lastCostDate: null };
+        return {
+          canonicalAssetId: group.canonicalAssetId,
+          canonicalAssetCode: group.canonicalAssetCode,
+          canonicalAssetName: group.canonicalAssetName,
+          candidateCount: group.candidateCount,
+          exactIdentifierCount: group.exactIdentifierCount,
+          evidenceLevels: [...group.evidenceLevels],
+          laudusNames: [...group.laudusNames].slice(0, 6),
+          maintenanceCost: maintenance.cost,
+          maintenanceMovements: maintenance.movements,
+          lastMaintenanceCostDate: maintenance.lastCostDate,
+        };
+      })
+      .filter((row) => row.maintenanceCost > 0)
+      .sort((a, b) => b.maintenanceCost - a.maintenanceCost)
+      .slice(0, 10);
+
     const assetEconomicsSummary = {
       laudusAssets: Number(fixedAssetPayload.summary?.laudus_assets || 0),
       candidateRows: Number(fixedAssetPayload.summary?.candidate_rows || fixedAssetQueue.length),
@@ -228,6 +276,8 @@ export async function GET(request: NextRequest) {
       depreciationBlocked: assetEconomics.filter((row) => row.depreciationStatus === 'blocked_missing_acquisition_cost').length,
       withMaintenanceHistory: assetEconomics.filter((row) => row.maintenanceCost > 0).length,
       fullyConsumedByCalendar: assetEconomics.filter((row) => Number(row.lifeConsumedPct || 0) >= 1).length,
+      reconciliationOpportunities: assetReconciliationOpportunities.length,
+      reconciliationOpportunityMaintenanceCost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenanceCost, 0),
     };
 
     return NextResponse.json({
@@ -249,6 +299,7 @@ export async function GET(request: NextRequest) {
       laudusSupplierPressure,
       laudusPressureTrajectory,
       assetEconomics,
+      assetReconciliationOpportunities,
       assetEconomicsSummary,
       certification: {
         origin: 'CANONICAL+ERP',
