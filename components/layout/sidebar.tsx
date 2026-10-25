@@ -31,7 +31,7 @@ const menuItems: MenuItem[] = [
   { itemKey: 'warehouse', href: '/dashboard/bodega', icon: Boxes, group: 'areas', moduleKey: 'bodega_inventario', roles: ['superadmin','admin','Bodega-Supervisor','jefe_mantencion'] },
   { itemKey: 'procurement', href: '/dashboard/compras', icon: ShoppingCart, group: 'areas', moduleKey: 'fin_compras', roles: ['superadmin','admin','Compras-Supervisor'] },
   { itemKey: 'finance', href: '/dashboard/finanzas', icon: CircleDollarSign, group: 'areas', moduleKey: 'fin_finanzas', roles: ['superadmin','admin','Finanzas-Supervisor'] },
-  { itemKey: 'value', href: '/dashboard/valor', icon: BarChart3, group: 'areas', moduleKey: 'fin_finanzas', roles: allStandardRoles },
+  { itemKey: 'value', href: '/dashboard/valor', icon: BarChart3, group: 'admin', roles: ['superadmin','admin'] },
   { itemKey: 'hr', href: '/dashboard/rrhh', icon: Users, group: 'areas', roles: ['superadmin','admin','manager'] },
   { itemKey: 'sustainability', href: '/dashboard/sostenibilidad', icon: Leaf, group: 'areas', moduleKey: 'sos_tablero', roles: ['superadmin','admin','Sostenibilidad-Supervisor','HSE-Supervisor'] },
   { itemKey: 'legal', href: '/dashboard/legal', icon: FileCheck, group: 'areas', moduleKey: 'legal_modulo', roles: ['superadmin','admin','manager'] },
