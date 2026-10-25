@@ -29,7 +29,7 @@ test('maintenance control tower keeps six fixed views and independent refresh ca
 test('stopped equipment separates validated state from latest reported signal', () => {
   assert.match(source, /Estado confirmado/);
   assert.match(source, /Última señal/);
-  assert.match(source, /row\.canonicalStatus \|\| 'Sin confirmación registrada'/);
+  assert.match(source, /row\.canonicalStatus \|\| 'Pendiente de confirmar'/);
   assert.match(source, /ageLabel\(row\.latestSignalAgeHours\)/);
 });
 
@@ -158,7 +158,7 @@ test('wallboard typography follows MOTIL corporate hierarchy', () => {
 
 test('wallboard uses plain language for confirmed equipment state', () => {
   assert.match(source, /Estado confirmado/);
-  assert.match(source, /Sin confirmación registrada/);
+  assert.match(source, /Pendiente de confirmar/);
   assert.doesNotMatch(source, /Estado validado/);
   assert.doesNotMatch(source, /Sin estado validado/);
 });

@@ -317,7 +317,7 @@ function StoppedSlide({ data }: { data: any }) {
         <SmallMetric label="OT abiertas" value={data?.summary?.openWorkOrders} />
         <SmallMetric label="Repuestos pendientes" value={data?.summary?.partsPendingAssets} />
       </div>
-      <Panel title="Detalle de equipos detenidos" subtitle="Sólo condiciones actuales respaldadas por evidencia">
+      <Panel title="Equipos reportados fuera de servicio" subtitle="Estado informado por la fuente; la confirmación formal se muestra por separado.">
         {rows.length === 0 ? (
           data?.summary?.stoppedAssets === 0 ? (
             <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.06] px-6 py-8 text-center" role="status">
@@ -335,13 +335,13 @@ function StoppedSlide({ data }: { data: any }) {
           )
         ) : (
           <DataTable
-            headers={['Equipo', 'Faena', 'Estado confirmado', 'Última señal', 'Antigüedad', 'OT / bloqueo']}
+            headers={['Equipo', 'Faena', 'Estado reportado', 'Confirmación', 'Antigüedad', 'OT / bloqueo']}
             columnTemplate="1.8fr .75fr 1.15fr 1.45fr .65fr 1.2fr"
             rows={rows.slice(0, 8).map((row: any) => [
               row.assetName,
               row.site,
-              row.canonicalStatus || 'Sin confirmación registrada',
               row.currentReportedStatus || signalText(row),
+              row.canonicalStatus || 'Pendiente de confirmar',
               ageLabel(row.latestSignalAgeHours),
               `${row.openWorkOrderNumbers?.join(', ') || 'Sin OT'}${row.partsPending ? ' · Repuesto pendiente' : ''}`,
             ])}
