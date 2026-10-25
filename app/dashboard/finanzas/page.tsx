@@ -140,7 +140,6 @@ type Response = {
     maintenanceCost?: number | null;
     maintenanceMovements?: number | null;
     lastMaintenanceCostDate?: string | null;
-    imageUrl?: string | null;
   }>;
   assetReconciliationOpportunities?: Array<{
     canonicalAssetId?: string | null;
@@ -153,6 +152,7 @@ type Response = {
     maintenanceCost?: number;
     maintenanceMovements?: number;
     lastMaintenanceCostDate?: string | null;
+    imageUrl?: string | null;
   }>;
   assetEconomicsSummary?: {
     laudusAssets?: number;
