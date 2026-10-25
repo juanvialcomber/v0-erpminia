@@ -218,6 +218,11 @@ export function WeeklyMaintenancePlanning() {
                       title: row.interval ? `Mantención ${row.interval} ${row.meterUnit || 'h'}` : 'Mantención preventiva',
                       workType: 'preventive',
                       priority: row.priority?.startsWith('P1') || row.priority?.startsWith('P2') ? 'high' : 'medium',
+                      standardPlanId: row.standardPlan?.status === 'approved' ? row.standardPlan.id : '',
+                      standardPlanName: row.standardPlan?.status === 'approved' ? row.standardPlan.name : '',
+                      plannedDurationHours: row.standardPlan?.status === 'approved' && row.standardPlan.estimatedDurationHours != null
+                        ? String(row.standardPlan.estimatedDurationHours)
+                        : '',
                     },
                   }} onClick={() => recordDecision(row, 'schedule')}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>}
             </div>
