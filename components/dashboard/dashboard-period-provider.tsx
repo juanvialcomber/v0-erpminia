@@ -23,7 +23,7 @@ export function DashboardPeriodProvider({children}:{children:React.ReactNode}){
         <div className="flex items-center gap-2 text-sm"><CalendarDays className="h-4 w-4 text-muted-foreground"/><span className="font-medium">Período de Geología</span><span className="text-muted-foreground">{month?new Intl.DateTimeFormat('es-CL',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(`${month}-01T12:00:00Z`)):'Todo el histórico'}</span></div>
         <div className="flex items-center gap-2"><Select value={month||'all'} onValueChange={(next)=>setMonth(next==='all'?null:next)}><SelectTrigger aria-label="Filtrar Geología por mes" className="h-8 w-[190px]"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todo el histórico</SelectItem>{monthOptions.map(option=><SelectItem key={option.value} value={option.value} className="capitalize">{option.label}</SelectItem>)}</SelectContent></Select>{month?<Button variant="ghost" size="sm" onClick={()=>setMonth(null)}><X className="h-4 w-4"/>Todo</Button>:null}</div>
       </div>
-    </div>}
+    </div> : null}
     {children}
   </DashboardPeriodContext.Provider>;
 }
