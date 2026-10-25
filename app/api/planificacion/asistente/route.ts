@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     const latestPreventiveByAsset = new Map<string, any>();
     for (const row of recentWorkOrders.data || []) {
       const assetId = String((row as any).canonical_asset_id || '');
-      if (!assetId || String((row as any).work_type || '').toLowerCase() !== 'preventive') continue;
+      if (!assetId || String((row as any).work_type || '').toLowerCase() !== 'preventive' || !(row as any).closed_at) continue;
       if (!latestPreventiveByAsset.has(assetId)) latestPreventiveByAsset.set(assetId, row);
     }
     const planningRank = new Map([
@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
           priority: row.priority || null,
           recommendedAction: row.recommended_action || null,
           workType: 'preventivo',
-          suggestedName: `Plan preventivo · ${row.asset_name || row.asset_code || 'Equipo'}`,
+          suggestedName: `Plan · ${evidenceWo.title || 'Mantención preventiva'} · ${row.asset_name || row.asset_code || 'Equipo'}`,
           estimatedDurationHours: observedHours,
           reason: `Candidato desde planificación ${row.priority || ''}; existe evidencia de una OT preventiva real para este equipo.`,
           evidenceReference: evidenceParts.join(' · '),
