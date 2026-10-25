@@ -113,8 +113,57 @@ export async function POST(request: NextRequest) {
       ['canonical_purchase_orders_current', purchaseOrders.error],
       ['maintenance_work_orders', recentWorkOrders.error],
       ['maintenance_standard_job_plans', standardPlans.error],
+      ['work_order_material_requirements', observedMaterialError],
+      ['canonical.products', observedProductError],
     ] as const;
     const failed = sources.filter(([, error]) => Boolean(error)).map(([source, error]) => ({ source, error: (error as any)?.message || 'error' }));
+
+    const workOrderIds = (recentWorkOrders.data || []).map((row: any) => row.id).filter(Boolean);
+    let observedMaterialRows: any[] = [];
+    let observedMaterialError: any = null;
+    let observedProductRows: any[] = [];
+    let observedProductError: any = null;
+
+    if (workOrderIds.length > 0) {
+      const requirementResult = await context.supabase
+        .from('work_order_material_requirements')
+        .select('work_order_id,canonical_product_id,quantity_required,status')
+        .eq('organization_id', context.organizationId)
+        .in('work_order_id', workOrderIds)
+        .limit(1000);
+      observedMaterialRows = requirementResult.data || [];
+      observedMaterialError = requirementResult.error;
+
+      const productIds = [...new Set(observedMaterialRows.map((row: any) => row.canonical_product_id).filter(Boolean))];
+      if (productIds.length > 0) {
+        const productResult = await context.supabase
+          .schema('canonical')
+          .from('products')
+          .select('id,product_code,name,unit')
+          .eq('organization_id', context.organizationId)
+          .in('id', productIds)
+          .limit(1000);
+        observedProductRows = productResult.data || [];
+        observedProductError = productResult.error;
+      }
+    }
+
+    const observedProductMap = new Map(observedProductRows.map((row: any) => [String(row.id), row]));
+    const observedMaterialsByWorkOrder = new Map<string, any[]>();
+    for (const row of observedMaterialRows) {
+      const workOrderId = String((row as any).work_order_id || '');
+      const product = observedProductMap.get(String((row as any).canonical_product_id || ''));
+      if (!workOrderId || !product?.product_code) continue;
+      const list = observedMaterialsByWorkOrder.get(workOrderId) || [];
+      list.push({
+        productCode: product.product_code,
+        productName: product.name || null,
+        unit: product.unit || null,
+        quantityRequired: Number((row as any).quantity_required || 0),
+        sourceStatus: (row as any).status || null,
+      });
+      observedMaterialsByWorkOrder.set(workOrderId, list);
+    }
 
     const rows = sourceRows.data || [];
     const matched = rows.filter((row: any) => row.reconciliation_status === 'matched').length;
@@ -180,6 +229,8 @@ export async function POST(request: NextRequest) {
           evidenceReference: evidenceParts.join(' · '),
           sourceWorkOrderNumber: evidenceWo.work_order_number || null,
           sourceWorkOrderTitle: evidenceWo.title || null,
+          materials: observedMaterialsByWorkOrder.get(String(evidenceWo.id || '')) || [],
+          materialSemantics: 'Material requerido en la OT fuente; no implica consumo futuro ni stock disponible.',
           rank: planningRank.get(String(row.priority || '')) || 99,
         };
       })
