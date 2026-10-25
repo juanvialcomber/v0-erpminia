@@ -121,7 +121,7 @@ export function WeeklyMaintenancePlanning() {
       </div>
 
       {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted"/> : !error && rows.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No hay decisiones semanales priorizadas con la evidencia disponible.</CardContent></Card> : <div className="space-y-3">
-        {rows.map((row) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || Math.random()} className="shadow-none">
+        {rows.map((row, index) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || String(index)} className="shadow-none">
           <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px_190px] lg:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
