@@ -106,6 +106,19 @@ export default function ValueScorecardPage() {
         ? 'En validación'
         : score.scaleGate || '—';
   const historyCount = data?.history?.count || 0;
+  const baselineSampleCount = baseline.data?.sampleCount || 0;
+  const assistedTimingSample = financeReviewTiming.sample || 0;
+  const manualMedian = baseline.data?.medianSecondsPerCase ?? null;
+  const assistedMedian = financeReviewTiming.medianSeconds ?? null;
+  const timingComparisonReady =
+    baselineSampleCount >= 3 &&
+    assistedTimingSample >= 20 &&
+    manualMedian != null &&
+    assistedMedian != null &&
+    manualMedian > 0;
+  const observedTimeReductionPct = timingComparisonReady
+    ? Math.round(((manualMedian - assistedMedian) / manualMedian) * 100)
+    : null;
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -133,6 +146,8 @@ export default function ValueScorecardPage() {
   };
 
   const nextActions = [
+    baselineSampleCount < 3 ? `Registrar ${3 - baselineSampleCount} muestras manuales más para establecer baseline.` : null,
+    assistedTimingSample < 20 ? `Registrar ${20 - assistedTimingSample} decisiones con tiempo válido para comparar desempeño.` : null,
     decisions + financeReviewTotal < 20 ? `Registrar ${20 - decisions - financeReviewTotal} decisiones humanas más para calibrar L4.` : null,
     outcomes < 5 ? `Cerrar ${5 - outcomes} resultados reales para demostrar efecto operacional.` : null,
     e3 < 3 ? `Documentar ${3 - e3} impactos E3 con evidencia económica observada.` : null,
@@ -274,6 +289,15 @@ export default function ValueScorecardPage() {
               {baseline.data?.medianSecondsPerCase == null ? '—' : `${number(baseline.data.medianSecondsPerCase)} s`}
             </p>
           </div>
+        </div>
+        <div className="mt-3 rounded-md border px-4 py-3">
+          <p className="text-xs text-muted-foreground">Reducción observada de tiempo</p>
+          <p className="mt-1 text-xl font-semibold">
+            {observedTimeReductionPct == null ? '—' : `${number(observedTimeReductionPct)}%`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Se habilita sólo con 3 muestras manuales y 20 decisiones asistidas con tiempo válido.
+          </p>
         </div>
         {baselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{baselineNotice}</p> : null}
         <p className="mt-3 text-xs text-muted-foreground">
