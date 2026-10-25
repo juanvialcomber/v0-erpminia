@@ -112,6 +112,21 @@ export async function GET(request: NextRequest) {
     (row) => !CLOSED_STATUSES.has(normalizeStatus(row.status)),
   );
   const windows = (windowsResult.data || []) as WindowRow[];
+  const workOrderIds = workOrders.map((row) => row.id).filter(Boolean);
+  let actualShortageWorkOrderIds = new Set<string>();
+  if (workOrderIds.length > 0) {
+    const { data: requirements, error: requirementsError } = await context.supabase
+      .from('work_order_material_requirements')
+      .select('work_order_id,quantity_shortage,status')
+      .eq('organization_id', context.organizationId)
+      .in('work_order_id', workOrderIds)
+      .gt('quantity_shortage', 0)
+      .limit(1000);
+    if (requirementsError) {
+      return NextResponse.json({ error: 'No se pudo verificar cobertura real de materiales.' }, { status: 500 });
+    }
+    actualShortageWorkOrderIds = new Set((requirements || []).map((row: any) => String(row.work_order_id || '')).filter(Boolean));
+  }
   const conflicts: Array<{ type: string; workOrderId: string; detail: string }> = [];
 
   for (const workOrder of workOrders) {
@@ -194,7 +209,12 @@ export async function GET(request: NextRequest) {
       const scheduledOrder = assetOrders.find((item) => item.scheduled_date && item.scheduled_date >= fromDate && item.scheduled_date <= weekUntilDate);
       const standardPlan = (plansByAsset.get(assetId) || [])[0] || null;
       const partsStatus = String(row.parts_status_raw || '').trim();
-      const partsPending = !partsStatus || /pendiente|faltante/i.test(partsStatus);
+      const actualMaterialShortage = assetOrders.some((item) => actualShortageWorkOrderIds.has(item.id));
+      const readingAt = row.current_reading_at ? new Date(row.current_reading_at) : null;
+      const readingAgeDays = readingAt && Number.isFinite(readingAt.getTime())
+        ? Math.max(0, Math.floor((from.getTime() - readingAt.getTime()) / 86400000))
+        : null;
+      const evidenceFreshness = readingAgeDays == null ? 'unknown' : readingAgeDays <= 30 ? 'current' : 'stale';
       return {
         canonicalAssetId: assetId || null,
         assetCode: row.asset_code || null,
@@ -208,8 +228,10 @@ export async function GET(request: NextRequest) {
         currentReading: row.current_reading == null ? null : Number(row.current_reading),
         currentReadingAt: row.current_reading_at || null,
         remainingMeter: row.remaining_meter == null ? null : Number(row.remaining_meter),
-        partsStatus: partsStatus || null,
-        partsPending,
+        sourcePartsStatus: partsStatus || null,
+        actualMaterialShortage,
+        evidenceFreshness,
+        readingAgeDays,
         sourceFile: row.source_file || null,
         sourceImportedAt: row.imported_at || null,
         scheduledWorkOrder: scheduledOrder || null,
@@ -222,10 +244,14 @@ export async function GET(request: NextRequest) {
           estimatedDurationHours: standardPlan.estimated_duration_hours == null ? null : Number(standardPlan.estimated_duration_hours),
           proposalSource: standardPlan.proposed_by ? 'human' : 'motil',
         } : null,
-        state: scheduledOrder ? 'scheduled' : partsPending ? 'blocked_materials' : standardPlan?.status === 'approved' ? 'ready' : 'review',
+        state: scheduledOrder ? 'scheduled' : actualMaterialShortage ? 'blocked_materials' : evidenceFreshness === 'stale' ? 'stale_evidence' : standardPlan?.status === 'approved' ? 'ready' : 'review',
       };
     })
-    .sort((a: any, b: any) => (priorityRank.get(a.priority) || 99) - (priorityRank.get(b.priority) || 99) || Number(a.remainingMeter || 0) - Number(b.remainingMeter || 0))
+    .sort((a: any, b: any) =>
+      (a.evidenceFreshness === 'stale' ? 1 : 0) - (b.evidenceFreshness === 'stale' ? 1 : 0) ||
+      (priorityRank.get(a.priority) || 99) - (priorityRank.get(b.priority) || 99) ||
+      Number(a.remainingMeter || 0) - Number(b.remainingMeter || 0)
+    )
     .slice(0, 12);
 
   const weeklySummary = {
@@ -235,6 +261,7 @@ export async function GET(request: NextRequest) {
     blockedMaterials: weeklyDecisions.filter((row: any) => row.state === 'blocked_materials').length,
     ready: weeklyDecisions.filter((row: any) => row.state === 'ready').length,
     review: weeklyDecisions.filter((row: any) => row.state === 'review').length,
+    staleEvidence: weeklyDecisions.filter((row: any) => row.state === 'stale_evidence').length,
   };
 
   return NextResponse.json({
