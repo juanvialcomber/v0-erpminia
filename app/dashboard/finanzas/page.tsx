@@ -159,6 +159,17 @@ const shortDate = (value: unknown) => {
   }).format(date);
 };
 
+const priorityGuidance = (item: LaudusReviewItem) => {
+  const overdueDays = Number(item.days_overdue || 0);
+  if (overdueDays > 0) {
+    return `Vencida hace ${number(overdueDays)} días. Confirmar saldo, vencimiento y respaldo en Laudus antes de decidir.`;
+  }
+  if (!item.due_date) {
+    return 'Sin vencimiento informado. Completar evidencia antes de proyectar caja o priorizar pago.';
+  }
+  return 'Obligación abierta. Validar respaldo documental y estado vigente en Laudus antes de decidir.';
+};
+
 const concentrationConfig: Record<
   ConcentrationKey,
   { label: string; labelKey: string; amountKey: string }
@@ -409,7 +420,9 @@ export default function FinanzasPage() {
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {item.doc_number ? `Doc. ${item.doc_number} · ` : ''}
                     {item.review_reason || 'Revisión requerida'}
-                    {Number(item.days_overdue || 0) > 0 ? ` · ${number(item.days_overdue)} días` : ''}
+                  </p>
+                  <p className="mt-1 text-xs text-foreground/80">
+                    <span className="font-medium">Qué revisar:</span> {priorityGuidance(item)}
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground md:text-right">
