@@ -64,16 +64,17 @@ function priorityFor(capability: LaudusCapability): number {
 
 function valueFor(capability: LaudusCapability): string {
   const text = (capability.path + ' ' + capability.tags.join(' ')).toLowerCase();
+  if (/reconciliation\/bankstatementnotinjournal|reconciliation\/journalnotinbankstatement/.test(text)) return 'Detectar diferencias entre cartola bancaria y libro contable.';
+  if (/fixed.?asset|depreciation/.test(text)) return 'Cruzar activo contable, depreciación y costo total con Activo 360.';
+  if (/dte|sii|tax/.test(text)) return 'Estado documental y tributario trazable.';
   if (/bank|statement|cartola/.test(text)) return 'Conciliación bancaria y visibilidad de caja.';
-  if (/balance|accounting|journal|ledger|account/.test(text)) return 'Control contable, variaciones y trazabilidad financiera.';
+  if (/profit.?and.?loss|balance|accounting|journal|ledger|account/.test(text)) return 'Control contable, resultados, variaciones y trazabilidad financiera.';
   if (/supplier.?invoice|purchase|receipt|waybill/.test(text)) return 'Conciliar compra, recepción, factura y cuenta por pagar.';
   if (/supplier/.test(text)) return 'Proveedor 360, concentración y desempeño de compras.';
   if (/stock|inventory/.test(text)) return 'Comparar stock ERP, stock MOTIL y conteo físico.';
   if (/warehouse/.test(text)) return 'Unificar bodegas y ubicación del inventario.';
   if (/product/.test(text)) return 'Maestro de productos, costos y trazabilidad de repuestos.';
   if (/cost.?center/.test(text)) return 'Imputación y análisis por centro de costo.';
-  if (/dte|sii|tax/.test(text)) return 'Estado documental y tributario trazable.';
-  if (/fixed.?asset|depreciation/.test(text)) return 'Cruzar activo contable con Activo 360 y costo total.';
   if (/employee|payroll|remuneration/.test(text)) return 'Costos de personas y trazabilidad laboral.';
   if (/sales|quote|order|customer|invoice/.test(text)) return 'Trazabilidad comercial desde cotización a cobro.';
   return 'Dato disponible para evaluar su aporte operacional.';
