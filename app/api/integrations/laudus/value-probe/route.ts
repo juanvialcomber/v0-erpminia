@@ -44,3 +44,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+// Read-only browser QA alias; authorization is identical to POST.
+export const GET = POST;
