@@ -202,3 +202,13 @@ Estos umbrales habilitan escala inicial, no E4.
 - Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
 - Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
 - Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
+
+
+## 2026-10-25 — Mantención: gates explícitos L / E / C
+
+- L: se mantiene L4 hasta contar con al menos 20 decisiones semanales abiertas y 20 outcomes humanos sobre planes propuestos por MOTIL. Sólo entonces se considera L4 calibrado; L5 requerirá autonomía controlada explícitamente autorizada y reversibilidad.
+- E: E2 se sostiene con tiempos, eventos, outcomes y ciclos medidos. Un candidato E3 exige ciclos operacionales completos y comparación válida; aprobación o velocidad por sí solas no son impacto económico.
+- C: una cadena crítica sólo cuenta como completa cuando existe evidencia real de solicitud, OC, recepción e instalación asociadas al flujo de Mantención. La mera existencia de módulos no eleva C.
+- Funnel medido: requerimiento → shortage → solicitud → OC → recepción → instalación. Se miden además los ciclos solicitud→OC, OC→recepción y recepción→instalación usando timestamps canónicos.
+- Deuda histórica: OT cerradas con shortages aún abiertos se clasifican como deuda de calidad de datos y no como cumplimiento actual.
+- Evidencia comercial: DEMOSTRADO sólo para eventos/timestamps observados; CALCULABLE para impactos que aún requieren baseline; NO MEDIBLE AÚN para ahorro económico sin comparación válida.
