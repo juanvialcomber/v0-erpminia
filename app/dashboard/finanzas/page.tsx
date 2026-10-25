@@ -1111,7 +1111,7 @@ export default function FinanzasPage() {
       <section className="overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Evidencia</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Antes de pagar</p>
             <h2 className="mt-1 text-lg font-semibold">Evidencia de factura</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               MOTIL consulta directamente el detalle y la trazabilidad documental disponible en Laudus. Finanzas mantiene la decisión.
