@@ -130,3 +130,11 @@ test('internal value page exposes measured cross-domain cycle timing', () => {
   assert.match(page, /Recepción → instalación/);
   assert.match(page, /Sin muestra/);
 });
+
+
+test('internal maintenance value page shows L E C gates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Gates L E C de Mantención/);
+  assert.match(page, /L4 en calibración/);
+  assert.match(page, /Cadena incompleta/);
+});
