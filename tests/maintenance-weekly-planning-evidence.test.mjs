@@ -37,7 +37,7 @@ test('standard plan outcomes become calibration evidence without becoming ROI', 
   assert.match(scorecard, /motilDecisions/);
   assert.match(scorecard, /acceptanceRatePct/);
   assert.match(scorecard, /medianDecisionCycleSeconds/);
-  assert.match(scorecard, /acceptance is calibration evidence, not economic impact/);
+  assert.match(scorecard, /acceptance and correction are calibration evidence, not economic impact/);
 });
 
 test('standard plan API validates steps before inserting the plan and audits human outcome', () => {
