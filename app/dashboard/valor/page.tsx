@@ -84,6 +84,17 @@ type ApiResponse = {
     measurableExecutionCycles?: number;
     medianExecutionCycleSeconds?: number | null;
     medianExecutionCycleHours?: number | null;
+    recurrence7d?: {
+      matured?: number;
+      recurrent?: number;
+      ratePct?: number | null;
+      semantics?: string;
+    };
+    shortageToProcurement?: {
+      samples?: number;
+      medianSeconds?: number | null;
+      semantics?: string;
+    };
     evidenceLevel?: string;
     workflowLevel?: number;
     semantics?: string;
@@ -166,6 +177,8 @@ export default function ValueScorecardPage() {
   const maintenanceValue = data?.maintenanceValue || {};
   const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
+  const recurrence7d = maintenanceValue.recurrence7d || {};
+  const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -313,6 +326,38 @@ export default function ValueScorecardPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">
+        <div className="bg-card px-5 py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Baseline post-OT</p>
+          <h3 className="mt-1 text-base font-semibold">Reincidencia a 7 días</h3>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {recurrence7d.ratePct == null ? '—' : `${number(recurrence7d.ratePct)}%`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {number(recurrence7d.recurrent || 0)} de {number(recurrence7d.matured || 0)} OT maduras generaron otra OT sobre el mismo activo dentro de 7 días.
+          </p>
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+            Baseline E2. No implica que la OT anterior haya fallado ni atribuye causalidad a MOTIL.
+          </p>
+        </div>
+
+        <div className="bg-card px-5 py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Handoff a Compras</p>
+          <h3 className="mt-1 text-base font-semibold">Shortage → solicitud operativa</h3>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {shortageToProcurement.medianSeconds == null
+              ? 'Sin muestra'
+              : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(Number(shortageToProcurement.medianSeconds) / 3600)} h`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Mediana de {number(shortageToProcurement.samples || 0)} handoff(s) reales desde faltante detectado hasta solicitud creada.
+          </p>
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+            MOTIL detecta el faltante automáticamente; la creación de la solicitud sigue requiriendo acción humana.
+          </p>
         </div>
       </section>
 
