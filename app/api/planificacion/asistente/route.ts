@@ -126,6 +126,61 @@ export async function POST(request: NextRequest) {
     }).slice(0, 80);
     const openPurchaseOrders = (purchaseOrders.data || []).filter((row: any) => !['closed','cerrada','cerrado','completed','completada','completado','cancelled','cancelada','cancelado','received','recibida','recibido'].includes(String(row.status || '').trim().toLowerCase())).slice(0, 80);
 
+
+    const existingPlanKeys = new Set(
+      (standardPlans.data || []).map((row: any) =>
+        [String(row.canonical_asset_id || ''), String(row.work_type || '').toLowerCase()].join('|'),
+      ),
+    );
+    const latestPreventiveByAsset = new Map<string, any>();
+    for (const row of recentWorkOrders.data || []) {
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId || String((row as any).work_type || '').toLowerCase() !== 'preventive') continue;
+      if (!latestPreventiveByAsset.has(assetId)) latestPreventiveByAsset.set(assetId, row);
+    }
+    const planningRank = new Map([
+      ['P1 - VENCIDO', 1],
+      ['P2 - INMEDIATO', 2],
+      ['P3 - PROGRAMAR', 3],
+      ['P4 - PLANIFICAR', 4],
+    ]);
+    const planCandidates = (priorities.data || [])
+      .filter((row: any) => planningRank.has(String(row.priority || '')))
+      .map((row: any) => {
+        const assetId = String(row.canonical_asset_id || '');
+        const evidenceWo = latestPreventiveByAsset.get(assetId);
+        if (!evidenceWo) return null;
+        const existingKey = [assetId, 'preventive'].join('|');
+        if (existingPlanKeys.has(existingKey)) return null;
+        const observedSeconds = Number(evidenceWo.total_timer_seconds || 0);
+        const observedHours = observedSeconds > 0
+          ? Math.round((observedSeconds / 3600) * 100) / 100
+          : null;
+        const evidenceParts = [
+          evidenceWo.work_order_number ? `OT ${evidenceWo.work_order_number}` : null,
+          observedHours != null ? `${observedHours} h observadas` : null,
+          evidenceWo.closed_at ? `cerrada ${String(evidenceWo.closed_at).slice(0, 10)}` : 'OT aún abierta',
+        ].filter(Boolean);
+        return {
+          canonicalAssetId: assetId,
+          assetCode: row.asset_code || null,
+          assetName: row.asset_name || null,
+          priority: row.priority || null,
+          recommendedAction: row.recommended_action || null,
+          workType: 'preventivo',
+          suggestedName: `Plan preventivo · ${row.asset_name || row.asset_code || 'Equipo'}`,
+          estimatedDurationHours: observedHours,
+          reason: `Candidato desde planificación ${row.priority || ''}; existe evidencia de una OT preventiva real para este equipo.`,
+          evidenceReference: evidenceParts.join(' · '),
+          sourceWorkOrderNumber: evidenceWo.work_order_number || null,
+          sourceWorkOrderTitle: evidenceWo.title || null,
+          rank: planningRank.get(String(row.priority || '')) || 99,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.rank - b.rank)
+      .slice(0, 3);
+
     const operationalContext = {
       generated_at: new Date().toISOString(),
       user: {
@@ -199,6 +254,7 @@ export async function POST(request: NextRequest) {
       coverage: operationalContext.data_quality,
       sources: sources.map(([source]) => source),
       policy: 'READ-only planning copilot: evidencia real → interpretación → acción humana.',
+      planCandidates,
     });
   } catch (error) {
     console.error('[planning-assistant] request failed', error);
