@@ -98,17 +98,17 @@ export function CostCentersWorkspace() {
         credentials: 'include',
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo sincronizar la base de referencia');
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo actualizar la lista de centros de costo');
       setAdminResult({
         tone: 'success',
-        title: 'Base sincronizada',
-        description: payload?.message || 'La base de referencia fue procesada correctamente.',
+        title: 'Lista actualizada',
+        description: payload?.message || 'La lista de centros de costo quedó al día.',
       });
       reload();
     } catch (cause) {
       setAdminResult({
         tone: 'error',
-        title: 'No fue posible sincronizar',
+        title: 'No se pudo actualizar la lista',
         description: cause instanceof Error ? cause.message : 'Error inesperado',
       });
     } finally {
@@ -121,8 +121,8 @@ export function CostCentersWorkspace() {
     if (!name.endsWith('.csv') && !name.endsWith('.xls') && !name.endsWith('.xlsx')) {
       setAdminResult({
         tone: 'error',
-        title: 'Formato no soportado',
-        description: 'Usa CSV, XLS o XLSX.',
+        title: 'No podemos leer este archivo',
+        description: 'Elige una planilla o un archivo de movimientos descargado.',
       });
       return;
     }
@@ -138,17 +138,17 @@ export function CostCentersWorkspace() {
         body: form,
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo importar la base');
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la lista de centros de costo');
       setAdminResult({
         tone: 'success',
-        title: 'Importación procesada',
-        description: `${payload?.imported ?? 0} nuevos · ${payload?.updated ?? 0} actualizados.`,
+        title: 'Lista actualizada',
+        description: `${payload?.imported ?? 0} centros agregados · ${payload?.updated ?? 0} actualizados.`,
       });
       reload();
     } catch (cause) {
       setAdminResult({
         tone: 'error',
-        title: 'No fue posible importar',
+        title: 'No se pudo cargar la lista',
         description: cause instanceof Error ? cause.message : 'Error inesperado',
       });
     } finally {
@@ -172,7 +172,7 @@ export function CostCentersWorkspace() {
   };
 
   if (loading) {
-    return <StatePanel tone="loading" title="Cargando centros de costos" description="Consultando la estructura canónica vigente." />;
+    return <StatePanel tone="loading" title="Cargando centros de costo" description="Consultando la lista vigente." />;
   }
 
   if (error) {
@@ -187,7 +187,7 @@ export function CostCentersWorkspace() {
   }
 
   if (visible.length === 0) {
-    return <StatePanel tone="neutral" title="Sin centros de costos visibles" description="No hay una estructura operacional disponible para esta organización." />;
+    return <StatePanel tone="neutral" title="No hay centros de costo disponibles" description="Esta organización todavía no tiene centros de costo en la lista." />;
   }
 
   return (
@@ -275,8 +275,8 @@ export function CostCentersWorkspace() {
           aria-expanded={adminOpen}
         >
           <div>
-            <p className="text-sm font-medium">Administrar base</p>
-            <p className="text-xs text-muted-foreground">Herramientas secundarias para administradores: sincronizar o importar.</p>
+            <p className="text-sm font-medium">Administrar lista</p>
+            <p className="text-xs text-muted-foreground">Opciones para actualizar o cargar la lista de centros de costo.</p>
           </div>
           <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${adminOpen ? 'rotate-180' : ''}`} />
         </button>
@@ -285,10 +285,10 @@ export function CostCentersWorkspace() {
           <div className="mt-3 space-y-3 rounded-md border bg-muted/10 p-4">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" disabled={busy} onClick={() => void syncReference()}>
-                <Database className="mr-2 h-4 w-4" />Sincronizar referencia
+                <Database className="mr-2 h-4 w-4" />Actualizar lista
               </Button>
               <Button variant="outline" size="sm" disabled={busy} onClick={() => inputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />Importar archivo
+                <Upload className="mr-2 h-4 w-4" />Cargar planilla
               </Button>
               <input
                 ref={inputRef}
@@ -309,7 +309,7 @@ export function CostCentersWorkspace() {
               onDrop={handleDrop}
               className={`rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground ${dragActive ? 'bg-muted' : ''}`}
             >
-              Arrastra aquí un CSV, XLS o XLSX. Estas acciones requieren permisos de administrador.
+              Suelta aquí una planilla o un archivo descargado desde el sistema contable. Solo administradores pueden actualizar la lista.
             </div>
 
             {adminResult ? (

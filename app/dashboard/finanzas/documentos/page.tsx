@@ -134,10 +134,10 @@ export default function DocumentosFinanzasPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
+            <Link href="/dashboard/finanzas/documentos/importar">Subir documentos</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Importar movimientos</Link>
+            <Link href="/dashboard/finanzas/importar">Cargar movimientos</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/dashboard/finanzas">
@@ -244,7 +244,7 @@ export default function DocumentosFinanzasPage() {
                   <Link href="/dashboard/finanzas/documentos/importar">Agregar documentos</Link>
                 </Button>
                 <Button size="sm" variant="ghost" asChild>
-                  <Link href="/dashboard/finanzas/importar">Importar movimientos</Link>
+                  <Link href="/dashboard/finanzas/importar">Cargar movimientos</Link>
                 </Button>
               </div>
               <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={loadDocuments} />

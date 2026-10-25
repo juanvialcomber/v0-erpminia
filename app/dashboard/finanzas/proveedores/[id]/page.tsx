@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CertifiedFinancialSummary } from '@/components/finance/certified-financial-summary';
+import { financeStatusLabel } from '@/lib/finance-ui-labels';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -29,7 +30,7 @@ function statusLabel(value: string | null | undefined) {
     valid: 'Datos revisados', verified: 'Datos confirmados', warning: 'Requieren revisión',
     invalid: 'Requieren corrección', incomplete: 'Faltan datos',
   };
-  return labels[value.toLowerCase()] || (value.includes('_') ? 'En revisión' : value);
+  return labels[value.toLowerCase()] || financeStatusLabel(value, 'procurement');
 }
 
 type PurchaseOrder = { id: string; order_number: string; order_date?: string | null; total_amount?: number | null; operational_status?: string | null; status?: string | null };

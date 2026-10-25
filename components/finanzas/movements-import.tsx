@@ -23,7 +23,7 @@ export function MovementsImport() {
     const name = file.name.toLowerCase();
     const valid = name.endsWith('.csv') || name.endsWith('.xls') || name.endsWith('.xlsx');
     if (!valid) {
-      setResult({ success: false, message: 'Este formato de archivo no está permitido.', error: 'Usa un archivo CSV o de hoja de cálculo.' });
+      setResult({ success: false, message: 'No podemos usar este archivo.', error: 'Elige una planilla o un archivo de movimientos descargado.' });
       return;
     }
 
@@ -44,7 +44,7 @@ export function MovementsImport() {
       if (!response.ok) {
         setResult({
           success: false,
-          message: 'No se pudieron importar los movimientos',
+          message: 'No se pudieron cargar los movimientos',
           error: 'Revisa que el archivo incluya las columnas indicadas y vuelve a intentarlo.',
         });
         return;
@@ -86,7 +86,7 @@ export function MovementsImport() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Upload className="h-5 w-5" />
-          Importar movimientos financieros
+          Cargar movimientos financieros
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -102,7 +102,7 @@ export function MovementsImport() {
         >
           <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
           <p className="font-semibold">Arrastra tu archivo o haz clic para seleccionar</p>
-          <p className="mt-1 text-sm text-muted-foreground">Archivo CSV o de hoja de cálculo</p>
+          <p className="mt-1 text-sm text-muted-foreground">Planilla o archivo de movimientos descargado</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -118,7 +118,7 @@ export function MovementsImport() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-          <p className="mb-2 font-semibold">Columnas del archivo:</p>
+          <p className="mb-2 font-semibold">Datos que debe incluir:</p>
             <div className="rounded bg-muted p-2 font-mono text-sm">
               FECHA | DESCRIPCIÓN | MONTO | TIPO | CATEGORÍA | CENTRO DE COSTO
             </div>

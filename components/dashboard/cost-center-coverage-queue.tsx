@@ -112,7 +112,7 @@ export function CostCenterCoverageQueue() {
   };
 
   if (loading) {
-    return <StatePanel tone="loading" title="Revisando cobertura operacional" description="Buscando registros sin centro de costo en los módulos que puedes ver." />;
+    return <StatePanel tone="loading" title="Buscando registros sin centro de costo" description="Solo se incluyen los módulos que tienes permiso para consultar." />;
   }
 
   if (error && !coverage) {
@@ -120,21 +120,21 @@ export function CostCenterCoverageQueue() {
   }
 
   if (rows.length === 0) {
-    return <StatePanel tone="success" title="Cobertura completa" description="No hay registros visibles pendientes de centro de costo." />;
+    return <StatePanel tone="success" title="No hay asignaciones pendientes" description="Todos los registros que puedes consultar tienen un centro de costo asignado." />;
   }
 
   return (
     <section className="space-y-4" aria-label="Cobertura de centros de costo">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold">Cobertura operacional</p>
-          <p className="mt-1 text-sm text-muted-foreground">Completa sólo referencias faltantes. MOTIL no infiere ni reemplaza asignaciones existentes.</p>
+          <p className="text-sm font-semibold">Registros sin centro de costo</p>
+          <p className="mt-1 text-sm text-muted-foreground">Agrega un centro solo a los registros que aún no lo tienen. Las asignaciones existentes se conservan.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           <Badge variant="outline">{coverage?.summary.production ?? 0} Producción</Badge>
           <Badge variant="outline">{coverage?.summary.maintenance ?? 0} Mantención</Badge>
           <Badge variant="outline">{coverage?.summary.procurement ?? 0} Compras</Badge>
-          <Badge variant={assignable ? 'default' : 'outline'}>{assignable} editables</Badge>
+          <Badge variant={assignable ? 'default' : 'outline'}>{assignable} con permiso para asignar</Badge>
         </div>
       </div>
 
@@ -144,11 +144,11 @@ export function CostCenterCoverageQueue() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Origen</TableHead>
-              <TableHead>Registro</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>Módulo</TableHead>
+              <TableHead>Detalle</TableHead>
+              <TableHead>Estado y monto</TableHead>
               <TableHead>Centro de costo</TableHead>
-              <TableHead className="text-right">Acción</TableHead>
+              <TableHead className="text-right">Asignación</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -166,7 +166,7 @@ export function CostCenterCoverageQueue() {
                   {row.canAssign ? (
                     <Select value={selections[row.id] || ''} onValueChange={(value) => setSelections((current) => ({ ...current, [row.id]: value }))}>
                       <SelectTrigger size="sm" className="w-[260px] max-w-[65vw]">
-                        <SelectValue placeholder="Seleccionar centro" />
+                        <SelectValue placeholder="Elegir centro de costo" />
                       </SelectTrigger>
                       <SelectContent>
                         {costCenters.map((center) => (
@@ -175,7 +175,7 @@ export function CostCenterCoverageQueue() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Sólo lectura</span>
+                    <span className="text-xs text-muted-foreground">Sin permiso para asignar</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
@@ -184,7 +184,7 @@ export function CostCenterCoverageQueue() {
                     disabled={!row.canAssign || !selections[row.id] || busyId === row.id}
                     onClick={() => void assign(row)}
                   >
-                    {busyId === row.id ? 'Asignando…' : 'Asignar'}
+                    {busyId === row.id ? 'Asignando…' : 'Asignar centro'}
                   </Button>
                 </TableCell>
               </TableRow>

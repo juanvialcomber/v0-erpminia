@@ -47,7 +47,7 @@ export default function FinanzasImportPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Importar movimientos financieros</h1>
+          <h1 className="text-3xl font-bold">Cargar movimientos financieros</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
             Carga ingresos y gastos desde un archivo. Incluye la fecha, el detalle, el monto y el centro de costo para conservar el historial.
           </p>
@@ -55,7 +55,7 @@ export default function FinanzasImportPage() {
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="mr-2 h-4 w-4" />
-            Plantilla Excel
+            Plantilla de movimientos
           </Button>
           <Button asChild>
             <Link href="/dashboard/finanzas">

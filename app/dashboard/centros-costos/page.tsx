@@ -18,10 +18,10 @@ export default function CostCentersPage() {
     <div className="space-y-6">
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderEyebrow>Control transversal</PageHeaderEyebrow>
-          <PageHeaderTitle>Centros de costos</PageHeaderTitle>
+          <PageHeaderEyebrow>Gestión de costos</PageHeaderEyebrow>
+          <PageHeaderTitle>Centros de costo</PageHeaderTitle>
           <PageHeaderDescription>
-            Consulta la estructura canónica vigente y resuelve referencias faltantes de Producción, Mantención y Compras sin inferir asignaciones.
+            Revisa la lista de centros de costo y asigna uno a los registros de Producción, Mantención y Compras que aún no lo tienen. Las asignaciones existentes se conservan.
           </PageHeaderDescription>
         </PageHeaderContent>
       </PageHeader>

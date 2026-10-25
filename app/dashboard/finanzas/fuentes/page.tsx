@@ -50,7 +50,14 @@ function sourceStatus(source: Source) {
 }
 
 function currencyName(currency: string) {
-  return currency === 'CLP' ? 'pesos chilenos' : currency;
+  const names: Record<string, string> = {
+    CLP: 'pesos chilenos',
+    USD: 'dólares estadounidenses',
+    EUR: 'euros',
+    ARS: 'pesos argentinos',
+    PEN: 'soles peruanos',
+  };
+  return names[currency.trim().toUpperCase()] || 'la moneda informada';
 }
 
 export default function FinanceSourcesPage() {
