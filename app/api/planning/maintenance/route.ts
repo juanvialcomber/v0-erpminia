@@ -44,8 +44,11 @@ export async function GET(request: NextRequest) {
   from.setHours(0, 0, 0, 0);
   const until = new Date(from);
   until.setDate(until.getDate() + 45);
+  const weekUntil = new Date(from);
+  weekUntil.setDate(weekUntil.getDate() + 6);
   const fromDate = from.toISOString().slice(0, 10);
   const untilDate = until.toISOString().slice(0, 10);
+  const weekUntilDate = weekUntil.toISOString().slice(0, 10);
 
   const [workOrdersResult, preventiveResult, peopleResult, assetsResult, windowsResult, priorityResult, standardPlansResult] = await Promise.all([
     context.supabase
@@ -188,7 +191,7 @@ export async function GET(request: NextRequest) {
     .map((row: any) => {
       const assetId = String(row.canonical_asset_id || '');
       const assetOrders = openByAsset.get(assetId) || [];
-      const scheduledOrder = assetOrders.find((item) => item.scheduled_date);
+      const scheduledOrder = assetOrders.find((item) => item.scheduled_date && item.scheduled_date >= fromDate && item.scheduled_date <= weekUntilDate);
       const standardPlan = (plansByAsset.get(assetId) || [])[0] || null;
       const partsStatus = String(row.parts_status_raw || '').trim();
       const partsPending = !partsStatus || /pendiente|faltante/i.test(partsStatus);
@@ -236,6 +239,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     period: { from: fromDate, until: untilDate },
+    weekPeriod: { from: fromDate, until: weekUntilDate },
     workOrders,
     preventive: preventiveResult.data || [],
     people: peopleResult.data || [],
