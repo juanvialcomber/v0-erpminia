@@ -82,3 +82,26 @@ test('maintenance execution-cycle metric is explicit and not mislabeled as savin
   assert.match(page, /Mediana de/);
   assert.doesNotMatch(page, /horas ahorradas por mantención/i);
 });
+
+
+test('maintenance recurrence is a post-close baseline and not causal attribution', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /recurrence7d/);
+  assert.match(api, /new work order on the same canonical asset within 7 days after closure/);
+  assert.match(page, /Reincidencia a 7 días/);
+  assert.match(page, /Baseline E2/);
+  assert.match(page, /No implica que la OT anterior haya fallado/);
+});
+
+test('maintenance shortage handoff measures only a real human-confirmed procurement transition', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /procurement_intake_created/);
+  assert.match(api, /supply_need_refreshed/);
+  assert.match(api, /human-confirmed handoff/);
+  assert.match(page, /Shortage → solicitud operativa/);
+  assert.match(page, /la creación de la solicitud sigue requiriendo acción humana/);
+});
