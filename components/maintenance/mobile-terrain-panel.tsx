@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowRight, ClipboardList, Gauge, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ClipboardList, Clock3, Gauge, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -21,6 +21,7 @@ type TerrainAction = {
   daysUntil: number | null;
   timerStatus: string;
   isCritical: boolean;
+  isOverdue: boolean;
   isRunning: boolean;
   isPaused: boolean;
 };
@@ -49,6 +50,7 @@ export function MobileTerrainPanel() {
   );
   const actions = data?.actions || [];
   const critical = actions.filter((action) => action.isCritical);
+  const overdue = actions.filter((action) => action.isOverdue && !action.isCritical);
   const running = actions.find((action) => action.isRunning);
   const identityLinked = data?.identityLinked !== false;
   const previousCritical = useRef(new Set<string>());
@@ -107,6 +109,16 @@ export function MobileTerrainPanel() {
         </div>
       ) : null}
 
+      {overdue.length > 0 ? (
+        <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4" role="status">
+          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+          <div className="space-y-1">
+            <p className="font-semibold">{overdue.length === 1 ? '1 OT vencida' : overdue.length + ' OT vencidas'}</p>
+            <p className="text-sm text-muted-foreground">Tienen una fecha programada anterior a hoy y siguen abiertas. Revisa su estado antes de iniciar o cerrar trabajo.</p>
+          </div>
+        </div>
+      ) : null}
+
       {isLoading ? <StatePanel tone="loading" title="Buscando tus órdenes asignadas" className="min-h-40" /> : null}
       {error ? <StatePanel tone="error" title="No se pudieron cargar las OT" description={error.message}
         actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} /> : null}
@@ -130,6 +142,7 @@ export function MobileTerrainPanel() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold">{action.title}</span>
                   <Badge variant={action.isCritical ? 'destructive' : 'outline'}>{action.priorityLabel}</Badge>
+                  {action.isOverdue ? <Badge variant="destructive">Vencida</Badge> : null}
                   {action.isRunning ? <Badge>En ejecución</Badge> : action.isPaused ? <Badge variant="secondary">Pausada</Badge> : null}
                 </div>
                 <p className="text-sm leading-5">{action.description}</p>
