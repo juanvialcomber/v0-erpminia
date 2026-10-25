@@ -37,6 +37,14 @@ test('empty MOTIL payables do not render a wall of zeros',()=>{
 test('primary KPI strip stays executive',()=>{
   assert.match(page,/Saldo abierto/);
   assert.match(page,/Vencido/);
-  assert.match(page,/Compras comprometidas/);
+  assert.match(page,/Prioridad inmediata/);
   assert.doesNotMatch(page,/Costo reconocido MOTIL.*Hechos operacionales reconocidos/s);
+  assert.doesNotMatch(page,/Compras comprometidas.*Compromisos operacionales/s);
+});
+
+
+test('priority amount respects currency boundaries',()=>{
+  assert.match(page,/pendingCurrencies/);
+  assert.match(page,/pendingCurrencies\.length === 1/);
+  assert.match(page,/currencyMoney\(pendingAttentionAmount, pendingCurrencies\[0\]\)/);
 });
