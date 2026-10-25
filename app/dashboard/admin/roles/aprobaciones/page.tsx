@@ -62,7 +62,7 @@ export default function RoleMatrixApprovalsPage() {
         <p className="text-sm font-medium text-primary">Administración · Permisos</p>
         <h1 className="mt-1 text-3xl font-semibold">Solicitudes de permisos</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Cada cambio requiere aprobación de Jefatura de Área y luego de Gerencia. El solicitante no puede aprobar su propia solicitud.
+          Cada cambio requiere aprobación de Jefatura de Área y luego de Gerencia. Juan Admin puede aprobar una etapa de su solicitud; la otra debe aprobarla otra persona.
         </p>
       </div>
 
@@ -72,12 +72,16 @@ export default function RoleMatrixApprovalsPage() {
         ) : requests.map((request: any) => {
           const isRequester = request.requested_by === actor?.id;
           const sameAreaApprover = request.area_manager_approved_by === actor?.id;
+          const actorRole = String(actor?.role || '').trim().toLowerCase();
+          const isAdminPrincipal = actorRole === 'superadmin' || actorRole === 'super_admin';
           const canApproveArea =
-            request.status === 'pending_area_manager' && actor?.canApproveArea && !isRequester;
+            request.status === 'pending_area_manager' &&
+            actor?.canApproveArea &&
+            (!isRequester || isAdminPrincipal);
           const canApproveManagement =
             request.status === 'pending_management' &&
             actor?.canApproveManagement &&
-            !isRequester &&
+            (!isRequester || isAdminPrincipal) &&
             !sameAreaApprover;
           const moduleLabel = MODULE_LABELS[request.module_key] || 'Permiso de módulo';
           const requestLabel = request.operation === 'delete'
@@ -106,7 +110,15 @@ export default function RoleMatrixApprovalsPage() {
                 <p className="text-xs text-muted-foreground">
                   Solicitado: {new Date(request.requested_at).toLocaleString('es-CL')}
                 </p>
-                {isRequester ? (
+                {isRequester && sameAreaApprover ? (
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    Juan Admin ya aprobó esta etapa. La aprobación restante debe realizarla otra persona.
+                  </p>
+                ) : isRequester && isAdminPrincipal ? (
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    Juan Admin puede aprobar esta etapa. La aprobación restante debe realizarla otra persona.
+                  </p>
+                ) : isRequester ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                     El solicitante no puede aprobar su propia solicitud. Debe revisarla otra persona.
                   </p>
