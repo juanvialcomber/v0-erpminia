@@ -73,6 +73,21 @@ type NativeTraceResponse = {
   readOnly?: boolean;
 };
 
+type ReconciliationItem = {
+  date: string | null;
+  description: string | null;
+  document: string | null;
+  amount: number;
+};
+
+type BankReconciliation = {
+  status: 'available' | 'empty' | 'unavailable';
+  bankStatement: { dateFrom: string | null; dateTo: string | null; initialBalance: number | null } | null;
+  bankOnly: { count: number; amount: number; items: ReconciliationItem[] };
+  journalOnly: { count: number; amount: number; items: ReconciliationItem[] };
+  persisted: false;
+};
+
 type Response = {
   overview?: Row | null;
   topAssets?: Row[];
@@ -164,6 +179,16 @@ export default function FinanzasPage() {
       return payload;
     },
     { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
+  );
+  const bankReconciliation = useSWR<BankReconciliation>(
+    '/api/integrations/laudus/bank-reconciliation',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar la conciliación bancaria Laudus.');
+      return payload;
+    },
+    { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const reviewState = useSWR<ReviewFeedbackResponse>(
     '/api/integrations/laudus/finance-review-feedback',
@@ -513,6 +538,75 @@ export default function FinanzasPage() {
                 MOTIL consulta el detalle y las relaciones documentales que Laudus informa para la factura. Una traza disponible no se interpreta automáticamente como orden de compra ni como aprobación de pago.
               </p>
             </details>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control Laudus</p>
+            <h2 className="mt-1 text-lg font-semibold">Conciliación bancaria</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              MOTIL compara la última cartola disponible con la contabilidad Laudus y muestra sólo las diferencias que requieren revisión.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">Solo lectura</span>
+        </div>
+
+        {bankReconciliation.error ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">
+            Laudus no entregó la conciliación en este momento. MOTIL no interpreta la ausencia como cero diferencias.
+          </p>
+        ) : !bankReconciliation.data ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">Comparando cartola y contabilidad Laudus…</p>
+        ) : bankReconciliation.data.status === 'empty' ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">No hay cartolas Laudus disponibles para comparar.</p>
+        ) : bankReconciliation.data.status === 'unavailable' ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">La conciliación Laudus no está disponible.</p>
+        ) : (
+          <div>
+            <div className="grid gap-px border-b bg-border sm:grid-cols-2">
+              <div className="bg-card px-5 py-4">
+                <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
+                <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.bankOnly.count)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.bankOnly.amount)} por revisar</p>
+              </div>
+              <div className="bg-card px-5 py-4">
+                <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
+                <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.journalOnly.count)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.journalOnly.amount)} por revisar</p>
+              </div>
+            </div>
+
+            {(bankReconciliation.data.bankOnly.items.length > 0 || bankReconciliation.data.journalOnly.items.length > 0) ? (
+              <div className="grid gap-px bg-border lg:grid-cols-2">
+                {[
+                  ['Cartola sin contabilidad', bankReconciliation.data.bankOnly.items],
+                  ['Contabilidad sin cartola', bankReconciliation.data.journalOnly.items],
+                ].map(([title, items]) => (
+                  <div key={String(title)} className="bg-card">
+                    <div className="border-b px-5 py-3"><h3 className="text-sm font-semibold">{String(title)}</h3></div>
+                    {(items as ReconciliationItem[]).map((item, index) => (
+                      <div key={`${String(title)}-${index}`} className="grid gap-1 border-b px-5 py-3 last:border-b-0 sm:grid-cols-[90px_1fr_130px] sm:items-center">
+                        <span className="text-xs text-muted-foreground">{item.date ? shortDate(item.date) : 'Sin fecha'}</span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{item.description || 'Sin descripción'}</p>
+                          <p className="truncate text-xs text-muted-foreground">{item.document || 'Sin documento'}</p>
+                        </div>
+                        <span className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {bankReconciliation.data.bankStatement ? (
+              <p className="border-t px-5 py-3 text-xs text-muted-foreground">
+                Fuente: Laudus · última cartola disponible · {shortDate(bankReconciliation.data.bankStatement.dateFrom)} → {shortDate(bankReconciliation.data.bankStatement.dateTo)}.
+              </p>
+            ) : null}
           </div>
         )}
       </section>
