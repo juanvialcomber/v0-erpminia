@@ -60,8 +60,9 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
   return (
     <div className="space-y-6">
       <section className="border-b" aria-label="Navegación de Finanzas">
-        <div className="mx-auto flex min-h-12 w-full max-w-[1600px] items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
-          <nav className="flex min-w-0 flex-1 items-center gap-1" aria-label="Operación financiera">
+        <div className="mx-auto flex min-h-12 w-full max-w-[1600px] items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <span className="hidden sm:block" aria-hidden="true" />
+          <nav className="flex min-w-0 items-center gap-1 sm:justify-self-center" aria-label="Operación financiera">
             {visiblePrimary.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -84,6 +85,7 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
           </nav>
 
           {visibleSecondary.length > 0 ? (
+            <div className="sm:justify-self-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -111,6 +113,7 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           ) : null}
         </div>
       </section>
