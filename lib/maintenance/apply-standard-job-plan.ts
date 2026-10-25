@@ -20,6 +20,29 @@ export async function applyStandardJobPlanToWorkOrder(input: ApplyInput) {
   if (!workOrder) throw new Error('La orden de trabajo no existe en la organización activa.');
   if (plan.canonical_asset_id && plan.canonical_asset_id !== workOrder.canonical_asset_id) throw new Error('El plan estándar está aprobado para otro equipo.');
 
+  const { data: planSteps, error: planStepsError } = await supabase
+    .from('maintenance_standard_job_plan_steps')
+    .select('title,instructions,control_requirement')
+    .eq('organization_id', organizationId)
+    .eq('plan_id', planId);
+  if (planStepsError) throw planStepsError;
+
+  const declaredNonOperational = (planSteps || []).some((step: any) => {
+    const text = [step.title, step.instructions, step.control_requirement]
+      .filter(Boolean)
+      .join(' ')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    return text.includes('uat controlado')
+      || text.includes('no representa una intervencion real de terreno')
+      || text.includes('solo para pruebas')
+      || text.includes('test only');
+  });
+  if (declaredNonOperational) {
+    throw new Error('El plan estándar está marcado como UAT/prueba y no puede aplicarse a una OT operacional.');
+  }
+
   const { data: activeApplication, error: applicationReadError } = await supabase
     .from('maintenance_standard_job_plan_applications')
     .select('id,plan_id')
