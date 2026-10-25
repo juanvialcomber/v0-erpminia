@@ -278,7 +278,7 @@ export async function GET(request: NextRequest) {
         procurementCommitment,
         tracedPartsCost,
       },
-      semantics: 'observed maintenance execution and traceability; execution cycle is first timer start to work-order closure; not saved time, avoided downtime, or economic ROI',
+      semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
     };
 
     return NextResponse.json({
