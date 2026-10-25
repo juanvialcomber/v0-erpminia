@@ -69,8 +69,8 @@ test('asset economics keeps depreciation monetary values gated by verified acqui
 
 
 test('asset economics exposes depreciation readiness without fabricating book value',()=>{
-  assert.match(page,/Depreciación preparada/);
-  assert.match(page,/cálculo sólo con costo verificable/);
+  assert.match(page,/Costo histórico por conciliar/);
+  assert.match(page,/no es ahorro ni valor libro/);
   assert.match(page,/Qué activo revisar/);
 });
 
