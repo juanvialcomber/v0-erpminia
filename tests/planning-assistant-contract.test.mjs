@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const api = await readFile(new URL('../app/api/planificacion/asistente/route.ts', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/dashboard/planificacion/asistente/page.tsx', import.meta.url), 'utf8');
 const dict = await readFile(new URL('../lib/i18n/dictionaries.ts', import.meta.url), 'utf8');
+const plansPage = await readFile(new URL('../app/dashboard/mantenimiento/planes-estandar/page.tsx', import.meta.url), 'utf8');
 
 test('Ariel planning assistant reads real transversal sources and is tenant scoped', () => {
   for (const source of [
@@ -47,7 +48,6 @@ test('Ariel planning assistant can propose standard plans without creating or ap
 
 
 test('real plan candidates open the standard-plan form with evidence-backed prefill only', () => {
-  const plansPage = fs.readFileSync('app/dashboard/mantenimiento/planes-estandar/page.tsx', 'utf8');
   assert.match(api, /planCandidates/);
   assert.match(api, /latestPreventiveByAsset/);
   assert.match(api, /estimatedDurationHours/);
