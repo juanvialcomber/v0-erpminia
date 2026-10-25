@@ -38,7 +38,7 @@ test('Daniel gets one-tap executive questions with provenance and conversational
 });
 
 test('finance copilot remains advisory and read only',()=>{
-  assert.match(assistant,/No ejecutes acciones/);
+  assert.match(assistant,/No ejecutes compras, reservas, ajustes de stock, recepciones, aprobaciones, cambios de plan, cierres, pagos/);
   assert.match(assistant,/Una prioridad ejecutiva es una recomendación explicable/);
   assert.match(assistant,/No sugieras que MOTIL reemplaza Laudus/);
 });
