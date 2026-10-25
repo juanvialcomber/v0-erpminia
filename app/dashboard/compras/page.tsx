@@ -13,6 +13,7 @@ import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
 import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
 import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
+import { MaintenanceSupplyHandoffs } from '@/components/procurement/maintenance-supply-handoffs';
 
 type Overview = {
   canEdit: boolean;
@@ -154,6 +155,7 @@ export default function ComprasPage() {
 
       <section aria-labelledby="compras-pendientes" className="space-y-3">
         <div><h2 id="compras-pendientes" className="text-lg font-semibold tracking-tight">Qué necesita atención</h2><p className="text-sm text-muted-foreground">Pendientes y siguientes pasos del flujo de abastecimiento.</p></div>
+        <MaintenanceSupplyHandoffs />
         <OperationalPipelineBoard />
       </section>
     </div>
