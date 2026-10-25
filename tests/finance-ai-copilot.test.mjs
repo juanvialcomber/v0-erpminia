@@ -16,6 +16,10 @@ test('Daniel finance AI is grounded in canonical finance, forecast, aging and La
   assert.match(assistant,/laudus_purchase_invoice_payment_status_service_v1/);
   assert.match(assistant,/laudus_aging/);
   assert.match(assistant,/laudus_supplier_pressure/);
+  assert.match(assistant,/motil_laudus_fixed_asset_review_queue/);
+  assert.match(assistant,/maintenance_asset_economic_history_v1/);
+  assert.match(assistant,/asset_economics/);
+  assert.match(assistant,/blocked_missing_acquisition_cost/);
   assert.match(assistant,/Laudus es fuente financiera trazable/);
 });
 
