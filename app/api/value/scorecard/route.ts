@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       }),
       context.supabase
         .from('laudus_finance_review_feedback_service_v1')
-        .select('decision,created_at')
+        .select('purchase_invoice_external_id,decision,created_at')
         .eq('organization_id', context.organizationId)
         .order('created_at', { ascending: false })
         .limit(500),
@@ -38,12 +38,19 @@ export async function GET(request: NextRequest) {
     if (financeReviews.error) throw financeReviews.error;
 
     const financeRows = financeReviews.data || [];
+    const latestFinanceReviews = new Map<string, any>();
+    for (const row of financeRows) {
+      const key = String(row.purchase_invoice_external_id || '');
+      if (key && !latestFinanceReviews.has(key)) latestFinanceReviews.set(key, row);
+    }
+    const financeReviewRows = Array.from(latestFinanceReviews.values());
     const financeReview = {
-      total: financeRows.length,
-      reviewed: financeRows.filter((row: any) => row.decision === 'accepted').length,
-      deferred: financeRows.filter((row: any) => row.decision === 'deferred').length,
-      rejected: financeRows.filter((row: any) => row.decision === 'rejected').length,
+      total: financeReviewRows.length,
+      reviewed: financeReviewRows.filter((row: any) => row.decision === 'accepted').length,
+      deferred: financeReviewRows.filter((row: any) => row.decision === 'deferred').length,
+      rejected: financeReviewRows.filter((row: any) => row.decision === 'rejected').length,
       latestAt: financeRows[0]?.created_at || null,
+      calibrationGate: financeReviewRows.length >= 20 ? 'PASS' : 'HOLD',
     };
 
     return NextResponse.json({
