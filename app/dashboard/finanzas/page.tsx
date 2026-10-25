@@ -398,6 +398,19 @@ export default function FinanzasPage() {
                 ))}
               </div>
             )}
+            {Number(poControl.data.summary?.examined || 0) > Number(poControl.data.summary?.withLines || 0) ? (
+              <div className="border-t px-5 py-3 text-xs">
+                <span className="font-medium">
+                  Próximo paso: completar detalle de {number(
+                    Number(poControl.data.summary?.examined || 0) -
+                      Number(poControl.data.summary?.withLines || 0),
+                  )} obligaciones prioritarias.
+                </span>
+                <span className="ml-1 text-muted-foreground">
+                  Sin líneas de producto MOTIL no fuerza una OC candidata.
+                </span>
+              </div>
+            ) : null}
             <p className="border-t px-5 py-3 text-xs text-muted-foreground">
               La exposición candidata no es ahorro. Una diferencia sólo genera valor E3 cuando una revisión humana demuestra una corrección antes del pago.
             </p>
