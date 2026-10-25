@@ -73,7 +73,8 @@ const currencyMoney = (value: unknown, currency: unknown) => {
   const code =
     typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency)
       ? currency.toUpperCase()
-      : 'CLP';
+      : null;
+  if (!code) return '—';
   try {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
