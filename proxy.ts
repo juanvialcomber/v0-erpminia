@@ -126,6 +126,17 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (path === '/dashboard/compras') return true;
   if (path.startsWith('/dashboard/compras/')) return true;
   if (path.startsWith('/api/auth/') || path.startsWith('/api/me/') || path === '/api/value/scorecard') return true;
+  if (path === '/api/value/finance-baseline') return true;
+
+  const financeIntegrationRoutes = new Set([
+    '/api/integrations/laudus/invoice-po-control',
+    '/api/integrations/laudus/native-invoice-trace',
+    '/api/integrations/laudus/finance-review-feedback',
+  ]);
+  if (financeIntegrationRoutes.has(path)) {
+    return path === '/api/integrations/laudus/finance-review-feedback' ? true : readOnly;
+  }
+
   const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
   if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
   if (path.startsWith('/api/finance/')) return false;
