@@ -12,10 +12,13 @@ import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-fin
 import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-accounting-readiness-card';
 
 type Row = Record<string, string | number | null>;
-type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
+type FinanceAlert = { alert_code?: string; title?: string; severity?: string; exception_count?: number; description?: string };
+type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; alerts?: FinanceAlert[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
+type ReconciliationItem = { date: string | null; description: string | null; document: string | null; amount: number };
+type BankReconciliation = { status: 'available' | 'empty' | 'unavailable'; bankStatement: { dateFrom: string | null; dateTo: string | null; initialBalance: number | null } | null; bankOnly: { count: number; amount: number; items: ReconciliationItem[] }; journalOnly: { count: number; amount: number; items: ReconciliationItem[] }; persisted: false };
 type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
 
-const fetcher = async (url: string): Promise<Response> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload; };
+const fetcher = async <T,>(url: string): Promise<T> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload as T; };
 const amount = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
 const money = (value: unknown) => amount(value) === null ? '—' : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount(value)!);
 const currencyMoney = (value: unknown, currency: unknown) => { const numeric = amount(value); if (numeric === null) return '—'; const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : null; if (!code) return '—'; try { return new Intl.NumberFormat('es-CL', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(numeric); } catch { return `${code} ${new Intl.NumberFormat('es-CL').format(numeric)}`; } };
@@ -32,6 +35,7 @@ const agingLabels: Record<string, string> = { no_due_date: 'Sin vencimiento', cu
 
 export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher);
+  const { data: bankReconciliation, error: bankReconciliationError, isLoading: bankReconciliationLoading } = useSWR<BankReconciliation>('/api/integrations/laudus/bank-reconciliation', fetcher, { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 });
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
   const sourceStatus = useDataSourceStatus();
@@ -40,6 +44,7 @@ export default function FinanzasPage() {
   const treasury = error ? [] : data?.treasury || [];
   const treasuryAging = error ? [] : data?.treasuryAging || [];
   const cashForecast = error ? [] : data?.cashForecast || [];
+  const financeAlerts = error ? [] : (data?.alerts || []).filter((alert) => Number(alert.exception_count || 0) > 0).slice(0, 3);
   const validationStatus = typeof data?.validation?.status === 'string' ? data.validation.status.toLowerCase() : null;
   const rowsByType: Record<ConcentrationKey, Row[]> = error ? { assets: [], products: [], suppliers: [], costCenters: [] } : { assets: data?.topAssets || [], products: data?.topProducts || [], suppliers: data?.topSuppliers || [], costCenters: data?.topCostCenters || [] };
   const config = concentrationConfig[activeConcentration];
@@ -58,7 +63,7 @@ export default function FinanzasPage() {
         sources={[
           sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: conexión en verificación; el estado se actualiza con evidencia real.' }),
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
@@ -66,6 +71,67 @@ export default function FinanzasPage() {
       <LaudusFinanceReadinessCard />
 
       <LaudusAccountingReadinessCard />
+
+      <section className="space-y-3 border-t pt-5" aria-label="Prioridades financieras">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Qué requiere atención</h2>
+            <p className="text-sm text-muted-foreground">Primero excepciones que pueden afectar una decisión financiera. Sin inferencias automáticas.</p>
+          </div>
+          <Link href="/dashboard/finanzas/trazabilidad" className="text-sm font-medium text-primary hover:underline">Revisar evidencia</Link>
+        </div>
+        {isLoading ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Verificando excepciones financieras…</div> : financeAlerts.length === 0 ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Sin excepciones financieras activas en la evidencia canónica disponible.</div> : <div className="overflow-hidden rounded-lg border">
+          {financeAlerts.map((alert, index) => <div key={String(alert.alert_code || index)} className="grid gap-2 border-b px-4 py-3 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{alert.title || 'Excepción financiera'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{alert.description || 'Requiere revisión de la fuente antes de usarla para una decisión material.'}</p>
+            </div>
+            <div className="text-left md:text-right">
+              <p className="text-sm font-semibold tabular-nums">{number(alert.exception_count || 0)} caso(s)</p>
+              <p className="text-xs text-muted-foreground">{String(alert.severity || 'review')}</p>
+            </div>
+          </div>)}
+        </div>}
+      </section>
+
+      <section className="space-y-3 border-t pt-5" aria-label="Conciliación bancaria Laudus">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Conciliación bancaria</h2>
+            <p className="text-sm text-muted-foreground">Diferencias entre cartola y contabilidad Laudus. Sólo lectura; MOTIL no concilia ni contabiliza automáticamente.</p>
+          </div>
+          <Link href="/dashboard/finanzas/fuentes" className="text-sm font-medium text-primary hover:underline">Ver fuente</Link>
+        </div>
+        {bankReconciliationLoading ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Comparando cartola y contabilidad…</div> : null}
+        {bankReconciliationError || bankReconciliation?.status === 'unavailable' ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">La conciliación Laudus no está disponible en este momento. No se asume que las diferencias sean cero.</div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'empty' ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">No hay cartolas disponibles para comparar.</div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' ? <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(bankReconciliation.bankOnly.count)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.bankOnly.amount)} por revisar</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(bankReconciliation.journalOnly.count)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.journalOnly.amount)} por revisar</p>
+          </div>
+        </div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && (bankReconciliation.bankOnly.items.length > 0 || bankReconciliation.journalOnly.items.length > 0) ? <div className="grid gap-3 lg:grid-cols-2">
+          {[
+            ['Cartola sin contabilidad', bankReconciliation.bankOnly.items],
+            ['Contabilidad sin cartola', bankReconciliation.journalOnly.items],
+          ].map(([title, items]) => <div key={String(title)} className="overflow-hidden rounded-lg border">
+            <div className="border-b px-4 py-3"><h3 className="text-sm font-semibold">{String(title)}</h3></div>
+            {(items as ReconciliationItem[]).map((item, index) => <div key={`${String(title)}-${index}`} className="grid gap-1 border-b px-4 py-3 last:border-b-0 sm:grid-cols-[90px_1fr_120px] sm:items-center">
+              <span className="text-xs text-muted-foreground">{item.date ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'short' }).format(new Date(item.date)) : 'Sin fecha'}</span>
+              <div className="min-w-0"><p className="truncate text-sm font-medium">{item.description || 'Sin descripción'}</p><p className="truncate text-xs text-muted-foreground">{item.document || 'Sin documento'}</p></div>
+              <span className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount)}</span>
+            </div>)}
+          </div>)}
+        </div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && bankReconciliation.bankStatement ? <p className="text-xs text-muted-foreground">Cartola evaluada: {bankReconciliation.bankStatement.dateFrom || 'sin inicio'} → {bankReconciliation.bankStatement.dateTo || 'sin cierre'} · Laudus.</p> : null}
+      </section>
 
       <DataReceptionReadiness
         description="Finanzas está preparada para recibir hechos ERP sin confundirlos con aprobación de pagos ni con decisiones operacionales. Los datos externos entrarán con procedencia y conciliación."

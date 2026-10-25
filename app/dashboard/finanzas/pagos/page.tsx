@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { CheckCircle2, Clock3, Landmark, ReceiptText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -140,12 +141,22 @@ export default function PayablesPage() {
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
-      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay facturas aprobadas para pago.</p> : null}
+      {!isLoading && !payables.length ? <div className="rounded-lg border border-dashed p-5">
+        <p className="text-sm font-semibold">No hay CxP pendientes en MOTIL</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">No se puede concluir que no existan obligaciones en Laudus. Aquí sólo aparecen facturas aprobadas para pago en MOTIL.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild size="sm"><Link href="/dashboard/compras/facturas">Revisar facturas</Link></Button>
+          <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/fuentes">Ver fuentes</Link></Button>
+        </div>
+      </div> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
 
     <Card className="shadow-none"><CardHeader><CardTitle>Pagos y conciliación</CardTitle><CardDescription>La conciliación no reconoce gasto; confirma la salida de caja con referencia trazable.</CardDescription></CardHeader><CardContent className="space-y-3">
-      {!payments.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay pagos registrados.</p> : null}
+      {!payments.length ? <div className="rounded-lg border border-dashed p-5">
+        <p className="text-sm font-semibold">Aún no hay pagos para conciliar</p>
+        <p className="mt-1 text-sm text-muted-foreground">{payables.length ? 'El primer paso es registrar el pago de una CxP aprobada.' : 'Cuando exista una CxP aprobada y se registre su pago, aparecerá aquí para conciliación.'}</p>
+      </div> : null}
       {payments.map((row)=><div key={row.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{money(row.amount,row.currency || 'CLP')} · {row.payment_date}</p><p className="text-sm text-muted-foreground">{row.payment_reference || 'Sin referencia de pago'}</p></div>{row.reconciled_at ? <Badge><CheckCircle2 className="mr-1 h-3.5 w-3.5"/>Conciliado</Badge> : canEdit ? <Button size="sm" variant="outline" onClick={()=>openReconcile(row)}><Landmark className="mr-2 h-4 w-4"/>Conciliar</Button> : <Badge variant="outline"><Clock3 className="mr-1 h-3.5 w-3.5"/>Pendiente</Badge>}</div>)}
     </CardContent></Card>
 
