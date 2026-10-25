@@ -25,6 +25,15 @@ test('rejected finance review requires a human reason',()=>{
 test('value scorecard surfaces real finance review adoption separately from ROI',()=>{
   assert.match(valueApi,/laudus_finance_review_feedback_service_v1/);
   assert.match(valueApi,/financeReview/);
+  assert.match(valueApi,/latestFinanceReviews/);
+  assert.match(valueApi,/financeReviewRows\.length >= 20/);
   assert.match(valuePage,/Revisiones financieras/);
   assert.match(valuePage,/actor y timestamp/);
+});
+
+
+test('finance cockpit does not inflate adoption with repeated review clicks',()=>{
+  assert.match(route,/latestByInvoice/);
+  assert.match(finance,/latestReviewByInvoice/);
+  assert.match(finance,/priorReview\?\.decision === 'accepted'/);
 });
