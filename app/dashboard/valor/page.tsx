@@ -36,6 +36,14 @@ type Scorecard = {
 
 type ApiResponse = {
   current?: Scorecard | null;
+  financeReview?: {
+    total?: number;
+    reviewed?: number;
+    deferred?: number;
+    rejected?: number;
+    latestAt?: string | null;
+    calibrationGate?: string;
+  } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
 };
 
@@ -64,6 +72,8 @@ export default function ValueScorecardPage() {
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
   const outcomes = score.outcomes?.closed || 0;
+  const financeReview = data?.financeReview || {};
+  const financeReviewTotal = financeReview.total || 0;
   const e3 = score.observedImpact?.e3Records || 0;
   const gates = score.adoptionGate || {};
   const scaleLabel =
@@ -75,7 +85,7 @@ export default function ValueScorecardPage() {
   const historyCount = data?.history?.count || 0;
 
   const nextActions = [
-    decisions < 20 ? `Registrar ${20 - decisions} decisiones humanas más para calibrar L4.` : null,
+    decisions + financeReviewTotal < 20 ? `Registrar ${20 - decisions - financeReviewTotal} decisiones humanas más para calibrar L4.` : null,
     outcomes < 5 ? `Cerrar ${5 - outcomes} resultados reales para demostrar efecto operacional.` : null,
     e3 < 3 ? `Documentar ${3 - e3} impactos E3 con evidencia económica observada.` : null,
   ].filter(Boolean) as string[];
@@ -106,12 +116,19 @@ export default function ValueScorecardPage() {
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-4">
         <div className="rounded-lg border p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisiones asistidas</p>
           <p className="mt-2 text-3xl font-semibold">{number(decisions)}</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Revisiones humanas y decisiones de abastecimiento registradas con evidencia.
+          </p>
+        </div>
+        <div className="rounded-lg border p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Revisiones financieras</p>
+          <p className="mt-2 text-3xl font-semibold">{number(financeReviewTotal)}</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Prioridades Laudus revisadas por Finanzas con actor y timestamp. No equivalen a ahorro.
           </p>
         </div>
         <div className="rounded-lg border p-5">
@@ -140,7 +157,7 @@ export default function ValueScorecardPage() {
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {[
-            ['Calibración de decisiones', gates.matchCalibration || 'HOLD'],
+            ['Calibración de decisiones', decisions + financeReviewTotal >= 20 ? 'PASS' : gates.matchCalibration || 'HOLD'],
             ['Resultados de abastecimiento', gates.supplyOutcomes || 'HOLD'],
             ['Evidencia de valor', gates.valueEvidence || 'HOLD'],
           ].map(([label, value]) => (
