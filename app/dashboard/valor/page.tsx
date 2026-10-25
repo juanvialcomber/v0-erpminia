@@ -104,6 +104,16 @@ type ApiResponse = {
       receiptToInstall?: { samples?: number; medianSeconds?: number | null };
       semantics?: string;
     };
+    standardPlanOutcomeQuality?: {
+      applications?: number;
+      durationSamples?: number;
+      medianDurationErrorPct?: number | null;
+      within20Pct?: number | null;
+      scheduleSamples?: number;
+      startedOnScheduledDate?: number;
+      scheduleAdherencePct?: number | null;
+      semantics?: string;
+    };
     standardPlanLearning?: {
       motilDecisions?: number;
       approved?: number;
@@ -221,6 +231,7 @@ export default function ValueScorecardPage() {
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
   const weeklyPlanning = maintenanceValue.weeklyPlanning || {};
   const standardPlanLearning = maintenanceValue.standardPlanLearning || {};
+  const standardPlanOutcomeQuality = maintenanceValue.standardPlanOutcomeQuality || {};
   const crossDomainCycle = maintenanceValue.crossDomainCycle || {};
   const supplyFunnel = maintenanceValue.supplyChain?.funnel || {};
   const maintenanceL4Calibrated = (weeklyPlanning.decisionsOpened || 0) >= 20 && (standardPlanLearning.motilDecisions || 0) >= 20;
@@ -444,6 +455,23 @@ export default function ValueScorecardPage() {
               </p>
             </div>
           ))}
+        </div>
+        <div className="grid gap-px border-t bg-border md:grid-cols-3">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Error mediano de duración</p>
+            <p className="mt-1 text-xl font-semibold">{standardPlanOutcomeQuality.medianDurationErrorPct == null ? 'Sin muestra' : `${number(standardPlanOutcomeQuality.medianDurationErrorPct)}%`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(standardPlanOutcomeQuality.durationSamples || 0)} OT con plan y duración real.</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Dentro de ±20% del plan</p>
+            <p className="mt-1 text-xl font-semibold">{standardPlanOutcomeQuality.within20Pct == null ? 'Sin muestra' : `${number(standardPlanOutcomeQuality.within20Pct)}%`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Precisión observada; no se estima cuando no hay aplicaciones.</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Inicio en fecha programada</p>
+            <p className="mt-1 text-xl font-semibold">{standardPlanOutcomeQuality.scheduleAdherencePct == null ? 'Sin muestra' : `${number(standardPlanOutcomeQuality.scheduleAdherencePct)}%`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(standardPlanOutcomeQuality.scheduleSamples || 0)} OT con fecha y primer inicio observados.</p>
+          </div>
         </div>
         <div className="grid gap-px border-t bg-border md:grid-cols-2">
           <div className="bg-card px-5 py-4">
