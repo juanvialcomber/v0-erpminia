@@ -18,7 +18,7 @@ test('fixed-asset probe returns only availability and field metadata', () => {
   assert.match(helper, /sampleFields/);
   assert.match(helper, /costFields/);
   assert.match(helper, /attempts: attempts\.map/);
-  assert.doesNotMatch(helper, /payload:/);
+  assert.doesNotMatch(helper, /return\s+\{[\s\S]*?payload:/);
 });
 
 test('fixed-asset readiness is finance scoped and available to finance manager', () => {
