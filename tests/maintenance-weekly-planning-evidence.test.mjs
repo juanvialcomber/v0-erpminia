@@ -82,3 +82,13 @@ test('standard plan learning measures correction as calibration rather than ROI'
   assert.match(scorecard, /correctionRatePct/);
   assert.match(scorecard, /acceptance and correction are calibration evidence, not economic impact/);
 });
+
+
+test('all standard plan edits remain proposed-only and auditable', () => {
+  const progressive = fs.readFileSync('app/api/maintenance/standard-job-plans/progressive/route.ts','utf8');
+  assert.match(progressive, /action === 'add_step'/);
+  assert.match(progressive, /action === 'add_material'/);
+  assert.match(progressive, /edit_type: 'add_step'/);
+  assert.match(progressive, /edit_type: 'add_material'/);
+  assert.ok((progressive.match(/Sólo se editan planes propuestos/g) || []).length >= 5);
+});
