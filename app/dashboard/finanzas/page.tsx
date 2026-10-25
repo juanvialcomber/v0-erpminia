@@ -228,20 +228,17 @@ export default function FinanzasPage() {
   const treasury = error ? [] : data?.treasury || [];
   const laudus = error ? null : data?.laudusReview || null;
   const laudusSummary = laudus?.summary || {};
-  const attention = (laudus?.reviews || []).slice(0, 3);
   const latestReviewByInvoice = new Map(
     (reviewState.data?.reviews || []).map((row) => [row.purchase_invoice_external_id, row]),
   );
-  const pendingAttention = attention.filter((item) => {
-    const decision = item.purchase_invoice_external_id
-      ? latestReviewByInvoice.get(item.purchase_invoice_external_id)?.decision
-      : undefined;
-    return decision !== 'accepted' && decision !== 'rejected';
-  });
-  const pendingAttentionAmount = pendingAttention.reduce(
-    (sum, item) => sum + Number(item.outstanding_amount || 0),
-    0,
-  );
+  const pendingAttention = (laudus?.reviews || [])
+    .filter((item) => {
+      const decision = item.purchase_invoice_external_id
+        ? latestReviewByInvoice.get(item.purchase_invoice_external_id)?.decision
+        : undefined;
+      return decision !== 'accepted' && decision !== 'rejected';
+    })
+    .slice(0, 3);
 
   const motilOutstanding = treasury.reduce(
     (sum, row) => sum + Number(row.outstanding_amount || 0),
@@ -323,7 +320,7 @@ export default function FinanzasPage() {
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">Decisiones financieras</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             {pendingAttention.length > 0
-              ? `${number(pendingAttention.length)} prioridades requieren revisión por ${money(pendingAttentionAmount)}.`
+              ? `${number(pendingAttention.length)} prioridades requieren revisión.`
               : 'No hay prioridades pendientes en la muestra actual.'}
           </p>
         </div>
@@ -392,13 +389,13 @@ export default function FinanzasPage() {
         </div>
         {isLoading ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">Cargando prioridades…</p>
-        ) : attention.length === 0 ? (
+        ) : pendingAttention.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">
             No hay obligaciones Laudus abiertas disponibles para priorizar.
           </p>
         ) : (
           <div>
-            {attention.map((item, index) => {
+            {pendingAttention.map((item, index) => {
               const priorReview = item.purchase_invoice_external_id
                 ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
                 : undefined;
