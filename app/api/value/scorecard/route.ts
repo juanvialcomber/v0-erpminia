@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -46,6 +46,11 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,event_type,event_at')
         .eq('organization_id', context.organizationId)
         .limit(10000),
+      context.supabase
+        .from('work_order_supply_chain_v1')
+        .select('work_order_id,material_requirement_count,material_shortage_count,procurement_request_count,procurement_order_count,parts_installed,procurement_order_amount,parts_cost')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     if (current.error) throw current.error;
@@ -54,6 +59,7 @@ export async function GET(request: NextRequest) {
     if (financeTiming.error) throw financeTiming.error;
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
+    if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -120,6 +126,27 @@ export async function GET(request: NextRequest) {
     const workOrdersWithEvents = new Set(
       maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
     );
+    const supplyRows = maintenanceSupplyChain.data || [];
+    const withMaterials = supplyRows.filter((row: any) => Number(row.material_requirement_count || 0) > 0).length;
+    const withShortages = supplyRows.filter((row: any) => Number(row.material_shortage_count || 0) > 0).length;
+    const withProcurementRequests = supplyRows.filter((row: any) => Number(row.procurement_request_count || 0) > 0).length;
+    const withPurchaseOrders = supplyRows.filter((row: any) => Number(row.procurement_order_count || 0) > 0).length;
+    const withPartsInstalled = supplyRows.filter((row: any) => Number(row.parts_installed || 0) > 0).length;
+    const procurementCommitment = supplyRows.reduce(
+      (sum: number, row: any) => sum + (Number.isFinite(Number(row.procurement_order_amount)) ? Number(row.procurement_order_amount) : 0),
+      0,
+    );
+    const tracedPartsCost = supplyRows.reduce(
+      (sum: number, row: any) => sum + (Number.isFinite(Number(row.parts_cost)) ? Number(row.parts_cost) : 0),
+      0,
+    );
+    const connectedDomains = [
+      maintenanceRows.length > 0 ? 'Mantención' : null,
+      withMaterials > 0 || withPartsInstalled > 0 ? 'Bodega' : null,
+      withProcurementRequests > 0 || withPurchaseOrders > 0 ? 'Compras' : null,
+      procurementCommitment > 0 ? 'Finanzas' : null,
+    ].filter(Boolean);
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -135,6 +162,18 @@ export async function GET(request: NextRequest) {
       evidenceLevel:
         timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      connectedDomains,
+      connectedDomainCount: connectedDomains.length,
+      supplyChain: {
+        workOrders: supplyRows.length,
+        withMaterials,
+        withShortages,
+        withProcurementRequests,
+        withPurchaseOrders,
+        withPartsInstalled,
+        procurementCommitment,
+        tracedPartsCost,
+      },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI',
     };
 
