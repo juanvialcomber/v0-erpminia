@@ -16,6 +16,7 @@ type LaudusReviewItem = {
   outstanding_amount?: number | null;
   currency?: string | null;
   days_overdue?: number | null;
+  priority_rank?: number | null;
   review_reason?: string | null;
 };
 
@@ -117,6 +118,9 @@ export default function FinanzasPage() {
   });
   const { canEdit, ready } = useModuleAccess();
   const [activeConcentration, setActiveConcentration] = useState<ConcentrationKey>('assets');
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   const overview = error ? {} : data?.overview || {};
   const treasury = error ? [] : data?.treasury || [];
@@ -147,6 +151,50 @@ export default function FinanzasPage() {
       };
   const config = concentrationConfig[activeConcentration];
   const rows = rowsByType[activeConcentration].slice(0, 5);
+
+  const recordReview = async (
+    item: LaudusReviewItem,
+    decision: 'accepted' | 'rejected' | 'deferred',
+  ) => {
+    const invoiceId = item.purchase_invoice_external_id;
+    if (!invoiceId || reviewingId) return;
+
+    let reason = '';
+    if (decision === 'rejected') {
+      reason = window.prompt('¿Por qué esta prioridad no aplica?')?.trim() || '';
+      if (!reason) return;
+    }
+
+    setReviewingId(invoiceId);
+    setReviewNotice(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/finance-review-feedback', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purchaseInvoiceExternalId: invoiceId,
+          decision,
+          reason: reason || null,
+          outstandingAmount: amount(item.outstanding_amount),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la revisión.');
+      setReviewNotice(
+        decision === 'accepted'
+          ? 'Revisión registrada.'
+          : decision === 'deferred'
+            ? 'Caso diferido.'
+            : 'Caso marcado como no aplicable.',
+      );
+    } catch (cause) {
+      setReviewNotice(cause instanceof Error ? cause.message : 'No se pudo registrar la revisión.');
+    } finally {
+      setReviewingId(null);
+      setRejectingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -215,7 +263,10 @@ export default function FinanzasPage() {
               Mayores excepciones abiertas de Laudus, ordenadas por vencimiento y monto.
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">Fuente de solo lectura</span>
+          <div className="text-right">
+            <span className="text-xs text-muted-foreground">Fuente de solo lectura</span>
+            {reviewNotice ? <p className="mt-1 text-xs text-foreground">{reviewNotice}</p> : null}
+          </div>
         </div>
         {isLoading ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">Cargando prioridades…</p>
@@ -228,7 +279,7 @@ export default function FinanzasPage() {
             {attention.map((item, index) => (
               <div
                 key={item.purchase_invoice_external_id || `${item.doc_number}-${index}`}
-                className="grid gap-2 border-b px-5 py-4 last:border-b-0 md:grid-cols-[28px_minmax(0,1fr)_150px_140px] md:items-center"
+                className="grid gap-3 border-b px-5 py-4 last:border-b-0 xl:grid-cols-[28px_minmax(0,1fr)_130px_140px_auto] xl:items-center"
               >
                 <span className="text-xs font-semibold text-muted-foreground">{index + 1}</span>
                 <div className="min-w-0">
@@ -244,9 +295,38 @@ export default function FinanzasPage() {
                 <span className="text-xs text-muted-foreground md:text-right">
                   {item.due_date ? `Vence ${shortDate(item.due_date)}` : 'Sin vencimiento'}
                 </span>
-                <span className="text-sm font-semibold tabular-nums md:text-right">
+                <span className="text-sm font-semibold tabular-nums xl:text-right">
                   {currencyMoney(item.outstanding_amount, item.currency)}
                 </span>
+                <div className="flex flex-wrap gap-1.5 xl:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'accepted')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  >
+                    Revisado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'deferred')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    Después
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingId(item.purchase_invoice_external_id || null);
+                      void recordReview(item, 'rejected');
+                    }}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    {rejectingId === item.purchase_invoice_external_id ? 'Registrando…' : 'No aplica'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
