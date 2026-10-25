@@ -44,6 +44,11 @@ type ApiResponse = {
     latestAt?: string | null;
     calibrationGate?: string;
   } | null;
+  financeReviewTiming?: {
+    sample?: number;
+    medianSeconds?: number | null;
+    semantics?: string;
+  } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
 };
 
@@ -73,6 +78,7 @@ export default function ValueScorecardPage() {
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
   const outcomes = score.outcomes?.closed || 0;
   const financeReview = data?.financeReview || {};
+  const financeReviewTiming = data?.financeReviewTiming || {};
   const financeReviewTotal = financeReview.total || 0;
   const e3 = score.observedImpact?.e3Records || 0;
   const gates = score.adoptionGate || {};
@@ -116,7 +122,7 @@ export default function ValueScorecardPage() {
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 lg:grid-cols-5">
         <div className="rounded-lg border p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisiones asistidas</p>
           <p className="mt-2 text-3xl font-semibold">{number(decisions)}</p>
@@ -129,6 +135,15 @@ export default function ValueScorecardPage() {
           <p className="mt-2 text-3xl font-semibold">{number(financeReviewTotal)}</p>
           <p className="mt-2 text-sm text-muted-foreground">
             Prioridades Laudus revisadas por Finanzas con actor y timestamp. No equivalen a ahorro.
+          </p>
+        </div>
+        <div className="rounded-lg border p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Latencia observada</p>
+          <p className="mt-2 text-3xl font-semibold">
+            {financeReviewTiming.medianSeconds == null ? '—' : `${number(financeReviewTiming.medianSeconds)} s`}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Mediana desde la carga del cockpit hasta la decisión. No es aún baseline manual.
           </p>
         </div>
         <div className="rounded-lg border p-5">
