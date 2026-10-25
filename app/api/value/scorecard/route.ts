@@ -387,6 +387,14 @@ export async function GET(request: NextRequest) {
     const motilStandardPlanDecisions = standardPlanDecisionRows.filter(
       (row: any) => row.new_values?.proposal_source === 'motil',
     );
+    const decidedMotilPlanIds = new Set(
+      motilStandardPlanDecisions
+        .map((row: any) => String(row.resource_identifier || ''))
+        .filter(Boolean),
+    );
+    const correctedDecidedMotilPlanIds = new Set(
+      Array.from(motilEditedPlanIds).filter((planId) => decidedMotilPlanIds.has(planId)),
+    );
     const standardPlanDecisionCycles = motilStandardPlanDecisions
       .map((row: any) => Number(row.new_values?.decision_cycle_seconds))
       .filter((value: number) => Number.isFinite(value) && value >= 0)
@@ -464,6 +472,7 @@ export async function GET(request: NextRequest) {
         approved: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'approved').length,
         rejected: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'rejected').length,
         editedPlans: motilEditedPlanIds.size,
+        correctedDecidedPlans: correctedDecidedMotilPlanIds.size,
         editEvents: standardPlanEditRows.filter((row: any) => row.new_values?.proposal_source === 'motil').length,
         acceptanceRatePct:
           motilStandardPlanDecisions.length > 0
@@ -475,7 +484,7 @@ export async function GET(request: NextRequest) {
             : null,
         correctionRatePct:
           motilStandardPlanDecisions.length > 0
-            ? Math.round((motilEditedPlanIds.size / motilStandardPlanDecisions.length) * 100)
+            ? Math.round((correctedDecidedMotilPlanIds.size / motilStandardPlanDecisions.length) * 100)
             : null,
         medianDecisionCycleSeconds: medianStandardPlanDecisionSeconds,
         evidenceLevel: motilStandardPlanDecisions.length >= 20 ? 'E2' : motilStandardPlanDecisions.length > 0 ? 'E1' : 'E0',
