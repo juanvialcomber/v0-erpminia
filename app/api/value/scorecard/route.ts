@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -31,11 +31,20 @@ export async function GET(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .order('created_at', { ascending: false })
         .limit(500),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'finance_review_decision')
+        .eq('resource_type', 'laudus_purchase_invoice')
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
     if (current.error) throw current.error;
     if (history.error) throw history.error;
     if (financeReviews.error) throw financeReviews.error;
+    if (financeTiming.error) throw financeTiming.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -53,9 +62,32 @@ export async function GET(request: NextRequest) {
       calibrationGate: financeReviewRows.length >= 20 ? 'PASS' : 'HOLD',
     };
 
+    const latestTimingByInvoice = new Map<string, number>();
+    for (const row of financeTiming.data || []) {
+      const key = String(row.resource_identifier || '');
+      const latency = Number((row.new_values as any)?.decision_latency_ms);
+      if (key && Number.isFinite(latency) && latency >= 0 && !latestTimingByInvoice.has(key)) {
+        latestTimingByInvoice.set(key, latency);
+      }
+    }
+    const timingValues = Array.from(latestTimingByInvoice.values()).sort((a, b) => a - b);
+    const midpoint = Math.floor(timingValues.length / 2);
+    const medianMs =
+      timingValues.length === 0
+        ? null
+        : timingValues.length % 2 === 0
+          ? Math.round((timingValues[midpoint - 1] + timingValues[midpoint]) / 2)
+          : timingValues[midpoint];
+    const financeReviewTiming = {
+      sample: timingValues.length,
+      medianSeconds: medianMs === null ? null : Math.round(medianMs / 1000),
+      semantics: 'time from finance cockpit load to human decision; not manual baseline',
+    };
+
     return NextResponse.json({
       current: current.data || null,
       financeReview,
+      financeReviewTiming,
       history: history.data || null,
       definitions: {
         workflow: {
