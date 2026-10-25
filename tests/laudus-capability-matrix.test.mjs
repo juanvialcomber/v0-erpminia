@@ -23,3 +23,14 @@ test('capabilities endpoint is finance-authorized and read only', () => {
   assert.match(route, /export async function GET/);
   assert.doesNotMatch(route, /POST|PUT|PATCH|DELETE/);
 });
+
+
+test('current Laudus Swagger v2 is preferred', () => {
+  assert.match(matrix, /\/swagger\/v2\/swagger\.json/);
+});
+
+test('POST list endpoints are discovery reads, not business mutations', () => {
+  const discovery = fs.readFileSync('lib/integrations/laudus/openapi-discovery.ts','utf8');
+  assert.match(discovery, /method === 'post' && \/\\\/list/);
+  assert.match(discovery, /isMutatingMethod/);
+});
