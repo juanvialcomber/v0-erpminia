@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     caseCount > 20
   ) {
     return NextResponse.json(
-      { error: 'La medición debe tener entre 10 minutos? No: al menos 10 segundos, máximo 60 minutos y entre 1 y 20 casos.' },
+      { error: 'La medición debe durar entre 10 segundos y 60 minutos, con 1 a 20 casos.' },
       { status: 400 },
     );
   }
