@@ -59,8 +59,8 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border bg-card/60" aria-label="Navegación de Finanzas">
-        <div className="flex min-h-12 items-center gap-1 overflow-x-auto px-2 [scrollbar-width:none] sm:px-3 [&::-webkit-scrollbar]:hidden">
+      <section className="border-b" aria-label="Navegación de Finanzas">
+        <div className="mx-auto flex min-h-12 w-full max-w-[1600px] items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
           <nav className="flex min-w-0 flex-1 items-center gap-1" aria-label="Operación financiera">
             {visiblePrimary.map((item) => {
               const active = isActive(pathname, item.href);
@@ -70,10 +70,10 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
                   href={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'relative inline-flex min-h-12 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'relative inline-flex min-h-12 shrink-0 items-center px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     active
-                      ? 'bg-primary/10 text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {item.label}
@@ -90,7 +90,7 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
                   type="button"
                   variant={secondaryActive ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-10 shrink-0 gap-1.5"
+                  className="h-9 shrink-0 gap-1.5 rounded-md"
                   aria-label="Más opciones de Finanzas"
                 >
                   <MoreHorizontal className="h-4 w-4" />
