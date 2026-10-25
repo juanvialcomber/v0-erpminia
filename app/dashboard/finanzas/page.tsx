@@ -47,28 +47,13 @@ type ReviewFeedbackResponse = {
   uniqueInvoices?: number;
 };
 
-type InvoicePoCandidate = {
-  invoiceExternalId?: string;
-  docNumber?: string | null;
-  supplierName?: string | null;
-  outstandingAmount?: number;
-  currency?: string | null;
-  orderNumber?: string | null;
-  score?: number;
-  confidence?: 'strong' | 'review';
-  matchedProducts?: number;
-  invoiceProducts?: number;
-  exactQuantityProducts?: number;
-  exactPriceProducts?: number;
-};
-
 type NativeTraceResponse = {
   summary?: {
     examined?: number;
     nativeLookups?: number;
     detailRecovered?: number;
     withNativeTrace?: number;
-    withConfirmedPo?: number;
+    missingEvidence?: number;
     apiCalls?: number;
   };
   invoices?: Array<{
@@ -80,28 +65,10 @@ type NativeTraceResponse = {
     sourceDetailAvailable?: boolean;
     itemCount?: number;
     nativeTraceCount?: number;
-    confirmedPurchaseOrders?: Array<{
-      purchaseOrderExternalId?: string;
-      orderNumber?: string | null;
-      evidence?: string;
-    }>;
-    unclassifiedTraceCount?: number;
+    traceAtItemLevel?: boolean;
+    traceAtDocumentLevel?: boolean;
+    sourceError?: string | null;
   }>;
-  readOnly?: boolean;
-};
-
-type InvoicePoControlResponse = {
-  summary?: {
-    openTotal?: number;
-    examined?: number;
-    withLines?: number;
-    withCandidate?: number;
-    strong?: number;
-    review?: number;
-    exposureExaminedByCurrency?: Record<string, number>;
-    candidateExposureByCurrency?: Record<string, number>;
-  };
-  candidates?: InvoicePoCandidate[];
   readOnly?: boolean;
 };
 
@@ -196,16 +163,6 @@ export default function FinanzasPage() {
       return payload;
     },
     { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
-  );
-  const poControl = useSWR<InvoicePoControlResponse>(
-    '/api/integrations/laudus/invoice-po-control',
-    async (url: string) => {
-      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el control previo al pago.');
-      return payload;
-    },
-    { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const reviewState = useSWR<ReviewFeedbackResponse>(
     '/api/integrations/laudus/finance-review-feedback',
@@ -486,90 +443,29 @@ export default function FinanzasPage() {
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Antes de pagar</p>
-            <h2 className="mt-1 text-lg font-semibold">Cruce factura / OC</h2>
+            <h2 className="mt-1 text-lg font-semibold">Evidencia de factura</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              MOTIL compara las obligaciones prioritarias con sus órdenes de compra. La decisión sigue siendo de Finanzas.
+              MOTIL consulta directamente el detalle y la trazabilidad documental disponible en Laudus. Finanzas mantiene la decisión.
             </p>
           </div>
-          
+          <span className="text-xs text-muted-foreground">Solo lectura</span>
         </div>
-        {nativeTrace.data?.summary?.nativeLookups ? (
-          <div className="border-b bg-muted/20 px-5 py-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-medium">Confirmación Laudus</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Cuando Laudus conoce la relación documental, MOTIL la muestra como evidencia primaria.
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {number(nativeTrace.data.summary.withConfirmedPo || 0)} confirmadas · {number(nativeTrace.data.summary.detailRecovered || 0)} detalles recuperados
-              </span>
-            </div>
-            <details className="mt-2 text-xs text-muted-foreground">
-              <summary className="cursor-pointer select-none hover:text-foreground">Cómo se determinó</summary>
-              <p className="mt-2 max-w-3xl">
-                MOTIL usa primero la relación documental informada por Laudus. Si no existe, compara proveedor, productos, cantidades, precios y fechas para proponer un candidato que siempre requiere revisión humana.
-              </p>
-            </details>
-            {(nativeTrace.data.invoices || []).some((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0) ? (
-              <div className="mt-3 space-y-2">
-                {(nativeTrace.data.invoices || [])
-                  .filter((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0)
-                  .slice(0, 3)
-                  .map((invoice) => (
-                    <div key={invoice.invoiceExternalId} className="flex flex-col gap-1 rounded-md border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-medium">
-                          Factura {invoice.docNumber || 's/n'} · {invoice.supplierName || 'Proveedor'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          OC confirmada por trazabilidad Laudus: {(invoice.confirmedPurchaseOrders || []).map((order) => order.orderNumber || order.purchaseOrderExternalId).join(', ')}
-                        </p>
-                      </div>
-                      <span className="text-xs font-medium">Confirmado por Laudus</span>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-muted-foreground">
-                Laudus aún no confirma una OC para esta muestra. Los demás vínculos se muestran sólo como candidatos para revisión.
-              </p>
-            )}
-          </div>
-        ) : null}
-        {poControl.error ? (
+
+        {nativeTrace.error ? (
           <p className="px-5 py-5 text-sm text-muted-foreground">
-            El control previo al pago no está disponible en este momento.
+            Laudus no entregó evidencia adicional para esta muestra. Las prioridades siguen disponibles para revisión.
           </p>
-        ) : !poControl.data ? (
-          <p className="px-5 py-5 text-sm text-muted-foreground">Analizando obligaciones prioritarias…</p>
+        ) : !nativeTrace.data ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">
+            Consultando evidencia de las facturas prioritarias…
+          </p>
         ) : (
           <div>
             <div className="grid gap-px border-b bg-border sm:grid-cols-3">
               {[
-                ['Con OC candidata', number(poControl.data.summary?.withCandidate || 0)],
-                [
-                  'Falta detalle',
-                  number(
-                    Math.max(
-                      0,
-                      Number(poControl.data.summary?.examined || 0) -
-                        Number(poControl.data.summary?.withLines || 0),
-                    ),
-                  ),
-                ],
-                [
-                  'Exposición con candidata',
-                  Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 1
-                    ? currencyMoney(
-                        Object.values(poControl.data.summary?.candidateExposureByCurrency || {})[0],
-                        Object.keys(poControl.data.summary?.candidateExposureByCurrency || {})[0],
-                      )
-                    : Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 0
-                      ? '—'
-                      : `${Object.keys(poControl.data.summary?.candidateExposureByCurrency || {}).length} monedas`,
-                ],
+                ['Con detalle', number(nativeTrace.data.summary?.detailRecovered || 0)],
+                ['Con traza Laudus', number(nativeTrace.data.summary?.withNativeTrace || 0)],
+                ['Falta evidencia', number(nativeTrace.data.summary?.missingEvidence || 0)],
               ].map(([label, value]) => (
                 <div key={label} className="bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -577,54 +473,43 @@ export default function FinanzasPage() {
                 </div>
               ))}
             </div>
-            {(poControl.data.candidates || []).slice(0, 3).length === 0 ? (
-              <p className="px-5 py-5 text-sm text-muted-foreground">
-                No hay candidatas suficientes en las obligaciones analizadas. MOTIL no fuerza una coincidencia.
-              </p>
-            ) : (
-              <div>
-                {(poControl.data.candidates || []).slice(0, 3).map((candidate, index) => (
-                  <div
-                    key={candidate.invoiceExternalId || index}
-                    className="grid gap-2 border-b px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_150px_120px_150px] lg:items-center"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {candidate.supplierName || 'Proveedor'} · Factura {candidate.docNumber || 's/n'}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        OC candidata {candidate.orderNumber || 's/n'} · {number(candidate.matchedProducts || 0)}/{number(candidate.invoiceProducts || 0)} productos · {number(candidate.exactPriceProducts || 0)} precios exactos
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {candidate.confidence === 'strong' ? 'Alta coincidencia' : 'Revisar'}
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums lg:text-right">
-                      {number(candidate.matchedProducts || 0)}/{number(candidate.invoiceProducts || 0)} productos
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums lg:text-right">
-                      {currencyMoney(candidate.outstandingAmount, candidate.currency)}
-                    </span>
+
+            <div>
+              {(nativeTrace.data.invoices || []).slice(0, 3).map((invoice) => (
+                <div
+                  key={invoice.invoiceExternalId}
+                  className="grid gap-2 border-b px-5 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_150px] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {invoice.sourceDetailAvailable
+                        ? `${number(invoice.itemCount || 0)} líneas recuperadas`
+                        : 'Detalle no disponible en la consulta actual'}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-            {Number(poControl.data.summary?.examined || 0) > Number(poControl.data.summary?.withLines || 0) ? (
-              <div className="border-t px-5 py-3 text-xs">
-                <span className="font-medium">
-                  Falta información en {number(
-                    Number(poControl.data.summary?.examined || 0) -
-                      Number(poControl.data.summary?.withLines || 0),
-                  )} obligaciones prioritarias.
-                </span>
-                <span className="ml-1 text-muted-foreground">
-                  MOTIL no propone una OC sin detalle suficiente.
-                </span>
-              </div>
-            ) : null}
-            <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-              Una diferencia sólo cuenta como valor cuando Finanzas confirma una corrección antes del pago.
-            </p>
+                  <span className="text-xs text-muted-foreground md:text-right">
+                    {Number(invoice.nativeTraceCount || 0) > 0
+                      ? 'Traza Laudus disponible'
+                      : 'Falta evidencia'}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums md:text-right">
+                    {currencyMoney(invoice.outstandingAmount, invoice.currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <details className="border-t px-5 py-3 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none hover:text-foreground">
+                Cómo se determinó
+              </summary>
+              <p className="mt-2 max-w-3xl">
+                MOTIL consulta el detalle y las relaciones documentales que Laudus informa para la factura. Una traza disponible no se interpreta automáticamente como orden de compra ni como aprobación de pago.
+              </p>
+            </details>
           </div>
         )}
       </section>
