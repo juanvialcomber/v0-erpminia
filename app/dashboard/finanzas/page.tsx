@@ -136,6 +136,7 @@ type Response = {
     annualDepreciation?: number | null;
     accumulatedDepreciation?: number | null;
     estimatedBookValue?: number | null;
+    costRecoveryStatus?: string | null;
     maintenanceCost?: number | null;
     maintenanceMovements?: number | null;
     lastMaintenanceCostDate?: string | null;
@@ -161,6 +162,9 @@ type Response = {
     depreciationBlocked?: number;
     withMaintenanceHistory?: number;
     fullyConsumedByCalendar?: number;
+    historicalBackfillRequired?: number;
+    documentLookupRequired?: number;
+    invoiceCoverageStart?: string | null;
     reconciliationOpportunities?: number;
     reconciliationOpportunityMaintenanceCost?: number;
   };
@@ -857,12 +861,13 @@ export default function FinanzasPage() {
           </span>
         </div>
 
-        <div className="grid gap-px border-b bg-border sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-px border-b bg-border sm:grid-cols-3 xl:grid-cols-7">
           {[
             ['Matches fuertes', number(assetEconomicsSummary.strongCandidates || 0), 'identidad suficiente para analizar vida útil'],
             ['Vida útil agotada', number(retiredByCalendar), 'según calendario Laudus'],
             ['Retiro ≤ 24 meses', number(retirementHorizon(24)), 'matches fuertes'],
             ['Costo base disponible', number(assetEconomicsSummary.withAcquisitionCost || 0), 'requerido para depreciación CLP'],
+            ['Backfill histórico', number(assetEconomicsSummary.historicalBackfillRequired || 0), assetEconomicsSummary.invoiceCoverageStart ? `adquiridos antes de ${shortDate(assetEconomicsSummary.invoiceCoverageStart)}` : 'histórico de facturas incompleto'],
             ['Conciliaciones prioritarias', number(assetEconomicsSummary.reconciliationOpportunities || 0), 'con costo histórico MOTIL'],
             ['Costo histórico por conciliar', money(assetEconomicsSummary.reconciliationOpportunityMaintenanceCost || 0), 'no es ahorro ni valor libro'],
           ].map(([label, value, detail]) => (
@@ -944,6 +949,7 @@ export default function FinanzasPage() {
             )}
             <div className="rounded-md bg-muted/40 px-3 py-3 text-xs leading-5 text-muted-foreground">
               <span className="font-medium text-foreground">Depreciación CLP bloqueada.</span> Falta costo de adquisición verificable y confirmación de identidad por activo. MOTIL no reparte el total de una factura entre activos sin evidencia.
+              {assetEconomicsSummary.invoiceCoverageStart ? ` El histórico de facturas disponible comienza el ${shortDate(assetEconomicsSummary.invoiceCoverageStart)}.` : ''}
             </div>
           </div>
         </div>
