@@ -5,6 +5,7 @@ import { Gauge, RefreshCw, TrendingDown, TrendingUp, Wrench } from 'lucide-react
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
+import { isWorkOrderScheduledOverdue } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
@@ -65,13 +66,8 @@ export function MaintenanceIndicatorsBoard() {
   const inProgressOrders = workOrders.filter((order) => ['in_progress', 'en_progreso'].includes(normalizeStatus(order.status))).length;
   const completedOrders = workOrders.filter((order) => ['completed', 'completado', 'closed'].includes(normalizeStatus(order.status))).length;
   const overdueOrders = workOrders.filter((order) => {
-    if (!order.scheduled_date) return false;
-    const due = new Date(order.scheduled_date);
-    if (Number.isNaN(due.getTime())) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    due.setHours(0, 0, 0, 0);
-    return due < today && !['completed', 'completado', 'closed'].includes(normalizeStatus(order.status));
+    return isWorkOrderScheduledOverdue(order.scheduled_date)
+      && !['completed', 'completado', 'closed'].includes(normalizeStatus(order.status));
   }).length;
 
   const activeAssets = machineRows.filter((asset) => ['active', 'activo', 'operativo', 'operational'].includes(normalizeStatus(asset.status))).length;

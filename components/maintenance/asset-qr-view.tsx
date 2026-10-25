@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { inferMachineFamilyFromText } from '@/lib/maintenance/cost-center-machines';
+import { formatWorkOrderDate } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 type MaintenanceAsset = {
   id: string;
@@ -27,7 +28,7 @@ type WorkOrder = {
   id: string;
   status: string;
   work_order_number?: string;
-  created_at?: string;
+  scheduled_date?: string | null;
   completion_date?: string;
   asset_id?: string | null;
 };
@@ -329,18 +330,21 @@ export function AssetQrView({ scope }: AssetQrViewProps) {
                   <p className="mb-3 text-sm font-semibold">Ultimas OT</p>
                   <div className="space-y-3">
                     {recentOrders.length ? (
-                      recentOrders.map((order) => (
-                        <div key={order.id} className="rounded-md bg-muted/40 p-3 text-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">{order.work_order_number || order.id}</span>
-                            <span className="text-xs text-muted-foreground">{statusLabel(order.status)}</span>
+                      recentOrders.map((order) => {
+                        const scheduledDate = formatWorkOrderDate(order.scheduled_date);
+                        return (
+                          <div key={order.id} className="rounded-md bg-muted/40 p-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium">{order.work_order_number || order.id}</span>
+                              <span className="text-xs text-muted-foreground">{statusLabel(order.status)}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {scheduledDate ? `Programada: ${scheduledDate}` : 'Sin fecha programada'}
+                              {order.completion_date ? ` - cierre ${new Date(order.completion_date).toLocaleDateString('es-CL')}` : ''}
+                            </p>
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {order.created_at ? new Date(order.created_at).toLocaleDateString('es-CL') : 'Sin fecha'}
-                            {order.completion_date ? ` - cierre ${new Date(order.completion_date).toLocaleDateString('es-CL')}` : ''}
-                          </p>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <p className="text-sm text-muted-foreground">Sin OT registradas.</p>
                     )}
