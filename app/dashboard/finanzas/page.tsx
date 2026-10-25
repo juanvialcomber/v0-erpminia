@@ -12,7 +12,8 @@ import { LaudusFinanceReadinessCard } from '@/components/integrations/laudus-fin
 import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-accounting-readiness-card';
 
 type Row = Record<string, string | number | null>;
-type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
+type FinanceAlert = { alert_code?: string; title?: string; severity?: string; exception_count?: number; description?: string };
+type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; alerts?: FinanceAlert[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
 type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
 
 const fetcher = async (url: string): Promise<Response> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload; };
@@ -40,6 +41,7 @@ export default function FinanzasPage() {
   const treasury = error ? [] : data?.treasury || [];
   const treasuryAging = error ? [] : data?.treasuryAging || [];
   const cashForecast = error ? [] : data?.cashForecast || [];
+  const financeAlerts = error ? [] : (data?.alerts || []).filter((alert) => Number(alert.exception_count || 0) > 0).slice(0, 3);
   const validationStatus = typeof data?.validation?.status === 'string' ? data.validation.status.toLowerCase() : null;
   const rowsByType: Record<ConcentrationKey, Row[]> = error ? { assets: [], products: [], suppliers: [], costCenters: [] } : { assets: data?.topAssets || [], products: data?.topProducts || [], suppliers: data?.topSuppliers || [], costCenters: data?.topCostCenters || [] };
   const config = concentrationConfig[activeConcentration];
@@ -58,7 +60,7 @@ export default function FinanzasPage() {
         sources={[
           sourceStatus.source('finance', { key: 'finance', label: 'MOTIL Finanzas', state: 'pending', detail: 'Costos, compromisos y trazabilidad operacional.' }),
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'OC, recepciones, facturas y cuentas por pagar.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Contabilidad y ERP: conexión en verificación; el estado se actualiza con evidencia real.' }),
           { key: 'legal', label: 'Evidencia legal', state: 'updated', detail: 'Separada de cifras operacionales y financieras.' },
         ]}
       />
@@ -66,6 +68,28 @@ export default function FinanzasPage() {
       <LaudusFinanceReadinessCard />
 
       <LaudusAccountingReadinessCard />
+
+      <section className="space-y-3 border-t pt-5" aria-label="Prioridades financieras">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Qué requiere atención</h2>
+            <p className="text-sm text-muted-foreground">Primero excepciones que pueden afectar una decisión financiera. Sin inferencias automáticas.</p>
+          </div>
+          <Link href="/dashboard/finanzas/trazabilidad" className="text-sm font-medium text-primary hover:underline">Revisar evidencia</Link>
+        </div>
+        {isLoading ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Verificando excepciones financieras…</div> : financeAlerts.length === 0 ? <div className="rounded-lg border px-4 py-5 text-sm text-muted-foreground">Sin excepciones financieras activas en la evidencia canónica disponible.</div> : <div className="overflow-hidden rounded-lg border">
+          {financeAlerts.map((alert, index) => <div key={String(alert.alert_code || index)} className="grid gap-2 border-b px-4 py-3 last:border-b-0 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{alert.title || 'Excepción financiera'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{alert.description || 'Requiere revisión de la fuente antes de usarla para una decisión material.'}</p>
+            </div>
+            <div className="text-left md:text-right">
+              <p className="text-sm font-semibold tabular-nums">{number(alert.exception_count || 0)} caso(s)</p>
+              <p className="text-xs text-muted-foreground">{String(alert.severity || 'review')}</p>
+            </div>
+          </div>)}
+        </div>}
+      </section>
 
       <DataReceptionReadiness
         description="Finanzas está preparada para recibir hechos ERP sin confundirlos con aprobación de pagos ni con decisiones operacionales. Los datos externos entrarán con procedencia y conciliación."
