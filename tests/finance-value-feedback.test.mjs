@@ -9,7 +9,7 @@ const valuePage = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
 
 test('Daniel can record finance review feedback without mutating Laudus or canonical finance',()=>{
   assert.match(finance,/Revisado/);
-  assert.match(finance,/Después/);
+  assert.match(finance,/Posponer/);
   assert.match(finance,/No aplica/);
   assert.match(route,/motil_record_laudus_finance_review_feedback/);
   assert.match(route,/canonicalMutationExecuted: false/);
