@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const organizationId = context.organizationId;
-    const [overview, assets, products, suppliers, costCenters, validation, recent, alerts, operationalProcurement, operationalEvents, treasury, treasuryAging, cashForecast] = await Promise.all([
+    const [overview, assets, products, suppliers, costCenters, validation, recent, alerts, operationalProcurement, operationalEvents, treasury, treasuryAging, cashForecast, laudusReview] = await Promise.all([
       context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
       context.supabase.from('canonical_finance_assets').select('*').eq('organization_id', organizationId).order('recognized_clp', { ascending: false }).limit(10),
       context.supabase.from('canonical_finance_products').select('*').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(10),
@@ -23,9 +23,10 @@ export async function GET(request: NextRequest) {
       context.supabase.from('procurement_treasury_summary_v1').select('*').eq('organization_id', organizationId).order('currency', { ascending: true }),
       context.supabase.from('procurement_accounts_payable_aging_summary_v1').select('*').eq('organization_id', organizationId).order('outstanding_amount', { ascending: false }).limit(30),
       context.supabase.from('procurement_cash_forecast_summary_v1').select('*').eq('organization_id', organizationId).order('currency', { ascending: true }),
+      context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: organizationId, p_limit: 10 }),
     ]);
 
-    const error = overview.error || assets.error || products.error || suppliers.error || costCenters.error || validation.error || recent.error || alerts.error || operationalProcurement.error || operationalEvents.error || treasury.error || treasuryAging.error || cashForecast.error;
+    const error = overview.error || assets.error || products.error || suppliers.error || costCenters.error || validation.error || recent.error || alerts.error || operationalProcurement.error || operationalEvents.error || treasury.error || treasuryAging.error || cashForecast.error || laudusReview.error;
     if (error) throw error;
 
     return NextResponse.json({
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       treasury: treasury.data || [],
       treasuryAging: treasuryAging.data || [],
       cashForecast: cashForecast.data || [],
+      laudusReview: laudusReview.data || null,
       certification: {
         origin: 'CANONICAL+ERP',
         currency: 'CLP',
