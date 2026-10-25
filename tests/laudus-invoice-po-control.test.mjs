@@ -53,3 +53,13 @@ test('finance cockpit exposes pre-payment control without calling candidate expo
   assert.match(page,/La exposición candidata no es ahorro/);
   assert.match(page,/MOTIL no fuerza una coincidencia/);
 });
+
+
+test('candidate exposure is never summed across currencies',()=>{
+  assert.match(lib,/amountsByCurrency/);
+  assert.match(lib,/candidateExposureByCurrency/);
+  assert.doesNotMatch(lib,/candidateExposure: candidates\.reduce/);
+  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+  assert.match(page,/candidateExposureByCurrency/);
+  assert.match(page,/monedas/);
+});
