@@ -15,9 +15,12 @@ test('cost-center coverage is derived from operational owners without inventing 
   assert.match(route, /\.eq\('is_active', true\)/);
 });
 
-test('assignment requires cost-center write access and owner-module write access', () => {
-  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.CORE_CENTROS_COSTOS, true\)/);
-  assert.match(route, /requireModuleAccess\(request, config\.moduleKey, true\)/);
+test('assignment requires its dedicated permission and readable source access', () => {
+  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.CORE_CENTROS_COSTOS\)/);
+  assert.match(route, /MODULE_KEYS\.CORE_CENTROS_COSTOS_ASIGNACION,\s*true/);
+  assert.match(route, /canAssign: assignmentAccessLevel === 'ED'/);
+  assert.match(route, /if \(!canRead\(sourceAccessLevel\)\)/);
+  assert.doesNotMatch(route, /requireModuleAccess\(request, config\.moduleKey, true\)/);
   assert.match(route, /MODULE_KEYS\.PROD_OPERACIONES/);
   assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(route, /MODULE_KEYS\.FIN_COMPRAS/);
