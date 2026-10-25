@@ -131,17 +131,21 @@ export async function loadLaudusCapabilityMatrix() {
   }
 
   const capabilities = discoverLaudusCapabilities(document);
-  const rows: LaudusCapabilityRow[] = capabilities.map((capability) => ({
-    ...capability,
-    motilModule: moduleFor(capability),
-    value: valueFor(capability),
-    status: READY_PATHS.has(capability.path)
+  const rows: LaudusCapabilityRow[] = capabilities.map((capability): LaudusCapabilityRow => {
+    const status: LaudusCapabilityRow['status'] = READY_PATHS.has(capability.path)
       ? 'connector_ready'
       : capability.domain === 'unknown'
         ? 'evaluate'
-        : 'available',
-    priority: priorityFor(capability),
-  })).sort((a, b) => b.priority - a.priority || a.path.localeCompare(b.path));
+        : 'available';
+
+    return {
+      ...capability,
+      motilModule: moduleFor(capability),
+      value: valueFor(capability),
+      status,
+      priority: priorityFor(capability),
+    };
+  }).sort((a, b) => b.priority - a.priority || a.path.localeCompare(b.path));
 
   const byDomain = rows.reduce<Record<string, number>>((acc, row) => {
     acc[row.domain] = (acc[row.domain] || 0) + 1;
