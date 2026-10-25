@@ -66,10 +66,17 @@ export default function ValueScorecardPage() {
   const outcomes = score.outcomes?.closed || 0;
   const e3 = score.observedImpact?.e3Records || 0;
   const gates = score.adoptionGate || {};
+  const scaleLabel =
+    score.scaleGate === 'SCALE'
+      ? 'Listo para escalar'
+      : score.scaleGate === 'CONDITIONAL'
+        ? 'En validación'
+        : score.scaleGate || '—';
+  const historyCount = data?.history?.count || 0;
 
   const nextActions = [
     decisions < 20 ? `Registrar ${20 - decisions} decisiones humanas más para calibrar L4.` : null,
-    outcomes < 5 ? `Cerrar ${5 - outcomes} outcomes reales para demostrar efecto operacional.` : null,
+    outcomes < 5 ? `Cerrar ${5 - outcomes} resultados reales para demostrar efecto operacional.` : null,
     e3 < 3 ? `Documentar ${3 - e3} impactos E3 con evidencia económica observada.` : null,
   ].filter(Boolean) as string[];
 
@@ -89,8 +96,8 @@ export default function ValueScorecardPage() {
         {[
           ['Nivel operacional', isLoading ? '—' : `L${score.workflowLevel || 0}`],
           ['Evidencia', isLoading ? '—' : score.evidenceLevel || 'E0'],
-          ['Gate de escala', isLoading ? '—' : score.scaleGate || '—'],
-          ['Histórico', isLoading ? '—' : `${number(data?.history?.count || 0)} cortes`],
+          ['Gate de escala', isLoading ? '—' : scaleLabel],
+          ['Histórico', isLoading ? '—' : `${number(historyCount)} ${historyCount === 1 ? 'corte' : 'cortes'}`],
         ].map(([label, value]) => (
           <div key={label} className="bg-card px-5 py-4">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -108,10 +115,10 @@ export default function ValueScorecardPage() {
           </p>
         </div>
         <div className="rounded-lg border p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Outcomes cerrados</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Resultados cerrados</p>
           <p className="mt-2 text-3xl font-semibold">{number(outcomes)}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Casos donde MOTIL puede comparar recomendación, acción y resultado observado.
+            Casos donde MOTIL compara recomendación, acción y resultado observado.
           </p>
         </div>
         <div className="rounded-lg border p-5">
