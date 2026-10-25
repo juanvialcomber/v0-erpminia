@@ -238,7 +238,7 @@ export async function runLaudusBankReconciliationSummary() {
       bankStatementId: Number(row.bankStatementId),
       dateFrom: typeof row.dateFrom === 'string' ? row.dateFrom : null,
       dateTo: typeof row.dateTo === 'string' ? row.dateTo : null,
-      initialBalance: typeof row.initialBalance === 'number' ? row.initialBalance : null,
+      initialBalance: Number.isFinite(Number(row.initialBalance)) ? Number(row.initialBalance) : null,
     }))
     .filter((row) => Number.isFinite(row.bankStatementId))
     .sort((a, b) => Date.parse(b.dateTo || b.dateFrom || '') - Date.parse(a.dateTo || a.dateFrom || ''));
@@ -278,15 +278,15 @@ export async function runLaudusBankReconciliationSummary() {
       : [];
 
   const bankOnlyAmount = bankOnlyRows.reduce((sum, row) => {
-    const deposit = typeof row.deposit === 'number' ? row.deposit : 0;
-    const withdrawal = typeof row.withdrawal === 'number' ? row.withdrawal : 0;
-    return sum + Math.abs(deposit) + Math.abs(withdrawal);
+    const deposit = Number(row.deposit || 0);
+    const withdrawal = Number(row.withdrawal || 0);
+    return sum + (Number.isFinite(deposit) ? Math.abs(deposit) : 0) + (Number.isFinite(withdrawal) ? Math.abs(withdrawal) : 0);
   }, 0);
 
   const journalOnlyAmount = journalOnlyRows.reduce((sum, row) => {
-    const debit = typeof row.debit === 'number' ? row.debit : 0;
-    const credit = typeof row.credit === 'number' ? row.credit : 0;
-    return sum + Math.abs(debit) + Math.abs(credit);
+    const debit = Number(row.debit || 0);
+    const credit = Number(row.credit || 0);
+    return sum + (Number.isFinite(debit) ? Math.abs(debit) : 0) + (Number.isFinite(credit) ? Math.abs(credit) : 0);
   }, 0);
 
   return {
