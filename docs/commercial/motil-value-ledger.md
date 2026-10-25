@@ -202,3 +202,14 @@ Estos umbrales habilitan escala inicial, no E4.
 - Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
 - Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
 - Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
+
+
+## 2026-10-25 — Mantención → Compras: handoff de shortages reales
+
+- Problema previo: Mantención podía detectar un faltante real de OT y generar una necesidad de abastecimiento, pero Compras no tenía esa necesidad como primera tarea visible antes del pipeline de cotización.
+- Capacidad: la portada de Compras muestra `Necesidades desde Mantención` para shortages reales sin solicitud operativa y permite a un usuario con permiso de Compras ejecutar `Tomar necesidad`.
+- Autoridad: la acción reutiliza `convert_supply_need_to_intake_request`; crea una solicitud operativa, pero no cotiza, no adjudica proveedor, no emite OC y no compra automáticamente.
+- Evidencia actual verificada: OT-2026-0011, Scoop Atlas Copco ST-1030 (4), 6 líneas faltantes, necesidad de abastecimiento abierta y 0 solicitud de Compras al momento de instrumentar.
+- Efecto C: Mantención y Bodega ya generan evidencia; este handoff permite incorporar Compras con una transición humana trazable. C aumenta sólo cuando exista una solicitud real derivada de una necesidad de OT.
+- Efecto E: el evento `procurement_intake_created` permite medir tiempo desde shortage detectado hasta toma por Compras. E3 requiere observar reducción de espera o evitar una interrupción con comparación válida; todavía no se afirma ahorro.
+- Efecto L: MOTIL prepara la excepción y el siguiente paso, pero conserva la decisión humana de Compras. Se mantiene en L4; no se promueve a L5 sin autorización explícita para autonomía controlada.
