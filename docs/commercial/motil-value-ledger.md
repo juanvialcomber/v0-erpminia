@@ -132,3 +132,18 @@ Estos umbrales habilitan escala inicial, no E4.
 - No se interpreta `fromStep/toStep` sin evidencia documental adicional; códigos desconocidos permanecen sin clasificar.
 - No hay persistencia en esta fase; la fuente se consulta como preview y no modifica Laudus ni MOTIL.
 - Valor: aumenta precisión y auditabilidad del control previo al pago sin depender de inferencia cuando Laudus ya conoce la relación documental.
+
+
+## 2026-10-25 — Cockpit interno de valor generado
+
+- Alcance: visible sólo para `admin/superadmin`; no se incorpora al cockpit operativo de Daniel ni a usuarios de Finanzas.
+- Objetivo: permitir a N3uralia medir valor acumulado de MOTIL para pricing, renovación y expansión sin contaminar la UX del cliente.
+- Verde permitido únicamente para:
+  - valor económico E3 observado;
+  - reducción observada de tiempo cuando el gate tenga ≥3 baselines manuales y ≥20 decisiones asistidas cronometradas;
+  - capacidad administrativa recuperada calculada sólo sobre casos efectivamente revisados y con el mismo gate.
+- Contexto neutral:
+  - monto bajo control financiero = suma de obligaciones con decisión humana registrada.
+  - Este monto nunca se presenta como ahorro, costo evitado ni ROI.
+- Estado inicial verificado en Supabase: 0 decisiones financieras cronometradas y 0 muestras de baseline manual al momento de instrumentar esta capa.
+- Siguiente evidencia necesaria: uso real. El sistema está preparado para que los indicadores cambien automáticamente cuando existan decisiones y baselines suficientes.
