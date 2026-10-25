@@ -32,7 +32,17 @@ function stringOrNull(value: unknown) {
 }
 
 function depreciationShape(value: unknown) {
-  if (Array.isArray(value)) return { kind: 'array', count: value.length };
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return {
+      kind: 'array',
+      count: value.length,
+      itemFields:
+        first && typeof first === 'object' && !Array.isArray(first)
+          ? Object.keys(first as Record<string, unknown>).slice(0, 40)
+          : [],
+    };
+  }
   if (value && typeof value === 'object') {
     return {
       kind: 'object',
