@@ -48,6 +48,10 @@ const domainLabel: Record<CoverageDomain, string> = {
   procurement: 'Compras',
 };
 
+function displayRecordLabel(label: string) {
+  return label.replace(/\s*\(working light\)/gi, '').trim();
+}
+
 export function CostCenterCoverageQueue() {
   const [coverage, setCoverage] = useState<CoveragePayload | null>(null);
   const [costCenters, setCostCenters] = useState<CostCenterRecord[]>([]);
@@ -124,7 +128,7 @@ export function CostCenterCoverageQueue() {
   }
 
   return (
-    <section className="space-y-4" aria-label="Cobertura de centros de costo">
+    <section className="space-y-4" aria-label="Registros sin centro de costo">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold">Registros sin centro de costo</p>
@@ -140,7 +144,7 @@ export function CostCenterCoverageQueue() {
 
       {error ? <StatePanel tone="error" title="No se completó la última asignación" description={error} className="min-h-0" /> : null}
 
-      <div className="overflow-hidden rounded-md border bg-card">
+      <div className="overflow-x-auto rounded-md border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -148,7 +152,7 @@ export function CostCenterCoverageQueue() {
               <TableHead>Detalle</TableHead>
               <TableHead>Estado y monto</TableHead>
               <TableHead>Centro de costo</TableHead>
-              <TableHead className="text-right">Asignación</TableHead>
+              <TableHead className="text-right">Asignar</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -157,7 +161,7 @@ export function CostCenterCoverageQueue() {
                 <TableCell><Badge variant="outline">{domainLabel[row.domain]}</Badge></TableCell>
                 <TableCell>
                   <div className="max-w-sm">
-                    <p className="truncate font-medium">{row.label}</p>
+                    <p className="truncate font-medium">{displayRecordLabel(row.label)}</p>
                     <p className="truncate text-xs text-muted-foreground">{row.code || row.id}</p>
                   </div>
                 </TableCell>
@@ -184,7 +188,7 @@ export function CostCenterCoverageQueue() {
                     disabled={!row.canAssign || !selections[row.id] || busyId === row.id}
                     onClick={() => void assign(row)}
                   >
-                    {busyId === row.id ? 'Asignando…' : 'Asignar centro'}
+                    {busyId === row.id ? 'Asignando…' : 'Asignar'}
                   </Button>
                 </TableCell>
               </TableRow>
