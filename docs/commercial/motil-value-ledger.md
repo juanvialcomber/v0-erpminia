@@ -106,3 +106,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Fórmula: `(mediana_manual - mediana_asistida) / mediana_manual`.
 - La métrica se presenta como reducción observada de tiempo, no como ahorro CLP.
 - Valores negativos se conservan: si MOTIL demora más, el resultado debe mostrarlo en vez de ocultarlo.
+
+
+## 2026-10-25 — Control preventivo factura ↔ orden de compra
+
+- Problema previo: Finanzas puede conocer la obligación abierta, pero no tiene una capa operativa que sugiera qué OC revisar antes de pagar.
+- Capacidad: MOTIL analiza las 25 obligaciones Laudus de mayor saldo y busca OCs candidatas mediante proveedor exacto, producto/SKU, ventana temporal de 180 días, cantidad y precio.
+- Seguridad: read-only; no aprueba pagos, no modifica Laudus y no muta el canónico.
+- Cobertura histórica exploratoria: 2.037 facturas con líneas; 1.837 encontraron al menos una OC candidata (90,2%) en el universo histórico con detalle.
+- Cobertura del universo abierto: 1.183 obligaciones abiertas/parciales; 99 cuentan hoy con líneas detalladas en staging; 69 encontraron candidata en la exploración read-only.
+- Hallazgo de calidad: el universo abierto todavía no produjo candidatos suficientemente separados para auto-sugerencia fuerte bajo el gate estricto. Por eso todos los casos permanecen sujetos a revisión humana.
+- Diferencia bruta exploratoria: no se trata como ahorro, error ni impacto E3. Puede contener parcialidades, impuestos, múltiples OCs u otras diferencias legítimas.
+- Nivel actual: L3 inteligencia candidata; objetivo L4 cuando la revisión humana confirme o rechace la relación factura-OC.
+- Evidencia actual: E1/E2 de cobertura y comportamiento del matcher; E3 sólo cuando una diferencia se corrija antes del pago y el resultado económico quede demostrado.
+- Siguiente medición: aceptación/rechazo del candidato, motivo, corrección resultante y monto efectivamente corregido antes del pago.
