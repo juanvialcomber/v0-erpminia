@@ -51,6 +51,9 @@ type ApiResponse = {
     rejected?: number;
     latestAt?: string | null;
     calibrationGate?: string;
+    reviewedAmountClp?: number;
+    acceptedAmountClp?: number;
+    semantics?: string;
   } | null;
   financeReviewTiming?: {
     sample?: number;
@@ -119,6 +122,19 @@ export default function ValueScorecardPage() {
   const observedTimeReductionPct = timingComparisonReady
     ? Math.round(((manualMedian - assistedMedian) / manualMedian) * 100)
     : null;
+  const observedSecondsRecoveredPerCase =
+    timingComparisonReady && manualMedian != null && assistedMedian != null
+      ? Math.max(0, manualMedian - assistedMedian)
+      : null;
+  const observedHoursRecovered =
+    observedSecondsRecoveredPerCase == null
+      ? null
+      : (observedSecondsRecoveredPerCase * financeReviewTotal) / 3600;
+  const demonstratedValueClp =
+    (score.observedImpact?.e3Records || 0) > 0
+      ? Number(score.observedImpact?.observedValueClp || 0)
+      : null;
+  const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -164,6 +180,52 @@ export default function ValueScorecardPage() {
       </section>
 
       {error ? <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">{error.message}</div> : null}
+
+      <section aria-label="Valor generado por MOTIL" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Lectura interna N3uralia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Valor generado</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verde significa impacto observado con gate suficiente. Volumen bajo control se muestra aparte y nunca se convierte en ahorro.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Valor económico demostrado</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${demonstratedValueClp != null && demonstratedValueClp > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {demonstratedValueClp == null ? 'Aún no demostrado' : money(demonstratedValueClp)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sólo impactos E3 observados. Nunca exposición ni monto priorizado.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Reducción observada de tiempo</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${observedTimeReductionPct != null && observedTimeReductionPct > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {observedTimeReductionPct == null ? 'Gate pendiente' : `${number(observedTimeReductionPct)}%`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Requiere ≥3 baselines manuales y ≥20 decisiones asistidas cronometradas.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Capacidad recuperada observada</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${observedHoursRecovered != null && observedHoursRecovered > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {observedHoursRecovered == null ? 'Gate pendiente' : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(observedHoursRecovered)} h`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Aplicada sólo a casos efectivamente revisados; todavía no monetizada.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Monto bajo control financiero</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{money(reviewedAmountClp)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         {[
