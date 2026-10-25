@@ -50,3 +50,15 @@ test('finance review timing is bounded, audited and not presented as ROI',()=>{
   assert.match(valuePage,/Latencia observada/);
   assert.match(valuePage,/No es aún baseline manual/);
 });
+
+
+test('manual finance baseline is explicit, bounded and separate from assisted timing',()=>{
+  const baselineRoute = fs.readFileSync('app/api/value/finance-baseline/route.ts','utf8');
+  assert.match(baselineRoute,/finance_review_manual_baseline/);
+  assert.match(baselineRoute,/manual Laudus review timed outside MOTIL assistance/);
+  assert.match(baselineRoute,/caseCount > 20/);
+  assert.match(valuePage,/Baseline manual/);
+  assert.match(valuePage,/Iniciar baseline/);
+  assert.match(valuePage,/Finalizar medición/);
+  assert.match(valuePage,/por sí sola no demuestra ahorro/);
+});
