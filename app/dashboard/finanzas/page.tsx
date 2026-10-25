@@ -146,7 +146,10 @@ const number = (value: unknown) =>
 
 const shortDate = (value: unknown) => {
   if (typeof value !== 'string' || !value) return 'Sin vencimiento';
-  const date = new Date(value);
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]), 12, 0, 0)
+    : new Date(value);
   if (Number.isNaN(date.getTime())) return 'Fecha por revisar';
   return new Intl.DateTimeFormat('es-CL', {
     day: '2-digit',
