@@ -50,6 +50,7 @@ test('Ariel planning assistant can propose standard plans without creating or ap
 test('real plan candidates open the standard-plan form with evidence-backed prefill only', () => {
   assert.match(api, /planCandidates/);
   assert.match(api, /latestPreventiveByAsset/);
+  assert.match(api, /\|\| !\(row as any\)\.closed_at\) continue/);
   assert.match(api, /estimatedDurationHours/);
   assert.match(page, /Candidatos con evidencia real/);
   assert.match(page, /Preparar plan/);
