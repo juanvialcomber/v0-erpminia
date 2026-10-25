@@ -80,16 +80,34 @@ export async function POST(request: NextRequest) {
     if (!plan) return NextResponse.json({ error: 'Plan estándar no encontrado.' }, { status: 404 });
 
     if (action === 'add_step') {
+      if (plan.status !== 'proposed') return NextResponse.json({ error: 'Sólo se editan planes propuestos.' }, { status: 409 });
       const title = text(body?.title);
       if (!title) return NextResponse.json({ error: 'El paso requiere título.' }, { status: 400 });
+      const newStep = {
+        title,
+        instructions: text(body?.instructions) || null,
+        control_requirement: text(body?.controlRequirement) || null,
+        estimated_minutes: body?.estimatedMinutes ? num(body.estimatedMinutes) : null,
+      };
       const { data, error } = await context.supabase.rpc('add_standard_job_plan_step_v1', {
         p_plan_id: planId,
-        p_title: title,
-        p_instructions: text(body?.instructions) || null,
-        p_control_requirement: text(body?.controlRequirement) || null,
-        p_estimated_minutes: body?.estimatedMinutes ? num(body.estimatedMinutes) : null,
+        p_title: newStep.title,
+        p_instructions: newStep.instructions,
+        p_control_requirement: newStep.control_requirement,
+        p_estimated_minutes: newStep.estimated_minutes,
       });
       if (error) throw error;
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        new_values: { edit_type: 'add_step', step: newStep, step_id: data, proposal_source: plan.proposed_by ? 'human' : 'motil' },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
       return NextResponse.json({ ok: true, stepId: data });
     }
 
@@ -182,15 +200,37 @@ export async function POST(request: NextRequest) {
       const canonical = context.supabase.schema('canonical');
       const { data: product } = await canonical.from('products').select('id,product_code,name').eq('organization_id', context.organizationId).eq('product_code', productCode).maybeSingle();
       if (!product) return NextResponse.json({ error: `Producto canónico no encontrado: ${productCode}` }, { status: 404 });
-      const { error } = await context.supabase.from('maintenance_standard_job_plan_materials').insert({
+      const newMaterial = {
         organization_id: context.organizationId,
         plan_id: planId,
         canonical_product_id: product.id,
         quantity_required: quantity,
         notes: text(body?.notes) || null,
-      });
+      };
+      const { data: insertedMaterial, error } = await context.supabase
+        .from('maintenance_standard_job_plan_materials')
+        .insert(newMaterial)
+        .select('id')
+        .single();
       if (error) throw error;
-      return NextResponse.json({ ok: true, product });
+      await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_standard_plan_edited',
+        resource_type: 'maintenance_standard_job_plan',
+        resource_id: planId,
+        resource_identifier: plan.plan_code || planId,
+        new_values: {
+          edit_type: 'add_material',
+          material_id: insertedMaterial.id,
+          canonical_product_id: product.id,
+          quantity_required: quantity,
+          proposal_source: plan.proposed_by ? 'human' : 'motil',
+        },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      return NextResponse.json({ ok: true, product, materialId: insertedMaterial.id });
     }
 
     if (action === 'update_material') {
