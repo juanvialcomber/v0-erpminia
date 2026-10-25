@@ -176,6 +176,64 @@ export async function GET(request: NextRequest) {
           ? Math.round((executionCycles[executionMidpoint - 1] + executionCycles[executionMidpoint]) / 2)
           : executionCycles[executionMidpoint];
 
+
+    const closedMaintenanceRows = maintenanceRows
+      .filter((row: any) => row.closed_at)
+      .map((row: any) => ({
+        ...row,
+        closedAtMs: Date.parse(String(row.closed_at)),
+      }))
+      .filter((row: any) => Number.isFinite(row.closedAtMs));
+    const maintenanceByAsset = new Map<string, any[]>();
+    for (const row of maintenanceRows) {
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId) continue;
+      const rows = maintenanceByAsset.get(assetId) || [];
+      rows.push(row);
+      maintenanceByAsset.set(assetId, rows);
+    }
+    const nowMs = Date.now();
+    let matured7d = 0;
+    let recurrent7d = 0;
+    for (const row of closedMaintenanceRows) {
+      if (row.closedAtMs > nowMs - 7 * 86400000) continue;
+      matured7d += 1;
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId) continue;
+      const recurrent = (maintenanceByAsset.get(assetId) || []).some((candidate: any) => {
+        if (candidate.id === row.id) return false;
+        const createdMs = Date.parse(String(candidate.created_at || ''));
+        return Number.isFinite(createdMs) && createdMs > row.closedAtMs && createdMs <= row.closedAtMs + 7 * 86400000;
+      });
+      if (recurrent) recurrent7d += 1;
+    }
+    const recurrence7dPct = matured7d > 0 ? Math.round((recurrent7d / matured7d) * 100) : null;
+
+    const supplyEventTimes = new Map<string, { shortage?: number; procurement?: number }>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const current = supplyEventTimes.get(key) || {};
+      const atMs = Date.parse(String(row.event_at || ''));
+      if (!Number.isFinite(atMs)) continue;
+      if (row.event_type === 'supply_need_refreshed' && current.shortage == null) current.shortage = atMs;
+      if (row.event_type === 'procurement_intake_created' && current.procurement == null) current.procurement = atMs;
+      supplyEventTimes.set(key, current);
+    }
+    const shortageToProcurementSeconds = Array.from(supplyEventTimes.values())
+      .map((row) => row.shortage != null && row.procurement != null && row.procurement >= row.shortage
+        ? Math.round((row.procurement - row.shortage) / 1000)
+        : null)
+      .filter((value): value is number => value !== null)
+      .sort((a,b)=>a-b);
+    const shortageMidpoint = Math.floor(shortageToProcurementSeconds.length / 2);
+    const medianShortageToProcurementSeconds =
+      shortageToProcurementSeconds.length === 0
+        ? null
+        : shortageToProcurementSeconds.length % 2 === 0
+          ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
+          : shortageToProcurementSeconds[shortageMidpoint];
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -190,6 +248,17 @@ export async function GET(request: NextRequest) {
       eventCount: maintenanceEventRows.length,
       measurableExecutionCycles: executionCycles.length,
       medianExecutionCycleSeconds,
+      recurrence7d: {
+        matured: matured7d,
+        recurrent: recurrent7d,
+        ratePct: recurrence7dPct,
+        semantics: 'new work order on the same canonical asset within 7 days after closure; baseline only, not causal attribution',
+      },
+      shortageToProcurement: {
+        samples: shortageToProcurementSeconds.length,
+        medianSeconds: medianShortageToProcurementSeconds,
+        semantics: 'time from first supply_need_refreshed event to procurement_intake_created; human-confirmed handoff',
+      },
       medianExecutionCycleHours:
         medianExecutionCycleSeconds === null
           ? null
