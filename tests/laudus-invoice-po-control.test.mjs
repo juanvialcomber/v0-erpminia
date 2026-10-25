@@ -54,13 +54,12 @@ test('finance cockpit keeps deterministic PO matcher out of the interactive surf
 });
 
 
-test('candidate exposure is never summed across currencies',()=>{
+test('candidate exposure keeps currency boundaries inside the offline matcher only',()=>{
   assert.match(lib,/amountsByCurrency/);
   assert.match(lib,/candidateExposureByCurrency/);
   assert.doesNotMatch(lib,/candidateExposure: candidates\.reduce/);
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
-  assert.match(page,/candidateExposureByCurrency/);
-  assert.match(page,/monedas/);
+  assert.doesNotMatch(page,/candidateExposureByCurrency/);
 });
 
 
