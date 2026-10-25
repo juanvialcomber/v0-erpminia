@@ -17,6 +17,22 @@ type Source = {
   provenanceKind: 'canonical_table';
 };
 
+type LaudusCapability = {
+  path: string;
+  methods: string[];
+  domain: string;
+  motilModule: string;
+  value: string;
+  status: 'connector_ready' | 'available' | 'evaluate';
+};
+
+type LaudusResponse = {
+  generatedAt: string;
+  version: string | null;
+  summary: { endpoints: number; connectorReady: number; writeCapable: number; domains: number };
+  rows: LaudusCapability[];
+};
+
 type Response = {
   data: Source[];
   summary: {
@@ -28,11 +44,11 @@ type Response = {
   };
 };
 
-const fetcher = async (url: string): Promise<Response> => {
+const fetcher = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar las fuentes de Finanzas');
-  return payload as Response;
+  return payload as T;
 };
 
 function date(value: string | null) {
@@ -41,6 +57,7 @@ function date(value: string | null) {
 
 export default function FinanceSourcesPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
+  const { data: laudus, error: laudusError, isLoading: laudusLoading } = useSWR<LaudusResponse>('/api/integrations/laudus/capabilities', fetcher, { revalidateOnFocus: false, refreshInterval: 6 * 60 * 60 * 1000 });
 
   if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Leyendo la trazabilidad canónica certificada." />;
   if (error || !data) return <StatePanel tone="error" title="Fuentes financieras no disponibles" description="No se reemplaza provenance faltante por una lista vacía." />;
@@ -54,6 +71,37 @@ export default function FinanceSourcesPage() {
           Origen certificado del costo reconocido y de las compras comprometidas. MOTIL mantiene separada la tabla canónica de los archivos documentales nuevos.
         </p>
       </header>
+
+      <section className="overflow-hidden rounded-lg border">
+        <div className="border-b px-4 py-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold">Qué más puede aportar Laudus</h2>
+              <p className="mt-1 text-xs text-muted-foreground">MOTIL lee el Swagger vigente y separa disponibilidad de integración real.</p>
+            </div>
+            {!laudusLoading && !laudusError && laudus ? <p className="text-xs text-muted-foreground">{laudus.summary.endpoints.toLocaleString('es-CL')} capacidades detectadas</p> : null}
+          </div>
+        </div>
+        {laudusLoading ? <div className="p-4 text-sm text-muted-foreground">Verificando capacidades de Laudus…</div> : null}
+        {laudusError ? <div className="p-4 text-sm text-muted-foreground">No fue posible verificar el catálogo Laudus en este momento.</div> : null}
+        {!laudusLoading && !laudusError && laudus ? <div className="divide-y">
+          {laudus.rows.filter((row) => row.motilModule !== 'Por evaluar').slice(0, 12).map((row) => (
+            <article key={row.path} className="grid gap-2 px-4 py-3 lg:grid-cols-[140px_1fr_auto] lg:items-center">
+              <div>
+                <p className="text-sm font-medium">{row.motilModule}</p>
+                <p className="text-xs text-muted-foreground">{row.domain}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm">{row.value}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{row.path}</p>
+              </div>
+              <Badge variant={row.status === 'connector_ready' ? 'secondary' : 'outline'}>
+                {row.status === 'connector_ready' ? 'Conector preparado' : row.status === 'available' ? 'Disponible en Laudus' : 'Por evaluar'}
+              </Badge>
+            </article>
+          ))}
+        </div> : null}
+      </section>
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
