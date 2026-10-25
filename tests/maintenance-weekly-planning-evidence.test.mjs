@@ -61,3 +61,24 @@ test('maintenance value scorecard exposes the cross-domain supply funnel conserv
   assert.match(scorecard, /closedWithOpenShortage/);
   assert.match(scorecard, /historical closed shortages are data-quality debt, not active compliance/);
 });
+
+
+test('Ariel can correct proposed MOTIL plans without weakening approval authority', () => {
+  const progressive = fs.readFileSync('app/api/maintenance/standard-job-plans/progressive/route.ts','utf8');
+  const editor = fs.readFileSync('components/maintenance/standard-plan-editor.tsx','utf8');
+  assert.match(progressive, /action === 'update_step'/);
+  assert.match(progressive, /action === 'remove_step'/);
+  assert.match(progressive, /action === 'update_material'/);
+  assert.match(progressive, /action === 'remove_material'/);
+  assert.match(progressive, /maintenance_standard_plan_edited/);
+  assert.match(progressive, /Sólo se editan planes propuestos/);
+  assert.match(progressive, /El plan debe conservar al menos un paso/);
+  assert.match(editor, /Corregir propuesta MOTIL/);
+  assert.match(editor, /Cada cambio queda registrado/);
+});
+
+test('standard plan learning measures correction as calibration rather than ROI', () => {
+  assert.match(scorecard, /editedPlans/);
+  assert.match(scorecard, /correctionRatePct/);
+  assert.match(scorecard, /acceptance and correction are calibration evidence, not economic impact/);
+});
