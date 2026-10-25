@@ -532,7 +532,7 @@ export default function FinanzasPage() {
           <p className="px-5 py-5 text-sm text-muted-foreground">Analizando obligaciones prioritarias…</p>
         ) : (
           <div>
-            <div className="grid gap-px border-b bg-border sm:grid-cols-4">
+            <div className="grid gap-px border-b bg-border sm:grid-cols-3">
               {[
                 ['Con OC candidata', number(poControl.data.summary?.withCandidate || 0)],
                 [
