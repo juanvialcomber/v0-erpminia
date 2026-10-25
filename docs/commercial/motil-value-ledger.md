@@ -169,3 +169,12 @@ Estos umbrales habilitan escala inicial, no E4.
 - Lectura C interna: Mantención y Bodega ya comparten evidencia real; Compras y Finanzas aún no forman una cadena operativa cerrada.
 - Regla: un dominio sólo cuenta como conectado cuando existe evidencia transaccional real. Tener el módulo o la integración disponible no eleva C.
 - Siguiente salto de valor: material shortage de OT -> solicitud de compra -> OC -> recepción/instalación -> costo final de OT -> validación financiera.
+
+
+## 2026-10-25 — Mantención: baseline de ciclo ejecutado
+
+- 10 OT tienen evidencia suficiente para medir primer `timer_play` → `work_order_closed`.
+- Mediana observada actual: 10.259,6 segundos ≈ 2,85 h.
+- Uso: baseline E2 para comparar cohortes/períodos futuros.
+- No usar como ahorro ni mejora atribuible hasta contar con comparación temporal y outcome.
+- Creación → primer inicio no se usa todavía como tiempo de respuesta: la muestra mezcla planificación con fecha de creación y requiere semántica adicional antes de promoverla como KPI.
