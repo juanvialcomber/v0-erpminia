@@ -103,21 +103,6 @@ export async function POST(request: NextRequest) {
         .limit(100),
     ]);
 
-    const sources = [
-      ['planning_maintenance_priority_v1', priorities.error],
-      ['planning_maintenance_source_rows', sourceRows.error],
-      ['operational_attention_global_v1', attention.error],
-      ['preventive_maintenance_hour_status_v1', preventive.error],
-      ['production_monthly_plans', productionPlan.error],
-      ['canonical_inventory_current', inventory.error],
-      ['canonical_purchase_orders_current', purchaseOrders.error],
-      ['maintenance_work_orders', recentWorkOrders.error],
-      ['maintenance_standard_job_plans', standardPlans.error],
-      ['work_order_material_requirements', observedMaterialError],
-      ['canonical.products', observedProductError],
-    ] as const;
-    const failed = sources.filter(([, error]) => Boolean(error)).map(([source, error]) => ({ source, error: (error as any)?.message || 'error' }));
-
     const workOrderIds = (recentWorkOrders.data || []).map((row: any) => row.id).filter(Boolean);
     let observedMaterialRows: any[] = [];
     let observedMaterialError: any = null;
@@ -164,6 +149,21 @@ export async function POST(request: NextRequest) {
       });
       observedMaterialsByWorkOrder.set(workOrderId, list);
     }
+
+    const sources = [
+      ['planning_maintenance_priority_v1', priorities.error],
+      ['planning_maintenance_source_rows', sourceRows.error],
+      ['operational_attention_global_v1', attention.error],
+      ['preventive_maintenance_hour_status_v1', preventive.error],
+      ['production_monthly_plans', productionPlan.error],
+      ['canonical_inventory_current', inventory.error],
+      ['canonical_purchase_orders_current', purchaseOrders.error],
+      ['maintenance_work_orders', recentWorkOrders.error],
+      ['maintenance_standard_job_plans', standardPlans.error],
+      ['work_order_material_requirements', observedMaterialError],
+      ['canonical.products', observedProductError],
+    ] as const;
+    const failed = sources.filter(([, error]) => Boolean(error)).map(([source, error]) => ({ source, error: (error as any)?.message || 'error' }));
 
     const rows = sourceRows.data || [];
     const matched = rows.filter((row: any) => row.reconciliation_status === 'matched').length;
