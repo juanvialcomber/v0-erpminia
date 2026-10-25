@@ -55,6 +55,45 @@ function depreciationShape(value: unknown) {
   return { kind: value === null ? 'null' : 'missing' };
 }
 
+function depreciationSummary(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const rows = value.filter(
+    (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object' && !Array.isArray(item)),
+  );
+  if (rows.length === 0) return null;
+
+  const numeric = (row: Record<string, unknown>, key: string) => {
+    const value = Number(row[key]);
+    return Number.isFinite(value) ? value : null;
+  };
+
+  const years = rows.map((row) => numeric(row, 'year')).filter((value): value is number => value !== null);
+  const amounts = rows.map((row) => numeric(row, 'amount')).filter((value): value is number => value !== null);
+  const accumulated = rows.map((row) => numeric(row, 'accumulated')).filter((value): value is number => value !== null);
+  const amountsInflation = rows
+    .map((row) => numeric(row, 'amountWithInflationCorrection'))
+    .filter((value): value is number => value !== null);
+  const accumulatedInflation = rows
+    .map((row) => numeric(row, 'accumulatedWithInflationCorrection'))
+    .filter((value): value is number => value !== null);
+  const percentages = rows.map((row) => numeric(row, 'percentage')).filter((value): value is number => value !== null);
+
+  return {
+    rows: rows.length,
+    firstYear: years.length ? Math.min(...years) : null,
+    lastYear: years.length ? Math.max(...years) : null,
+    percentageTotal: percentages.length ? percentages.reduce((sum, value) => sum + value, 0) : null,
+    amountTotal: amounts.length ? amounts.reduce((sum, value) => sum + value, 0) : null,
+    accumulatedMax: accumulated.length ? Math.max(...accumulated) : null,
+    amountWithInflationCorrectionTotal: amountsInflation.length
+      ? amountsInflation.reduce((sum, value) => sum + value, 0)
+      : null,
+    accumulatedWithInflationCorrectionMax: accumulatedInflation.length
+      ? Math.max(...accumulatedInflation)
+      : null,
+  };
+}
+
 export async function readLaudusFixedAssetEconomics(candidates: FixedAssetCandidateInput[]) {
   const bounded = candidates.slice(0, 6);
   const results: Array<Record<string, unknown>> = [];
@@ -98,6 +137,7 @@ export async function readLaudusFixedAssetEconomics(candidates: FixedAssetCandid
             ? detail.depreciateWithInflationCorrection
             : null,
         depreciationShape: depreciationShape(detail.depreciation),
+        depreciationSummary: depreciationSummary(detail.depreciation),
         purchaseInvoiceLinked: Boolean(detail.purchaseInvoice),
         invoiceNumber: stringOrNull(detail.invoiceNumber),
       });
