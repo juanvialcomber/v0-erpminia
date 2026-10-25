@@ -63,6 +63,13 @@ export async function POST(request: NextRequest) {
     typeof body?.outstandingAmount === 'number' && Number.isFinite(body.outstandingAmount)
       ? body.outstandingAmount
       : null;
+  const decisionLatencyMs =
+    typeof body?.decisionLatencyMs === 'number' &&
+    Number.isFinite(body.decisionLatencyMs) &&
+    body.decisionLatencyMs >= 0 &&
+    body.decisionLatencyMs <= 30 * 60 * 1000
+      ? Math.round(body.decisionLatencyMs)
+      : null;
 
   const result = await context.supabase.rpc('motil_record_laudus_finance_review_feedback', {
     p_organization_id: context.organizationId,
@@ -82,6 +89,29 @@ export async function POST(request: NextRequest) {
       { error: 'No fue posible registrar la revisión.' },
       { status: 409 },
     );
+  }
+
+  if (decisionLatencyMs !== null) {
+    const telemetry = await context.supabase.from('audit_log').insert({
+      organization_id: context.organizationId,
+      user_id: context.userId,
+      action: 'finance_review_decision',
+      resource_type: 'laudus_purchase_invoice',
+      resource_identifier: purchaseInvoiceExternalId,
+      new_values: {
+        decision,
+        decision_latency_ms: decisionLatencyMs,
+        outstanding_amount: outstandingAmount,
+        metric_version: 'finance-review-v1',
+        semantics: 'time from finance cockpit load to human decision; not manual baseline',
+      },
+      user_agent: request.headers.get('user-agent'),
+      status: 'completed',
+    });
+
+    if (telemetry.error) {
+      console.warn('[laudus/finance-review-feedback:telemetry]', telemetry.error);
+    }
   }
 
   return NextResponse.json({
