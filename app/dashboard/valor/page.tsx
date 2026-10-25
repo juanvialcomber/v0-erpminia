@@ -378,32 +378,41 @@ export default function ValueScorecardPage() {
       </section>
 
       <section aria-label="Gates L E C de Mantención" className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-3">
-        <div className="bg-card px-5 py-5">
+        <div className="flex flex-col bg-card px-5 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">L · decisión asistida</p>
           <p className="mt-2 text-xl font-semibold">{maintenanceL4Calibrated ? 'L4 calibrado' : 'L4 en calibración'}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 flex-1 text-sm text-muted-foreground">
             {maintenanceL4Calibrated
               ? 'Hay volumen suficiente de decisiones y planes MOTIL revisados para evaluar calidad antes de considerar autonomía controlada.'
               : `Faltan ${Math.max(0, 20 - Number(weeklyPlanning.decisionsOpened || 0))} decisiones semanales y ${Math.max(0, 20 - Number(standardPlanLearning.motilDecisions || 0))} decisiones sobre planes MOTIL para calibrar L4.`}
           </p>
+          <Link href="/dashboard/mantenimiento/planificacion" className="mt-4 text-sm font-medium text-primary hover:underline">
+            Generar evidencia L →
+          </Link>
         </div>
-        <div className="bg-card px-5 py-5">
+        <div className="flex flex-col bg-card px-5 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">E · evidencia</p>
           <p className="mt-2 text-xl font-semibold">{maintenanceE3Candidate ? 'Candidato E3' : 'E2 medido'}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 flex-1 text-sm text-muted-foreground">
             {maintenanceE3Candidate
               ? 'Existe base suficiente para buscar impacto operacional atribuible con comparación antes/después.'
               : 'Primero necesitamos ciclos completos recepción→instalación y outcomes repetidos. No se declara ahorro antes de eso.'}
           </p>
+          <Link href="/dashboard/mantenimiento/ordenes-trabajo" className="mt-4 text-sm font-medium text-primary hover:underline">
+            Completar outcomes E →
+          </Link>
         </div>
-        <div className="bg-card px-5 py-5">
+        <div className="flex flex-col bg-card px-5 py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">C · proceso crítico conectado</p>
           <p className="mt-2 text-xl font-semibold">{maintenanceCChainComplete ? 'Cadena completa observada' : 'Cadena incompleta'}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 flex-1 text-sm text-muted-foreground">
             {maintenanceCChainComplete
               ? 'Ya existe evidencia real desde Mantención hasta instalación. El próximo gate es recurrencia y dependencia operacional.'
               : 'Falta observar al menos una cadena real solicitud → OC → recepción → instalación. Tener los módulos no cuenta como C.'}
           </p>
+          <Link href="/dashboard/compras" className="mt-4 text-sm font-medium text-primary hover:underline">
+            Cerrar cadena C →
+          </Link>
         </div>
       </section>
 
