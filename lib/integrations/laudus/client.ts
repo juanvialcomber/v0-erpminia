@@ -206,19 +206,126 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
 }
 
 function summarizePayload(payload: unknown) {
-  if (Array.isArray(payload)) return { rows: payload.length, shape: 'array' as const };
+  const fieldsOf = (row: unknown) =>
+    row && typeof row === 'object' && !Array.isArray(row)
+      ? Object.keys(row as Record<string, unknown>).slice(0, 40)
+      : [];
+
+  if (Array.isArray(payload)) {
+    return { rows: payload.length, shape: 'array' as const, sampleFields: fieldsOf(payload[0]) };
+  }
 
   if (payload && typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
     for (const key of ['data', 'items', 'results', 'rows']) {
       if (Array.isArray(record[key])) {
-        return { rows: record[key].length, shape: key };
+        const rows = record[key] as unknown[];
+        return { rows: rows.length, shape: key, sampleFields: fieldsOf(rows[0]) };
       }
     }
-    return { rows: null, shape: 'object' as const };
+    return { rows: null, shape: 'object' as const, sampleFields: Object.keys(record).slice(0, 40) };
   }
 
-  return { rows: null, shape: typeof payload };
+  return { rows: null, shape: typeof payload, sampleFields: [] as string[] };
+}
+
+export async function runLaudusBankReconciliationSummary() {
+  await getLaudusAccessToken();
+
+  const statementPayload = await listLaudus('/accounting/bankStatements/list', {
+    options: { offset: 0, limit: 25 },
+    fields: ['bankStatementId', 'dateFrom', 'dateTo', 'initialBalance'],
+    orderBy: [{ field: 'dateTo', direction: 'DESC' }],
+  });
+
+  const statements = Array.isArray(statementPayload)
+    ? statementPayload
+    : statementPayload && typeof statementPayload === 'object'
+      ? ((statementPayload as Record<string, unknown>).data as unknown[] || [])
+      : [];
+
+  const normalized = statements
+    .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === 'object' && !Array.isArray(row)))
+    .map((row) => ({
+      bankStatementId: Number(row.bankStatementId),
+      dateFrom: typeof row.dateFrom === 'string' ? row.dateFrom : null,
+      dateTo: typeof row.dateTo === 'string' ? row.dateTo : null,
+      initialBalance: Number.isFinite(Number(row.initialBalance)) ? Number(row.initialBalance) : null,
+    }))
+    .filter((row) => Number.isFinite(row.bankStatementId))
+    .sort((a, b) => Date.parse(b.dateTo || b.dateFrom || '') - Date.parse(a.dateTo || a.dateFrom || ''));
+
+  const statement = normalized[0] || null;
+  if (!statement) {
+    return {
+      status: 'empty' as const,
+      bankStatement: null,
+      bankOnly: { count: 0, amount: 0, items: [] },
+      journalOnly: { count: 0, amount: 0, items: [] },
+      persisted: false,
+    };
+  }
+
+  const query = new URLSearchParams({
+    bankStatementId: String(statement.bankStatementId),
+    includeOtherBankStatements: 'None',
+  }).toString();
+
+  const [bankOnlyPayload, journalOnlyPayload] = await Promise.all([
+    request('/accounting/reconciliation/bankStatementNotInJournal?' + query, {
+      headers: { Authorization: `Bearer ${await getLaudusAccessToken()}` },
+    }),
+    request('/accounting/reconciliation/journalNotInBankStatement?' + query, {
+      headers: { Authorization: `Bearer ${await getLaudusAccessToken()}` },
+    }),
+  ]);
+
+  const bankOnlyRows =
+    bankOnlyPayload && typeof bankOnlyPayload === 'object' && Array.isArray((bankOnlyPayload as Record<string, unknown>).data)
+      ? ((bankOnlyPayload as Record<string, unknown>).data as Record<string, unknown>[])
+      : [];
+  const journalOnlyRows =
+    journalOnlyPayload && typeof journalOnlyPayload === 'object' && Array.isArray((journalOnlyPayload as Record<string, unknown>).data)
+      ? ((journalOnlyPayload as Record<string, unknown>).data as Record<string, unknown>[])
+      : [];
+
+  const bankOnlyAmount = bankOnlyRows.reduce((sum, row) => {
+    const deposit = Number(row.deposit || 0);
+    const withdrawal = Number(row.withdrawal || 0);
+    return sum + (Number.isFinite(deposit) ? Math.abs(deposit) : 0) + (Number.isFinite(withdrawal) ? Math.abs(withdrawal) : 0);
+  }, 0);
+
+  const journalOnlyAmount = journalOnlyRows.reduce((sum, row) => {
+    const debit = Number(row.debit || 0);
+    const credit = Number(row.credit || 0);
+    return sum + (Number.isFinite(debit) ? Math.abs(debit) : 0) + (Number.isFinite(credit) ? Math.abs(credit) : 0);
+  }, 0);
+
+  const bankOnlyItems = bankOnlyRows.slice(0, 8).map((row) => ({
+    date: typeof row.date === 'string' ? row.date : null,
+    description: typeof row.description === 'string' ? row.description : null,
+    document: typeof row.document === 'string' ? row.document : null,
+    amount: Math.abs(Number(row.deposit || 0)) + Math.abs(Number(row.withdrawal || 0)),
+  }));
+
+  const journalOnlyItems = journalOnlyRows.slice(0, 8).map((row) => ({
+    date: typeof row.date === 'string' ? row.date : null,
+    description: typeof row.description === 'string' ? row.description : null,
+    document: typeof row.document === 'string' ? row.document : null,
+    amount: Math.abs(Number(row.debit || 0)) + Math.abs(Number(row.credit || 0)),
+  }));
+
+  return {
+    status: 'available' as const,
+    bankStatement: {
+      dateFrom: statement.dateFrom,
+      dateTo: statement.dateTo,
+      initialBalance: statement.initialBalance,
+    },
+    bankOnly: { count: bankOnlyRows.length, amount: bankOnlyAmount, items: bankOnlyItems },
+    journalOnly: { count: journalOnlyRows.length, amount: journalOnlyAmount, items: journalOnlyItems },
+    persisted: false,
+  };
 }
 
 export async function runLaudusReadOnlySmokeTest() {
