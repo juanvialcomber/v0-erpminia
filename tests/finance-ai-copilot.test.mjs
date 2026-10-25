@@ -17,9 +17,9 @@ test('Daniel finance AI is grounded in canonical finance, forecast, aging and La
 });
 
 test('finance AI keeps contractual forecast separate from statistical prediction',()=>{
-  assert.match(assistant,/Forecast contractual basado en CxP y fechas de vencimiento conocidas/);
+  assert.match(assistant,/Forecast contractual basado en CxP y fechas de vencimiento/);
   assert.match(assistant,/No es predicción estadística/);
-  assert.match(assistant,/Nunca inventar confianza/);
+  assert.match(assistant,/No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado/);
   assert.match(finance,/Predicción estadística/);
   assert.match(finance,/En calibración/);
 });
