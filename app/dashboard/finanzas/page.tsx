@@ -485,6 +485,12 @@ export default function FinanzasPage() {
             <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
             <p className="mt-3 text-xs text-muted-foreground">Señal explicable · recalculada desde evidencia financiera</p>
+            <div className="mt-4 border-t pt-3">
+              <p className="text-xs font-medium">Predicción estadística</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                En calibración. MOTIL separa primero operación real de cargas históricas extraordinarias antes de proyectar tendencia. Mientras tanto, la caja a 90 días usa vencimientos reales y no estimaciones.
+              </p>
+            </div>
           </div>
         </div>
       </section>
