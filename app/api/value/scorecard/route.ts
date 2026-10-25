@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenancePlanningEvidence] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -51,6 +51,13 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,material_requirement_count,material_shortage_count,procurement_request_count,procurement_order_count,parts_installed,procurement_order_amount,parts_cost')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('audit_log')
+        .select('action,resource_identifier,new_values,created_at,user_id')
+        .eq('organization_id', context.organizationId)
+        .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened'])
+        .order('created_at', { ascending: false })
+        .limit(2000),
     ]);
 
     if (current.error) throw current.error;
@@ -60,6 +67,7 @@ export async function GET(request: NextRequest) {
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
+    if (maintenancePlanningEvidence.error) throw maintenancePlanningEvidence.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -234,6 +242,35 @@ export async function GET(request: NextRequest) {
           ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
           : shortageToProcurementSeconds[shortageMidpoint];
 
+    const planningEvidenceRows = maintenancePlanningEvidence.data || [];
+    const planningSessions = planningEvidenceRows.filter((row: any) => row.action === 'maintenance_weekly_planning_session_started');
+    const planningDecisions = planningEvidenceRows.filter((row: any) => row.action === 'maintenance_weekly_planning_decision_opened');
+    const planningLatencyMs = planningDecisions
+      .map((row: any) => Number(row.new_values?.decision_latency_ms))
+      .filter((value: number) => Number.isFinite(value) && value >= 0 && value <= 30 * 60 * 1000)
+      .sort((a: number, b: number) => a - b);
+    const planningLatencyMidpoint = Math.floor(planningLatencyMs.length / 2);
+    const planningMedianLatencyMs =
+      planningLatencyMs.length === 0
+        ? null
+        : planningLatencyMs.length % 2 === 0
+          ? Math.round((planningLatencyMs[planningLatencyMidpoint - 1] + planningLatencyMs[planningLatencyMidpoint]) / 2)
+          : planningLatencyMs[planningLatencyMidpoint];
+    const planningActionCounts = planningDecisions.reduce((acc: Record<string, number>, row: any) => {
+      const action = String(row.new_values?.decision_action || 'unknown');
+      acc[action] = (acc[action] || 0) + 1;
+      return acc;
+    }, {});
+    const planningUniqueAssetDecisions = new Set(
+      planningDecisions
+        .map((row: any) => String(row.new_values?.asset_id || row.resource_identifier || ''))
+        .filter(Boolean),
+    ).size;
+    const planningPreparedDecisions = planningSessions.reduce(
+      (sum: number, row: any) => sum + Math.max(0, Number(row.new_values?.decisions_prepared) || 0),
+      0,
+    );
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -268,6 +305,17 @@ export async function GET(request: NextRequest) {
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
       connectedDomains,
       connectedDomainCount: connectedDomains.length,
+      weeklyPlanning: {
+        sessions: planningSessions.length,
+        decisionsOpened: planningDecisions.length,
+        uniqueAssetsEngaged: planningUniqueAssetDecisions,
+        preparedDecisionCount: planningPreparedDecisions,
+        medianDecisionLatencySeconds: planningMedianLatencyMs === null ? null : Math.round(planningMedianLatencyMs / 1000),
+        actions: planningActionCounts,
+        latestAt: planningEvidenceRows[0]?.created_at || null,
+        evidenceLevel: planningDecisions.length >= 20 ? 'E2' : planningDecisions.length > 0 ? 'E1' : 'E0',
+        semantics: 'human engagement with weekly decisions prepared by MOTIL; not acceptance, saved time, or economic impact',
+      },
       supplyChain: {
         workOrders: supplyRows.length,
         withMaterials,
