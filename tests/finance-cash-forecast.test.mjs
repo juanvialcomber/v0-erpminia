@@ -28,12 +28,11 @@ test('finance executive API exposes forecast tenant scoped through organization 
   assert.match(route,/cashForecast: cashForecast\.data \|\| \[\]/);
 });
 
-test('finance UI renders 7 30 60 90 day horizons and honest empty state',()=>{
-  assert.match(page,/Forecast de caja/);
-  assert.match(page,/Próx\. 7 días/);
-  assert.match(page,/Próx\. 30 días/);
-  assert.match(page,/Próx\. 60 días/);
-  assert.match(page,/Próx\. 90 días/);
-  assert.match(page,/No hay obligaciones aprobadas con saldo pendiente para proyectar/);
-  assert.match(page,/Las cuentas sin fecha se mantienen fuera del forecast/);
+test('finance cockpit keeps short-term treasury visible without expanding the full forecast',()=>{
+  assert.match(page,/CxP aprobadas en MOTIL/);
+  assert.match(page,/Vence ≤ 7 días/);
+  assert.match(page,/Este universo es distinto de la exposición histórica observada en Laudus/);
+  assert.doesNotMatch(page,/Próx\. 30 días/);
+  assert.doesNotMatch(page,/Próx\. 60 días/);
+  assert.doesNotMatch(page,/Próx\. 90 días/);
 });

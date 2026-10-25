@@ -7,16 +7,16 @@ test('financial numbers distinguish missing evidence from real zero', () => {
   assert.doesNotMatch(page, /Number\(value \|\| 0\)/);
   assert.match(page, /const overview = error \? \{\} :/);
 });
-test('operating costs do not imply an approved closure valuation or guarantee', () => {
-  assert.match(page, /No representan la valorización aprobada del plan de cierre ni garantías financieras constituidas/);
-  assert.match(page, /resolución vigente, medidas por instalación, cronograma, memoria de valorización e instrumentos de garantía/);
+test('closure valuation stays out of the finance cockpit and remains linked to legal evidence', () => {
+  assert.doesNotMatch(page, /valorización aprobada del plan de cierre/);
+  assert.doesNotMatch(page, /garantías financieras constituidas/);
   assert.match(page, /dashboard\/legal/);
 });
 
-test('finance does not infer validation result or currency without evidence', () => {
-  assert.match(page, /validationStatus === null \? 'Sin evidencia'/);
+test('finance does not infer currency without evidence', () => {
   assert.match(page, /if \(!code\) return '—'/);
   assert.doesNotMatch(page, /String\(currency \|\| 'CLP'\)/);
+  assert.doesNotMatch(page, /: 'CLP';/);
 });
 
 const legalPage = readFileSync('app/dashboard/legal/page.tsx', 'utf8');
