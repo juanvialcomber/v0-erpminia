@@ -468,18 +468,17 @@ export default function ValueScorecardPage() {
           ))}
         </div>
         <div className="grid gap-px border-t bg-border md:grid-cols-3">
-          {[
-            ['Solicitud → OC', crossDomainCycle.intakeToOrder],
-            ['OC → recepción', crossDomainCycle.orderToReceipt],
-            ['Recepción → instalación', crossDomainCycle.receiptToInstall],
-          ].map(([label, metric]) => {
-            const item = metric as { samples?: number; medianSeconds?: number | null } | undefined;
-            const hours = item?.medianSeconds == null ? null : Number(item.medianSeconds) / 3600;
+          {([
+            { label: 'Solicitud → OC', metric: crossDomainCycle.intakeToOrder },
+            { label: 'OC → recepción', metric: crossDomainCycle.orderToReceipt },
+            { label: 'Recepción → instalación', metric: crossDomainCycle.receiptToInstall },
+          ] as Array<{ label: string; metric?: { samples?: number; medianSeconds?: number | null } }>).map(({ label, metric }) => {
+            const hours = metric?.medianSeconds == null ? null : Number(metric.medianSeconds) / 3600;
             return (
-              <div key={String(label)} className="bg-card px-5 py-4">
+              <div key={label} className="bg-card px-5 py-4">
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="mt-1 text-xl font-semibold">{hours == null ? 'Sin muestra' : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(hours)} h`}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{number(item?.samples || 0)} ciclo(s) observados.</p>
+                <p className="mt-1 text-xs text-muted-foreground">{number(metric?.samples || 0)} ciclo(s) observados.</p>
               </div>
             );
           })}
