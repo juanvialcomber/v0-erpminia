@@ -48,3 +48,12 @@ test('priority amount respects currency boundaries',()=>{
   assert.match(page,/pendingCurrencies\.length === 1/);
   assert.match(page,/currencyMoney\(pendingAttentionAmount, pendingCurrencies\[0\]\)/);
 });
+
+
+test('Daniel sees decision-grade aging and pressure charts instead of decorative finance graphics',()=>{
+  assert.match(page,/Edad del saldo Laudus/);
+  assert.match(page,/Presión por proveedor/);
+  assert.match(page,/Presión si nada cambia/);
+  assert.match(page,/No supone pagos ni es una predicción estadística/);
+  assert.match(page,/adicionales pasarían a vencido dentro de 60 días si no cambia el estado actual/);
+});
