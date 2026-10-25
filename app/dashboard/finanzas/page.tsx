@@ -70,8 +70,8 @@ type InvoicePoControlResponse = {
     withCandidate?: number;
     strong?: number;
     review?: number;
-    exposureExamined?: number;
-    candidateExposure?: number;
+    exposureExaminedByCurrency?: Record<string, number>;
+    candidateExposureByCurrency?: Record<string, number>;
   };
   candidates?: InvoicePoCandidate[];
   readOnly?: boolean;
@@ -348,7 +348,17 @@ export default function FinanzasPage() {
                 ['Analizadas', number(poControl.data.summary?.examined || 0)],
                 ['Con detalle', number(poControl.data.summary?.withLines || 0)],
                 ['Con OC candidata', number(poControl.data.summary?.withCandidate || 0)],
-                ['Exposición candidata', money(poControl.data.summary?.candidateExposure || 0)],
+                [
+                  'Exposición candidata',
+                  Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 1
+                    ? currencyMoney(
+                        Object.values(poControl.data.summary?.candidateExposureByCurrency || {})[0],
+                        Object.keys(poControl.data.summary?.candidateExposureByCurrency || {})[0],
+                      )
+                    : Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 0
+                      ? '—'
+                      : `${Object.keys(poControl.data.summary?.candidateExposureByCurrency || {}).length} monedas`,
+                ],
               ].map(([label, value]) => (
                 <div key={label} className="bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
