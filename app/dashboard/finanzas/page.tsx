@@ -364,7 +364,7 @@ export default function FinanzasPage() {
     setAiError(null);
     setAiSources([]);
     try {
-      const response = await fetch('/api/intelligence/executive-assistant', {
+      const response = await fetch('/api/finance/assistant', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -377,9 +377,11 @@ export default function FinanzasPage() {
         Array.isArray(payload?.sources)
           ? payload.sources
               .map((source: unknown) =>
-                source && typeof source === 'object' && 'source' in source
-                  ? String((source as { source?: unknown }).source || '')
-                  : '',
+                typeof source === 'string'
+                  ? source
+                  : source && typeof source === 'object' && 'source' in source
+                    ? String((source as { source?: unknown }).source || '')
+                    : '',
               )
               .filter(Boolean)
               .slice(0, 6)
