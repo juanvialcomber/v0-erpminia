@@ -144,7 +144,7 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, invoiceCoverageStartQuery, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
     context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
     context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
@@ -152,6 +152,14 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     context.supabase.from('procurement_cash_forecast_summary_v1').select('currency,open_payables,total_outstanding_amount,overdue_amount,due_next_7_amount,due_next_30_amount,due_next_60_amount,due_next_90_amount,due_after_90_amount,no_due_date_amount,no_due_date_count,next_due_date').eq('organization_id', organizationId).order('currency', { ascending: true }),
     context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: organizationId, p_limit: 10 }),
     context.supabase.rpc('motil_laudus_fixed_asset_review_queue', { p_organization_id: organizationId, p_limit: 1000 }),
+    context.supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('issued_date')
+      .eq('organization_id', organizationId)
+      .not('issued_date', 'is', null)
+      .order('issued_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
     context.supabase
       .from('laudus_purchase_invoice_payment_status_service_v1')
       .select('supplier_name,outstanding_amount,due_date')
@@ -169,7 +177,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(40),
     context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
   ]);
-  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, invoiceCoverageStartQuery.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
@@ -246,6 +254,11 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     maintenanceByAsset.set(id, current);
   }
 
+  const invoiceCoverageStart =
+    typeof invoiceCoverageStartQuery.data?.issued_date === 'string'
+      ? invoiceCoverageStartQuery.data.issued_date.slice(0, 10)
+      : null;
+
   const now = new Date();
   const assetEconomics = fixedAssetStrong.map((row) => {
     const acquisitionDate = typeof row.acquisition_date === 'string' ? row.acquisition_date : null;
@@ -272,6 +285,12 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       depreciation_type: row.depreciation_type || null,
       acquisition_cost: Number(row.acquisition_cost || 0) > 0 ? Number(row.acquisition_cost) : null,
       depreciation_status: Number(row.acquisition_cost || 0) > 0 ? 'cost_available_for_review' : 'blocked_missing_acquisition_cost',
+      cost_recovery_status:
+        Number(row.acquisition_cost || 0) > 0
+          ? 'cost_available'
+          : acquisitionDate && invoiceCoverageStart && acquisitionDate < invoiceCoverageStart
+            ? 'historical_backfill_required'
+            : 'document_lookup_required',
       maintenance_cost: maintenance.cost,
       maintenance_movements: maintenance.movements,
       last_maintenance_cost_date: maintenance.lastCostDate,
@@ -366,6 +385,9 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         strong_candidates: assetEconomics.length,
         with_acquisition_cost: assetEconomics.filter((row) => Number(row.acquisition_cost || 0) > 0).length,
         with_maintenance_history: assetEconomics.filter((row) => row.maintenance_cost > 0).length,
+        invoice_coverage_start: invoiceCoverageStart,
+        historical_backfill_required: assetEconomics.filter((row) => row.cost_recovery_status === 'historical_backfill_required').length,
+        document_lookup_required: assetEconomics.filter((row) => row.cost_recovery_status === 'document_lookup_required').length,
         reconciliation_opportunities: assetReconciliationOpportunities.length,
         reconciliation_opportunity_maintenance_cost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenance_cost, 0),
       },
@@ -378,7 +400,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento. No es predicción estadística ni probabilidad futura.',
         aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio. Para exposición actual Laudus, usa laudus_aging y laudus_supplier_pressure antes que un aging MOTIL vacío.',
         statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
-        asset_economics: 'Para depreciación o reemplazo, usa asset_economics sólo para identidades fuertes. asset_reconciliation_opportunities contiene activos MOTIL con alto costo histórico pero identidad Laudus todavía pendiente; úsalo para priorizar conciliación, no para atribuir depreciación o recomendar reemplazo. No calcules valor libro ni ahorro si falta acquisition_cost.',
+        asset_economics: 'Para depreciación o reemplazo, usa asset_economics sólo para identidades fuertes. cost_recovery_status distingue backfill histórico de búsqueda documental. asset_reconciliation_opportunities contiene activos MOTIL con alto costo histórico pero identidad Laudus todavía pendiente; úsalo para priorizar conciliación, no para atribuir depreciación o recomendar reemplazo. No calcules valor libro ni ahorro si falta acquisition_cost.',
         cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
       },
     },
