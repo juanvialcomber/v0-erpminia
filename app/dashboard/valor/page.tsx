@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 
@@ -32,6 +33,13 @@ type Scorecard = {
   workflowLevel?: number;
   adoptionGate?: Record<string, string>;
   scaleGate?: string;
+};
+
+type BaselineResponse = {
+  sampleCount?: number;
+  medianSecondsPerCase?: number | null;
+  latestAt?: string | null;
+  semantics?: string;
 };
 
 type ApiResponse = {
@@ -73,6 +81,15 @@ export default function ValueScorecardPage() {
   const { data, error, isLoading } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
+  const baseline = useSWR<BaselineResponse>('/api/value/finance-baseline', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline.');
+    return payload;
+  });
+  const baselineStartedAt = useRef<number | null>(null);
+  const [baselineRunning, setBaselineRunning] = useState(false);
+  const [baselineNotice, setBaselineNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -89,6 +106,31 @@ export default function ValueScorecardPage() {
         ? 'En validación'
         : score.scaleGate || '—';
   const historyCount = data?.history?.count || 0;
+
+  const saveBaseline = async () => {
+    if (!baselineStartedAt.current) return;
+    const durationMs = Date.now() - baselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántos documentos revisaste manualmente?', '5');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/finance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline.');
+      setBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por caso.`);
+      baselineStartedAt.current = null;
+      setBaselineRunning(false);
+      await baseline.mutate();
+    } catch (cause) {
+      setBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline.');
+    }
+  };
 
   const nextActions = [
     decisions + financeReviewTotal < 20 ? `Registrar ${20 - decisions - financeReviewTotal} decisiones humanas más para calibrar L4.` : null,
@@ -189,6 +231,54 @@ export default function ValueScorecardPage() {
             <div className="rounded-md border px-4 py-3 text-sm">Los gates mínimos de escala están cumplidos. Corresponde medir recurrencia para E4.</div>
           )}
         </div>
+      </section>
+
+      <section className="rounded-lg border p-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Baseline manual</h2>
+            <p className="text-sm text-muted-foreground">
+              Cronometra una revisión real en Laudus sin asistencia de MOTIL. Recomendado: 5 documentos.
+            </p>
+          </div>
+          {!baselineRunning ? (
+            <button
+              type="button"
+              onClick={() => {
+                baselineStartedAt.current = Date.now();
+                setBaselineRunning(true);
+                setBaselineNotice('Medición activa. Revisa los casos manualmente en Laudus y vuelve aquí al terminar.');
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Iniciar baseline
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void saveBaseline()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Finalizar medición
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Muestras</p>
+            <p className="mt-1 text-xl font-semibold">{number(baseline.data?.sampleCount || 0)}</p>
+          </div>
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana manual por caso</p>
+            <p className="mt-1 text-xl font-semibold">
+              {baseline.data?.medianSecondsPerCase == null ? '—' : `${number(baseline.data.medianSecondsPerCase)} s`}
+            </p>
+          </div>
+        </div>
+        {baselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{baselineNotice}</p> : null}
+        <p className="mt-3 text-xs text-muted-foreground">
+          Esta medición es baseline operacional; por sí sola no demuestra ahorro.
+        </p>
       </section>
 
       <section className="rounded-lg border p-5">
