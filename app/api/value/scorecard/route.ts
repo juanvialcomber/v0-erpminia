@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenancePlanningEvidence] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenancePlanningEvidence, maintenanceProcurementIntakes, maintenanceProcurementOrders, maintenanceProcurementReceipts, maintenanceParts] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -58,6 +58,28 @@ export async function GET(request: NextRequest) {
         .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened','maintenance_standard_plan_decision'])
         .order('created_at', { ascending: false })
         .limit(2000),
+            context.supabase
+        .from('procurement_intake_requests')
+        .select('id,work_order_id,created_at,status')
+        .eq('organization_id', context.organizationId)
+        .not('work_order_id', 'is', null)
+        .limit(5000),
+      context.supabase
+        .from('procurement_operational_orders')
+        .select('id,work_order_id,issued_at,status')
+        .eq('organization_id', context.organizationId)
+        .not('work_order_id', 'is', null)
+        .limit(5000),
+      context.supabase
+        .from('procurement_operational_receipts')
+        .select('id,order_id,received_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('work_order_parts')
+        .select('id,work_order_id,installed_at,quantity_installed,status')
+        .eq('organization_id', context.organizationId)
+        .limit(10000),
     ]);
 
     if (current.error) throw current.error;
@@ -68,6 +90,10 @@ export async function GET(request: NextRequest) {
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
     if (maintenancePlanningEvidence.error) throw maintenancePlanningEvidence.error;
+    if (maintenanceProcurementIntakes.error) throw maintenanceProcurementIntakes.error;
+    if (maintenanceProcurementOrders.error) throw maintenanceProcurementOrders.error;
+    if (maintenanceProcurementReceipts.error) throw maintenanceProcurementReceipts.error;
+    if (maintenanceParts.error) throw maintenanceParts.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -232,6 +258,66 @@ export async function GET(request: NextRequest) {
     }
     const recurrence7dPct = matured7d > 0 ? Math.round((recurrent7d / matured7d) * 100) : null;
 
+    const intakeRows = maintenanceProcurementIntakes.data || [];
+    const orderRows = maintenanceProcurementOrders.data || [];
+    const receiptRows = maintenanceProcurementReceipts.data || [];
+    const partRows = maintenanceParts.data || [];
+
+    const orderById = new Map(orderRows.map((row: any) => [String(row.id), row]));
+    const firstIntakeByWorkOrder = new Map<string, number>();
+    const firstOrderByWorkOrder = new Map<string, number>();
+    const firstReceiptByWorkOrder = new Map<string, number>();
+    const firstInstallByWorkOrder = new Map<string, number>();
+
+    for (const row of intakeRows) {
+      const workOrderId = String((row as any).work_order_id || '');
+      const at = Date.parse(String((row as any).created_at || ''));
+      if (!workOrderId || !Number.isFinite(at)) continue;
+      const current = firstIntakeByWorkOrder.get(workOrderId);
+      if (current == null || at < current) firstIntakeByWorkOrder.set(workOrderId, at);
+    }
+    for (const row of orderRows) {
+      const workOrderId = String((row as any).work_order_id || '');
+      const at = Date.parse(String((row as any).issued_at || ''));
+      if (!workOrderId || !Number.isFinite(at)) continue;
+      const current = firstOrderByWorkOrder.get(workOrderId);
+      if (current == null || at < current) firstOrderByWorkOrder.set(workOrderId, at);
+    }
+    for (const row of receiptRows) {
+      const order = orderById.get(String((row as any).order_id || ''));
+      const workOrderId = String(order?.work_order_id || '');
+      const at = Date.parse(String((row as any).received_at || ''));
+      if (!workOrderId || !Number.isFinite(at)) continue;
+      const current = firstReceiptByWorkOrder.get(workOrderId);
+      if (current == null || at < current) firstReceiptByWorkOrder.set(workOrderId, at);
+    }
+    for (const row of partRows) {
+      const workOrderId = String((row as any).work_order_id || '');
+      const at = Date.parse(String((row as any).installed_at || ''));
+      if (!workOrderId || !Number.isFinite(at) || Number((row as any).quantity_installed || 0) <= 0) continue;
+      const current = firstInstallByWorkOrder.get(workOrderId);
+      if (current == null || at < current) firstInstallByWorkOrder.set(workOrderId, at);
+    }
+
+    const stageSeconds = (from: Map<string, number>, to: Map<string, number>) =>
+      Array.from(from.entries())
+        .map(([workOrderId, fromAt]) => {
+          const toAt = to.get(workOrderId);
+          return toAt != null && toAt >= fromAt ? Math.round((toAt - fromAt) / 1000) : null;
+        })
+        .filter((value): value is number => value !== null)
+        .sort((a, b) => a - b);
+
+    const median = (values: number[]) => {
+      if (!values.length) return null;
+      const midpoint = Math.floor(values.length / 2);
+      return values.length % 2 === 0 ? Math.round((values[midpoint - 1] + values[midpoint]) / 2) : values[midpoint];
+    };
+
+    const intakeToOrderSeconds = stageSeconds(firstIntakeByWorkOrder, firstOrderByWorkOrder);
+    const orderToReceiptSeconds = stageSeconds(firstOrderByWorkOrder, firstReceiptByWorkOrder);
+    const receiptToInstallSeconds = stageSeconds(firstReceiptByWorkOrder, firstInstallByWorkOrder);
+
     const supplyEventTimes = new Map<string, { shortage?: number; procurement?: number }>();
     for (const row of maintenanceEventRows) {
       const key = String(row.work_order_id || '');
@@ -328,6 +414,21 @@ export async function GET(request: NextRequest) {
         samples: shortageToProcurementSeconds.length,
         medianSeconds: medianShortageToProcurementSeconds,
         semantics: 'time from first supply_need_refreshed event to procurement_intake_created; human-confirmed handoff',
+      },
+      crossDomainCycle: {
+        intakeToOrder: {
+          samples: intakeToOrderSeconds.length,
+          medianSeconds: median(intakeToOrderSeconds),
+        },
+        orderToReceipt: {
+          samples: orderToReceiptSeconds.length,
+          medianSeconds: median(orderToReceiptSeconds),
+        },
+        receiptToInstall: {
+          samples: receiptToInstallSeconds.length,
+          medianSeconds: median(receiptToInstallSeconds),
+        },
+        semantics: 'observed stage timing across maintenance and procurement using canonical timestamps; empty stages are not estimated',
       },
       medianExecutionCycleHours:
         medianExecutionCycleSeconds === null
