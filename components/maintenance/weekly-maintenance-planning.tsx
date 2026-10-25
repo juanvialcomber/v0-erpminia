@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { AlertTriangle, CalendarDays, CheckCircle2, PackageSearch, RefreshCw, Wrench } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
@@ -92,6 +93,48 @@ export function WeeklyMaintenancePlanning() {
   const { data, error, isLoading, mutate } = useSWR<WeeklyResponse>('/api/planning/maintenance', fetcher, { revalidateOnFocus: false });
   const rows = data?.weeklyDecisions || [];
   const summary = data?.weeklySummary;
+  const sessionIdRef = useRef<string>(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `weekly-${Date.now()}`);
+  const sessionStartedAtRef = useRef<number>(Date.now());
+  const sessionRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!data?.weekPeriod || !summary || sessionRecordedRef.current) return;
+    sessionRecordedRef.current = true;
+    void apiFetch('/api/planning/maintenance/evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'session_started',
+        sessionId: sessionIdRef.current,
+        weekFrom: data.weekPeriod.from,
+        weekUntil: data.weekPeriod.until,
+        summary,
+      }),
+    }).catch(() => undefined);
+  }, [data?.weekPeriod, summary]);
+
+  function recordDecision(row: WeeklyDecision, decisionAction: 'open_work_order' | 'review_plan' | 'schedule' | 'refresh_reading') {
+    if (!data?.weekPeriod) return;
+    void apiFetch('/api/planning/maintenance/evidence', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'decision_opened',
+        sessionId: sessionIdRef.current,
+        weekFrom: data.weekPeriod.from,
+        weekUntil: data.weekPeriod.until,
+        decisionAction,
+        latencyMs: Date.now() - sessionStartedAtRef.current,
+        assetId: row.canonicalAssetId,
+        assetCode: row.assetCode,
+        priority: row.priority,
+        planningState: row.state,
+        evidenceFreshness: row.evidenceFreshness,
+        proposedByMotil: row.standardPlan?.proposalSource === 'motil',
+      }),
+    }).catch(() => undefined);
+  }
 
   return <main className="space-y-6">
     <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between">
@@ -165,9 +208,9 @@ export function WeeklyMaintenancePlanning() {
             </div>
 
             <div className="flex justify-end">
-              {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
-                : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
-                : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+              {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
+                : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`} onClick={() => recordDecision(row, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
+                : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
                 : <Button asChild size="sm"><Link href={{
                     pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
                     query: {
@@ -176,7 +219,7 @@ export function WeeklyMaintenancePlanning() {
                       workType: 'preventive',
                       priority: row.priority?.startsWith('P1') || row.priority?.startsWith('P2') ? 'high' : 'medium',
                     },
-                  }}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>}
+                  }} onClick={() => recordDecision(row, 'schedule')}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>}
             </div>
           </CardContent>
         </Card>)}
