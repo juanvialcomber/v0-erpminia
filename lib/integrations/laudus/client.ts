@@ -222,14 +222,14 @@ export async function runLaudusReadOnlyValueProbe() {
   await getLaudusAccessToken();
 
   const targets = [
-    ['purchaseInvoices', '/purchases/invoices/list', ['purchaseInvoiceId', 'issuedDate', 'dueDate', 'supplier.supplierId']],
-    ['purchaseOrders', '/purchases/orders/list', ['purchaseOrderId', 'issuedDate', 'dueDate', 'supplier.supplierId']],
-    ['purchasePayments', '/purchases/payments/list', ['paymentId', 'issuedDate', 'dueDate', 'paymentType']],
-    ['bankStatements', '/accounting/bankStatements/list', ['bankStatementId', 'dateFrom', 'dateTo', 'initialBalance']],
-    ['journalEntries', '/accounting/journal/entries/list', ['journalEntryId', 'journalEntryNumber', 'date', 'approved']],
-    ['fixedAssets', '/purchases/fixedAssets/list', ['fixedAssetId', 'name', 'dateAcquisition', 'acquisitionCost']],
-    ['inventories', '/production/inventories/list', ['inventoryId', 'date', 'warehouse.warehouseId']],
-    ['stockTransfers', '/production/stockTransfers/list', ['stockTransferId', 'date', 'warehouseFrom.warehouseId', 'warehouseTo.warehouseId']],
+    ['purchaseInvoices', '/purchases/invoices/list', ['purchaseInvoiceId']],
+    ['purchaseOrders', '/purchases/orders/list', ['purchaseOrderId']],
+    ['purchasePayments', '/purchases/payments/list', ['paymentId']],
+    ['bankStatements', '/accounting/bankStatements/list', ['bankStatementId']],
+    ['journalEntries', '/accounting/journal/entries/list', ['journalEntryId']],
+    ['fixedAssets', '/purchases/fixedAssets/list', ['fixedAssetId']],
+    ['inventories', '/production/inventories/list', ['inventoryId']],
+    ['stockTransfers', '/production/stockTransfers/list', ['stockTransferId']],
   ] as const;
 
   const results: Record<string, {
