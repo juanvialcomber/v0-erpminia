@@ -61,7 +61,7 @@ test('Daniel sees decision-grade aging and pressure charts instead of decorative
 
 test('asset economics keeps depreciation monetary values gated by verified acquisition cost',()=>{
   assert.match(page,/Economía del activo/);
-  assert.match(page,/Vida útil vs costo de mantenimiento/);
+  assert.match(page,/Vida útil y conciliación económica/);
   assert.match(page,/Depreciación CLP bloqueada/);
   assert.match(page,/MOTIL no reparte el total de una factura entre activos sin evidencia/);
   assert.match(page,/vida útil calendario consumida/);
@@ -72,4 +72,12 @@ test('asset economics exposes depreciation readiness without fabricating book va
   assert.match(page,/Depreciación preparada/);
   assert.match(page,/cálculo sólo con costo verificable/);
   assert.match(page,/Qué activo revisar/);
+});
+
+
+test('high-maintenance ambiguous assets are shown as reconciliation priorities, not confirmed economics',()=>{
+  assert.match(page,/Destrabar valor primero/);
+  assert.match(page,/múltiples candidatos Laudus/);
+  assert.match(page,/no es ahorro ni valor libro/);
+  assert.match(page,/No se mezcla con costos de activos todavía ambiguos/);
 });
