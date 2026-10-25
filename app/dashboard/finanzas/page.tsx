@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
 
 type Row = Record<string, string | number | null>;
@@ -107,6 +107,14 @@ type Response = {
     outstanding?: number;
     overdue?: number;
     maxDaysOverdue?: number;
+  }>;
+  laudusPressureTrajectory?: Array<{
+    label?: string;
+    days?: number;
+    current?: number;
+    overdue?: number;
+    olderThan90?: number;
+    noDueDate?: number;
   }>;
 };
 
@@ -337,6 +345,18 @@ export default function FinanzasPage() {
       maxDaysOverdue,
     };
   });
+  const pressureTrajectory = (data?.laudusPressureTrajectory || []).map((row) => ({
+    label: String(row.label || ''),
+    overdue: Number(row.overdue || 0),
+    olderThan90: Number(row.olderThan90 || 0),
+    current: Number(row.current || 0),
+    noDueDate: Number(row.noDueDate || 0),
+  }));
+  const pressureToday = pressureTrajectory[0] || null;
+  const pressure60 = pressureTrajectory.find((row) => row.label === '+60 días') || null;
+  const overdueIncrease60 =
+    pressureToday && pressure60 ? Math.max(0, pressure60.overdue - pressureToday.overdue) : null;
+
   const nextDueDate = typeof primaryForecast?.next_due_date === 'string' ? primaryForecast.next_due_date : null;
   const bankStatementDate = bankReconciliation.data?.bankStatement?.dateTo || null;
   const bankStatementAgeDays = bankStatementDate ? Math.max(0, -Number(daysUntil(bankStatementDate) || 0)) : null;
@@ -659,25 +679,43 @@ export default function FinanzasPage() {
       <section className="grid gap-4 xl:grid-cols-2" aria-label="Proyecciones financieras">
         <div className="rounded-lg border p-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proyección</p>
-            <h2 className="mt-1 text-lg font-semibold">Caja a 90 días</h2>
-            <p className="mt-1 text-xs text-muted-foreground">CxP aprobadas en MOTIL por horizonte de vencimiento · {forecastCurrency}. Separadas de la exposición histórica Laudus.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Trayectoria contractual</p>
+            <h2 className="mt-1 text-lg font-semibold">Presión si nada cambia</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Evolución de la exposición Laudus usando sólo fechas de vencimiento actuales. No supone pagos ni es una predicción estadística.
+            </p>
           </div>
-          {!hasCashProjection ? (
-            <p className="py-10 text-sm text-muted-foreground">Sin CxP aprobadas pendientes en MOTIL para proyectar a 90 días.</p>
+          {overdueIncrease60 !== null ? (
+            <div className="mt-4">
+              <p className="text-2xl font-semibold tracking-tight">{money(overdueIncrease60)}</p>
+              <p className="text-xs text-muted-foreground">adicionales pasarían a vencido dentro de 60 días si no cambia el estado actual</p>
+            </div>
+          ) : null}
+          {pressureTrajectory.length === 0 ? (
+            <p className="py-10 text-sm text-muted-foreground">Sin fechas suficientes para proyectar presión.</p>
           ) : (
             <div className="mt-4 h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cashProjection} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                <LineChart data={pressureTrajectory} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="horizon" tickLine={false} axisLine={false} fontSize={11} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
                   <YAxis tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} width={64} fontSize={11} />
-                  <Tooltip formatter={(value) => [currencyMoney(Number(value), forecastCurrency), 'Obligaciones']} />
-                  <Bar dataKey="amount" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-                </BarChart>
+                  <Tooltip
+                    formatter={(value, name) => [
+                      money(Number(value)),
+                      name === 'olderThan90' ? '>90 días' : name === 'overdue' ? 'Vencido total' : 'Corriente',
+                    ]}
+                  />
+                  <Legend formatter={(value) => value === 'olderThan90' ? '>90 días' : value === 'overdue' ? 'Vencido total' : 'Corriente'} />
+                  <Line type="monotone" dataKey="overdue" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="olderThan90" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3 }} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Para caja operativa, MOTIL mantiene aparte las CxP aprobadas: {hasCashProjection ? 'hay obligaciones proyectables.' : 'hoy no hay CxP aprobadas pendientes.'}
+          </p>
         </div>
 
         <div className="rounded-lg border p-5">
