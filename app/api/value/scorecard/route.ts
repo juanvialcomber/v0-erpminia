@@ -147,6 +147,35 @@ export async function GET(request: NextRequest) {
       procurementCommitment > 0 ? 'Finanzas' : null,
     ].filter(Boolean);
 
+    const eventTimes = new Map<string, { created?: string; start?: string; close?: string }>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const current = eventTimes.get(key) || {};
+      const at = String(row.event_at || '');
+      if (row.event_type === 'work_order_created' && (!current.created || at < current.created)) current.created = at;
+      if (row.event_type === 'timer_play' && (!current.start || at < current.start)) current.start = at;
+      if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
+      eventTimes.set(key, current);
+    }
+    const executionCycles = Array.from(eventTimes.values())
+      .map((row) => {
+        const startMs = row.start ? Date.parse(row.start) : NaN;
+        const closeMs = row.close ? Date.parse(row.close) : NaN;
+        return Number.isFinite(startMs) && Number.isFinite(closeMs) && closeMs >= startMs
+          ? Math.round((closeMs - startMs) / 1000)
+          : null;
+      })
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => a - b);
+    const executionMidpoint = Math.floor(executionCycles.length / 2);
+    const medianExecutionCycleSeconds =
+      executionCycles.length === 0
+        ? null
+        : executionCycles.length % 2 === 0
+          ? Math.round((executionCycles[executionMidpoint - 1] + executionCycles[executionMidpoint]) / 2)
+          : executionCycles[executionMidpoint];
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -159,6 +188,12 @@ export async function GET(request: NextRequest) {
       observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
       workOrdersWithEvents: workOrdersWithEvents.size,
       eventCount: maintenanceEventRows.length,
+      measurableExecutionCycles: executionCycles.length,
+      medianExecutionCycleSeconds,
+      medianExecutionCycleHours:
+        medianExecutionCycleSeconds === null
+          ? null
+          : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       evidenceLevel:
         timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
@@ -174,7 +209,7 @@ export async function GET(request: NextRequest) {
         procurementCommitment,
         tracedPartsCost,
       },
-      semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI',
+      semantics: 'observed maintenance execution and traceability; execution cycle is first timer start to work-order closure; not saved time, avoided downtime, or economic ROI',
     };
 
     return NextResponse.json({
