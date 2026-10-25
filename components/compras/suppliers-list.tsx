@@ -86,7 +86,7 @@ export function SuppliersList() {
       <Card className="overflow-hidden shadow-none">
         <CardContent className="p-0">
           <div className="hidden grid-cols-[minmax(260px,1.4fr)_140px_110px_140px_130px_120px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
-            <span>Proveedor</span><span>Compras</span><span>Productos</span><span>Gasto</span><span>Última compra</span><span>Estado</span>
+            <span>Proveedor</span><span>OC</span><span>Productos</span><span>Gasto histórico</span><span>Última compra</span><span>Estado</span>
           </div>
           {isLoading ? <p className="p-8 text-sm text-muted-foreground">Cargando proveedores...</p> : null}
           {!isLoading && !suppliers.length ? <p className="p-8 text-center text-sm text-muted-foreground">No hay proveedores para esta búsqueda.</p> : null}
@@ -97,7 +97,7 @@ export function SuppliersList() {
                 <div><p className="font-medium">{supplier.trade_name || supplier.legal_name || 'Proveedor sin nombre'}</p><p className="mt-1 text-xs text-muted-foreground">{supplier.tax_id || 'Sin RUT'} · {supplier.region || 'Sin región'}</p></div>
                 <p className="text-sm"><span className="lg:hidden text-muted-foreground">OC: </span>{Number(performance?.purchase_order_count || 0).toLocaleString('es-CL')}</p>
                 <p className="text-sm"><span className="lg:hidden text-muted-foreground">Productos: </span>{Number(performance?.distinct_product_count || 0).toLocaleString('es-CL')}</p>
-                <p className="text-sm font-medium">{money(performance?.total_spend)}</p>
+                <p className="text-sm font-medium"><span className="lg:hidden text-muted-foreground">Gasto histórico: </span>{money(performance?.total_spend)}</p>
                 <p className="text-sm text-muted-foreground">{performance?.last_purchase_date || 'Sin compras'}</p>
                 <Badge variant={supplier.is_active ? 'secondary' : 'outline'}>{supplier.is_active ? 'Activo' : 'Inactivo'}</Badge>
               </Link>
