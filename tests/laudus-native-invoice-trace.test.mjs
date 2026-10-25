@@ -43,8 +43,8 @@ test('native trace API is Finance scoped and cached briefly',()=>{
 });
 
 test('finance presents native trace as primary evidence without calling it approval',()=>{
-  assert.match(page,/Fuente nativa Laudus/);
+  assert.match(page,/Confirmación Laudus/);
   assert.match(page,/OC confirmada por trazabilidad Laudus/);
-  assert.match(page,/Fuente primaria/);
-  assert.match(page,/matcher determinístico como candidato, no como verdad fuente/);
+  assert.match(page,/Confirmado por Laudus/);
+  assert.match(page,/Los demás vínculos se muestran sólo como candidatos para revisión/);
 });
