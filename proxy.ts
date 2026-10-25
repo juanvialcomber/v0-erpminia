@@ -122,11 +122,10 @@ async function isFinanceManager(profileId: string): Promise<boolean> {
 }
 function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
-  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas') || path === '/dashboard/valor') return true;
+  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas')) return true;
   if (path === '/dashboard/compras') return true;
   if (path.startsWith('/dashboard/compras/')) return true;
-  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/') || path === '/api/value/scorecard') return true;
-  if (path === '/api/value/finance-baseline') return true;
+  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
 
   const financeIntegrationRoutes = new Set([
     '/api/integrations/laudus/invoice-po-control',
