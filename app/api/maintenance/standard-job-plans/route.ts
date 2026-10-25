@@ -135,6 +135,20 @@ export async function POST(request: NextRequest) {
       materialRows.push({ canonical_product_id: product.id, bom_line_id: bomLineId, quantity_required: quantityRequired, notes: text(material?.notes) || null });
     }
 
+    const stepRows = steps.map((step: any, index: number) => ({
+      organization_id: context.organizationId,
+      plan_id: null as string | null,
+      sequence_no: index + 1,
+      title: text(step?.title),
+      instructions: text(step?.instructions) || null,
+      control_requirement: text(step?.controlRequirement) || null,
+      required_document_reference: text(step?.requiredDocumentReference) || null,
+      estimated_minutes: step?.estimatedMinutes ? num(step.estimatedMinutes) : null,
+    }));
+    if (stepRows.some((row: any) => !row.title)) {
+      return NextResponse.json({ error: 'Cada paso requiere un título.' }, { status: 400 });
+    }
+
     const { data: plan, error: planError } = await context.supabase.from('maintenance_standard_job_plans').insert({
       organization_id: context.organizationId,
       plan_code: planCode,
@@ -156,9 +170,9 @@ export async function POST(request: NextRequest) {
     }).select('id').single();
     if (planError) throw planError;
 
-    const stepRows = steps.map((step: any, index: number) => ({ organization_id: context.organizationId, plan_id: plan.id, sequence_no: index + 1, title: text(step?.title), instructions: text(step?.instructions) || null, control_requirement: text(step?.controlRequirement) || null, required_document_reference: text(step?.requiredDocumentReference) || null, estimated_minutes: step?.estimatedMinutes ? num(step.estimatedMinutes) : null }));
-    if (stepRows.some((row: any) => !row.title)) return NextResponse.json({ error: 'Cada paso requiere un título.' }, { status: 400 });
-    const { error: stepsError } = await context.supabase.from('maintenance_standard_job_plan_steps').insert(stepRows);
+    const { error: stepsError } = await context.supabase.from('maintenance_standard_job_plan_steps').insert(
+      stepRows.map((row: any) => ({ ...row, plan_id: plan.id })),
+    );
     if (stepsError) throw stepsError;
     if (materialRows.length) {
       const { error: materialsError } = await context.supabase.from('maintenance_standard_job_plan_materials').insert(materialRows.map((row) => ({ ...row, organization_id: context.organizationId, plan_id: plan.id })));
@@ -179,7 +193,7 @@ export async function PATCH(request: NextRequest) {
   const id = text(body?.id);
   const status = text(body?.status);
   if (!id || !['approved','rejected','inactive'].includes(status)) return NextResponse.json({ error: 'Cambio de estado inválido.' }, { status: 400 });
-  const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id,status,proposed_by').eq('organization_id', context.organizationId).eq('id', id).maybeSingle();
+  const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id,status,proposed_by,proposed_at,plan_code,name').eq('organization_id', context.organizationId).eq('id', id).maybeSingle();
   if (!plan) return NextResponse.json({ error: 'Plan estándar no encontrado.' }, { status: 404 });
   if (status === 'approved') {
     const { count: stepCount, error: stepCountError } = await context.supabase
@@ -193,5 +207,32 @@ export async function PATCH(request: NextRequest) {
   const approved = status === 'approved';
   const { error } = await context.supabase.from('maintenance_standard_job_plans').update({ status, approved_by: approved ? context.userId : null, approved_at: approved ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('organization_id', context.organizationId).eq('id', id);
   if (error) return NextResponse.json({ error: 'No se pudo actualizar el plan estándar.' }, { status: 500 });
-  return NextResponse.json({ ok: true, status });
+
+  const proposedAtMs = plan.proposed_at ? Date.parse(String(plan.proposed_at)) : NaN;
+  const decisionCycleSeconds = Number.isFinite(proposedAtMs)
+    ? Math.max(0, Math.round((Date.now() - proposedAtMs) / 1000))
+    : null;
+  const proposalSource = plan.proposed_by ? 'human' : 'motil';
+  const { error: auditError } = await context.supabase.from('audit_log').insert({
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    action: 'maintenance_standard_plan_decision',
+    resource_type: 'maintenance_standard_job_plan',
+    resource_id: id,
+    resource_identifier: plan.plan_code || id,
+    old_values: { status: plan.status },
+    new_values: {
+      status,
+      proposal_source: proposalSource,
+      decision_cycle_seconds: decisionCycleSeconds,
+      plan_name: plan.name || null,
+      metric_version: 'maintenance-standard-plan-decision-v1',
+      semantics: 'human decision on a standard plan proposal; approval is not economic impact',
+    },
+    user_agent: request.headers.get('user-agent'),
+    status: 'completed',
+  });
+  if (auditError) console.error('[maintenance/standard-job-plans:decision-audit]', auditError);
+
+  return NextResponse.json({ ok: true, status, proposalSource, decisionCycleSeconds });
 }
