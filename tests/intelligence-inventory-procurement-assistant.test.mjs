@@ -72,12 +72,16 @@ test('shared runtime stays read-only canonical freshness-aware and module-first'
   assert.match(runtime, /production_source_fidelity_exceptions_v1/);
   assert.match(runtime, /finance_overview/);
   assert.match(runtime, /canonical_finance_cost_centers/);
+  assert.match(runtime, /canonical_finance_suppliers/);
+  assert.match(runtime, /procurement_accounts_payable_aging_summary_v1/);
+  assert.match(runtime, /procurement_cash_forecast_summary_v1/);
+  assert.match(runtime, /motil_laudus_finance_review_queue/);
   assert.match(runtime, /finance_asset_reconciliation_v1/);
   assert.match(runtime, /maintenance_cost_by_cost_center_v1/);
   assert.match(runtime, /latest_snapshot_date/);
   assert.match(runtime, /latest_order_date/);
   assert.match(runtime, /latest_fine_copper_date/);
-  assert.match(runtime, /overview_last_financial_activity/);
+  assert.match(runtime, /overview_last_event_at/);
   assert.match(runtime, /latest_cost_center_event_at/);
   assert.match(runtime, /No presentes un snapshot antiguo como tiempo real/);
   assert.match(runtime, /separa valores reportados por fuente de cálculos determinísticos/);
