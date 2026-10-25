@@ -37,3 +37,16 @@ test('finance cockpit does not inflate adoption with repeated review clicks',()=
   assert.match(finance,/latestReviewByInvoice/);
   assert.match(finance,/priorReview\?\.decision === 'accepted'/);
 });
+
+
+test('finance review timing is bounded, audited and not presented as ROI',()=>{
+  assert.match(route,/decisionLatencyMs/);
+  assert.match(route,/30 \* 60 \* 1000/);
+  assert.match(route,/finance_review_decision/);
+  assert.match(route,/decision_latency_ms/);
+  assert.match(route,/not manual baseline/);
+  assert.match(finance,/reviewSessionStartedAt/);
+  assert.match(valueApi,/financeReviewTiming/);
+  assert.match(valuePage,/Latencia observada/);
+  assert.match(valuePage,/No es aún baseline manual/);
+});
