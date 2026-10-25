@@ -1173,11 +1173,16 @@ export default function FinanzasPage() {
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
               <span>Evidencia financiera trazable</span>
-              <Link href="/dashboard/legal" className="font-medium hover:text-foreground">
-                Ver evidencia legal
-              </Link>
+              <div className="flex items-center gap-4">
+                <Link href="/dashboard/finanzas/fuentes" className="font-medium hover:text-foreground">
+                  Fuentes y calidad
+                </Link>
+                <Link href="/dashboard/legal" className="font-medium hover:text-foreground">
+                  Evidencia legal
+                </Link>
+              </div>
             </div>
 
             <details className="border-t px-5 py-3 text-xs text-muted-foreground">
