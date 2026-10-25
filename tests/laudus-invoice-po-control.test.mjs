@@ -45,13 +45,12 @@ test('matcher refuses incompatible currencies and uses weighted aggregate price'
   assert.match(lib,/value\.lineTotal \/ value\.quantity/);
 });
 
-test('finance cockpit exposes pre-payment control without calling candidate exposure savings',()=>{
+test('finance cockpit keeps deterministic PO matcher out of the interactive surface',()=>{
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
   assert.match(page,/Antes de pagar/);
-  assert.match(page,/Cruce factura \/ OC/);
-  assert.match(page,/La decisión sigue siendo de Finanzas/);
-  assert.match(page,/Una diferencia sólo cuenta como valor cuando Finanzas confirma una corrección antes del pago/);
-  assert.match(page,/MOTIL no propone una OC sin detalle suficiente/);
+  assert.match(page,/Evidencia de factura/);
+  assert.doesNotMatch(page,/invoice-po-control/);
+  assert.doesNotMatch(page,/OC candidata/);
 });
 
 
@@ -65,8 +64,8 @@ test('candidate exposure is never summed across currencies',()=>{
 });
 
 
-test('finance cockpit exposes the invoice detail gap as the next action',()=>{
+test('finance cockpit exposes missing source evidence honestly',()=>{
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
-  assert.match(page,/Falta información en/);
-  assert.match(page,/MOTIL no propone una OC sin detalle suficiente/);
+  assert.match(page,/Falta evidencia/);
+  assert.match(page,/Detalle no disponible en la consulta actual/);
 });
