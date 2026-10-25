@@ -29,3 +29,11 @@ test('weekly planning keeps one direct action per decision', () => {
   assert.match(workspace, /Programar/);
   assert.doesNotMatch(workspace, /Aprobar automáticamente|Generar automáticamente/i);
 });
+
+
+test('weekly planning uses an explicit seven-day operating window', () => {
+  assert.match(api, /weekUntilDate/);
+  assert.match(api, /item\.scheduled_date >= fromDate && item\.scheduled_date <= weekUntilDate/);
+  assert.match(workspace, /próximos 7 días/);
+  assert.match(workspace, /Semana operativa/);
+});
