@@ -580,26 +580,35 @@ export default function FinanzasPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Finanzas
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Decisiones financieras</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {pendingAttention.length > 0
-              ? `${number(pendingAttention.length)} prioridades requieren revisión.`
-              : 'No hay prioridades pendientes en la muestra actual.'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href="#revisar-prioridades"
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-          >
-            Revisar prioridades <ArrowRight className="h-4 w-4" />
-          </a>
+    <div className="mx-auto w-full max-w-[1600px] space-y-6 pb-10">
+      <section className="relative overflow-hidden rounded-xl border bg-card px-5 py-5 shadow-none sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Finanzas
+              </p>
+              <span className="h-1 w-1 rounded-full bg-border" aria-hidden="true" />
+              <span className="text-[11px] text-muted-foreground">MOTIL + Laudus</span>
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Decisiones financieras</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {pendingAttention.length > 0
+                ? `${number(pendingAttention.length)} prioridades requieren revisión. El resto del detalle queda disponible bajo demanda.`
+                : 'Sin decisiones urgentes en la muestra actual. El detalle financiero permanece disponible para auditoría.'}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-start gap-2 sm:flex-row sm:items-center">
+            <span className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-xs font-medium text-muted-foreground">
+              {pendingAttention.length > 0 ? `${number(pendingAttention.length)} por revisar` : 'Sin urgencias'}
+            </span>
+            <a
+              href="#revisar-prioridades"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Revisar prioridades <ArrowRight className="h-4 w-4" />
+            </a>
+          </div>
         </div>
       </section>
 
@@ -609,7 +618,7 @@ export default function FinanzasPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
+      <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-3" aria-label="Resumen financiero">
         {[
           [
             'Saldo abierto',
@@ -627,7 +636,7 @@ export default function FinanzasPage() {
             `${number(pendingAttention.length)} decisiones por revisar`,
           ],
         ].map(([label, value, detail]) => (
-          <div key={label} className="bg-card px-5 py-4">
+          <div key={label} className="bg-card px-5 py-5 sm:px-6">
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="mt-1 text-2xl font-semibold tracking-tight">
               {isLoading || error ? '—' : value}
@@ -637,8 +646,101 @@ export default function FinanzasPage() {
         ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]" aria-label="Control financiero ejecutivo">
-        <div className="rounded-lg border p-5">
+      <section id="revisar-prioridades" className="scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-none">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Revisar ahora</h2>
+            <p className="text-sm text-muted-foreground">
+              Las tres prioridades de mayor impacto que requieren una decisión.
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-muted-foreground">{number(pendingAttention.length)} pendientes</span>
+            {reviewNotice ? <p className="mt-1 text-xs text-foreground">{reviewNotice}</p> : null}
+          </div>
+        </div>
+        {isLoading ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando prioridades…</p>
+        ) : pendingAttention.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">
+            No hay obligaciones Laudus abiertas disponibles para priorizar.
+          </p>
+        ) : (
+          <div>
+            {pendingAttention.map((item, index) => {
+              const priorReview = item.purchase_invoice_external_id
+                ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
+                : undefined;
+              return (
+              <div
+                key={item.purchase_invoice_external_id || `${item.doc_number}-${index}`}
+                className="grid gap-3 border-b px-5 py-4 last:border-b-0 xl:grid-cols-[28px_minmax(0,1fr)_130px_140px_auto] xl:items-center"
+              >
+                <span className="text-xs font-semibold text-muted-foreground">{index + 1}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {item.supplier_name || 'Proveedor sin identificar'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {item.doc_number ? `Doc. ${item.doc_number} · ` : ''}
+                    {item.review_reason || 'Revisión requerida'}
+                  </p>
+                  <p className="mt-1 text-xs text-foreground/80">
+                    <span className="font-medium">Qué revisar:</span> {priorityGuidance(item)}
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground md:text-right">
+                  {item.due_date ? `Vence ${shortDate(item.due_date)}` : 'Sin vencimiento'}
+                </span>
+                <span className="text-sm font-semibold tabular-nums xl:text-right">
+                  {currencyMoney(item.outstanding_amount, item.currency)}
+                </span>
+                <div className="flex flex-wrap gap-1.5 xl:justify-end">
+                  {priorReview?.decision === 'accepted' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Revisado</span>
+                  ) : null}
+                  {priorReview?.decision === 'rejected' ? (
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">No aplica</span>
+                  ) : null}
+                  {priorReview?.decision !== 'accepted' && priorReview?.decision !== 'rejected' ? <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'accepted')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  >
+                    Revisado
+                  </button> : null}
+                  <button
+                    type="button"
+                    onClick={() => void recordReview(item, 'deferred')}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    Posponer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRejectingId(item.purchase_invoice_external_id || null);
+                      void recordReview(item, 'rejected');
+                    }}
+                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    {rejectingId === item.purchase_invoice_external_id ? 'Registrando…' : 'No aplica'}
+                  </button>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+
+
+      <section className="grid items-start gap-4 xl:grid-cols-[1.45fr_0.95fr]" aria-label="Control financiero ejecutivo">
+        <div className="rounded-xl border bg-card p-5 shadow-none">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Presión financiera</p>
@@ -677,7 +779,7 @@ export default function FinanzasPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-lg border p-5">
+          <div className="rounded-xl border bg-card p-5 shadow-none">
             <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">ETA financiero</p></div>
             <p className="mt-3 text-3xl font-semibold tracking-tight">
               {forecastOpenPayables === 0
@@ -702,29 +804,46 @@ export default function FinanzasPage() {
             </p>
           </div>
 
-          <div className="rounded-lg border p-5">
+          <div className="rounded-xl border bg-card p-5 shadow-none">
             <div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inteligencia MOTIL</p></div>
             <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
             <p className="mt-3 text-xs text-muted-foreground">Señal explicable · recalculada desde evidencia financiera</p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
                 ['Qué revisar', 'Analiza exclusivamente Finanzas y dime qué 3 asuntos debería revisar primero el gerente de finanzas. Usa sólo evidencia MOTIL/Laudus autorizada. Para cada asunto: monto o hecho, por qué importa, evidencia/fuente y siguiente validación humana.'],
                 ['Qué viene', 'Analiza exclusivamente Finanzas y dime qué viene en los próximos 7, 30, 60 y 90 días usando forecast contractual y aging. No inventes predicción estadística ni confianza. Señala brechas de fechas o evidencia.'],
-                ['Fuera de patrón', 'Analiza exclusivamente Finanzas y señala concentraciones, excepciones o faltantes de evidencia que merezcan atención. No llames anomalía estadística a algo que no tenga modelo validado. Prioriza máximo 3.'],
-                ['Qué activo revisar', 'Analiza exclusivamente la economía de activos disponible en Finanzas. Prioriza máximo 3 activos candidatos usando vida útil consumida, costo histórico de mantenimiento y nivel de evidencia de identidad. No calcules valor libro, depreciación CLP ni ahorro de reposición si falta costo de adquisición verificado.'],
               ].map(([label, prompt]) => (
                 <button
                   key={label}
                   type="button"
                   onClick={() => void analyzeWithMotil(prompt)}
                   disabled={aiLoading}
-                  className="inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"
                 >
                   {aiLoading ? 'Analizando…' : label}
                 </button>
               ))}
             </div>
+            <details className="mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none py-1 font-medium hover:text-foreground">Más análisis</summary>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {[
+                  ['Fuera de patrón', 'Analiza exclusivamente Finanzas y señala concentraciones, excepciones o faltantes de evidencia que merezcan atención. No llames anomalía estadística a algo que no tenga modelo validado. Prioriza máximo 3.'],
+                  ['Qué activo revisar', 'Analiza exclusivamente la economía de activos disponible en Finanzas. Prioriza máximo 3 activos candidatos usando vida útil consumida, costo histórico de mantenimiento y nivel de evidencia de identidad. No calcules valor libro, depreciación CLP ni ahorro de reposición si falta costo de adquisición verificado.'],
+                ].map(([label, prompt]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => void analyzeWithMotil(prompt)}
+                    disabled={aiLoading}
+                    className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                  >
+                    {aiLoading ? 'Analizando…' : label}
+                  </button>
+                ))}
+              </div>
+            </details>
             <form
               className="mt-3 flex gap-2"
               onSubmit={(event) => {
@@ -761,18 +880,20 @@ export default function FinanzasPage() {
                 ) : null}
               </div>
             ) : null}
-            <div className="mt-4 border-t pt-3">
-              <p className="text-xs font-medium">Predicción estadística</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                En calibración. MOTIL separa primero operación real de cargas históricas extraordinarias antes de proyectar tendencia. Mientras tanto, la caja a 90 días usa vencimientos reales y no estimaciones.
+            <details className="mt-4 border-t pt-3 text-xs">
+              <summary className="cursor-pointer select-none font-medium text-muted-foreground hover:text-foreground">
+                Predicción estadística · en calibración
+              </summary>
+              <p className="mt-2 leading-5 text-muted-foreground">
+                MOTIL separa primero operación real de cargas históricas extraordinarias antes de proyectar tendencia. Mientras tanto, la caja a 90 días usa vencimientos reales y no estimaciones.
               </p>
-            </div>
+            </details>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2" aria-label="Proyecciones financieras">
-        <div className="rounded-lg border p-5">
+        <div className="rounded-xl border bg-card p-5 shadow-none">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Trayectoria contractual</p>
             <h2 className="mt-1 text-lg font-semibold">Presión si nada cambia</h2>
@@ -813,7 +934,7 @@ export default function FinanzasPage() {
           </p>
         </div>
 
-        <div className="rounded-lg border p-5">
+        <div className="rounded-xl border bg-card p-5 shadow-none">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración accionable</p>
             <h2 className="mt-1 text-lg font-semibold">Presión por proveedor</h2>
@@ -987,103 +1108,10 @@ export default function FinanzasPage() {
         </div>
       </section>
 
-      <section id="revisar-prioridades" className="rounded-lg border">
+      <section className="overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">Revisar ahora</h2>
-            <p className="text-sm text-muted-foreground">
-              Las tres prioridades de mayor impacto que requieren una decisión.
-            </p>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-muted-foreground">{number(pendingAttention.length)} pendientes</span>
-            {reviewNotice ? <p className="mt-1 text-xs text-foreground">{reviewNotice}</p> : null}
-          </div>
-        </div>
-        {isLoading ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando prioridades…</p>
-        ) : pendingAttention.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">
-            No hay obligaciones Laudus abiertas disponibles para priorizar.
-          </p>
-        ) : (
-          <div>
-            {pendingAttention.map((item, index) => {
-              const priorReview = item.purchase_invoice_external_id
-                ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
-                : undefined;
-              return (
-              <div
-                key={item.purchase_invoice_external_id || `${item.doc_number}-${index}`}
-                className="grid gap-3 border-b px-5 py-4 last:border-b-0 xl:grid-cols-[28px_minmax(0,1fr)_130px_140px_auto] xl:items-center"
-              >
-                <span className="text-xs font-semibold text-muted-foreground">{index + 1}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {item.supplier_name || 'Proveedor sin identificar'}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {item.doc_number ? `Doc. ${item.doc_number} · ` : ''}
-                    {item.review_reason || 'Revisión requerida'}
-                  </p>
-                  <p className="mt-1 text-xs text-foreground/80">
-                    <span className="font-medium">Qué revisar:</span> {priorityGuidance(item)}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground md:text-right">
-                  {item.due_date ? `Vence ${shortDate(item.due_date)}` : 'Sin vencimiento'}
-                </span>
-                <span className="text-sm font-semibold tabular-nums xl:text-right">
-                  {currencyMoney(item.outstanding_amount, item.currency)}
-                </span>
-                <div className="flex flex-wrap gap-1.5 xl:justify-end">
-                  {priorReview?.decision === 'accepted' ? (
-                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Revisado</span>
-                  ) : null}
-                  {priorReview?.decision === 'rejected' ? (
-                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">No aplica</span>
-                  ) : null}
-                  {priorReview?.decision !== 'accepted' && priorReview?.decision !== 'rejected' ? <button
-                    type="button"
-                    onClick={() => void recordReview(item, 'accepted')}
-                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
-                    className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-                  >
-                    Revisado
-                  </button> : null}
-                  <button
-                    type="button"
-                    onClick={() => void recordReview(item, 'deferred')}
-                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
-                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                  >
-                    Posponer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRejectingId(item.purchase_invoice_external_id || null);
-                      void recordReview(item, 'rejected');
-                    }}
-                    disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
-                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                  >
-                    {rejectingId === item.purchase_invoice_external_id ? 'Registrando…' : 'No aplica'}
-                  </button>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-
-
-      <section className="rounded-lg border">
-        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Antes de pagar</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Evidencia</p>
             <h2 className="mt-1 text-lg font-semibold">Evidencia de factura</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               MOTIL consulta directamente el detalle y la trazabilidad documental disponible en Laudus. Finanzas mantiene la decisión.
@@ -1157,7 +1185,7 @@ export default function FinanzasPage() {
         )}
       </section>
 
-      <section className="rounded-lg border">
+      <section className="overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control Laudus</p>
@@ -1207,12 +1235,12 @@ export default function FinanzasPage() {
             ) : (
               <>
                 <div className="grid gap-px border-b bg-border sm:grid-cols-2">
-                  <div className="bg-card px-5 py-4">
+                  <div className="bg-card px-5 py-5 sm:px-6">
                     <p className="text-xs text-muted-foreground">En cartola, no en contabilidad</p>
                     <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.bankOnly.count)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.bankOnly.amount)} por revisar</p>
                   </div>
-                  <div className="bg-card px-5 py-4">
+                  <div className="bg-card px-5 py-5 sm:px-6">
                     <p className="text-xs text-muted-foreground">En contabilidad, no en cartola</p>
                     <p className="mt-1 text-2xl font-semibold">{number(bankReconciliation.data.journalOnly.count)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.data.journalOnly.amount)} por revisar</p>
@@ -1255,7 +1283,7 @@ export default function FinanzasPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-lg border p-5">
+        <div className="rounded-xl border bg-card p-5 shadow-none">
           <div className="flex items-center gap-2">
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-base font-semibold">CxP aprobadas en MOTIL</h2>
@@ -1298,7 +1326,7 @@ export default function FinanzasPage() {
           )}
         </div>
 
-        <div className="rounded-lg border p-5">
+        <div className="rounded-xl border bg-card p-5 shadow-none">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-semibold">Dónde se concentra</h2>
@@ -1352,13 +1380,6 @@ export default function FinanzasPage() {
         </section>
       ) : null}
 
-      <section className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-xs text-muted-foreground">
-        <Link href="/dashboard/finanzas/trazabilidad" className="hover:text-foreground">Trazabilidad</Link>
-        <Link href="/dashboard/finanzas/fuentes" className="hover:text-foreground">Fuentes y calidad</Link>
-        <Link href="/dashboard/finanzas/documentos" className="hover:text-foreground">Documentos</Link>
-        <Link href="/dashboard/legal" className="hover:text-foreground">Evidencia legal</Link>
-        <Link href="/dashboard/finanzas/calendario" className="hover:text-foreground">Calendario</Link>
-      </section>
     </div>
   );
 }
