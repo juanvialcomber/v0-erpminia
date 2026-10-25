@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import {
   getLaudusConfigurationState,
   LaudusApiError,
@@ -9,14 +9,8 @@ import {
 } from '@/lib/integrations/laudus/client';
 
 export async function POST(request: NextRequest) {
-  const access = await resolveDataHealthAccess(request);
-  if (!access.ok) return access.response;
-  if (!access.admin) {
-    return NextResponse.json(
-      { error: 'La verificación de cobertura Laudus requiere permisos de administración.' },
-      { status: 403 },
-    );
-  }
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (!access.authorized) return access.response;
 
   const configuration = getLaudusConfigurationState();
   if (!configuration.configured) {
