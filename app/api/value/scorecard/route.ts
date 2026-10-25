@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -36,12 +36,24 @@ export async function GET(request: NextRequest) {
         .eq('resource_type', 'laudus_purchase_invoice')
         .order('created_at', { ascending: false })
         .limit(500),
+      context.supabase
+        .from('maintenance_work_orders')
+        .select('id,status,total_timer_seconds,actual_duration_hours,closed_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('work_order_events')
+        .select('work_order_id,event_type,event_at')
+        .eq('organization_id', context.organizationId)
+        .limit(10000),
     ]);
 
     if (current.error) throw current.error;
     if (history.error) throw history.error;
     if (financeReviews.error) throw financeReviews.error;
     if (financeTiming.error) throw financeTiming.error;
+    if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
+    if (maintenanceEvents.error) throw maintenanceEvents.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -95,10 +107,42 @@ export async function GET(request: NextRequest) {
       semantics: 'time from finance cockpit load to human decision; not manual baseline',
     };
 
+    const maintenanceRows = maintenanceWorkOrders.data || [];
+    const maintenanceEventRows = maintenanceEvents.data || [];
+    const timerRows = maintenanceRows.filter(
+      (row: any) => Number.isFinite(Number(row.total_timer_seconds)) && Number(row.total_timer_seconds) > 0,
+    );
+    const timerSecondsObserved = timerRows.reduce(
+      (sum: number, row: any) => sum + Number(row.total_timer_seconds || 0),
+      0,
+    );
+    const closedRows = maintenanceRows.filter((row: any) => Boolean(row.closed_at));
+    const workOrdersWithEvents = new Set(
+      maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
+    );
+    const maintenanceValue = {
+      workOrders: maintenanceRows.length,
+      closedWorkOrders: closedRows.length,
+      timerInstrumentedWorkOrders: timerRows.length,
+      timerCoverage:
+        maintenanceRows.length > 0
+          ? Math.round((timerRows.length / maintenanceRows.length) * 100)
+          : null,
+      observedExecutionSeconds: timerSecondsObserved,
+      observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
+      workOrdersWithEvents: workOrdersWithEvents.size,
+      eventCount: maintenanceEventRows.length,
+      evidenceLevel:
+        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+      workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI',
+    };
+
     return NextResponse.json({
       current: current.data || null,
       financeReview,
       financeReviewTiming,
+      maintenanceValue,
       history: history.data || null,
       definitions: {
         workflow: {
