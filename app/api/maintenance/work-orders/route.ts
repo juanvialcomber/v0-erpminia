@@ -382,6 +382,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let selectedStandardPlan: { id: string; status: string; canonical_asset_id: string | null; estimated_duration_hours: number | string | null } | null = null;
+    if (standardPlanId) {
+      const { data: plan, error: planError } = await context.supabase
+        .from('maintenance_standard_job_plans')
+        .select('id,status,canonical_asset_id,estimated_duration_hours')
+        .eq('organization_id', context.organizationId)
+        .eq('id', standardPlanId)
+        .maybeSingle();
+      if (planError) throw planError;
+      if (!plan || plan.status !== 'approved') {
+        return NextResponse.json({ error: 'El plan estándar ya no está aprobado o no existe.' }, { status: 409 });
+      }
+      if (plan.canonical_asset_id && plan.canonical_asset_id !== canonicalAssetId) {
+        return NextResponse.json({ error: 'El plan estándar corresponde a otro equipo.' }, { status: 409 });
+      }
+      selectedStandardPlan = plan;
+    }
+
     if (reviewId) {
       const { data: review, error: reviewError } = await context.supabase
         .from('drilling_maintenance_review_queue_v1')
@@ -489,7 +507,13 @@ export async function POST(request: NextRequest) {
 
     const year = new Date().getFullYear();
     const prefix = `OT-${year}-`;
-    const plannedHours = Number(body.plannedDurationHours ?? body.planned_duration_hours ?? 0);
+    const requestedPlannedHours = body.plannedDurationHours ?? body.planned_duration_hours ?? null;
+    const planEstimatedHours = selectedStandardPlan?.estimated_duration_hours ?? null;
+    const plannedHours = Number(
+      requestedPlannedHours !== null && requestedPlannedHours !== ''
+        ? requestedPlannedHours
+        : planEstimatedHours ?? 0,
+    );
     const meterReading = body.meterReading ?? body.meter_reading ?? null;
 
     const { data: latestOrder, error: latestOrderError } = await context.supabase
