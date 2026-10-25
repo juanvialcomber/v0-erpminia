@@ -61,7 +61,7 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
     <div className="space-y-6">
       <section className="rounded-lg border bg-card/60" aria-label="Navegación de Finanzas">
         <div className="flex min-h-12 items-center gap-1 overflow-x-auto px-2 [scrollbar-width:none] sm:px-3 [&::-webkit-scrollbar]:hidden">
-          <nav className="flex min-w-0 flex-1 items-center gap-1" aria-label="Finanzas">
+          <nav className="flex min-w-0 flex-1 items-center gap-1" aria-label="Operación financiera">
             {visiblePrimary.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -97,7 +97,7 @@ export default function FinanceLayout({ children }: { children: ReactNode }) {
                   <span>{activeSecondary?.label || 'Más'}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-56">
+              <DropdownMenuContent align="end" className="min-w-56" aria-label="Control financiero">
                 {visibleSecondary.map((item) => (
                   <DropdownMenuItem key={item.href} asChild>
                     <Link
