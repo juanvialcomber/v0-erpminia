@@ -239,6 +239,71 @@ export async function GET(request: NextRequest) {
           : executionCycles[executionMidpoint];
 
 
+    const planApplicationRows = maintenancePlanApplications.data || [];
+    const standardPlanRows = maintenanceStandardPlans.data || [];
+    const workOrderByIdForPlans = new Map(maintenanceRows.map((row: any) => [String(row.id || ''), row]));
+    const standardPlanById = new Map(standardPlanRows.map((row: any) => [String(row.id || ''), row]));
+    const durationErrorPct: number[] = [];
+    let scheduleSamples = 0;
+    let startedOnScheduledDate = 0;
+
+    const chileDateKey = (value: string) => {
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return null;
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Santiago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date);
+    };
+
+    for (const application of planApplicationRows) {
+      const workOrder: any = workOrderByIdForPlans.get(String((application as any).work_order_id || ''));
+      const plan: any = standardPlanById.get(String((application as any).plan_id || ''));
+      if (!workOrder || !plan) continue;
+
+      const planned = Number(plan.estimated_duration_hours);
+      const actual = Number(workOrder.actual_duration_hours);
+      if (Number.isFinite(planned) && planned > 0 && Number.isFinite(actual) && actual > 0) {
+        durationErrorPct.push(Math.abs(actual - planned) / planned * 100);
+      }
+
+      const scheduledDate = String(workOrder.scheduled_date || '');
+      const firstStart = eventTimes.get(String(workOrder.id || ''))?.start || null;
+      if (scheduledDate && firstStart) {
+        const actualDate = chileDateKey(firstStart);
+        if (actualDate) {
+          scheduleSamples += 1;
+          if (actualDate === scheduledDate) startedOnScheduledDate += 1;
+        }
+      }
+    }
+    durationErrorPct.sort((a, b) => a - b);
+    const durationMidpoint = Math.floor(durationErrorPct.length / 2);
+    const medianDurationErrorPct =
+      durationErrorPct.length === 0
+        ? null
+        : durationErrorPct.length % 2 === 0
+          ? Math.round(((durationErrorPct[durationMidpoint - 1] + durationErrorPct[durationMidpoint]) / 2) * 10) / 10
+          : Math.round(durationErrorPct[durationMidpoint] * 10) / 10;
+    const durationWithin20Pct =
+      durationErrorPct.length > 0
+        ? Math.round((durationErrorPct.filter((value) => value <= 20).length / durationErrorPct.length) * 100)
+        : null;
+    const scheduleAdherencePct =
+      scheduleSamples > 0 ? Math.round((startedOnScheduledDate / scheduleSamples) * 100) : null;
+    const standardPlanOutcomeQuality = {
+      applications: planApplicationRows.length,
+      durationSamples: durationErrorPct.length,
+      medianDurationErrorPct,
+      within20Pct: durationWithin20Pct,
+      scheduleSamples,
+      startedOnScheduledDate,
+      scheduleAdherencePct,
+      semantics: 'observed execution quality for work orders carrying approved standard plans; no sample is estimated',
+    };
+
     const closedMaintenanceRows = maintenanceRows
       .filter((row: any) => row.closed_at)
       .map((row: any) => ({
@@ -480,6 +545,7 @@ export async function GET(request: NextRequest) {
         evidenceLevel: planningDecisions.length >= 20 ? 'E2' : planningDecisions.length > 0 ? 'E1' : 'E0',
         semantics: 'human engagement with weekly decisions prepared by MOTIL; not acceptance, saved time, or economic impact',
       },
+      standardPlanOutcomeQuality,
       standardPlanLearning: {
         motilDecisions: motilStandardPlanDecisions.length,
         approved: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'approved').length,
