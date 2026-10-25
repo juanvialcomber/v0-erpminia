@@ -224,6 +224,7 @@ export async function runLaudusBankReconciliationSummary() {
   const statementPayload = await listLaudus('/accounting/bankStatements/list', {
     options: { offset: 0, limit: 25 },
     fields: ['bankStatementId', 'dateFrom', 'dateTo', 'initialBalance'],
+    orderBy: [{ field: 'dateTo', direction: 'DESC' }],
   });
 
   const statements = Array.isArray(statementPayload)
