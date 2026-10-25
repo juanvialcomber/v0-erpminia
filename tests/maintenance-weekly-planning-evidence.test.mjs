@@ -49,3 +49,15 @@ test('standard plan API validates steps before inserting the plan and audits hum
   assert.match(page, /Descartar/);
   assert.doesNotMatch(page, /quantityRequired:Number\(row\.quantityRequired\|\|1\)/);
 });
+
+
+test('maintenance value scorecard exposes the cross-domain supply funnel conservatively', () => {
+  assert.match(scorecard, /supplyChainFunnel/);
+  assert.match(scorecard, /withRequirements/);
+  assert.match(scorecard, /withRequest/);
+  assert.match(scorecard, /withOrder/);
+  assert.match(scorecard, /withDeliveredOrder/);
+  assert.match(scorecard, /withInstalledParts/);
+  assert.match(scorecard, /closedWithOpenShortage/);
+  assert.match(scorecard, /historical closed shortages are data-quality debt, not active compliance/);
+});
