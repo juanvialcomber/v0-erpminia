@@ -44,3 +44,17 @@ test('Ariel planning assistant can propose standard plans without creating or ap
   assert.match(page, /Abrir planes estándar/);
   assert.match(page, /Ariel puede abrir el registro de planes, completar los datos faltantes y aprobarla/);
 });
+
+
+test('real plan candidates open the standard-plan form with evidence-backed prefill only', () => {
+  const plansPage = fs.readFileSync('app/dashboard/mantenimiento/planes-estandar/page.tsx', 'utf8');
+  assert.match(api, /planCandidates/);
+  assert.match(api, /latestPreventiveByAsset/);
+  assert.match(api, /estimatedDurationHours/);
+  assert.match(page, /Candidatos con evidencia real/);
+  assert.match(page, /Preparar plan/);
+  assert.match(plansPage, /searchParams\.get\('durationHours'\)/);
+  assert.match(plansPage, /searchParams\.get\('evidence'\)/);
+  assert.match(plansPage, /MOTIL prellena sólo campos sustentados/);
+  assert.match(plansPage, /Ariel debe completar pasos, controles, personas y materiales antes de aprobar/);
+});
