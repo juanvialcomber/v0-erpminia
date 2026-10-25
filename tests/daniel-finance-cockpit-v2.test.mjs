@@ -20,13 +20,13 @@ test('technical language is hidden from the normal finance surface',()=>{
   assert.match(page,/Cómo se determinó/);
 });
 
-test('pre-payment control uses business language and keeps human authority',()=>{
+test('pre-payment evidence uses business language and keeps human authority',()=>{
   assert.match(page,/Antes de pagar/);
-  assert.match(page,/Cruce factura \/ OC/);
-  assert.match(page,/La decisión sigue siendo de Finanzas/);
-  assert.match(page,/Confirmado por Laudus/);
-  assert.match(page,/Alta coincidencia/);
-  assert.match(page,/MOTIL no propone una OC sin detalle suficiente/);
+  assert.match(page,/Evidencia de factura/);
+  assert.match(page,/Finanzas mantiene la decisión/);
+  assert.match(page,/Traza Laudus disponible/);
+  assert.match(page,/Falta evidencia/);
+  assert.doesNotMatch(page,/OC candidata/);
 });
 
 test('empty MOTIL payables do not render a wall of zeros',()=>{
