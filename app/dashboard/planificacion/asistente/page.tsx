@@ -22,6 +22,14 @@ type PlanCandidate = {
   evidenceReference?: string | null;
   sourceWorkOrderNumber?: string | null;
   sourceWorkOrderTitle?: string | null;
+  materials?: Array<{
+    productCode: string;
+    productName?: string | null;
+    unit?: string | null;
+    quantityRequired: number;
+    sourceStatus?: string | null;
+  }>;
+  materialSemantics?: string | null;
 };
 
 type AssistantResponse = {
@@ -117,6 +125,7 @@ export default function PlanningAssistantPage() {
                 durationHours: candidate.estimatedDurationHours == null ? '' : String(candidate.estimatedDurationHours),
                 reason: candidate.reason || '',
                 evidence: candidate.evidenceReference || '',
+                materials: JSON.stringify(candidate.materials || []),
               });
               return <div key={`${candidate.assetCode}-${candidate.sourceWorkOrderNumber}`} className="rounded-md border p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -124,7 +133,10 @@ export default function PlanningAssistantPage() {
                     <p className="font-medium">{candidate.suggestedName}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{candidate.priority} · {candidate.recommendedAction}</p>
                     <p className="mt-2 text-sm">{candidate.evidenceReference}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">La duración es evidencia observada, no una promesa de tiempo estándar.</p>
+                    {(candidate.materials || []).length > 0 ? <p className="mt-1 text-xs text-muted-foreground">
+                      {(candidate.materials || []).length} material(es) canónicos observados en la OT fuente.
+                    </p> : null}
+                    <p className="mt-1 text-xs text-muted-foreground">La duración y los materiales son evidencia observada, no una promesa de tiempo ni consumo futuro.</p>
                   </div>
                   <Button asChild size="sm" className="shrink-0">
                     <Link href={`/dashboard/mantenimiento/planes-estandar?${params.toString()}`}>Preparar plan</Link>
