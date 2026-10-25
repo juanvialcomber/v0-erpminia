@@ -2,9 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
-
-const managementRoles = new Set(['superadmin', 'admin', 'manager']);
+const managementRoles = new Set(['superadmin', 'admin']);
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
@@ -12,8 +10,7 @@ export async function GET(request: NextRequest) {
 
   const role = String(context.role || '').trim().toLowerCase();
   if (!managementRoles.has(role)) {
-    const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
-    if (!access.authorized) return access.response;
+    return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
   try {
