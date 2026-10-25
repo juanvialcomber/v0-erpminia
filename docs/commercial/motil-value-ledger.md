@@ -87,3 +87,14 @@ Estos umbrales habilitan escala inicial, no E4.
 - Seguridad semántica: esta métrica no es todavía “tiempo ahorrado” ni baseline manual; sólo mide latencia observada dentro de MOTIL.
 - Antirruido: se descartan latencias mayores a 30 minutos y el scorecard usa una muestra única por factura.
 - Uso comercial futuro: comparar esta distribución contra un baseline manual cronometrado para cuantificar capacidad administrativa recuperada.
+
+
+## 2026-10-25 — Baseline manual de revisión financiera
+
+- Herramienta añadida en `Valor MOTIL`: cronómetro explícito para medir revisiones realizadas manualmente en Laudus, sin asistencia MOTIL.
+- Unidad recomendada: 5 documentos por muestra.
+- Persistencia: `audit_log` con duración total, cantidad de casos y segundos por caso.
+- Límites: 10 segundos a 60 minutos por muestra; 1 a 20 casos.
+- Métrica ejecutiva: mediana de segundos manuales por caso.
+- Regla de valor: baseline manual y latencia MOTIL se muestran separados hasta contar con muestras suficientes. La diferencia no se convierte automáticamente en ahorro monetario.
+- Próximo gate: obtener al menos 3 muestras manuales y 20 decisiones asistidas únicas antes de reportar capacidad administrativa recuperada.
