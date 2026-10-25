@@ -73,6 +73,11 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
+    const assignmentAccessLevel = await getModuleAccessLevel(
+      context.userId,
+      context.role,
+      MODULE_KEYS.CORE_CENTROS_COSTOS_ASIGNACION,
+    );
     const entries = await Promise.all(
       (Object.entries(DOMAIN_CONFIG) as Array<[CoverageDomain, DomainConfig]>).map(async ([domain, config]) => {
         const accessLevel = await getModuleAccessLevel(context.userId, context.role, config.moduleKey);
@@ -100,7 +105,7 @@ export async function GET(request: NextRequest) {
       rows.map((row) => ({
         id: String(row.id),
         domain,
-        canAssign: accessLevel === 'ED' && costCenterAccess.canWrite,
+        canAssign: assignmentAccessLevel === 'ED' && canRead(accessLevel),
         ...labelRow(domain, row),
       })),
     );
@@ -123,8 +128,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const costCenterAccess = await requireModuleAccess(request, MODULE_KEYS.CORE_CENTROS_COSTOS, true);
+  const costCenterAccess = await requireModuleAccess(request, MODULE_KEYS.CORE_CENTROS_COSTOS);
   if (!costCenterAccess.authorized) return costCenterAccess.response;
+  const assignmentAccess = await requireModuleAccess(
+    request,
+    MODULE_KEYS.CORE_CENTROS_COSTOS_ASIGNACION,
+    true,
+  );
+  if (!assignmentAccess.authorized) return assignmentAccess.response;
 
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -139,8 +150,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Dominio, registro y centro de costo son obligatorios' }, { status: 400 });
   }
 
-  const ownerAccess = await requireModuleAccess(request, config.moduleKey, true);
-  if (!ownerAccess.authorized) return ownerAccess.response;
+  const sourceAccessLevel = await getModuleAccessLevel(context.userId, context.role, config.moduleKey);
+  if (!canRead(sourceAccessLevel)) {
+    return NextResponse.json({ error: 'No tienes acceso a este registro' }, { status: 403 });
+  }
 
   try {
     const { data: costCenter, error: costCenterError } = await context.supabase
