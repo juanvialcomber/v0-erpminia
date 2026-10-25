@@ -248,8 +248,8 @@ export async function runLaudusBankReconciliationSummary() {
     return {
       status: 'empty' as const,
       bankStatement: null,
-      bankOnly: { count: 0, amount: 0 },
-      journalOnly: { count: 0, amount: 0 },
+      bankOnly: { count: 0, amount: 0, items: [] },
+      journalOnly: { count: 0, amount: 0, items: [] },
       persisted: false,
     };
   }
@@ -289,6 +289,20 @@ export async function runLaudusBankReconciliationSummary() {
     return sum + (Number.isFinite(debit) ? Math.abs(debit) : 0) + (Number.isFinite(credit) ? Math.abs(credit) : 0);
   }, 0);
 
+  const bankOnlyItems = bankOnlyRows.slice(0, 8).map((row) => ({
+    date: typeof row.date === 'string' ? row.date : null,
+    description: typeof row.description === 'string' ? row.description : null,
+    document: typeof row.document === 'string' ? row.document : null,
+    amount: Math.abs(Number(row.deposit || 0)) + Math.abs(Number(row.withdrawal || 0)),
+  }));
+
+  const journalOnlyItems = journalOnlyRows.slice(0, 8).map((row) => ({
+    date: typeof row.date === 'string' ? row.date : null,
+    description: typeof row.description === 'string' ? row.description : null,
+    document: typeof row.document === 'string' ? row.document : null,
+    amount: Math.abs(Number(row.debit || 0)) + Math.abs(Number(row.credit || 0)),
+  }));
+
   return {
     status: 'available' as const,
     bankStatement: {
@@ -296,8 +310,8 @@ export async function runLaudusBankReconciliationSummary() {
       dateTo: statement.dateTo,
       initialBalance: statement.initialBalance,
     },
-    bankOnly: { count: bankOnlyRows.length, amount: bankOnlyAmount },
-    journalOnly: { count: journalOnlyRows.length, amount: journalOnlyAmount },
+    bankOnly: { count: bankOnlyRows.length, amount: bankOnlyAmount, items: bankOnlyItems },
+    journalOnly: { count: journalOnlyRows.length, amount: journalOnlyAmount, items: journalOnlyItems },
     persisted: false,
   };
 }
