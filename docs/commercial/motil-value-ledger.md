@@ -147,3 +147,14 @@ Estos umbrales habilitan escala inicial, no E4.
   - Este monto nunca se presenta como ahorro, costo evitado ni ROI.
 - Estado inicial verificado en Supabase: 0 decisiones financieras cronometradas y 0 muestras de baseline manual al momento de instrumentar esta capa.
 - Siguiente evidencia necesaria: uso real. El sistema está preparado para que los indicadores cambien automáticamente cuando existan decisiones y baselines suficientes.
+
+
+## 2026-10-25 — Mantención: trazabilidad operacional medida
+
+- Estado productivo observado al instrumentar: 11 OT; 10 con cronómetro a nivel de segundo; 74.560 segundos de ejecución acumulada (20,7 h); 220 eventos de OT; 9 OT cerradas.
+- Cobertura de cronómetro: 90,9% del universo de OT observado.
+- Clasificación interna: L4 / E2 para el flujo de OT instrumentado.
+- Valor ya demostrado: control y trazabilidad de ejecución, actor, tiempo y cierre.
+- No demostrado todavía: horas ahorradas, downtime evitado, ahorro CLP, mejora MTTR atribuible o costo evitado.
+- Gate E3: comparar outcomes reales entre cohortes/períodos con evidencia suficiente (MTTR, reincidencia, downtime, costo posterior o tiempo administrativo) y registrar la intervención MOTIL que precedió al cambio.
+- Siguiente medición: capturar baseline de gestión manual/administrativa y outcome post-cierre por activo/OT; priorizar reincidencia y tiempo desde creación → inicio → cierre por ser variables ya trazables.
