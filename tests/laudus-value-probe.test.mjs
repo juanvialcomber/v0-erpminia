@@ -17,9 +17,9 @@ test('Laudus value probe is bounded, redacted and read only', () => {
   assert.doesNotMatch(client, /method: 'PUT'|method: 'DELETE'|method: 'PATCH'/);
 });
 
-test('value probe is admin scoped and never persists source rows', () => {
-  assert.match(route, /resolveDataHealthAccess/);
-  assert.match(route, /access\.admin/);
+test('value probe is finance scoped and never persists source rows', () => {
+  assert.match(route, /requireModuleAccess/);
+  assert.match(route, /MODULE_KEYS\.FIN_FINANZAS/);
   assert.match(route, /persisted: false/);
   assert.doesNotMatch(route, /insert\(|update\(|upsert\(|delete\(/);
 });
