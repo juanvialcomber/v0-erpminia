@@ -51,10 +51,52 @@ type ApiResponse = {
     rejected?: number;
     latestAt?: string | null;
     calibrationGate?: string;
+    reviewedAmountClp?: number;
+    acceptedAmountClp?: number;
+    semantics?: string;
   } | null;
   financeReviewTiming?: {
     sample?: number;
     medianSeconds?: number | null;
+    semantics?: string;
+  } | null;
+  maintenanceValue?: {
+    workOrders?: number;
+    closedWorkOrders?: number;
+    timerInstrumentedWorkOrders?: number;
+    timerCoverage?: number | null;
+    observedExecutionSeconds?: number;
+    observedExecutionHours?: number;
+    workOrdersWithEvents?: number;
+    eventCount?: number;
+    measurableExecutionCycles?: number;
+    medianExecutionCycleSeconds?: number | null;
+    medianExecutionCycleHours?: number | null;
+    recurrence7d?: {
+      matured?: number;
+      recurrent?: number;
+      ratePct?: number | null;
+      semantics?: string;
+    };
+    shortageToProcurement?: {
+      samples?: number;
+      medianSeconds?: number | null;
+      semantics?: string;
+    };
+    evidenceLevel?: string;
+    workflowLevel?: number;
+    connectedDomains?: string[];
+    connectedDomainCount?: number;
+    supplyChain?: {
+      workOrders?: number;
+      withMaterials?: number;
+      withShortages?: number;
+      withProcurementRequests?: number;
+      withPurchaseOrders?: number;
+      withPartsInstalled?: number;
+      procurementCommitment?: number;
+      tracedPartsCost?: number;
+    };
     semantics?: string;
   } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
@@ -119,6 +161,24 @@ export default function ValueScorecardPage() {
   const observedTimeReductionPct = timingComparisonReady
     ? Math.round(((manualMedian - assistedMedian) / manualMedian) * 100)
     : null;
+  const observedSecondsRecoveredPerCase =
+    timingComparisonReady && manualMedian != null && assistedMedian != null
+      ? Math.max(0, manualMedian - assistedMedian)
+      : null;
+  const observedHoursRecovered =
+    observedSecondsRecoveredPerCase == null
+      ? null
+      : (observedSecondsRecoveredPerCase * financeReviewTotal) / 3600;
+  const demonstratedValueClp =
+    (score.observedImpact?.e3Records || 0) > 0
+      ? Number(score.observedImpact?.observedValueClp || 0)
+      : null;
+  const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
+  const maintenanceValue = data?.maintenanceValue || {};
+  const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
+  const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
+  const recurrence7d = maintenanceValue.recurrence7d || {};
+  const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -164,6 +224,174 @@ export default function ValueScorecardPage() {
       </section>
 
       {error ? <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">{error.message}</div> : null}
+
+      <section aria-label="Valor generado por MOTIL" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Lectura interna N3uralia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Valor generado</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Verde significa impacto observado con gate suficiente. Volumen bajo control se muestra aparte y nunca se convierte en ahorro.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border md:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Valor económico demostrado</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${demonstratedValueClp != null && demonstratedValueClp > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {demonstratedValueClp == null ? 'Aún no demostrado' : money(demonstratedValueClp)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sólo impactos E3 observados. Nunca exposición ni monto priorizado.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Reducción observada de tiempo</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${observedTimeReductionPct != null && observedTimeReductionPct > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {observedTimeReductionPct == null ? 'Gate pendiente' : `${number(observedTimeReductionPct)}%`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Requiere ≥3 baselines manuales y ≥20 decisiones asistidas cronometradas.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Capacidad recuperada observada</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${observedHoursRecovered != null && observedHoursRecovered > 0 ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {observedHoursRecovered == null ? 'Gate pendiente' : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(observedHoursRecovered)} h`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Aplicada sólo a casos efectivamente revisados; todavía no monetizada.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Monto bajo control financiero</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{money(reviewedAmountClp)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Valor interno de Mantención" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mantención · evidencia operacional</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Control real del trabajo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mide ejecución y trazabilidad observadas. Todavía no convierte horas registradas en ahorro económico.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Nivel actual</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              L{number(maintenanceValue.workflowLevel || 0)} · {maintenanceValue.evidenceLevel || 'E0'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">L4 significa flujo instrumentado con decisión humana; E2, desempeño medido.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT con cronómetro</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.timerInstrumentedWorkOrders || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {maintenanceTimerCoverage == null ? 'Sin universo medible' : `${number(maintenanceTimerCoverage)}% de cobertura actual`}
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Horas de ejecución observadas</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.observedExecutionHours || 0)} h
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Tiempo real capturado por MOTIL; no se interpreta como horas ahorradas.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Eventos trazados</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.eventCount || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Inicio, pausa, reanudación, cierre y demás evidencia operacional.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Ciclo ejecución → cierre</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {maintenanceValue.medianExecutionCycleHours == null ? '—' : `${number(maintenanceValue.medianExecutionCycleHours)} h`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mediana de {number(maintenanceValue.measurableExecutionCycles || 0)} OT medibles.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT cerradas trazables</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.closedWorkOrders || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">
+        <div className="bg-card px-5 py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Baseline post-OT</p>
+          <h3 className="mt-1 text-base font-semibold">Reincidencia a 7 días</h3>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {recurrence7d.ratePct == null ? '—' : `${number(recurrence7d.ratePct)}%`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {number(recurrence7d.recurrent || 0)} de {number(recurrence7d.matured || 0)} OT maduras generaron otra OT sobre el mismo activo dentro de 7 días.
+          </p>
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+            Baseline E2. No implica que la OT anterior haya fallado ni atribuye causalidad a MOTIL.
+          </p>
+        </div>
+
+        <div className="bg-card px-5 py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Handoff a Compras</p>
+          <h3 className="mt-1 text-base font-semibold">Shortage → solicitud operativa</h3>
+          <p className="mt-3 text-3xl font-semibold tracking-tight">
+            {shortageToProcurement.medianSeconds == null
+              ? 'Sin muestra'
+              : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(Number(shortageToProcurement.medianSeconds) / 3600)} h`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Mediana de {number(shortageToProcurement.samples || 0)} handoff(s) reales desde faltante detectado hasta solicitud creada.
+          </p>
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+            MOTIL detecta el faltante automáticamente; la creación de la solicitud sigue requiriendo acción humana.
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Cobertura inter-área de Mantención">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cobertura inter-área</p>
+            <h3 className="mt-1 text-base font-semibold">
+              {number(maintenanceValue.connectedDomainCount || 0)} dominios conectados con evidencia real
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {(maintenanceValue.connectedDomains || []).length > 0
+                ? (maintenanceValue.connectedDomains || []).join(' → ')
+                : 'Sin cadena inter-área demostrada todavía.'}
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            {[
+              ['Materiales', maintenanceValue.supplyChain?.withMaterials || 0],
+              ['Shortages', maintenanceValue.supplyChain?.withShortages || 0],
+              ['Solicitudes compra', maintenanceValue.supplyChain?.withProcurementRequests || 0],
+              ['OC', maintenanceValue.supplyChain?.withPurchaseOrders || 0],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="min-w-28 rounded-md bg-muted/40 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">{label}</p>
+                <p className="mt-0.5 text-lg font-semibold">{number(value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+          Objetivo C: Mantención → Bodega → Compras → Finanzas con evidencia de punta a punta. Sólo cuenta un dominio cuando existe un evento real, no por tener el módulo disponible.
+        </p>
+      </section>
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         {[

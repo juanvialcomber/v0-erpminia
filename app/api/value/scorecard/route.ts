@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       }),
       context.supabase
         .from('laudus_finance_review_feedback_service_v1')
-        .select('purchase_invoice_external_id,decision,created_at')
+        .select('purchase_invoice_external_id,decision,outstanding_amount,created_at')
         .eq('organization_id', context.organizationId)
         .order('created_at', { ascending: false })
         .limit(500),
@@ -36,12 +36,30 @@ export async function GET(request: NextRequest) {
         .eq('resource_type', 'laudus_purchase_invoice')
         .order('created_at', { ascending: false })
         .limit(500),
+      context.supabase
+        .from('maintenance_work_orders')
+        .select('id,canonical_asset_id,status,total_timer_seconds,actual_duration_hours,closed_at,created_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('work_order_events')
+        .select('work_order_id,event_type,event_at')
+        .eq('organization_id', context.organizationId)
+        .limit(10000),
+      context.supabase
+        .from('work_order_supply_chain_v1')
+        .select('work_order_id,material_requirement_count,material_shortage_count,procurement_request_count,procurement_order_count,parts_installed,procurement_order_amount,parts_cost')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     if (current.error) throw current.error;
     if (history.error) throw history.error;
     if (financeReviews.error) throw financeReviews.error;
     if (financeTiming.error) throw financeTiming.error;
+    if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
+    if (maintenanceEvents.error) throw maintenanceEvents.error;
+    if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -50,13 +68,27 @@ export async function GET(request: NextRequest) {
       if (key && !latestFinanceReviews.has(key)) latestFinanceReviews.set(key, row);
     }
     const financeReviewRows = Array.from(latestFinanceReviews.values());
+    const reviewedAmountClp = financeReviewRows.reduce(
+      (sum: number, row: any) => sum + (Number.isFinite(Number(row.outstanding_amount)) ? Number(row.outstanding_amount) : 0),
+      0,
+    );
+    const acceptedAmountClp = financeReviewRows
+      .filter((row: any) => row.decision === 'accepted')
+      .reduce(
+        (sum: number, row: any) => sum + (Number.isFinite(Number(row.outstanding_amount)) ? Number(row.outstanding_amount) : 0),
+        0,
+      );
+
     const financeReview = {
       total: financeReviewRows.length,
       reviewed: financeReviewRows.filter((row: any) => row.decision === 'accepted').length,
       deferred: financeReviewRows.filter((row: any) => row.decision === 'deferred').length,
       rejected: financeReviewRows.filter((row: any) => row.decision === 'rejected').length,
+      reviewedAmountClp,
+      acceptedAmountClp,
       latestAt: financeRows[0]?.created_at || null,
       calibrationGate: financeReviewRows.length >= 20 ? 'PASS' : 'HOLD',
+      semantics: 'amount reviewed is value under human control, not savings or avoided cost',
     };
 
     const latestTimingByInvoice = new Map<string, number>();
@@ -81,10 +113,179 @@ export async function GET(request: NextRequest) {
       semantics: 'time from finance cockpit load to human decision; not manual baseline',
     };
 
+    const maintenanceRows = maintenanceWorkOrders.data || [];
+    const maintenanceEventRows = maintenanceEvents.data || [];
+    const timerRows = maintenanceRows.filter(
+      (row: any) => Number.isFinite(Number(row.total_timer_seconds)) && Number(row.total_timer_seconds) > 0,
+    );
+    const timerSecondsObserved = timerRows.reduce(
+      (sum: number, row: any) => sum + Number(row.total_timer_seconds || 0),
+      0,
+    );
+    const closedRows = maintenanceRows.filter((row: any) => Boolean(row.closed_at));
+    const workOrdersWithEvents = new Set(
+      maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
+    );
+    const supplyRows = maintenanceSupplyChain.data || [];
+    const withMaterials = supplyRows.filter((row: any) => Number(row.material_requirement_count || 0) > 0).length;
+    const withShortages = supplyRows.filter((row: any) => Number(row.material_shortage_count || 0) > 0).length;
+    const withProcurementRequests = supplyRows.filter((row: any) => Number(row.procurement_request_count || 0) > 0).length;
+    const withPurchaseOrders = supplyRows.filter((row: any) => Number(row.procurement_order_count || 0) > 0).length;
+    const withPartsInstalled = supplyRows.filter((row: any) => Number(row.parts_installed || 0) > 0).length;
+    const procurementCommitment = supplyRows.reduce(
+      (sum: number, row: any) => sum + (Number.isFinite(Number(row.procurement_order_amount)) ? Number(row.procurement_order_amount) : 0),
+      0,
+    );
+    const tracedPartsCost = supplyRows.reduce(
+      (sum: number, row: any) => sum + (Number.isFinite(Number(row.parts_cost)) ? Number(row.parts_cost) : 0),
+      0,
+    );
+    const connectedDomains = [
+      maintenanceRows.length > 0 ? 'Mantención' : null,
+      withMaterials > 0 || withPartsInstalled > 0 ? 'Bodega' : null,
+      withProcurementRequests > 0 || withPurchaseOrders > 0 ? 'Compras' : null,
+      procurementCommitment > 0 ? 'Finanzas' : null,
+    ].filter(Boolean);
+
+    const eventTimes = new Map<string, { created?: string; start?: string; close?: string }>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const current = eventTimes.get(key) || {};
+      const at = String(row.event_at || '');
+      if (row.event_type === 'work_order_created' && (!current.created || at < current.created)) current.created = at;
+      if (row.event_type === 'timer_play' && (!current.start || at < current.start)) current.start = at;
+      if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
+      eventTimes.set(key, current);
+    }
+    const executionCycles = Array.from(eventTimes.values())
+      .map((row) => {
+        const startMs = row.start ? Date.parse(row.start) : NaN;
+        const closeMs = row.close ? Date.parse(row.close) : NaN;
+        return Number.isFinite(startMs) && Number.isFinite(closeMs) && closeMs >= startMs
+          ? Math.round((closeMs - startMs) / 1000)
+          : null;
+      })
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => a - b);
+    const executionMidpoint = Math.floor(executionCycles.length / 2);
+    const medianExecutionCycleSeconds =
+      executionCycles.length === 0
+        ? null
+        : executionCycles.length % 2 === 0
+          ? Math.round((executionCycles[executionMidpoint - 1] + executionCycles[executionMidpoint]) / 2)
+          : executionCycles[executionMidpoint];
+
+
+    const closedMaintenanceRows = maintenanceRows
+      .filter((row: any) => row.closed_at)
+      .map((row: any) => ({
+        ...row,
+        closedAtMs: Date.parse(String(row.closed_at)),
+      }))
+      .filter((row: any) => Number.isFinite(row.closedAtMs));
+    const maintenanceByAsset = new Map<string, any[]>();
+    for (const row of maintenanceRows) {
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId) continue;
+      const rows = maintenanceByAsset.get(assetId) || [];
+      rows.push(row);
+      maintenanceByAsset.set(assetId, rows);
+    }
+    const nowMs = Date.now();
+    let matured7d = 0;
+    let recurrent7d = 0;
+    for (const row of closedMaintenanceRows) {
+      if (row.closedAtMs > nowMs - 7 * 86400000) continue;
+      matured7d += 1;
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId) continue;
+      const recurrent = (maintenanceByAsset.get(assetId) || []).some((candidate: any) => {
+        if (candidate.id === row.id) return false;
+        const createdMs = Date.parse(String(candidate.created_at || ''));
+        return Number.isFinite(createdMs) && createdMs > row.closedAtMs && createdMs <= row.closedAtMs + 7 * 86400000;
+      });
+      if (recurrent) recurrent7d += 1;
+    }
+    const recurrence7dPct = matured7d > 0 ? Math.round((recurrent7d / matured7d) * 100) : null;
+
+    const supplyEventTimes = new Map<string, { shortage?: number; procurement?: number }>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const current = supplyEventTimes.get(key) || {};
+      const atMs = Date.parse(String(row.event_at || ''));
+      if (!Number.isFinite(atMs)) continue;
+      if (row.event_type === 'supply_need_refreshed' && current.shortage == null) current.shortage = atMs;
+      if (row.event_type === 'procurement_intake_created' && current.procurement == null) current.procurement = atMs;
+      supplyEventTimes.set(key, current);
+    }
+    const shortageToProcurementSeconds = Array.from(supplyEventTimes.values())
+      .map((row) => row.shortage != null && row.procurement != null && row.procurement >= row.shortage
+        ? Math.round((row.procurement - row.shortage) / 1000)
+        : null)
+      .filter((value): value is number => value !== null)
+      .sort((a,b)=>a-b);
+    const shortageMidpoint = Math.floor(shortageToProcurementSeconds.length / 2);
+    const medianShortageToProcurementSeconds =
+      shortageToProcurementSeconds.length === 0
+        ? null
+        : shortageToProcurementSeconds.length % 2 === 0
+          ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
+          : shortageToProcurementSeconds[shortageMidpoint];
+
+    const maintenanceValue = {
+      workOrders: maintenanceRows.length,
+      closedWorkOrders: closedRows.length,
+      timerInstrumentedWorkOrders: timerRows.length,
+      timerCoverage:
+        maintenanceRows.length > 0
+          ? Math.round((timerRows.length / maintenanceRows.length) * 100)
+          : null,
+      observedExecutionSeconds: timerSecondsObserved,
+      observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
+      workOrdersWithEvents: workOrdersWithEvents.size,
+      eventCount: maintenanceEventRows.length,
+      measurableExecutionCycles: executionCycles.length,
+      medianExecutionCycleSeconds,
+      recurrence7d: {
+        matured: matured7d,
+        recurrent: recurrent7d,
+        ratePct: recurrence7dPct,
+        semantics: 'new work order on the same canonical asset within 7 days after closure; baseline only, not causal attribution',
+      },
+      shortageToProcurement: {
+        samples: shortageToProcurementSeconds.length,
+        medianSeconds: medianShortageToProcurementSeconds,
+        semantics: 'time from first supply_need_refreshed event to procurement_intake_created; human-confirmed handoff',
+      },
+      medianExecutionCycleHours:
+        medianExecutionCycleSeconds === null
+          ? null
+          : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
+      evidenceLevel:
+        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+      workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      connectedDomains,
+      connectedDomainCount: connectedDomains.length,
+      supplyChain: {
+        workOrders: supplyRows.length,
+        withMaterials,
+        withShortages,
+        withProcurementRequests,
+        withPurchaseOrders,
+        withPartsInstalled,
+        procurementCommitment,
+        tracedPartsCost,
+      },
+      semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
+    };
+
     return NextResponse.json({
       current: current.data || null,
       financeReview,
       financeReviewTiming,
+      maintenanceValue,
       history: history.data || null,
       definitions: {
         workflow: {

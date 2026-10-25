@@ -42,3 +42,14 @@ test('approved plan application preserves existing material requirements', () =>
   assert.match(apply,/filter\(\(row: any\) => !existingIds\.has/);
   assert.match(apply,/createdRequirements/);
 });
+
+
+test('MOTIL-generated plan proposals are explicit and still require human completion', () => {
+  const api = fs.readFileSync('app/api/maintenance/standard-job-plans/route.ts','utf8');
+  const page = fs.readFileSync('app/dashboard/mantenimiento/planes-estandar/page.tsx','utf8');
+
+  assert.match(api,/proposal_source: plan\.proposed_by \? 'human' : 'motil'/);
+  assert.match(api,/Ariel debe completar el procedimiento antes de aprobar/);
+  assert.match(page,/Propuesto por MOTIL/);
+  assert.match(page,/Completar antes de aprobar/);
+});

@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
 
     const items = (plans || []).map((plan: any) => ({
       ...plan,
+      proposal_source: plan.proposed_by ? 'human' : 'motil',
       asset: plan.canonical_asset_id ? assetMap.get(plan.canonical_asset_id) || null : null,
       steps: (steps || []).filter((row: any) => row.plan_id === plan.id),
       materials: (materials || []).filter((row: any) => row.plan_id === plan.id).map((row: any) => ({ ...row, product: productMap.get(row.canonical_product_id) || null })),
@@ -178,8 +179,17 @@ export async function PATCH(request: NextRequest) {
   const id = text(body?.id);
   const status = text(body?.status);
   if (!id || !['approved','rejected','inactive'].includes(status)) return NextResponse.json({ error: 'Cambio de estado inválido.' }, { status: 400 });
-  const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id').eq('organization_id', context.organizationId).eq('id', id).maybeSingle();
+  const { data: plan } = await context.supabase.from('maintenance_standard_job_plans').select('id,status,proposed_by').eq('organization_id', context.organizationId).eq('id', id).maybeSingle();
   if (!plan) return NextResponse.json({ error: 'Plan estándar no encontrado.' }, { status: 404 });
+  if (status === 'approved') {
+    const { count: stepCount, error: stepCountError } = await context.supabase
+      .from('maintenance_standard_job_plan_steps')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', context.organizationId)
+      .eq('plan_id', id);
+    if (stepCountError) return NextResponse.json({ error: 'No se pudo verificar la completitud del plan.' }, { status: 500 });
+    if (!stepCount) return NextResponse.json({ error: 'El plan aún no tiene pasos validados. Ariel debe completar el procedimiento antes de aprobar.' }, { status: 409 });
+  }
   const approved = status === 'approved';
   const { error } = await context.supabase.from('maintenance_standard_job_plans').update({ status, approved_by: approved ? context.userId : null, approved_at: approved ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('organization_id', context.organizationId).eq('id', id);
   if (error) return NextResponse.json({ error: 'No se pudo actualizar el plan estándar.' }, { status: 500 });

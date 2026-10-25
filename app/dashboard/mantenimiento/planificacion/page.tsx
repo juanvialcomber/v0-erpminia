@@ -1,11 +1,10 @@
-﻿import { PreventivePlanBoard } from '@/components/maintenance/preventive-plan-board';
+import { WeeklyMaintenancePlanning } from '@/components/maintenance/weekly-maintenance-planning';
 
 export const metadata = {
-  title: 'Planificacion preventiva',
-  description: 'Programacion preventiva para los proximos 12 meses',
+  title: 'Planificación semanal',
+  description: 'Decisiones semanales de mantenimiento preparadas por MOTIL para revisión de Ariel.',
 };
 
 export default function MantenimientoPlanificacionPage() {
-  return <PreventivePlanBoard />;
+  return <WeeklyMaintenancePlanning />;
 }
-

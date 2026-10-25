@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   if (message.length > MAX_MESSAGE_CHARS) return NextResponse.json({ error: 'La consulta es demasiado extensa.' }, { status: 400 });
 
   try {
-    const [cargo, priorities, sourceRows, attention, preventive, productionPlan, inventory, purchaseOrders] = await Promise.all([
+    const [cargo, priorities, sourceRows, attention, preventive, productionPlan, inventory, purchaseOrders, recentWorkOrders, standardPlans] = await Promise.all([
       resolveCargo(context),
       context.supabase
         .from('planning_maintenance_priority_v1')
@@ -89,7 +89,66 @@ export async function POST(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .order('updated_at', { ascending: false })
         .limit(250),
+      context.supabase
+        .from('maintenance_work_orders')
+        .select('id,work_order_number,title,work_type,status,canonical_asset_id,total_timer_seconds,root_cause,preventive_actions,closed_at,created_at')
+        .eq('organization_id', context.organizationId)
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
+        .from('maintenance_standard_job_plans')
+        .select('id,plan_code,name,work_type,status,canonical_asset_id,asset_type,estimated_duration_hours,reason,evidence_reference,updated_at')
+        .eq('organization_id', context.organizationId)
+        .order('updated_at', { ascending: false })
+        .limit(100),
     ]);
+
+    const workOrderIds = (recentWorkOrders.data || []).map((row: any) => row.id).filter(Boolean);
+    let observedMaterialRows: any[] = [];
+    let observedMaterialError: any = null;
+    let observedProductRows: any[] = [];
+    let observedProductError: any = null;
+
+    if (workOrderIds.length > 0) {
+      const requirementResult = await context.supabase
+        .from('work_order_material_requirements')
+        .select('work_order_id,canonical_product_id,quantity_required,status')
+        .eq('organization_id', context.organizationId)
+        .in('work_order_id', workOrderIds)
+        .limit(1000);
+      observedMaterialRows = requirementResult.data || [];
+      observedMaterialError = requirementResult.error;
+
+      const productIds = [...new Set(observedMaterialRows.map((row: any) => row.canonical_product_id).filter(Boolean))];
+      if (productIds.length > 0) {
+        const productResult = await context.supabase
+          .schema('canonical')
+          .from('products')
+          .select('id,product_code,name,unit')
+          .eq('organization_id', context.organizationId)
+          .in('id', productIds)
+          .limit(1000);
+        observedProductRows = productResult.data || [];
+        observedProductError = productResult.error;
+      }
+    }
+
+    const observedProductMap = new Map(observedProductRows.map((row: any) => [String(row.id), row]));
+    const observedMaterialsByWorkOrder = new Map<string, any[]>();
+    for (const row of observedMaterialRows) {
+      const workOrderId = String((row as any).work_order_id || '');
+      const product = observedProductMap.get(String((row as any).canonical_product_id || ''));
+      if (!workOrderId || !product?.product_code) continue;
+      const list = observedMaterialsByWorkOrder.get(workOrderId) || [];
+      list.push({
+        productCode: product.product_code,
+        productName: product.name || null,
+        unit: product.unit || null,
+        quantityRequired: Number((row as any).quantity_required || 0),
+        sourceStatus: (row as any).status || null,
+      });
+      observedMaterialsByWorkOrder.set(workOrderId, list);
+    }
 
     const sources = [
       ['planning_maintenance_priority_v1', priorities.error],
@@ -99,6 +158,10 @@ export async function POST(request: NextRequest) {
       ['production_monthly_plans', productionPlan.error],
       ['canonical_inventory_current', inventory.error],
       ['canonical_purchase_orders_current', purchaseOrders.error],
+      ['maintenance_work_orders', recentWorkOrders.error],
+      ['maintenance_standard_job_plans', standardPlans.error],
+      ['work_order_material_requirements', observedMaterialError],
+      ['canonical.products', observedProductError],
     ] as const;
     const failed = sources.filter(([, error]) => Boolean(error)).map(([source, error]) => ({ source, error: (error as any)?.message || 'error' }));
 
@@ -111,6 +174,69 @@ export async function POST(request: NextRequest) {
       return Number.isFinite(quantity) && minStock != null && Number.isFinite(minStock) && quantity <= minStock;
     }).slice(0, 80);
     const openPurchaseOrders = (purchaseOrders.data || []).filter((row: any) => !['closed','cerrada','cerrado','completed','completada','completado','cancelled','cancelada','cancelado','received','recibida','recibido'].includes(String(row.status || '').trim().toLowerCase())).slice(0, 80);
+
+
+    const existingPlanKeys = new Set(
+      (standardPlans.data || []).map((row: any) =>
+        [String(row.canonical_asset_id || ''), String(row.work_type || '').toLowerCase()].join('|'),
+      ),
+    );
+    const latestPreventiveByAsset = new Map<string, any>();
+    for (const row of recentWorkOrders.data || []) {
+      const assetId = String((row as any).canonical_asset_id || '');
+      if (!assetId || String((row as any).work_type || '').toLowerCase() !== 'preventive' || !(row as any).closed_at) continue;
+      const title = String((row as any).title || '').toLowerCase();
+      const candidateScore = /mantenci[oó]n|250\s*h|500\s*h|1000\s*h|servicio/.test(title) ? 2 : 1;
+      const current = latestPreventiveByAsset.get(assetId);
+      const currentScore = Number(current?._candidateScore || 0);
+      if (!current || candidateScore > currentScore) {
+        latestPreventiveByAsset.set(assetId, { ...row, _candidateScore: candidateScore });
+      }
+    }
+    const planningRank = new Map([
+      ['P1 - VENCIDO', 1],
+      ['P2 - INMEDIATO', 2],
+      ['P3 - PROGRAMAR', 3],
+      ['P4 - PLANIFICAR', 4],
+    ]);
+    const planCandidates = (priorities.data || [])
+      .filter((row: any) => planningRank.has(String(row.priority || '')))
+      .map((row: any) => {
+        const assetId = String(row.canonical_asset_id || '');
+        const evidenceWo = latestPreventiveByAsset.get(assetId);
+        if (!evidenceWo) return null;
+        const existingKey = [assetId, 'preventive'].join('|');
+        if (existingPlanKeys.has(existingKey)) return null;
+        const observedSeconds = Number(evidenceWo.total_timer_seconds || 0);
+        const observedHours = observedSeconds > 0
+          ? Math.round((observedSeconds / 3600) * 100) / 100
+          : null;
+        const evidenceParts = [
+          evidenceWo.work_order_number ? `OT ${evidenceWo.work_order_number}` : null,
+          observedHours != null ? `${observedHours} h observadas` : null,
+          evidenceWo.closed_at ? `cerrada ${String(evidenceWo.closed_at).slice(0, 10)}` : 'OT aún abierta',
+        ].filter(Boolean);
+        return {
+          canonicalAssetId: assetId,
+          assetCode: row.asset_code || null,
+          assetName: row.asset_name || null,
+          priority: row.priority || null,
+          recommendedAction: row.recommended_action || null,
+          workType: 'preventivo',
+          suggestedName: `Plan · ${evidenceWo.title || 'Mantención preventiva'} · ${row.asset_name || row.asset_code || 'Equipo'}`,
+          estimatedDurationHours: observedHours,
+          reason: `Candidato desde planificación ${row.priority || ''}; existe evidencia de una OT preventiva real para este equipo.`,
+          evidenceReference: evidenceParts.join(' · '),
+          sourceWorkOrderNumber: evidenceWo.work_order_number || null,
+          sourceWorkOrderTitle: evidenceWo.title || null,
+          materials: observedMaterialsByWorkOrder.get(String(evidenceWo.id || '')) || [],
+          materialSemantics: 'Material requerido en la OT fuente; no implica consumo futuro ni stock disponible.',
+          rank: planningRank.get(String(row.priority || '')) || 99,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.rank - b.rank)
+      .slice(0, 3);
 
     const operationalContext = {
       generated_at: new Date().toISOString(),
@@ -132,19 +258,34 @@ export async function POST(request: NextRequest) {
       production_plan: productionPlan.data || null,
       inventory_low_or_min: lowStock,
       purchase_orders_open: openPurchaseOrders,
+      recent_work_orders: (recentWorkOrders.data || []).map((row: any) => ({
+        work_order_number: row.work_order_number,
+        title: row.title,
+        work_type: row.work_type,
+        status: row.status,
+        canonical_asset_id: row.canonical_asset_id,
+        observed_duration_hours: Number(row.total_timer_seconds || 0) > 0
+          ? Math.round((Number(row.total_timer_seconds) / 3600) * 100) / 100
+          : null,
+        root_cause: row.root_cause,
+        preventive_actions: row.preventive_actions,
+        closed_at: row.closed_at,
+      })),
+      standard_job_plans: standardPlans.data || [],
       semantics: {
         workbook: 'El Excel de Ariel es evidencia y lógica de planificación; no reemplaza el maestro canónico de activos.',
         priority: 'P1-P5 es una regla determinística de planificación, no probabilidad de falla ni diagnóstico.',
         meters: 'Lecturas históricas/importadas deben mantener lineage y no desplazan una lectura operacional posterior.',
         authority: 'Ariel valida programación, ventanas, responsables y correcciones de identidad. El asistente no ejecuta cambios.',
         cross_domain: 'Planificación cruza Mantenimiento, Producción, Bodega y Compras sin tomar propiedad de sus maestros canónicos.',
+        standard_plan: 'Un plan estándar es una propuesta reutilizable de pasos, duración, controles y materiales. Nunca debe inferirse como correcto sólo porque una OT histórica existió; Ariel debe revisarlo y aprobarlo antes de aplicación.',
       },
     };
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) return NextResponse.json({ error: 'El servicio de IA no está configurado en este entorno.' }, { status: 503 });
 
-    const instructions = `Eres el Asistente de Planificación de MOTIL. Tu usuario principal es Ariel López, Jefe de Planificación, aunque debes respetar la identidad de la sesión actual. Trabajas como copiloto operacional transversal de Mantenimiento, Producción, Bodega y Compras.\n\nREGLAS:\n1. Usa únicamente el CONTEXTO OPERACIONAL entregado para afirmar estados, cantidades, prioridades, vencimientos, inventario, compras o producción.\n2. Nunca inventes datos faltantes ni conviertas evidencia Excel no reconciliada en verdad canónica.\n3. Distingue DATO CANÓNICO/DERIVADO, INTERPRETACIÓN y PRÓXIMA ACCIÓN.\n4. P1-P5 ordena planificación humana; no es diagnóstico ni probabilidad de falla.\n5. Si hay datos no reconciliados, conflictos de horómetro o una fuente fallida, indícalo antes de recomendar.\n6. Cruza dependencias: mantenimiento próximo + inventario mínimo + compra abierta + ventana de producción cuando la evidencia lo permita. No asumas relaciones que no estén presentes.\n7. Ariel mantiene autoridad final sobre programación. No crees, cierres, autorices ni modifiques OT, compras, inventario o producción.\n8. Responde corto y accionable: primero qué atender, luego por qué, evidencia y siguiente acción.\n9. Para “qué hago hoy/esta semana”, prioriza P1/P2, bloqueos materiales, conflictos de evidencia, preventivos próximos y dependencias con producción.\n10. No expongas JSON ni IDs internos salvo que el usuario los pida.`;
+    const instructions = `Eres el Asistente de Planificación de MOTIL. Tu usuario principal es Ariel López, Jefe de Planificación, aunque debes respetar la identidad de la sesión actual. Trabajas como copiloto operacional transversal de Mantenimiento, Producción, Bodega y Compras.\n\nREGLAS:\n1. Usa únicamente el CONTEXTO OPERACIONAL entregado para afirmar estados, cantidades, prioridades, vencimientos, inventario, compras o producción.\n2. Nunca inventes datos faltantes ni conviertas evidencia Excel no reconciliada en verdad canónica.\n3. Distingue DATO CANÓNICO/DERIVADO, INTERPRETACIÓN y PRÓXIMA ACCIÓN.\n4. P1-P5 ordena planificación humana; no es diagnóstico ni probabilidad de falla.\n5. Si hay datos no reconciliados, conflictos de horómetro o una fuente fallida, indícalo antes de recomendar.\n6. Cruza dependencias: mantenimiento próximo + inventario mínimo + compra abierta + ventana de producción cuando la evidencia lo permita. No asumas relaciones que no estén presentes.\n7. Ariel mantiene autoridad final sobre programación. No crees, cierres, autorices ni modifiques OT, compras, inventario o producción.\n8. Responde corto y accionable: primero qué atender, luego por qué, evidencia y siguiente acción.\n9. Para “qué hago hoy/esta semana”, prioriza P1/P2, bloqueos materiales, conflictos de evidencia, preventivos próximos y dependencias con producción.\n10. Si Ariel pide crear, preparar o proponer planes, entrega máximo 3 PROPUESTAS DE PLAN ESTÁNDAR con: nombre, tipo de trabajo, equipo o alcance, por qué conviene estandarizarlo, duración sugerida sólo si hay evidencia histórica, pasos que puedan inferirse explícitamente de evidencia existente, datos faltantes por validar y referencia de evidencia. Si faltan pasos reales, dilo y no inventes procedimiento.\n11. Prioriza candidatos provenientes de trabajos recurrentes, mantenimiento preventivo/por horas, P1-P4 próximos, o actividades donde una OT histórica ya entregue duración/causa/acción preventiva. Evita convertir correctivos únicos en estándar sin evidencia suficiente.\n12. Antes de sugerir un plan nuevo, revisa los planes estándar existentes para no duplicar.\n13. Ariel mantiene autoridad final: el asistente propone; Ariel crea, corrige, aprueba y programa.\n14. No expongas JSON ni IDs internos salvo que el usuario los pida.`;
 
     const response = await fetch(OPENAI_RESPONSES_URL, {
       method: 'POST',
@@ -170,6 +311,7 @@ export async function POST(request: NextRequest) {
       coverage: operationalContext.data_quality,
       sources: sources.map(([source]) => source),
       policy: 'READ-only planning copilot: evidencia real → interpretación → acción humana.',
+      planCandidates,
     });
   } catch (error) {
     console.error('[planning-assistant] request failed', error);

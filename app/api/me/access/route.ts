@@ -13,6 +13,11 @@ export async function GET(request: NextRequest) {
 
   const admin = isAdminRole(auth.role);
   const organizationId = auth.organizationId || auth.user.organization_id || null;
+  const user = {
+    id: auth.user.id,
+    email: auth.user.email || null,
+    fullName: auth.user.full_name || null,
+  };
 
   if (admin) {
     return NextResponse.json({
@@ -21,6 +26,7 @@ export async function GET(request: NextRequest) {
       role: auth.role || null,
       organizationId,
       source: auth.source,
+      user,
       access: {},
     });
   }
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
     role: auth.role || null,
     organizationId,
     source: auth.source,
+    user,
     access,
   });
 }

@@ -44,10 +44,13 @@ export async function GET(request: NextRequest) {
   from.setHours(0, 0, 0, 0);
   const until = new Date(from);
   until.setDate(until.getDate() + 45);
+  const weekUntil = new Date(from);
+  weekUntil.setDate(weekUntil.getDate() + 6);
   const fromDate = from.toISOString().slice(0, 10);
   const untilDate = until.toISOString().slice(0, 10);
+  const weekUntilDate = weekUntil.toISOString().slice(0, 10);
 
-  const [workOrdersResult, preventiveResult, peopleResult, assetsResult, windowsResult] = await Promise.all([
+  const [workOrdersResult, preventiveResult, peopleResult, assetsResult, windowsResult, priorityResult, standardPlansResult] = await Promise.all([
     context.supabase
       .from('maintenance_work_orders')
       .select('id, work_order_number, title, status, priority, scheduled_date, planned_duration_hours, assigned_person_id, assigned_to_name, canonical_asset_id')
@@ -85,9 +88,22 @@ export async function GET(request: NextRequest) {
       .gte('end_date', fromDate)
       .order('start_date', { ascending: true })
       .limit(1000),
+    context.supabase
+      .from('planning_maintenance_priority_v1')
+      .select('canonical_asset_id,asset_code,asset_name,mine_raw,meter_unit,interval_mp,current_reading_at,current_reading,remaining_meter,criticality_raw,priority,recommended_action,scheduled_date,programming_status_raw,responsible_raw,parts_status_raw,source_file,imported_at')
+      .eq('organization_id', context.organizationId)
+      .in('priority', ['P1 - VENCIDO','P2 - INMEDIATO','P3 - PROGRAMAR','P4 - PLANIFICAR'])
+      .limit(200),
+    context.supabase
+      .from('maintenance_standard_job_plans')
+      .select('id,plan_code,name,status,canonical_asset_id,estimated_duration_hours,proposed_by,updated_at')
+      .eq('organization_id', context.organizationId)
+      .in('status', ['proposed','approved'])
+      .order('updated_at', { ascending: false })
+      .limit(200),
   ]);
 
-  const errors = [workOrdersResult.error, preventiveResult.error, peopleResult.error, assetsResult.error, windowsResult.error].filter(Boolean);
+  const errors = [workOrdersResult.error, preventiveResult.error, peopleResult.error, assetsResult.error, windowsResult.error, priorityResult.error, standardPlansResult.error].filter(Boolean);
   if (errors.length > 0) {
     return NextResponse.json({ error: 'No se pudo cargar la planificación operacional.' }, { status: 500 });
   }
@@ -96,6 +112,21 @@ export async function GET(request: NextRequest) {
     (row) => !CLOSED_STATUSES.has(normalizeStatus(row.status)),
   );
   const windows = (windowsResult.data || []) as WindowRow[];
+  const workOrderIds = workOrders.map((row) => row.id).filter(Boolean);
+  let actualShortageWorkOrderIds = new Set<string>();
+  if (workOrderIds.length > 0) {
+    const { data: requirements, error: requirementsError } = await context.supabase
+      .from('work_order_material_requirements')
+      .select('work_order_id,quantity_shortage,status')
+      .eq('organization_id', context.organizationId)
+      .in('work_order_id', workOrderIds)
+      .gt('quantity_shortage', 0)
+      .limit(1000);
+    if (requirementsError) {
+      return NextResponse.json({ error: 'No se pudo verificar cobertura real de materiales.' }, { status: 500 });
+    }
+    actualShortageWorkOrderIds = new Set((requirements || []).map((row: any) => String(row.work_order_id || '')).filter(Boolean));
+  }
   const conflicts: Array<{ type: string; workOrderId: string; detail: string }> = [];
 
   for (const workOrder of workOrders) {
@@ -151,8 +182,91 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const priorityRank = new Map([
+    ['P1 - VENCIDO', 1],
+    ['P2 - INMEDIATO', 2],
+    ['P3 - PROGRAMAR', 3],
+    ['P4 - PLANIFICAR', 4],
+  ]);
+  const openByAsset = new Map<string, WorkOrderRow[]>();
+  for (const workOrder of workOrders) {
+    if (!workOrder.canonical_asset_id) continue;
+    const rows = openByAsset.get(workOrder.canonical_asset_id) || [];
+    rows.push(workOrder);
+    openByAsset.set(workOrder.canonical_asset_id, rows);
+  }
+  const plansByAsset = new Map<string, any[]>();
+  for (const plan of standardPlansResult.data || []) {
+    if (!plan.canonical_asset_id) continue;
+    const rows = plansByAsset.get(plan.canonical_asset_id) || [];
+    rows.push(plan);
+    plansByAsset.set(plan.canonical_asset_id, rows);
+  }
+  const weeklyDecisions = (priorityResult.data || [])
+    .map((row: any) => {
+      const assetId = String(row.canonical_asset_id || '');
+      const assetOrders = openByAsset.get(assetId) || [];
+      const scheduledOrder = assetOrders.find((item) => item.scheduled_date && item.scheduled_date >= fromDate && item.scheduled_date <= weekUntilDate);
+      const standardPlan = (plansByAsset.get(assetId) || [])[0] || null;
+      const partsStatus = String(row.parts_status_raw || '').trim();
+      const actualMaterialShortage = assetOrders.some((item) => actualShortageWorkOrderIds.has(item.id));
+      const readingAt = row.current_reading_at ? new Date(row.current_reading_at) : null;
+      const readingAgeDays = readingAt && Number.isFinite(readingAt.getTime())
+        ? Math.max(0, Math.floor((from.getTime() - readingAt.getTime()) / 86400000))
+        : null;
+      const evidenceFreshness = readingAgeDays == null ? 'unknown' : readingAgeDays <= 30 ? 'current' : 'stale';
+      return {
+        canonicalAssetId: assetId || null,
+        assetCode: row.asset_code || null,
+        assetName: row.asset_name || row.asset_code || null,
+        site: row.mine_raw || null,
+        priority: row.priority || null,
+        recommendedAction: row.recommended_action || null,
+        criticality: row.criticality_raw || null,
+        meterUnit: row.meter_unit || null,
+        interval: row.interval_mp == null ? null : Number(row.interval_mp),
+        currentReading: row.current_reading == null ? null : Number(row.current_reading),
+        currentReadingAt: row.current_reading_at || null,
+        remainingMeter: row.remaining_meter == null ? null : Number(row.remaining_meter),
+        sourcePartsStatus: partsStatus || null,
+        actualMaterialShortage,
+        evidenceFreshness,
+        readingAgeDays,
+        sourceFile: row.source_file || null,
+        sourceImportedAt: row.imported_at || null,
+        scheduledWorkOrder: scheduledOrder || null,
+        openWorkOrderCount: assetOrders.length,
+        standardPlan: standardPlan ? {
+          id: standardPlan.id,
+          planCode: standardPlan.plan_code,
+          name: standardPlan.name,
+          status: standardPlan.status,
+          estimatedDurationHours: standardPlan.estimated_duration_hours == null ? null : Number(standardPlan.estimated_duration_hours),
+          proposalSource: standardPlan.proposed_by ? 'human' : 'motil',
+        } : null,
+        state: scheduledOrder ? 'scheduled' : actualMaterialShortage ? 'blocked_materials' : evidenceFreshness === 'stale' ? 'stale_evidence' : standardPlan?.status === 'approved' ? 'ready' : 'review',
+      };
+    })
+    .sort((a: any, b: any) =>
+      (a.evidenceFreshness === 'stale' ? 1 : 0) - (b.evidenceFreshness === 'stale' ? 1 : 0) ||
+      (priorityRank.get(a.priority) || 99) - (priorityRank.get(b.priority) || 99) ||
+      Number(a.remainingMeter || 0) - Number(b.remainingMeter || 0)
+    )
+    .slice(0, 12);
+
+  const weeklySummary = {
+    total: weeklyDecisions.length,
+    critical: weeklyDecisions.filter((row: any) => row.evidenceFreshness !== 'stale' && (row.priority === 'P1 - VENCIDO' || row.priority === 'P2 - INMEDIATO')).length,
+    scheduled: weeklyDecisions.filter((row: any) => row.state === 'scheduled').length,
+    blockedMaterials: weeklyDecisions.filter((row: any) => row.state === 'blocked_materials').length,
+    ready: weeklyDecisions.filter((row: any) => row.state === 'ready').length,
+    review: weeklyDecisions.filter((row: any) => row.state === 'review').length,
+    staleEvidence: weeklyDecisions.filter((row: any) => row.state === 'stale_evidence').length,
+  };
+
   return NextResponse.json({
     period: { from: fromDate, until: untilDate },
+    weekPeriod: { from: fromDate, until: weekUntilDate },
     workOrders,
     preventive: preventiveResult.data || [],
     people: peopleResult.data || [],
@@ -160,6 +274,8 @@ export async function GET(request: NextRequest) {
     windows,
     conflicts,
     capacity: Array.from(plannedHoursByPerson.entries()).map(([personId, plannedHours]) => ({ personId, plannedHours })),
+    weeklyDecisions,
+    weeklySummary,
     source: 'canonical',
   });
 }

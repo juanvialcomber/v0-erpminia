@@ -132,3 +132,73 @@ Estos umbrales habilitan escala inicial, no E4.
 - No se interpreta `fromStep/toStep` sin evidencia documental adicional; códigos desconocidos permanecen sin clasificar.
 - No hay persistencia en esta fase; la fuente se consulta como preview y no modifica Laudus ni MOTIL.
 - Valor: aumenta precisión y auditabilidad del control previo al pago sin depender de inferencia cuando Laudus ya conoce la relación documental.
+
+
+## 2026-10-25 — Cockpit interno de valor generado
+
+- Alcance: visible sólo para `admin/superadmin`; no se incorpora al cockpit operativo de Daniel ni a usuarios de Finanzas.
+- Objetivo: permitir a N3uralia medir valor acumulado de MOTIL para pricing, renovación y expansión sin contaminar la UX del cliente.
+- Verde permitido únicamente para:
+  - valor económico E3 observado;
+  - reducción observada de tiempo cuando el gate tenga ≥3 baselines manuales y ≥20 decisiones asistidas cronometradas;
+  - capacidad administrativa recuperada calculada sólo sobre casos efectivamente revisados y con el mismo gate.
+- Contexto neutral:
+  - monto bajo control financiero = suma de obligaciones con decisión humana registrada.
+  - Este monto nunca se presenta como ahorro, costo evitado ni ROI.
+- Estado inicial verificado en Supabase: 0 decisiones financieras cronometradas y 0 muestras de baseline manual al momento de instrumentar esta capa.
+- Siguiente evidencia necesaria: uso real. El sistema está preparado para que los indicadores cambien automáticamente cuando existan decisiones y baselines suficientes.
+
+
+## 2026-10-25 — Mantención: trazabilidad operacional medida
+
+- Estado productivo observado al instrumentar: 11 OT; 10 con cronómetro a nivel de segundo; 74.560 segundos de ejecución acumulada (20,7 h); 220 eventos de OT; 9 OT cerradas.
+- Cobertura de cronómetro: 90,9% del universo de OT observado.
+- Clasificación interna: L4 / E2 para el flujo de OT instrumentado.
+- Valor ya demostrado: control y trazabilidad de ejecución, actor, tiempo y cierre.
+- No demostrado todavía: horas ahorradas, downtime evitado, ahorro CLP, mejora MTTR atribuible o costo evitado.
+- Gate E3: comparar outcomes reales entre cohortes/períodos con evidencia suficiente (MTTR, reincidencia, downtime, costo posterior o tiempo administrativo) y registrar la intervención MOTIL que precedió al cambio.
+- Siguiente medición: capturar baseline de gestión manual/administrativa y outcome post-cierre por activo/OT; priorizar reincidencia y tiempo desde creación → inicio → cierre por ser variables ya trazables.
+
+
+## 2026-10-25 — Mantención: cobertura inter-área
+
+- Flujo observado: 11 OT presentes en `work_order_supply_chain_v1`.
+- Evidencia Bodega: 1 OT con requerimiento de material; 1 con shortage.
+- Evidencia Compras: 0 solicitudes de compra y 0 OC originadas desde el flujo observado.
+- Evidencia Finanzas: 0 compromiso de compra trazado desde OT en esta muestra.
+- Lectura C interna: Mantención y Bodega ya comparten evidencia real; Compras y Finanzas aún no forman una cadena operativa cerrada.
+- Regla: un dominio sólo cuenta como conectado cuando existe evidencia transaccional real. Tener el módulo o la integración disponible no eleva C.
+- Siguiente salto de valor: material shortage de OT -> solicitud de compra -> OC -> recepción/instalación -> costo final de OT -> validación financiera.
+
+
+## 2026-10-25 — Mantención: baseline de ciclo ejecutado
+
+- 10 OT tienen evidencia suficiente para medir primer `timer_play` → `work_order_closed`.
+- Mediana observada actual: 10.259,6 segundos ≈ 2,85 h.
+- Uso: baseline E2 para comparar cohortes/períodos futuros.
+- No usar como ahorro ni mejora atribuible hasta contar con comparación temporal y outcome.
+- Creación → primer inicio no se usa todavía como tiempo de respuesta: la muestra mezcla planificación con fecha de creación y requiere semántica adicional antes de promoverla como KPI.
+
+
+## 2026-10-25 — Mantención: baseline de reincidencia y handoff a Compras
+
+- Reincidencia 7d observada: 4 OT cerradas ya tienen ventana madura de 7 días; 1 tuvo una nueva OT sobre el mismo activo dentro de esa ventana.
+- Baseline inicial: 25% sobre muestra n=4. Clasificación E2; muestra insuficiente para atribución causal o conclusión de calidad de reparación.
+- Handoff supply: el sistema ya crea/actualiza necesidad de abastecimiento al registrar requerimientos y detectar shortage.
+- Autoridad humana preservada: convertir la necesidad a solicitud operativa de Compras requiere una acción explícita; MOTIL no compra automáticamente.
+- Métrica C/E siguiente: tiempo desde primer evento `supply_need_refreshed` hasta `procurement_intake_created`, sólo cuando exista un handoff real.
+- Gate E3 de Mantención: comparar reincidencia, ciclo de ejecución o downtime en cohortes/períodos con evidencia suficiente y una intervención MOTIL identificable.
+
+
+## 2026-10-25 — Mantención: planificación semanal asistida de Ariel
+
+- Problema previo: la planificación preventiva mezclaba horizonte largo, horómetros, señales históricas, materiales y generación de OT en una misma superficie; Ariel debía reconstruir manualmente qué requería decisión esta semana.
+- Capacidad: MOTIL prepara una cola semanal de hasta 12 decisiones P1–P4 usando prioridad operacional, OT abiertas/programadas, planes estándar, evidencia de lectura y faltantes reales de materiales.
+- Ventana operacional: próximos 7 días. El horizonte de recursos de 45 días se conserva sólo como contexto de planificación y no convierte trabajo futuro en programado esta semana.
+- Frescura: una señal por horómetro con más de 30 días desde la lectura queda marcada `Actualizar evidencia` y no compite como decisión semanal vigente.
+- Materiales: `parts_status_raw` del maestro histórico se conserva sólo como evidencia de fuente. Un bloqueo por materiales exige `quantity_shortage > 0` en requerimientos actuales de una OT real.
+- Decisión humana: MOTIL propone `Abrir OT`, `Revisar plan` o `Programar`; Ariel mantiene autoridad para programar, corregir, aprobar y priorizar.
+- Nivel actual: V3/L4 + E2. Ya existe priorización explicable y preparación de decisión, pero todavía no existe baseline manual suficiente para declarar horas ahorradas.
+- Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
+- Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
+- Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
