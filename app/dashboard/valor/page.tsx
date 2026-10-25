@@ -81,6 +81,9 @@ type ApiResponse = {
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
     eventCount?: number;
+    measurableExecutionCycles?: number;
+    medianExecutionCycleSeconds?: number | null;
+    medianExecutionCycleHours?: number | null;
     evidenceLevel?: string;
     workflowLevel?: number;
     semantics?: string;
@@ -263,7 +266,7 @@ export default function ValueScorecardPage() {
             Mide ejecución y trazabilidad observadas. Todavía no convierte horas registradas en ahorro económico.
           </p>
         </div>
-        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
           <div className="bg-card px-5 py-5">
             <p className="text-xs text-muted-foreground">Nivel actual</p>
             <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
@@ -293,6 +296,15 @@ export default function ValueScorecardPage() {
               {number(maintenanceValue.eventCount || 0)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Inicio, pausa, reanudación, cierre y demás evidencia operacional.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Ciclo ejecución → cierre</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {maintenanceValue.medianExecutionCycleHours == null ? '—' : `${number(maintenanceValue.medianExecutionCycleHours)} h`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mediana de {number(maintenanceValue.measurableExecutionCycles || 0)} OT medibles.
+            </p>
           </div>
           <div className="bg-card px-5 py-5">
             <p className="text-xs text-muted-foreground">OT cerradas trazables</p>
