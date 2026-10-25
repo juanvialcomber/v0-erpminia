@@ -26,3 +26,18 @@ test('value scorecard stays internal and invisible to finance users', () => {
   assert.match(route, /const managementRoles = new Set\(\['superadmin', 'admin'\]\)/);
   assert.match(route, /return NextResponse\.json\(\{ error: 'No autorizado' \}, \{ status: 403 \}\)/);
 });
+
+
+test('internal value cockpit turns green only for demonstrated or sufficiently gated operational value', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(page, /Valor económico demostrado/);
+  assert.match(page, /Reducción observada de tiempo/);
+  assert.match(page, /Capacidad recuperada observada/);
+  assert.match(page, /Monto bajo control financiero/);
+  assert.match(page, /text-emerald-600/);
+  assert.match(page, /Contexto, no ahorro/);
+  assert.match(api, /reviewedAmountClp/);
+  assert.match(api, /amount reviewed is value under human control, not savings or avoided cost/);
+});
