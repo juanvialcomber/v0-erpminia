@@ -98,6 +98,12 @@ type ApiResponse = {
       evidenceLevel?: string;
       semantics?: string;
     };
+    crossDomainCycle?: {
+      intakeToOrder?: { samples?: number; medianSeconds?: number | null };
+      orderToReceipt?: { samples?: number; medianSeconds?: number | null };
+      receiptToInstall?: { samples?: number; medianSeconds?: number | null };
+      semantics?: string;
+    };
     standardPlanLearning?: {
       motilDecisions?: number;
       approved?: number;
@@ -212,6 +218,7 @@ export default function ValueScorecardPage() {
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
   const weeklyPlanning = maintenanceValue.weeklyPlanning || {};
   const standardPlanLearning = maintenanceValue.standardPlanLearning || {};
+  const crossDomainCycle = maintenanceValue.crossDomainCycle || {};
   const supplyFunnel = maintenanceValue.supplyChain?.funnel || {};
 
   const saveBaseline = async () => {
@@ -422,6 +429,23 @@ export default function ValueScorecardPage() {
               <p className="mt-1 text-xl font-semibold">{number(value)}</p>
             </div>
           ))}
+        </div>
+        <div className="grid gap-px border-t bg-border md:grid-cols-3">
+          {[
+            ['Solicitud → OC', crossDomainCycle.intakeToOrder],
+            ['OC → recepción', crossDomainCycle.orderToReceipt],
+            ['Recepción → instalación', crossDomainCycle.receiptToInstall],
+          ].map(([label, metric]) => {
+            const item = metric as { samples?: number; medianSeconds?: number | null } | undefined;
+            const hours = item?.medianSeconds == null ? null : Number(item.medianSeconds) / 3600;
+            return (
+              <div key={String(label)} className="bg-card px-5 py-4">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-xl font-semibold">{hours == null ? 'Sin muestra' : `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(hours)} h`}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{number(item?.samples || 0)} ciclo(s) observados.</p>
+              </div>
+            );
+          })}
         </div>
         <div className="border-t px-5 py-4 text-xs text-muted-foreground">
           Deuda histórica detectada: {number(supplyFunnel.closedWithOpenShortage || 0)} OT cerrada(s) conservan shortages abiertos. Se muestran como deuda de calidad de datos, no como cumplimiento actual.
