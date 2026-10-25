@@ -3,10 +3,10 @@ import { getLaudusReadOnly, LaudusApiError } from './client';
 
 const MAX_NATIVE_INVOICES = 5;
 const MAX_NATIVE_CALLS = 10;
-const QUERY_CHUNK = 50;
 
 type OpenInvoice = {
   purchase_invoice_external_id: string;
+  laudus_purchase_invoice_id: number | string | null;
   doc_number: string | null;
   supplier_name: string | null;
   outstanding_amount: number | string | null;
@@ -17,28 +17,19 @@ type TraceDto = {
   traceId?: number | null;
   fromStep?: string | null;
   fromId?: number | string | null;
+  fromDocNumber?: number | string | null;
 };
 
 type TraceToDto = {
   toStep?: string | null;
   toId?: string | null;
-  toDocNumber?: number | null;
+  toDocNumber?: number | string | null;
 };
 
 type PurchaseInvoiceItemDto = {
   itemId?: number | null;
-  product?: {
-    productId?: number | null;
-    sku?: string | null;
-    description?: string | null;
-    unitOfMeasure?: string | null;
-  } | null;
-  itemDescription?: string | null;
   quantity?: number | null;
   unitCost?: number | null;
-  originalUnitCost?: number | null;
-  currencyCode?: string | null;
-  costCenter?: unknown;
   traceFrom?: TraceDto[] | null;
 };
 
@@ -46,16 +37,7 @@ type PurchaseInvoiceDto = {
   purchaseInvoiceId?: number | null;
   docNumber?: number | null;
   issuedDate?: string | null;
-  supplier?: unknown;
   items?: PurchaseInvoiceItemDto[] | null;
-};
-
-type PurchaseOrderRow = {
-  external_id: string;
-  order_number: string | null;
-  issued_date: string | null;
-  total_amount: number | string | null;
-  currency: string | null;
 };
 
 function num(value: unknown) {
@@ -65,13 +47,7 @@ function num(value: unknown) {
 
 function safeIntegerId(value: unknown) {
   const text = String(value ?? '').trim();
-  return /^\d{1,9}$/.test(text) ? text : null;
-}
-
-function chunk<T>(rows: T[], size = QUERY_CHUNK) {
-  const result: T[][] = [];
-  for (let i = 0; i < rows.length; i += size) result.push(rows.slice(i, i + size));
-  return result;
+  return /^\d{1,12}$/.test(text) ? text : null;
 }
 
 function parseInvoice(payload: unknown): PurchaseInvoiceDto | null {
@@ -90,59 +66,61 @@ export async function loadLaudusNativeInvoiceTrace(
   organizationId: string,
 ) {
   const openResult = await db
-    .schema('integration')
-    .from('laudus_purchase_invoice_payment_status_v1')
-    .select('purchase_invoice_external_id,doc_number,supplier_name,outstanding_amount,currency')
+    .from('laudus_purchase_invoice_payment_status_service_v1')
+    .select(
+      'purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_name,outstanding_amount,currency',
+    )
     .eq('organization_id', organizationId)
     .in('payment_status', ['unpaid', 'partially_paid'])
     .order('outstanding_amount', { ascending: false })
-    .limit(25);
+    .limit(MAX_NATIVE_INVOICES);
 
   if (openResult.error) throw new Error(openResult.error.message);
   const openRows = (openResult.data || []) as OpenInvoice[];
-  if (!openRows.length) {
-    return {
-      summary: { examined: 0, nativeLookups: 0, detailRecovered: 0, withNativeTrace: 0, withConfirmedPo: 0, apiCalls: 0 },
-      invoices: [],
-      readOnly: true,
-    };
-  }
 
-  const invoiceIds = openRows.map((row) => row.purchase_invoice_external_id);
-  const stagedLineInvoices = new Set<string>();
-  for (const ids of chunk(invoiceIds)) {
-    const result = await db
-      .schema('integration')
-      .from('laudus_purchase_invoice_lines')
-      .select('invoice_external_id')
-      .eq('organization_id', organizationId)
-      .in('invoice_external_id', ids);
-    if (result.error) throw new Error(result.error.message);
-    for (const row of result.data || []) stagedLineInvoices.add(String(row.invoice_external_id || ''));
-  }
-
-  const missing = openRows
-    .filter((row) => !stagedLineInvoices.has(row.purchase_invoice_external_id))
-    .slice(0, MAX_NATIVE_INVOICES);
-
-  const sourceRows: Array<{
-    invoice: OpenInvoice;
-    detail: PurchaseInvoiceDto | null;
-    traceTo: TraceToDto[];
+  const invoices: Array<{
+    invoiceExternalId: string;
+    docNumber: string | null;
+    supplierName: string | null;
+    outstandingAmount: number;
+    currency: string | null;
+    sourceDetailAvailable: boolean;
+    itemCount: number;
+    nativeTraceCount: number;
+    traceAtItemLevel: boolean;
+    traceAtDocumentLevel: boolean;
     sourceError: string | null;
   }> = [];
 
   let apiCalls = 0;
-  for (const invoice of missing) {
-    const id = safeIntegerId(invoice.purchase_invoice_external_id);
-    if (!id || apiCalls >= MAX_NATIVE_CALLS) continue;
+
+  for (const invoice of openRows) {
+    if (apiCalls >= MAX_NATIVE_CALLS) break;
+    const sourceId = safeIntegerId(invoice.laudus_purchase_invoice_id);
+
+    if (!sourceId) {
+      invoices.push({
+        invoiceExternalId: invoice.purchase_invoice_external_id,
+        docNumber: invoice.doc_number,
+        supplierName: invoice.supplier_name,
+        outstandingAmount: num(invoice.outstanding_amount),
+        currency: invoice.currency,
+        sourceDetailAvailable: false,
+        itemCount: 0,
+        nativeTraceCount: 0,
+        traceAtItemLevel: false,
+        traceAtDocumentLevel: false,
+        sourceError: 'Sin identificador fuente',
+      });
+      continue;
+    }
 
     let detail: PurchaseInvoiceDto | null = null;
     let traceTo: TraceToDto[] = [];
     let sourceError: string | null = null;
 
     try {
-      detail = parseInvoice(await getLaudusReadOnly(`/purchases/invoices/${id}`));
+      detail = parseInvoice(await getLaudusReadOnly(`/purchases/invoices/${sourceId}`));
       apiCalls += 1;
 
       const hasItemTrace = (detail?.items || []).some(
@@ -151,7 +129,7 @@ export async function loadLaudusNativeInvoiceTrace(
 
       if (!hasItemTrace && apiCalls < MAX_NATIVE_CALLS) {
         traceTo = parseTraceTo(
-          await getLaudusReadOnly(`/purchases/invoices/${id}/traceTo`),
+          await getLaudusReadOnly(`/purchases/invoices/${sourceId}/traceTo`),
         );
         apiCalls += 1;
       }
@@ -164,97 +142,37 @@ export async function loadLaudusNativeInvoiceTrace(
             : 'Laudus no respondió';
     }
 
-    sourceRows.push({ invoice, detail, traceTo, sourceError });
+    const itemTraces = (detail?.items || []).flatMap((item) => item.traceFrom || []);
+    const itemTraceIds = new Set(
+      itemTraces.map((trace) => safeIntegerId(trace.fromId)).filter(Boolean),
+    );
+    const documentTraceIds = new Set(
+      traceTo.map((trace) => safeIntegerId(trace.toId)).filter(Boolean),
+    );
+
+    invoices.push({
+      invoiceExternalId: invoice.purchase_invoice_external_id,
+      docNumber: invoice.doc_number,
+      supplierName: invoice.supplier_name,
+      outstandingAmount: num(invoice.outstanding_amount),
+      currency: invoice.currency,
+      sourceDetailAvailable: Boolean(detail),
+      itemCount: Array.isArray(detail?.items) ? detail!.items!.length : 0,
+      nativeTraceCount: itemTraceIds.size + documentTraceIds.size,
+      traceAtItemLevel: itemTraceIds.size > 0,
+      traceAtDocumentLevel: documentTraceIds.size > 0,
+      sourceError,
+    });
   }
-
-  const traceIds = new Set<string>();
-  for (const row of sourceRows) {
-    for (const item of row.detail?.items || []) {
-      for (const trace of item.traceFrom || []) {
-        const id = safeIntegerId(trace.fromId);
-        if (id) traceIds.add(id);
-      }
-    }
-    for (const trace of row.traceTo) {
-      const id = safeIntegerId(trace.toId);
-      if (id) traceIds.add(id);
-    }
-  }
-
-  const ordersById = new Map<string, PurchaseOrderRow>();
-  for (const ids of chunk([...traceIds])) {
-    if (!ids.length) continue;
-    const result = await db
-      .schema('integration')
-      .from('laudus_purchase_orders')
-      .select('external_id,order_number,issued_date,total_amount,currency')
-      .eq('organization_id', organizationId)
-      .in('external_id', ids);
-    if (result.error) throw new Error(result.error.message);
-    for (const row of result.data || []) {
-      ordersById.set(String(row.external_id), row as PurchaseOrderRow);
-    }
-  }
-
-  const invoices = sourceRows.map((row) => {
-    const itemTraceIds = new Set<string>();
-    for (const item of row.detail?.items || []) {
-      for (const trace of item.traceFrom || []) {
-        const id = safeIntegerId(trace.fromId);
-        if (id) itemTraceIds.add(id);
-      }
-    }
-    const documentTraceIds = new Set<string>();
-    for (const trace of row.traceTo) {
-      const id = safeIntegerId(trace.toId);
-      if (id) documentTraceIds.add(id);
-    }
-
-    const confirmed = [...new Set([...itemTraceIds, ...documentTraceIds])]
-      .map((id) => {
-        const order = ordersById.get(id);
-        if (!order) return null;
-        return {
-          purchaseOrderExternalId: order.external_id,
-          orderNumber: order.order_number,
-          issuedDate: order.issued_date,
-          totalAmount: num(order.total_amount),
-          currency: order.currency,
-          evidence:
-            itemTraceIds.has(id) && documentTraceIds.has(id)
-              ? 'item_and_document_trace'
-              : itemTraceIds.has(id)
-                ? 'item_trace'
-                : 'document_trace',
-        };
-      })
-      .filter((value): value is NonNullable<typeof value> => Boolean(value));
-
-    const nativeTraceCount = itemTraceIds.size + documentTraceIds.size;
-    const itemCount = Array.isArray(row.detail?.items) ? row.detail!.items!.length : 0;
-
-    return {
-      invoiceExternalId: row.invoice.purchase_invoice_external_id,
-      docNumber: row.invoice.doc_number,
-      supplierName: row.invoice.supplier_name,
-      outstandingAmount: num(row.invoice.outstanding_amount),
-      currency: row.invoice.currency,
-      sourceDetailAvailable: Boolean(row.detail),
-      itemCount,
-      nativeTraceCount,
-      confirmedPurchaseOrders: confirmed,
-      unclassifiedTraceCount: Math.max(0, nativeTraceCount - confirmed.length),
-      sourceError: row.sourceError,
-    };
-  });
 
   return {
     summary: {
       examined: openRows.length,
-      nativeLookups: missing.length,
       detailRecovered: invoices.filter((row) => row.sourceDetailAvailable).length,
       withNativeTrace: invoices.filter((row) => row.nativeTraceCount > 0).length,
-      withConfirmedPo: invoices.filter((row) => row.confirmedPurchaseOrders.length > 0).length,
+      missingEvidence: invoices.filter(
+        (row) => !row.sourceDetailAvailable || row.nativeTraceCount === 0,
+      ).length,
       apiCalls,
     },
     invoices,
@@ -262,11 +180,11 @@ export async function loadLaudusNativeInvoiceTrace(
     evidenceOrder: [
       'laudus_item_trace',
       'laudus_document_trace',
-      'deterministic_candidate',
       'insufficient_evidence',
     ],
     semantics: {
-      nativeTraceOverridesHeuristic: true,
+      sourceTraceTypeUnclassified: true,
+      sourceTraceIsNotPurchaseOrderConfirmation: true,
       sourceTraceIsNotPaymentApproval: true,
       persisted: false,
       canonicalMutationExecuted: false,
