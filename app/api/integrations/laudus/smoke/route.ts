@@ -8,10 +8,10 @@ import {
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
 
-export async function POST(request: NextRequest) {
+async function runSmoke(request: NextRequest, requireAdmin: boolean) {
   const access = await resolveDataHealthAccess(request);
   if (!access.ok) return access.response;
-  if (!access.admin) {
+  if (requireAdmin && !access.admin) {
     return NextResponse.json(
       { error: 'La prueba Laudus requiere permisos de administración.' },
       { status: 403 },
@@ -60,6 +60,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  return runSmoke(request, true);
+}
 
-// Temporary authenticated smoke alias. Remove after production validation.
-export const GET = POST;
+// Temporary production-only authenticated alias for one-shot smoke validation.
+// Remove immediately after the production check.
+export async function GET(request: NextRequest) {
+  if (process.env.VERCEL_ENV !== 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  return runSmoke(request, false);
+}
