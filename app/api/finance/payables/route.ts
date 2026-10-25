@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
+const isUatFixture = (value: unknown) => /^UAT-/i.test(String(value ?? '').trim());
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
   if (!access.authorized) return access.response;
@@ -18,7 +20,23 @@ export async function GET(request: NextRequest) {
     console.error('[finance/payables]', payablesError || paymentsError);
     return NextResponse.json({ payables: [], payments: [], canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
   }
-  return NextResponse.json({ payables: payables || [], payments: payments || [], canEdit: access.canWrite });
+  // Keep QA fixtures in the source tables for audit, but out of the operator's live finance queue.
+  const allPayables = payables || [];
+  const uatPayableIds = new Set<string>(
+    allPayables
+      .filter((row) => isUatFixture(row.invoice_number))
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0),
+  );
+  const operationalPayables = allPayables.filter((row) => !isUatFixture(row.invoice_number));
+  const operationalPayments = (payments || []).filter(
+    (row) => !isUatFixture(row.payment_reference) && !uatPayableIds.has(row.payable_id),
+  );
+  return NextResponse.json({
+    payables: operationalPayables,
+    payments: operationalPayments,
+    canEdit: access.canWrite,
+  });
 }
 
 export async function POST(request: NextRequest) {
