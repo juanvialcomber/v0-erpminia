@@ -30,3 +30,22 @@ test('weekly planning scorecard measures engagement without claiming ROI', () =>
   assert.match(scorecard, /medianDecisionLatencySeconds/);
   assert.match(scorecard, /human engagement with weekly decisions prepared by MOTIL; not acceptance, saved time, or economic impact/);
 });
+
+
+test('standard plan outcomes become calibration evidence without becoming ROI', () => {
+  assert.match(scorecard, /standardPlanLearning:/);
+  assert.match(scorecard, /motilDecisions/);
+  assert.match(scorecard, /acceptanceRatePct/);
+  assert.match(scorecard, /medianDecisionCycleSeconds/);
+  assert.match(scorecard, /acceptance is calibration evidence, not economic impact/);
+});
+
+test('standard plan API validates steps before inserting the plan and audits human outcome', () => {
+  const route = fs.readFileSync('app/api/maintenance/standard-job-plans/route.ts','utf8');
+  const page = fs.readFileSync('app/dashboard/mantenimiento/planes-estandar/page.tsx','utf8');
+  assert.ok(route.indexOf("Cada paso requiere un título.") < route.indexOf(".from('maintenance_standard_job_plans').insert"));
+  assert.match(route, /maintenance_standard_plan_decision/);
+  assert.match(route, /proposal_source/);
+  assert.match(page, /Descartar/);
+  assert.doesNotMatch(page, /quantityRequired:Number\(row\.quantityRequired\|\|1\)/);
+});
