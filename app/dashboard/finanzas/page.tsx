@@ -131,6 +131,11 @@ type Response = {
     estimatedRetirementDate?: string | null;
     depreciationType?: string | null;
     acquisitionCost?: number | null;
+    realizableValue?: number | null;
+    depreciationStatus?: string | null;
+    annualDepreciation?: number | null;
+    accumulatedDepreciation?: number | null;
+    estimatedBookValue?: number | null;
     maintenanceCost?: number | null;
     maintenanceMovements?: number | null;
     lastMaintenanceCostDate?: string | null;
@@ -140,6 +145,8 @@ type Response = {
     candidateRows?: number;
     strongCandidates?: number;
     withAcquisitionCost?: number;
+    depreciationReady?: number;
+    depreciationBlocked?: number;
     withMaintenanceHistory?: number;
     fullyConsumedByCalendar?: number;
   };
@@ -670,6 +677,7 @@ export default function FinanzasPage() {
                 ['Qué revisar', 'Analiza exclusivamente Finanzas y dime qué 3 asuntos debería revisar primero el gerente de finanzas. Usa sólo evidencia MOTIL/Laudus autorizada. Para cada asunto: monto o hecho, por qué importa, evidencia/fuente y siguiente validación humana.'],
                 ['Qué viene', 'Analiza exclusivamente Finanzas y dime qué viene en los próximos 7, 30, 60 y 90 días usando forecast contractual y aging. No inventes predicción estadística ni confianza. Señala brechas de fechas o evidencia.'],
                 ['Fuera de patrón', 'Analiza exclusivamente Finanzas y señala concentraciones, excepciones o faltantes de evidencia que merezcan atención. No llames anomalía estadística a algo que no tenga modelo validado. Prioriza máximo 3.'],
+                ['Qué activo revisar', 'Analiza exclusivamente la economía de activos disponible en Finanzas. Prioriza máximo 3 activos candidatos usando vida útil consumida, costo histórico de mantenimiento y nivel de evidencia de identidad. No calcules valor libro, depreciación CLP ni ahorro de reposición si falta costo de adquisición verificado.'],
               ].map(([label, prompt]) => (
                 <button
                   key={label}
@@ -820,12 +828,13 @@ export default function FinanzasPage() {
           </span>
         </div>
 
-        <div className="grid gap-px border-b bg-border sm:grid-cols-4">
+        <div className="grid gap-px border-b bg-border sm:grid-cols-5">
           {[
             ['Vida útil agotada', number(retiredByCalendar), 'según calendario Laudus'],
             ['Retiro ≤ 12 meses', number(retirementHorizon(12)), 'candidatos fuertes'],
             ['Retiro ≤ 24 meses', number(retirementHorizon(24)), 'candidatos fuertes'],
             ['Costo base disponible', number(assetEconomicsSummary.withAcquisitionCost || 0), 'requerido para depreciación CLP'],
+            ['Depreciación preparada', number(assetEconomicsSummary.depreciationReady || 0), 'cálculo sólo con costo verificable'],
           ].map(([label, value, detail]) => (
             <div key={label} className="bg-card px-4 py-3">
               <p className="text-xs text-muted-foreground">{label}</p>
