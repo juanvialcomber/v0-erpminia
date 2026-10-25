@@ -12,6 +12,12 @@ type OpenApiDocument = { paths?: Record<string, OpenApiPath> };
 
 const WRITE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
+function isMutatingMethod(path: string, method: string) {
+  if (!WRITE_METHODS.has(method)) return false;
+  if (method === 'post' && /\/list\/?$/i.test(path)) return false;
+  return true;
+}
+
 function classify(path: string, tags: string[]): LaudusCapability['domain'] {
   const haystack = (path + ' ' + tags.join(' ')).toLowerCase();
   if (/product|supplier|customer|cost.?center|warehouse/.test(haystack)) return 'master_data';
@@ -44,7 +50,7 @@ export function discoverLaudusCapabilities(document: OpenApiDocument): LaudusCap
       methods,
       tags,
       domain: classify(path, tags),
-      writeCapable: methods.some((method) => WRITE_METHODS.has(method)),
+      writeCapable: methods.some((method) => isMutatingMethod(path, method)),
     });
   }
 
