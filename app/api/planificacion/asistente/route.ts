@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   if (message.length > MAX_MESSAGE_CHARS) return NextResponse.json({ error: 'La consulta es demasiado extensa.' }, { status: 400 });
 
   try {
-    const [cargo, priorities, sourceRows, attention, preventive, productionPlan, inventory, purchaseOrders] = await Promise.all([
+    const [cargo, priorities, sourceRows, attention, preventive, productionPlan, inventory, purchaseOrders, recentWorkOrders, standardPlans] = await Promise.all([
       resolveCargo(context),
       context.supabase
         .from('planning_maintenance_priority_v1')
@@ -89,6 +89,18 @@ export async function POST(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .order('updated_at', { ascending: false })
         .limit(250),
+      context.supabase
+        .from('maintenance_work_orders')
+        .select('id,work_order_number,title,work_type,status,canonical_asset_id,total_timer_seconds,root_cause,preventive_actions,closed_at,created_at')
+        .eq('organization_id', context.organizationId)
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
+        .from('maintenance_standard_job_plans')
+        .select('id,plan_code,name,work_type,status,canonical_asset_id,asset_type,estimated_duration_hours,reason,evidence_reference,updated_at')
+        .eq('organization_id', context.organizationId)
+        .order('updated_at', { ascending: false })
+        .limit(100),
     ]);
 
     const sources = [
@@ -99,6 +111,8 @@ export async function POST(request: NextRequest) {
       ['production_monthly_plans', productionPlan.error],
       ['canonical_inventory_current', inventory.error],
       ['canonical_purchase_orders_current', purchaseOrders.error],
+      ['maintenance_work_orders', recentWorkOrders.error],
+      ['maintenance_standard_job_plans', standardPlans.error],
     ] as const;
     const failed = sources.filter(([, error]) => Boolean(error)).map(([source, error]) => ({ source, error: (error as any)?.message || 'error' }));
 
@@ -132,12 +146,27 @@ export async function POST(request: NextRequest) {
       production_plan: productionPlan.data || null,
       inventory_low_or_min: lowStock,
       purchase_orders_open: openPurchaseOrders,
+      recent_work_orders: (recentWorkOrders.data || []).map((row: any) => ({
+        work_order_number: row.work_order_number,
+        title: row.title,
+        work_type: row.work_type,
+        status: row.status,
+        canonical_asset_id: row.canonical_asset_id,
+        observed_duration_hours: Number(row.total_timer_seconds || 0) > 0
+          ? Math.round((Number(row.total_timer_seconds) / 3600) * 100) / 100
+          : null,
+        root_cause: row.root_cause,
+        preventive_actions: row.preventive_actions,
+        closed_at: row.closed_at,
+      })),
+      standard_job_plans: standardPlans.data || [],
       semantics: {
         workbook: 'El Excel de Ariel es evidencia y lógica de planificación; no reemplaza el maestro canónico de activos.',
         priority: 'P1-P5 es una regla determinística de planificación, no probabilidad de falla ni diagnóstico.',
         meters: 'Lecturas históricas/importadas deben mantener lineage y no desplazan una lectura operacional posterior.',
         authority: 'Ariel valida programación, ventanas, responsables y correcciones de identidad. El asistente no ejecuta cambios.',
         cross_domain: 'Planificación cruza Mantenimiento, Producción, Bodega y Compras sin tomar propiedad de sus maestros canónicos.',
+        standard_plan: 'Un plan estándar es una propuesta reutilizable de pasos, duración, controles y materiales. Nunca debe inferirse como correcto sólo porque una OT histórica existió; Ariel debe revisarlo y aprobarlo antes de aplicación.',
       },
     };
 
