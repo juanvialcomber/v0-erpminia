@@ -680,7 +680,7 @@ export default function FinanzasPage() {
           </div>
           <div className="mt-4">
             {!isLoading && !error && rows.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">Sin datos canónicos vinculados.</p>
+              <p className="py-4 text-sm text-muted-foreground">Sin datos vinculados para este resumen.</p>
             ) : (
               rows.map((row, index) => (
                 <div
@@ -714,7 +714,8 @@ export default function FinanzasPage() {
       ) : null}
 
       <section className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-xs text-muted-foreground">
-        <Link href="/dashboard/finanzas/trazabilidad" className="hover:text-foreground">Trazabilidad</Link>\n        <Link href="/dashboard/finanzas/fuentes" className="hover:text-foreground">Fuentes y calidad</Link>
+        <Link href="/dashboard/finanzas/trazabilidad" className="hover:text-foreground">Trazabilidad</Link>
+        <Link href="/dashboard/finanzas/fuentes" className="hover:text-foreground">Fuentes y calidad</Link>
         <Link href="/dashboard/finanzas/documentos" className="hover:text-foreground">Documentos</Link>
         <Link href="/dashboard/legal" className="hover:text-foreground">Evidencia legal</Link>
         <Link href="/dashboard/finanzas/calendario" className="hover:text-foreground">Calendario</Link>
