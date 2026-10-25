@@ -152,6 +152,7 @@ type Response = {
     maintenanceCost?: number;
     maintenanceMovements?: number;
     lastMaintenanceCostDate?: string | null;
+    imageUrl?: string | null;
   }>;
   assetEconomicsSummary?: {
     laudusAssets?: number;
@@ -434,6 +435,7 @@ export default function FinanzasPage() {
       maintenanceCost: Number(row.maintenanceCost || 0),
       maintenanceMovements: Number(row.maintenanceMovements || 0),
       lastMaintenanceCostDate: row.lastMaintenanceCostDate || null,
+      imageUrl: row.imageUrl || null,
     }))
     .filter((row) => row.maintenanceCost > 0)
     .slice(0, 6);
@@ -801,7 +803,7 @@ export default function FinanzasPage() {
                   />
                   <Legend formatter={(value) => value === 'olderThan90' ? '>90 días' : value === 'overdue' ? 'Vencido total' : 'Corriente'} />
                   <Line type="monotone" dataKey="overdue" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="olderThan90" stroke="var(--muted-foreground)" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="olderThan90" stroke="var(--destructive)" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -839,7 +841,7 @@ export default function FinanzasPage() {
                   />
                   <Legend formatter={(value) => value === 'overdue' ? 'Vencido' : 'Corriente'} />
                   <Bar dataKey="overdue" stackId="total" fill="var(--primary)" />
-                  <Bar dataKey="current" stackId="total" fill="var(--muted-foreground)" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="current" stackId="total" fill="var(--secondary)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -850,25 +852,22 @@ export default function FinanzasPage() {
       <section className="rounded-lg border" aria-label="Economía del activo">
         <div className="flex flex-col gap-2 border-b px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Economía del activo</p>
-            <h2 className="mt-1 text-lg font-semibold">Vida útil y conciliación económica</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Economía del activo</p>
+            <h2 className="mt-1 text-lg font-semibold">Qué conviene destrabar primero</h2>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Cruce read-only entre candidatos fuertes de activos fijos Laudus y Activo 360. El costo de adquisición aún no está disponible, por lo que MOTIL no calcula valor libro ni depreciación monetaria.
+              Prioriza activos por costo histórico y calidad de conciliación. La depreciación monetaria sigue bloqueada hasta contar con costo base verificable.
             </p>
           </div>
           <span className="text-xs text-muted-foreground">
-            {number(assetEconomicsSummary.strongCandidates || 0)} candidatos fuertes de {number(assetEconomicsSummary.laudusAssets || 0)} activos Laudus
+            {number(assetEconomicsSummary.strongCandidates || 0)} matches fuertes · {number(assetEconomicsSummary.laudusAssets || 0)} activos Laudus
           </span>
         </div>
 
-        <div className="grid gap-px border-b bg-border sm:grid-cols-3 xl:grid-cols-7">
+        <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['Matches fuertes', number(assetEconomicsSummary.strongCandidates || 0), 'identidad suficiente para analizar vida útil'],
-            ['Vida útil agotada', number(retiredByCalendar), 'según calendario Laudus'],
-            ['Retiro ≤ 24 meses', number(retirementHorizon(24)), 'matches fuertes'],
-            ['Costo base disponible', number(assetEconomicsSummary.withAcquisitionCost || 0), 'requerido para depreciación CLP'],
-            ['Backfill histórico', number(assetEconomicsSummary.historicalBackfillRequired || 0), assetEconomicsSummary.invoiceCoverageStart ? `adquiridos antes de ${shortDate(assetEconomicsSummary.invoiceCoverageStart)}` : 'histórico de facturas incompleto'],
-            ['Conciliaciones prioritarias', number(assetEconomicsSummary.reconciliationOpportunities || 0), 'con costo histórico MOTIL'],
+            ['Activos Laudus', number(assetEconomicsSummary.laudusAssets || 0), 'universo de activos fijos'],
+            ['Matches fuertes', number(assetEconomicsSummary.strongCandidates || 0), 'identidad suficiente para analizar'],
+            ['Por conciliar', number(assetEconomicsSummary.reconciliationOpportunities || 0), 'prioridades con costo MOTIL'],
             ['Costo histórico por conciliar', money(assetEconomicsSummary.reconciliationOpportunityMaintenanceCost || 0), 'no es ahorro ni valor libro'],
           ].map(([label, value, detail]) => (
             <div key={label} className="bg-card px-4 py-3">
@@ -879,77 +878,110 @@ export default function FinanzasPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 p-5 xl:grid-cols-[1.2fr_1fr]">
-          <div>
-            <div className="mb-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Identidad fuerte</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Vida útil calendario de los activos con mejor evidencia de identidad. No se mezcla con costos de activos todavía ambiguos.
-              </p>
+        <div className="grid gap-0 xl:grid-cols-[1.45fr_0.75fr]">
+          <div className="border-b p-5 xl:border-b-0 xl:border-r">
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Prioridades de conciliación</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Equipos con mayor costo histórico donde resolver identidad desbloquea análisis financiero confiable.
+                </p>
+              </div>
+              <span className="hidden text-xs text-muted-foreground sm:block">Fotos referenciales · identificación rápida</span>
             </div>
-            {assetEconomics.length === 0 ? (
-              <p className="py-10 text-sm text-muted-foreground">Aún no hay matches fuertes suficientes.</p>
+
+            {assetReconciliationOpportunities.length === 0 ? (
+              <p className="py-8 text-sm text-muted-foreground">Sin conciliaciones económicas priorizables.</p>
             ) : (
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={assetEconomics} layout="vertical" margin={{ top: 8, right: 12, left: 26, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" domain={[0, 150]} tickFormatter={(value) => `${number(Number(value))}%`} tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis type="category" dataKey="name" width={165} tickLine={false} axisLine={false} fontSize={10} />
-                    <Tooltip
-                      formatter={(value) => [`${number(Math.round(Number(value)))}%`, 'Vida útil consumida']}
-                      labelFormatter={(label) => {
-                        const row = assetEconomics.find((item) => item.name === label);
-                        return row ? [label, row.code].filter(Boolean).join(' · ') : String(label);
-                      }}
-                    />
-                    <ReferenceLine x={100} strokeDasharray="5 4" />
-                    <Bar dataKey="lifeConsumedPct" fill="var(--primary)" radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="divide-y">
+                {assetReconciliationOpportunities.slice(0, 5).map((row, index) => (
+                    <div
+                      key={row.canonicalAssetId || `${row.code}-${row.name}`}
+                      className="grid gap-3 py-3 sm:grid-cols-[28px_52px_minmax(0,1fr)_140px] sm:items-center"
+                    >
+                      <span className="text-xs font-semibold tabular-nums text-muted-foreground">{index + 1}</span>
+                      <div className="hidden h-10 w-12 overflow-hidden rounded-md border bg-muted sm:block">
+                        {row.imageUrl ? (
+                          <img
+                            src={row.imageUrl}
+                            alt={`Referencia visual de ${row.name}`}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">Sin foto</div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-medium">{row.name}</p>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            Por conciliar
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {row.code || 'Sin código'} · {number(row.candidateCount)} candidatos Laudus · {number(row.maintenanceMovements)} movimientos
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {row.exactIdentifierCount > 0
+                            ? `${number(row.exactIdentifierCount)} candidato(s) con identificador exacto`
+                            : 'Identidad requiere revisión humana'}
+                        </p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="text-sm font-semibold tabular-nums">{money(row.maintenanceCost)}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">mantenimiento histórico</p>
+                      </div>
+                    </div>
+                ))}
               </div>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              La línea de 100% marca el fin de vida útil calendario según Laudus. No significa automáticamente reemplazo.
-            </p>
           </div>
 
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Destrabar valor primero</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Activos MOTIL con mayor costo histórico y múltiples candidatos Laudus. Resolver identidad habilita depreciación y reparar vs reemplazar.
-              </p>
-            </div>
-            {assetReconciliationOpportunities.length === 0 ? (
-              <p className="py-6 text-sm text-muted-foreground">Sin conciliaciones económicas priorizables.</p>
-            ) : (
-              assetReconciliationOpportunities.slice(0, 5).map((row) => (
-                <div key={row.canonicalAssetId || `${row.code}-${row.name}`} className="rounded-md border px-3 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{row.name}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {row.code || 'Sin código'} · {number(row.candidateCount)} candidatos Laudus
-                      </p>
-                    </div>
-                    <span className="text-sm font-semibold tabular-nums">{money(row.maintenanceCost)}</span>
+          <div className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Readiness de depreciación</p>
+            <h3 className="mt-1 text-base font-semibold">Qué falta para calcular CLP</h3>
+            <div className="mt-4 space-y-3">
+              {[
+                ['Costo base disponible', number(assetEconomicsSummary.withAcquisitionCost || 0), 'de los matches fuertes', 'secondary'],
+                ['Backfill histórico', number(assetEconomicsSummary.historicalBackfillRequired || 0), assetEconomicsSummary.invoiceCoverageStart ? `anteriores a ${shortDate(assetEconomicsSummary.invoiceCoverageStart)}` : 'histórico incompleto', 'primary'],
+                ['Búsqueda documental', number(assetEconomicsSummary.documentLookupRequired || 0), 'dentro del período cubierto', 'primary'],
+              ].map(([label, value, detail, tone]) => (
+                <div key={label} className="flex items-start justify-between gap-4 border-b pb-3 last:border-b-0 last:pb-0">
+                  <div>
+                    <p className="text-sm font-medium">{label}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
                   </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span>Costo histórico MOTIL</span>
-                    <span>{number(row.maintenanceMovements)} movimientos</span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {row.exactIdentifierCount > 0
-                      ? `${number(row.exactIdentifierCount)} candidato(s) con identificador exacto`
-                      : 'Identidad requiere revisión humana'}
-                  </div>
+                  <span className={`text-lg font-semibold ${tone === 'secondary' ? 'text-secondary' : 'text-primary'}`}>{value}</span>
                 </div>
-              ))
-            )}
-            <div className="rounded-md bg-muted/40 px-3 py-3 text-xs leading-5 text-muted-foreground">
-              <span className="font-medium text-foreground">Depreciación CLP bloqueada.</span> Falta costo de adquisición verificable y confirmación de identidad por activo. MOTIL no reparte el total de una factura entre activos sin evidencia.
-              {assetEconomicsSummary.invoiceCoverageStart ? ` El histórico de facturas disponible comienza el ${shortDate(assetEconomicsSummary.invoiceCoverageStart)}.` : ''}
+              ))}
+            </div>
+
+            {assetEconomics.length > 0 ? (
+              <div className="mt-5 border-t pt-4">
+                <p className="text-xs font-medium">Vida útil · matches fuertes</p>
+                <div className="mt-3 space-y-3">
+                  {assetEconomics.slice(0, 4).map((row) => (
+                    <div key={`${row.code}-${row.name}`}>
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="truncate text-muted-foreground">{row.name}</span>
+                        <span className="font-medium">{number(Math.round(row.lifeConsumedPct))}%</span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={`h-full rounded-full ${row.lifeConsumedPct >= 100 ? 'bg-destructive' : row.lifeConsumedPct >= 80 ? 'bg-primary' : 'bg-secondary'}`}
+                          style={{ width: `${Math.min(100, Math.max(0, row.lifeConsumedPct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-5 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3 text-xs leading-5 text-muted-foreground">
+              <span className="font-medium text-destructive">Depreciación CLP bloqueada.</span>{' '}
+              Falta costo de adquisición verificable. MOTIL no reparte montos de factura entre activos sin evidencia.
             </div>
           </div>
         </div>
