@@ -14,19 +14,28 @@ export async function GET(request: NextRequest): Promise<Response> {
   const supabase = getSupabaseServerClient();
   const [{ data: profile }, { data: requests, error }] = await Promise.all([
     supabase.from('profiles').select('role,cargo_id,cargos(name)').eq('id', auth.user.id).maybeSingle(),
-    supabase.from('role_matrix_change_requests').select('id,cargo_id,module_key,requested_access_level,operation,reason,requested_by,requested_at,area_manager_approved_by,area_manager_approved_at,management_approved_by,management_approved_at,status,rejection_reason,cargos(name)').eq('organization_id', auth.organizationId).order('requested_at', { ascending: false }).limit(200),
+    supabase
+      .from('role_matrix_change_requests')
+      .select(
+        'id,cargo_id,module_key,requested_access_level,operation,reason,requested_by,requested_at,area_manager_approved_by,area_manager_approved_at,management_approved_by,management_approved_at,management_approval_bypassed_by,management_approval_bypassed_at,status,rejection_reason,cargos(name)',
+      )
+      .eq('organization_id', auth.organizationId)
+      .order('requested_at', { ascending: false })
+      .limit(200),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const cargoName = (profile as any)?.cargos?.name || '';
   const role = (profile as any)?.role || auth.role || '';
+  const normalizedRole = String(role).trim().toLowerCase();
+  const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(normalizedRole);
   return NextResponse.json({
     requests: requests || [],
     actor: {
       id: auth.user.id,
       cargoName,
       role,
-      canApproveArea: String(cargoName).toUpperCase().startsWith('JEFE ') || ['admin', 'superadmin'].includes(role),
-      canApproveManagement: ['GERENTE', 'SUBGERENTE OP.'].includes(cargoName) || ['admin', 'superadmin'].includes(role),
+      canApproveArea: String(cargoName).toUpperCase().startsWith('JEFE ') || isAdmin,
+      canApproveManagement: ['GERENTE', 'SUBGERENTE OP.'].includes(cargoName) || isAdmin,
     },
   });
 }
