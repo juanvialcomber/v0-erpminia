@@ -98,3 +98,11 @@ Estos umbrales habilitan escala inicial, no E4.
 - Métrica ejecutiva: mediana de segundos manuales por caso.
 - Regla de valor: baseline manual y latencia MOTIL se muestran separados hasta contar con muestras suficientes. La diferencia no se convierte automáticamente en ahorro monetario.
 - Próximo gate: obtener al menos 3 muestras manuales y 20 decisiones asistidas únicas antes de reportar capacidad administrativa recuperada.
+
+
+## 2026-10-25 — Gate de reducción observada de tiempo
+
+- Comparación habilitada sólo con ≥3 muestras de baseline manual y ≥20 decisiones asistidas con latencia válida.
+- Fórmula: `(mediana_manual - mediana_asistida) / mediana_manual`.
+- La métrica se presenta como reducción observada de tiempo, no como ahorro CLP.
+- Valores negativos se conservan: si MOTIL demora más, el resultado debe mostrarlo en vez de ocultarlo.
