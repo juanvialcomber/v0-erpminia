@@ -188,3 +188,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Autoridad humana preservada: convertir la necesidad a solicitud operativa de Compras requiere una acción explícita; MOTIL no compra automáticamente.
 - Métrica C/E siguiente: tiempo desde primer evento `supply_need_refreshed` hasta `procurement_intake_created`, sólo cuando exista un handoff real.
 - Gate E3 de Mantención: comparar reincidencia, ciclo de ejecución o downtime en cohortes/períodos con evidencia suficiente y una intervención MOTIL identificable.
+
+
+## 2026-10-25 — Mantención: planificación semanal asistida de Ariel
+
+- Problema previo: la planificación preventiva mezclaba horizonte largo, horómetros, señales históricas, materiales y generación de OT en una misma superficie; Ariel debía reconstruir manualmente qué requería decisión esta semana.
+- Capacidad: MOTIL prepara una cola semanal de hasta 12 decisiones P1–P4 usando prioridad operacional, OT abiertas/programadas, planes estándar, evidencia de lectura y faltantes reales de materiales.
+- Ventana operacional: próximos 7 días. El horizonte de recursos de 45 días se conserva sólo como contexto de planificación y no convierte trabajo futuro en programado esta semana.
+- Frescura: una señal por horómetro con más de 30 días desde la lectura queda marcada `Actualizar evidencia` y no compite como decisión semanal vigente.
+- Materiales: `parts_status_raw` del maestro histórico se conserva sólo como evidencia de fuente. Un bloqueo por materiales exige `quantity_shortage > 0` en requerimientos actuales de una OT real.
+- Decisión humana: MOTIL propone `Abrir OT`, `Revisar plan` o `Programar`; Ariel mantiene autoridad para programar, corregir, aprobar y priorizar.
+- Nivel actual: V3/L4 + E2. Ya existe priorización explicable y preparación de decisión, pero todavía no existe baseline manual suficiente para declarar horas ahorradas.
+- Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
+- Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
+- Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
