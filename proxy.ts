@@ -122,10 +122,10 @@ async function isFinanceManager(profileId: string): Promise<boolean> {
 }
 function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
-  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas')) return true;
+  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas') || path === '/dashboard/valor') return true;
   if (path === '/dashboard/compras') return true;
   if (path.startsWith('/dashboard/compras/')) return true;
-  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
+  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/') || path === '/api/value/scorecard') return true;
   const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
   if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
   if (path.startsWith('/api/finance/')) return false;
