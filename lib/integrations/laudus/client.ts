@@ -222,14 +222,14 @@ export async function runLaudusReadOnlyValueProbe() {
   await getLaudusAccessToken();
 
   const targets = [
-    ['purchaseInvoices', '/purchases/invoices/list'],
-    ['purchaseOrders', '/purchases/orders/list'],
-    ['purchasePayments', '/purchases/payments/list'],
-    ['bankStatements', '/accounting/bankStatements/list'],
-    ['journalEntries', '/accounting/journal/entries/list'],
-    ['fixedAssets', '/purchases/fixedAssets/list'],
-    ['inventories', '/production/inventories/list'],
-    ['stockTransfers', '/production/stockTransfers/list'],
+    ['purchaseInvoices', '/purchases/invoices/list', ['purchaseInvoiceId', 'issuedDate', 'dueDate', 'supplier.supplierId']],
+    ['purchaseOrders', '/purchases/orders/list', ['purchaseOrderId', 'issuedDate', 'dueDate', 'supplier.supplierId']],
+    ['purchasePayments', '/purchases/payments/list', ['paymentId', 'issuedDate', 'dueDate', 'paymentType']],
+    ['bankStatements', '/accounting/bankStatements/list', ['bankStatementId', 'dateFrom', 'dateTo', 'initialBalance']],
+    ['journalEntries', '/accounting/journal/entries/list', ['journalEntryId', 'journalEntryNumber', 'date', 'approved']],
+    ['fixedAssets', '/purchases/fixedAssets/list', ['fixedAssetId', 'name', 'dateAcquisition', 'acquisitionCost']],
+    ['inventories', '/production/inventories/list', ['inventoryId', 'date', 'warehouse.warehouseId']],
+    ['stockTransfers', '/production/stockTransfers/list', ['stockTransferId', 'date', 'warehouseFrom.warehouseId', 'warehouseTo.warehouseId']],
   ] as const;
 
   const results: Record<string, {
@@ -240,9 +240,9 @@ export async function runLaudusReadOnlyValueProbe() {
     upstreamStatus?: number | null;
   }> = {};
 
-  for (const [key, path] of targets) {
+  for (const [key, path, fields] of targets) {
     try {
-      const payload = await listLaudus(path, { options: { offset: 0, limit: 1 } });
+      const payload = await listLaudus(path, { options: { offset: 0, limit: 1 }, fields: [...fields] });
       const summary = summarizePayload(payload);
       results[key] = {
         status: Number(summary.rows || 0) > 0 ? 'data' : 'empty',
