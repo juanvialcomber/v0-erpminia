@@ -38,3 +38,18 @@ test('strong confidence requires coverage, multiple products and candidate separ
   assert.match(lib,/best\.metrics\.matchedProducts >= 2/);
   assert.match(lib,/gapToSecond === null \|\| gapToSecond >= 10/);
 });
+
+
+test('matcher refuses incompatible currencies and uses weighted aggregate price',()=>{
+  assert.match(lib,/invoice\.currency\.toUpperCase\(\) === order\.currency\.toUpperCase\(\)/);
+  assert.match(lib,/value\.lineTotal \/ value\.quantity/);
+});
+
+test('finance cockpit exposes pre-payment control without calling candidate exposure savings',()=>{
+  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+  assert.match(page,/Control antes de pagar/);
+  assert.match(page,/Factura ↔ orden de compra/);
+  assert.match(page,/Es una ayuda de revisión, no una aprobación de pago/);
+  assert.match(page,/La exposición candidata no es ahorro/);
+  assert.match(page,/MOTIL no fuerza una coincidencia/);
+});
