@@ -62,6 +62,34 @@ type InvoicePoCandidate = {
   exactPriceProducts?: number;
 };
 
+type NativeTraceResponse = {
+  summary?: {
+    examined?: number;
+    nativeLookups?: number;
+    detailRecovered?: number;
+    withNativeTrace?: number;
+    withConfirmedPo?: number;
+    apiCalls?: number;
+  };
+  invoices?: Array<{
+    invoiceExternalId?: string;
+    docNumber?: string | null;
+    supplierName?: string | null;
+    outstandingAmount?: number;
+    currency?: string | null;
+    sourceDetailAvailable?: boolean;
+    itemCount?: number;
+    nativeTraceCount?: number;
+    confirmedPurchaseOrders?: Array<{
+      purchaseOrderExternalId?: string;
+      orderNumber?: string | null;
+      evidence?: string;
+    }>;
+    unclassifiedTraceCount?: number;
+  }>;
+  readOnly?: boolean;
+};
+
 type InvoicePoControlResponse = {
   summary?: {
     openTotal?: number;
@@ -159,6 +187,16 @@ export default function FinanzasPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/executive', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
+  const nativeTrace = useSWR<NativeTraceResponse>(
+    '/api/integrations/laudus/native-invoice-trace',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar la trazabilidad nativa Laudus.');
+      return payload;
+    },
+    { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
+  );
   const poControl = useSWR<InvoicePoControlResponse>(
     '/api/integrations/laudus/invoice-po-control',
     async (url: string) => {
@@ -335,6 +373,45 @@ export default function FinanzasPage() {
           </div>
           <span className="text-xs text-muted-foreground">Solo lectura</span>
         </div>
+        {nativeTrace.data?.summary?.nativeLookups ? (
+          <div className="border-b bg-muted/20 px-5 py-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-medium">Fuente nativa Laudus</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Consulta acotada de facturas prioritarias sin detalle staged. Una OC sólo se confirma cuando el ID trazado por Laudus coincide exactamente con una OC del mismo tenant.
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {number(nativeTrace.data.summary.withConfirmedPo || 0)} confirmadas · {number(nativeTrace.data.summary.detailRecovered || 0)} detalles recuperados
+              </span>
+            </div>
+            {(nativeTrace.data.invoices || []).some((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0) ? (
+              <div className="mt-3 space-y-2">
+                {(nativeTrace.data.invoices || [])
+                  .filter((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0)
+                  .slice(0, 3)
+                  .map((invoice) => (
+                    <div key={invoice.invoiceExternalId} className="flex flex-col gap-1 rounded-md border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium">
+                          Factura {invoice.docNumber || 's/n'} · {invoice.supplierName || 'Proveedor'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          OC confirmada por trazabilidad Laudus: {(invoice.confirmedPurchaseOrders || []).map((order) => order.orderNumber || order.purchaseOrderExternalId).join(', ')}
+                        </p>
+                      </div>
+                      <span className="text-xs font-medium">Fuente primaria</span>
+                    </div>
+                  ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted-foreground">
+                La consulta nativa aún no confirma una OC para estas facturas. MOTIL conserva el matcher determinístico como candidato, no como verdad fuente.
+              </p>
+            )}
+          </div>
+        ) : null}
         {poControl.error ? (
           <p className="px-5 py-5 text-sm text-muted-foreground">
             El control previo al pago no está disponible en este momento.

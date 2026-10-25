@@ -120,3 +120,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L3 inteligencia candidata; objetivo L4 cuando la revisión humana confirme o rechace la relación factura-OC.
 - Evidencia actual: E1/E2 de cobertura y comportamiento del matcher; E3 sólo cuando una diferencia se corrija antes del pago y el resultado económico quede demostrado.
 - Siguiente medición: aceptación/rechazo del candidato, motivo, corrección resultante y monto efectivamente corregido antes del pago.
+
+
+## 2026-10-25 — Trazabilidad nativa Laudus como evidencia primaria
+
+- Swagger oficial Laudus v2 verificado en vivo: las facturas exponen `GET /purchases/invoices/{purchaseInvoiceId}`, `traceTo` y `traceFrom`.
+- `PurchaseInvoiceItemDto` contiene `traceFrom[]` a nivel de línea; el documento también permite consultar los documentos que lo originaron.
+- Jerarquía de evidencia: traza nativa de línea > traza nativa de documento > matcher determinístico > evidencia insuficiente.
+- Primera implementación: máximo 5 facturas prioritarias sin detalle staged y máximo 10 llamadas read-only por evaluación.
+- Confirmación de OC: sólo cuando el ID nativo trazado coincide exactamente con `integration.laudus_purchase_orders.external_id` del mismo tenant.
+- No se interpreta `fromStep/toStep` sin evidencia documental adicional; códigos desconocidos permanecen sin clasificar.
+- No hay persistencia en esta fase; la fuente se consulta como preview y no modifica Laudus ni MOTIL.
+- Valor: aumenta precisión y auditabilidad del control previo al pago sin depender de inferencia cuando Laudus ya conoce la relación documental.
