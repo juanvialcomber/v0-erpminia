@@ -223,7 +223,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     ['strong_identifier_candidate', 'strong_candidate'].includes(String(row.evidence_level || '')),
   );
   const fixedAssetIds = [...new Set(
-    fixedAssetStrong.map((row) => String(row.canonical_asset_id || '')).filter(Boolean),
+    fixedAssetQueue.map((row) => String(row.canonical_asset_id || '')).filter(Boolean),
   )];
   const maintenanceEconomics = fixedAssetIds.length > 0
     ? await context.supabase
@@ -278,6 +278,49 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
     };
   });
 
+  const reconciliationGroups = new Map<string, {
+    canonical_asset_id: string;
+    canonical_asset_code: string | null;
+    canonical_asset_name: string | null;
+    candidate_count: number;
+    exact_identifier_count: number;
+    evidence_levels: Set<string>;
+  }>();
+  for (const row of fixedAssetQueue) {
+    const canonicalAssetId = String(row.canonical_asset_id || '');
+    if (!canonicalAssetId) continue;
+    const group = reconciliationGroups.get(canonicalAssetId) || {
+      canonical_asset_id: canonicalAssetId,
+      canonical_asset_code: row.canonical_asset_code ? String(row.canonical_asset_code) : null,
+      canonical_asset_name: row.canonical_asset_name ? String(row.canonical_asset_name) : null,
+      candidate_count: 0,
+      exact_identifier_count: 0,
+      evidence_levels: new Set<string>(),
+    };
+    group.candidate_count += 1;
+    if (Boolean(row.exact_plate_support) || Boolean(row.exact_serial_support)) group.exact_identifier_count += 1;
+    if (row.evidence_level) group.evidence_levels.add(String(row.evidence_level));
+    reconciliationGroups.set(canonicalAssetId, group);
+  }
+  const assetReconciliationOpportunities = [...reconciliationGroups.values()]
+    .map((group) => {
+      const maintenance = maintenanceByAsset.get(group.canonical_asset_id) || { cost: 0, movements: 0, lastCostDate: null };
+      return {
+        canonical_asset_id: group.canonical_asset_id,
+        canonical_asset_code: group.canonical_asset_code,
+        canonical_asset_name: group.canonical_asset_name,
+        candidate_count: group.candidate_count,
+        exact_identifier_count: group.exact_identifier_count,
+        evidence_levels: [...group.evidence_levels],
+        maintenance_cost: maintenance.cost,
+        maintenance_movements: maintenance.movements,
+        last_maintenance_cost_date: maintenance.lastCostDate,
+      };
+    })
+    .filter((row) => row.maintenance_cost > 0)
+    .sort((a, b) => b.maintenance_cost - a.maintenance_cost)
+    .slice(0, 10);
+
   return {
     capability: 'finance',
     sources: [
@@ -317,11 +360,14 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       laudus_aging: laudusAging,
       laudus_supplier_pressure: laudusSupplierPressure,
       asset_economics: assetEconomics,
+      asset_reconciliation_opportunities: assetReconciliationOpportunities,
       asset_economics_summary: {
         laudus_assets: Number(fixedAssetPayload.summary?.laudus_assets || 0),
         strong_candidates: assetEconomics.length,
         with_acquisition_cost: assetEconomics.filter((row) => Number(row.acquisition_cost || 0) > 0).length,
         with_maintenance_history: assetEconomics.filter((row) => row.maintenance_cost > 0).length,
+        reconciliation_opportunities: assetReconciliationOpportunities.length,
+        reconciliation_opportunity_maintenance_cost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenance_cost, 0),
       },
       unresolved_asset_reconciliation: reconciliation.data || [],
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
@@ -332,7 +378,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento. No es predicción estadística ni probabilidad futura.',
         aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio. Para exposición actual Laudus, usa laudus_aging y laudus_supplier_pressure antes que un aging MOTIL vacío.',
         statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
-        asset_economics: 'Para depreciación o reemplazo, usa asset_economics. No calcules valor libro ni ahorro de reposición si falta acquisition_cost o la identidad sigue siendo candidata. Vida útil calendario y costo histórico de mantenimiento sí pueden orientar una revisión humana.',
+        asset_economics: 'Para depreciación o reemplazo, usa asset_economics sólo para identidades fuertes. asset_reconciliation_opportunities contiene activos MOTIL con alto costo histórico pero identidad Laudus todavía pendiente; úsalo para priorizar conciliación, no para atribuir depreciación o recomendar reemplazo. No calcules valor libro ni ahorro si falta acquisition_cost.',
         cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
       },
     },
