@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, TriangleAlert } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
 
@@ -581,7 +581,7 @@ export default function FinanzasPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 pb-10">
-      <section className="relative overflow-hidden rounded-xl border bg-card px-5 py-5 shadow-none sm:px-6 sm:py-6">
+      <section className="border-b px-1 pb-6 pt-1 sm:px-0">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -599,12 +599,12 @@ export default function FinanzasPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-start gap-2 sm:flex-row sm:items-center">
-            <span className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-xs font-medium text-muted-foreground">
+            <span className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground">
               {pendingAttention.length > 0 ? `${number(pendingAttention.length)} por revisar` : 'Sin urgencias'}
             </span>
             <a
               href="#revisar-prioridades"
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
               Revisar prioridades <ArrowRight className="h-4 w-4" />
             </a>
@@ -646,7 +646,7 @@ export default function FinanzasPage() {
         ))}
       </section>
 
-      <section id="revisar-prioridades" className="scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-none">
+      <section id="revisar-prioridades" className="scroll-mt-24 overflow-hidden rounded-xl border bg-card">
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold">Revisar ahora</h2>
@@ -706,7 +706,7 @@ export default function FinanzasPage() {
                     type="button"
                     onClick={() => void recordReview(item, 'accepted')}
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
-                    className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    className="rounded-md bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/15 disabled:opacity-50"
                   >
                     Revisado
                   </button> : null}
@@ -740,7 +740,7 @@ export default function FinanzasPage() {
 
 
       <section className="grid items-start gap-4 xl:grid-cols-[1.45fr_0.95fr]" aria-label="Control financiero ejecutivo">
-        <div className="rounded-xl border bg-card p-5 shadow-none">
+        <div className="rounded-xl border bg-card p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Presión financiera</p>
@@ -749,7 +749,7 @@ export default function FinanzasPage() {
                 Cuánto del saldo abierto está corriente y cuánto lleva semanas o meses vencido.
               </p>
             </div>
-            <Sparkles className="h-4 w-4 text-muted-foreground" />
+
           </div>
           {olderThan90Share !== null ? (
             <div className="mt-4 flex items-baseline gap-2">
@@ -779,7 +779,7 @@ export default function FinanzasPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <div className="rounded-xl border bg-card p-5 shadow-none">
+          <div className="rounded-xl border bg-card p-5">
             <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">ETA financiero</p></div>
             <p className="mt-3 text-3xl font-semibold tracking-tight">
               {forecastOpenPayables === 0
@@ -804,7 +804,7 @@ export default function FinanzasPage() {
             </p>
           </div>
 
-          <div className="rounded-xl border bg-card p-5 shadow-none">
+          <div className="rounded-xl border bg-card p-5">
             <div className="flex items-center gap-2"><BrainCircuit className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Inteligencia MOTIL</p></div>
             <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
@@ -893,7 +893,7 @@ export default function FinanzasPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2" aria-label="Proyecciones financieras">
-        <div className="rounded-xl border bg-card p-5 shadow-none">
+        <div className="rounded-xl border bg-card p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Trayectoria contractual</p>
             <h2 className="mt-1 text-lg font-semibold">Presión si nada cambia</h2>
@@ -934,7 +934,7 @@ export default function FinanzasPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-none">
+        <div className="rounded-xl border bg-card p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración accionable</p>
             <h2 className="mt-1 text-lg font-semibold">Presión por proveedor</h2>
@@ -1295,7 +1295,7 @@ export default function FinanzasPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-xl border bg-card p-5 shadow-none">
+        <div className="rounded-xl border bg-card p-5">
           <div className="flex items-center gap-2">
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-base font-semibold">CxP aprobadas en MOTIL</h2>
@@ -1338,7 +1338,7 @@ export default function FinanzasPage() {
           )}
         </div>
 
-        <div className="rounded-xl border bg-card p-5 shadow-none">
+        <div className="rounded-xl border bg-card p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-base font-semibold">Dónde se concentra</h2>
