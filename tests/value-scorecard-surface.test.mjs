@@ -7,10 +7,10 @@ test('finance cockpit separates Laudus exposure from canonical MOTIL payables', 
   const api = fs.readFileSync('app/api/finance/executive/route.ts', 'utf8');
 
   assert.match(api, /motil_laudus_finance_review_queue/);
-  assert.match(page, /Exposición Laudus/);
+  assert.match(page, /Saldo abierto/);
   assert.match(page, /CxP aprobadas en MOTIL/);
-  assert.match(page, /Este universo es distinto de la exposición histórica observada en Laudus/);
-  assert.match(page, /Revisar primero/);
+  assert.match(page, /Las obligaciones históricas de Laudus se mantienen separadas de las CxP aprobadas en MOTIL/);
+  assert.match(page, /Revisar ahora/);
   assert.doesNotMatch(page, /Preparado para nuevas fuentes/);
   assert.doesNotMatch(page, /Trazabilidad económica y SERNAGEOMIN/);
 });
