@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { getEquipmentImage } from '@/lib/maintenance/equipment-images';
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
@@ -280,6 +281,7 @@ export async function GET(request: NextRequest) {
           maintenanceCost: maintenance.cost,
           maintenanceMovements: maintenance.movements,
           lastMaintenanceCostDate: maintenance.lastCostDate,
+          imageUrl: getEquipmentImage(group.canonicalAssetName || group.canonicalAssetCode || null),
         };
       })
       .filter((row) => row.maintenanceCost > 0)
