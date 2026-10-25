@@ -178,3 +178,13 @@ Estos umbrales habilitan escala inicial, no E4.
 - Uso: baseline E2 para comparar cohortes/períodos futuros.
 - No usar como ahorro ni mejora atribuible hasta contar con comparación temporal y outcome.
 - Creación → primer inicio no se usa todavía como tiempo de respuesta: la muestra mezcla planificación con fecha de creación y requiere semántica adicional antes de promoverla como KPI.
+
+
+## 2026-10-25 — Mantención: baseline de reincidencia y handoff a Compras
+
+- Reincidencia 7d observada: 4 OT cerradas ya tienen ventana madura de 7 días; 1 tuvo una nueva OT sobre el mismo activo dentro de esa ventana.
+- Baseline inicial: 25% sobre muestra n=4. Clasificación E2; muestra insuficiente para atribución causal o conclusión de calidad de reparación.
+- Handoff supply: el sistema ya crea/actualiza necesidad de abastecimiento al registrar requerimientos y detectar shortage.
+- Autoridad humana preservada: convertir la necesidad a solicitud operativa de Compras requiere una acción explícita; MOTIL no compra automáticamente.
+- Métrica C/E siguiente: tiempo desde primer evento `supply_need_refreshed` hasta `procurement_intake_created`, sólo cuando exista un handoff real.
+- Gate E3 de Mantención: comparar reincidencia, ciclo de ejecución o downtime en cohortes/períodos con evidencia suficiente y una intervención MOTIL identificable.
