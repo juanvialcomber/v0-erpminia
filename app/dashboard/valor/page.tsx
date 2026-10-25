@@ -60,6 +60,19 @@ type ApiResponse = {
     medianSeconds?: number | null;
     semantics?: string;
   } | null;
+  maintenanceValue?: {
+    workOrders?: number;
+    closedWorkOrders?: number;
+    timerInstrumentedWorkOrders?: number;
+    timerCoverage?: number | null;
+    observedExecutionSeconds?: number;
+    observedExecutionHours?: number;
+    workOrdersWithEvents?: number;
+    eventCount?: number;
+    evidenceLevel?: string;
+    workflowLevel?: number;
+    semantics?: string;
+  } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
 };
 
@@ -135,6 +148,9 @@ export default function ValueScorecardPage() {
       ? Number(score.observedImpact?.observedValueClp || 0)
       : null;
   const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
+  const maintenanceValue = data?.maintenanceValue || {};
+  const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
+  const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -223,6 +239,55 @@ export default function ValueScorecardPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
             </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Valor interno de Mantención" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mantención · evidencia operacional</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Control real del trabajo</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mide ejecución y trazabilidad observadas. Todavía no convierte horas registradas en ahorro económico.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Nivel actual</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              L{number(maintenanceValue.workflowLevel || 0)} · {maintenanceValue.evidenceLevel || 'E0'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">L4 significa flujo instrumentado con decisión humana; E2, desempeño medido.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT con cronómetro</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.timerInstrumentedWorkOrders || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {maintenanceTimerCoverage == null ? 'Sin universo medible' : `${number(maintenanceTimerCoverage)}% de cobertura actual`}
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Horas de ejecución observadas</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.observedExecutionHours || 0)} h
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Tiempo real capturado por MOTIL; no se interpreta como horas ahorradas.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Eventos trazados</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.eventCount || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Inicio, pausa, reanudación, cierre y demás evidencia operacional.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT cerradas trazables</p>
+            <p className={`mt-1 text-2xl font-semibold tracking-tight ${maintenanceEvidenceIsMeasured ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+              {number(maintenanceValue.closedWorkOrders || 0)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
         </div>
       </section>
