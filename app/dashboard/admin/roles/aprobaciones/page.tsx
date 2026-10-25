@@ -62,7 +62,7 @@ export default function RoleMatrixApprovalsPage() {
         <p className="text-sm font-medium text-primary">Administración · Permisos</p>
         <h1 className="mt-1 text-3xl font-semibold">Solicitudes de permisos</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Las solicitudes pasan por Jefatura de Área y Gerencia. Juan Admin puede cerrar sus solicitudes como superadministrador, sin una aprobación adicional de Gerencia.
+          Las solicitudes pasan por Jefatura de Área y Gerencia. Para asignar centros de costo, Juan Admin puede cerrar la solicitud como superadministrador sin aprobación adicional de Gerencia.
         </p>
       </div>
 
@@ -74,12 +74,14 @@ export default function RoleMatrixApprovalsPage() {
           const sameAreaApprover = request.area_manager_approved_by === actor?.id;
           const actorRole = String(actor?.role || '').trim().toLowerCase();
           const isAdminPrincipal = actorRole === 'superadmin' || actorRole === 'super_admin';
+          const isCostCenterAssignment = request.module_key === 'core_centros_costos_asignacion';
           const canApproveArea =
             request.status === 'pending_area_manager' &&
             actor?.canApproveArea &&
             (!isRequester || isAdminPrincipal);
           const canBypassManagement =
             request.status === 'pending_management' &&
+            isCostCenterAssignment &&
             actor?.canApproveManagement &&
             isRequester &&
             isAdminPrincipal;
@@ -90,7 +92,7 @@ export default function RoleMatrixApprovalsPage() {
           const moduleLabel = MODULE_LABELS[request.module_key] || 'Permiso de módulo';
           const requestLabel = request.operation === 'delete'
             ? 'Retirar permiso'
-            : request.module_key === 'core_centros_costos_asignacion'
+            : isCostCenterAssignment
               ? 'Permitir asignar centros de costo'
               : `Permiso solicitado: ${ACCESS_LABELS[request.requested_access_level] || 'En revisión'}`;
 
@@ -116,19 +118,27 @@ export default function RoleMatrixApprovalsPage() {
                 </p>
                 {request.management_approval_bypassed_by ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    Gerencia no intervino. El superadministrador solicitante aprobó y aplicó el cambio.
+                    Juan Admin aprobó y aplicó esta asignación sin intervención de Gerencia.
                   </p>
                 ) : canBypassManagement ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    Juan Admin puede cerrar esta solicitud ahora, sin aprobación de Gerencia.
+                    Juan Admin puede cerrar esta solicitud de asignación sin aprobación de Gerencia.
+                  </p>
+                ) : isRequester && sameAreaApprover && isCostCenterAssignment ? (
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    Juan Admin ya aprobó Jefatura de Área y puede cerrar la asignación sin pasar por Gerencia.
                   </p>
                 ) : isRequester && sameAreaApprover ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    Juan Admin ya aprobó Jefatura de Área y puede cerrar la solicitud sin pasar por Gerencia.
+                    Juan Admin ya aprobó Jefatura de Área. Esta solicitud requiere revisión de Gerencia.
+                  </p>
+                ) : isRequester && isAdminPrincipal && isCostCenterAssignment ? (
+                  <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    Juan Admin puede aprobar como superadministrador y luego cerrar esta asignación sin aprobación adicional de Gerencia.
                   </p>
                 ) : isRequester && isAdminPrincipal ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    Juan Admin puede aprobar la solicitud como superadministrador y cerrarla sin aprobación adicional de Gerencia.
+                    Juan Admin puede aprobar Jefatura de Área; después, Gerencia debe revisar esta solicitud.
                   </p>
                 ) : isRequester ? (
                   <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
