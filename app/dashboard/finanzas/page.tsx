@@ -882,7 +882,7 @@ export default function FinanzasPage() {
             ) : null}
             <details className="mt-4 border-t pt-3 text-xs">
               <summary className="cursor-pointer select-none font-medium text-muted-foreground hover:text-foreground">
-                Predicción estadística · en calibración
+                Predicción estadística · En calibración
               </summary>
               <p className="mt-2 leading-5 text-muted-foreground">
                 MOTIL separa primero operación real de cargas históricas extraordinarias antes de proyectar tendencia. Mientras tanto, la caja a 90 días usa vencimientos reales y no estimaciones.
@@ -1171,6 +1171,13 @@ export default function FinanzasPage() {
                   </span>
                 </div>
               ))}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t px-5 py-3 text-xs text-muted-foreground">
+              <span>Evidencia financiera trazable</span>
+              <Link href="/dashboard/legal" className="font-medium hover:text-foreground">
+                Ver evidencia legal
+              </Link>
             </div>
 
             <details className="border-t px-5 py-3 text-xs text-muted-foreground">
