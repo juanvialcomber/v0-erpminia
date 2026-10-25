@@ -20,14 +20,14 @@ function isMutatingMethod(path: string, method: string) {
 
 function classify(path: string, tags: string[]): LaudusCapability['domain'] {
   const haystack = (path + ' ' + tags.join(' ')).toLowerCase();
-  if (/product|supplier|customer|cost.?center|warehouse/.test(haystack)) return 'master_data';
-  if (/stock|inventory|warehouse|lot|serial/.test(haystack)) return 'inventory';
-  if (/purchase|supplier.?invoice|waybill|receipt/.test(haystack)) return 'procurement';
-  if (/accounting|journal|bank|payment|ledger|account/.test(haystack)) return 'finance';
   if (/dte|sii|tax|certificate/.test(haystack)) return 'tax';
   if (/fixed.?asset|depreciation/.test(haystack)) return 'fixed_assets';
-  if (/employee|remuneration|absence|payroll/.test(haystack)) return 'hr';
-  if (/sales|quote|sales.?order|sales.?invoice/.test(haystack)) return 'sales';
+  if (/\/hr\/|employee|remuneration|absence|payroll/.test(haystack)) return 'hr';
+  if (/\/sales\/|sales|quote|sales.?order|sales.?invoice/.test(haystack)) return 'sales';
+  if (/stock|inventory|warehouse|lot|serial|kardex|stock.?transfer|\/production\/(products|inputs|outputs|processes|recipes|stages)/.test(haystack)) return 'inventory';
+  if (/\/purchases\/|purchase|supplier.?invoice|waybill|receipt/.test(haystack)) return 'procurement';
+  if (/\/accounting\/|accounting|journal|bank|payment|ledger|account|profit.?and.?loss|reconciliation/.test(haystack)) return 'finance';
+  if (/product|supplier|customer|cost.?center|warehouse/.test(haystack)) return 'master_data';
   return 'unknown';
 }
 
