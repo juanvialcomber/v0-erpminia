@@ -166,6 +166,7 @@ export function WeeklyMaintenancePlanning() {
 
             <div className="flex justify-end">
               {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
+                : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
                 : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
                 : <Button asChild size="sm"><Link href={{
                     pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
