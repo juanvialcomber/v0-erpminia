@@ -34,6 +34,13 @@ type LaudusResponse = {
   rows: LaudusCapability[];
 };
 
+type LaudusProbeResult = {
+  authenticated: boolean;
+  persisted: boolean;
+  redacted: boolean;
+  results: Record<string, { status: 'data' | 'empty' | 'unavailable'; rows: number | null }>;
+};
+
 type Response = {
   data: Source[];
   summary: {
@@ -59,6 +66,7 @@ function date(value: string | null) {
 export default function FinanceSourcesPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
   const { data: laudus, error: laudusError, isLoading: laudusLoading } = useSWR<LaudusResponse>('/api/integrations/laudus/capabilities', fetcher, { revalidateOnFocus: false, refreshInterval: 6 * 60 * 60 * 1000 });
+  const { data: laudusProbe, error: laudusProbeError, isLoading: laudusProbeLoading } = useSWR<LaudusProbeResult>('/api/integrations/laudus/value-probe', fetcher, { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 });
 
   if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Leyendo la trazabilidad canónica certificada." />;
   if (error || !data) return <StatePanel tone="error" title="Fuentes financieras no disponibles" description="No se reemplaza provenance faltante por una lista vacía." />;
@@ -111,6 +119,34 @@ export default function FinanceSourcesPage() {
               </Badge>
             </article>
           ))}
+        </div> : null}
+      </section>
+
+      <section className="overflow-hidden rounded-lg border">
+        <div className="border-b px-4 py-4">
+          <h2 className="text-sm font-semibold">Datos Laudus detectados</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Lectura mínima y redacted: confirma presencia, no importa ni altera registros.</p>
+        </div>
+        {laudusProbeLoading ? <div className="p-4 text-sm text-muted-foreground">Verificando datos disponibles…</div> : null}
+        {laudusProbeError ? <div className="p-4 text-sm text-muted-foreground">No fue posible verificar cobertura real en este momento.</div> : null}
+        {!laudusProbeLoading && !laudusProbeError && laudusProbe ? <div className="grid sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['Órdenes de compra', 'purchaseOrders'],
+            ['Cartolas bancarias', 'bankStatements'],
+            ['Asientos contables', 'journalEntries'],
+            ['Inventarios', 'inventories'],
+            ['Transferencias de stock', 'stockTransfers'],
+            ['Facturas de compra', 'purchaseInvoices'],
+            ['Pagos de compra', 'purchasePayments'],
+            ['Activos fijos', 'fixedAssets'],
+          ].map(([label, key], index) => {
+            const item = laudusProbe.results[key];
+            const status = item?.status ?? 'unavailable';
+            return <div key={key} className={`px-4 py-3 ${index % 4 ? 'border-l' : ''} ${index >= 4 ? 'border-t' : ''}`}>
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="mt-1 text-sm font-semibold">{status === 'data' ? 'Dato detectado' : status === 'empty' ? 'Sin registros' : 'Por verificar'}</p>
+            </div>;
+          })}
         </div> : null}
       </section>
 
