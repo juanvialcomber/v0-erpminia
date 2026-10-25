@@ -22,12 +22,14 @@ type WeeklyDecision = {
   currentReading: number | null;
   currentReadingAt: string | null;
   remainingMeter: number | null;
-  partsStatus: string | null;
-  partsPending: boolean;
+  sourcePartsStatus: string | null;
+  actualMaterialShortage: boolean;
+  evidenceFreshness: 'current' | 'stale' | 'unknown';
+  readingAgeDays: number | null;
   sourceFile: string | null;
   sourceImportedAt: string | null;
   openWorkOrderCount: number;
-  state: 'scheduled' | 'blocked_materials' | 'ready' | 'review';
+  state: 'scheduled' | 'blocked_materials' | 'ready' | 'review' | 'stale_evidence';
   scheduledWorkOrder: {
     id: string;
     work_order_number: string | null;
@@ -56,6 +58,7 @@ type WeeklyResponse = {
     blockedMaterials: number;
     ready: number;
     review: number;
+    staleEvidence: number;
   };
 };
 
@@ -75,6 +78,7 @@ function stateLabel(row: WeeklyDecision) {
   if (row.state === 'scheduled') return 'Programada';
   if (row.state === 'blocked_materials') return 'Revisar materiales';
   if (row.state === 'ready') return 'Lista para programar';
+  if (row.state === 'stale_evidence') return 'Actualizar evidencia';
   return row.standardPlan?.status === 'proposed' ? 'Plan MOTIL por aprobar' : 'Requiere revisión';
 }
 
@@ -136,7 +140,8 @@ export function WeeklyMaintenancePlanning() {
               <p className="mt-2 text-sm">{row.recommendedAction || 'Revisar planificación y evidencia.'}</p>
               <p className="mt-2 text-xs text-muted-foreground">{readingText(row)}{row.currentReadingAt ? ` · lectura ${new Date(row.currentReadingAt).toLocaleDateString('es-CL')}` : ''}</p>
               {row.standardPlan ? <p className="mt-1 text-xs text-muted-foreground">Plan: {row.standardPlan.name}{row.standardPlan.estimatedDurationHours != null ? ` · ${row.standardPlan.estimatedDurationHours.toLocaleString('es-CL')} h observadas/estimadas` : ''}</p> : null}
-              <p className="mt-1 text-xs text-muted-foreground">Fuente: {row.sourceFile || 'planificación canónica'}{row.partsStatus ? ` · materiales: ${row.partsStatus}` : ''}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Fuente: {row.sourceFile || 'planificación canónica'}{row.sourcePartsStatus ? ` · estado materiales en fuente: ${row.sourcePartsStatus}` : ''}</p>
+              {row.evidenceFreshness === 'stale' ? <p className="mt-1 text-xs text-amber-600">Lectura con {row.readingAgeDays ?? '—'} días de antigüedad. MOTIL exige actualización antes de tratar esta señal como decisión semanal.</p> : null}
             </div>
 
             <div className="space-y-2 text-sm">
@@ -144,9 +149,12 @@ export function WeeklyMaintenancePlanning() {
                 <p className="text-xs text-muted-foreground">Programación</p>
                 <p>{row.scheduledWorkOrder.scheduled_date || 'Sin fecha'} · {row.scheduledWorkOrder.assigned_to_name || 'Sin responsable'}</p>
                 <p className="text-xs text-muted-foreground">{row.scheduledWorkOrder.work_order_number || 'OT'} · {row.scheduledWorkOrder.title || 'Sin título'}</p>
-              </> : row.partsPending ? <>
-                <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Materiales por confirmar</p>
-                <p className="text-xs text-muted-foreground">No programar como lista hasta confirmar cobertura.</p>
+              </> : row.actualMaterialShortage ? <>
+                <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real en OT</p>
+                <p className="text-xs text-muted-foreground">Existe cantidad faltante registrada en requerimientos actuales de la OT.</p>
+              </> : row.state === 'stale_evidence' ? <>
+                <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Actualizar lectura</p>
+                <p className="text-xs text-muted-foreground">La prioridad proviene de evidencia antigua y debe validarse antes de programar.</p>
               </> : row.standardPlan?.status === 'approved' ? <>
                 <p className="flex items-center gap-2 font-medium"><CheckCircle2 className="h-4 w-4"/>Preparada</p>
                 <p className="text-xs text-muted-foreground">Tiene plan estándar aprobado y no registra bloqueo de materiales.</p>
