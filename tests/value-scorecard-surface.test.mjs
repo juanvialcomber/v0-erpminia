@@ -70,3 +70,15 @@ test('maintenance cross-domain coverage counts only domains with real evidence',
   assert.match(page, /Mantención → Bodega → Compras → Finanzas/);
   assert.match(page, /Sólo cuenta un dominio cuando existe un evento real/);
 });
+
+
+test('maintenance execution-cycle metric is explicit and not mislabeled as savings', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /medianExecutionCycleSeconds/);
+  assert.match(api, /first timer start to work-order closure/);
+  assert.match(page, /Ciclo ejecución → cierre/);
+  assert.match(page, /Mediana de/);
+  assert.doesNotMatch(page, /horas ahorradas por mantención/i);
+});
