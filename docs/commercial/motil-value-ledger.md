@@ -78,3 +78,12 @@ Estos umbrales habilitan escala inicial, no E4.
 - Gate E2: calibrar al menos 20 decisiones humanas antes de usar esta señal como evidencia robusta de desempeño/adopción.
 - Impacto económico: no medido todavía. No se atribuye ahorro por exposición, monto revisado ni cobertura.
 - Siguiente medición: incorporar tiempo observado de revisión y luego comparar contra baseline manual para estimar horas evitadas con evidencia.
+
+
+## 2026-10-25 — Latencia de decisión Finanzas
+
+- Métrica añadida: latencia observada entre la carga del cockpit financiero y la decisión humana sobre una prioridad Laudus.
+- Persistencia: `audit_log` con `action=finance_review_decision`, factura externa como identificador y `decision_latency_ms` en JSONB.
+- Seguridad semántica: esta métrica no es todavía “tiempo ahorrado” ni baseline manual; sólo mide latencia observada dentro de MOTIL.
+- Antirruido: se descartan latencias mayores a 30 minutos y el scorecard usa una muestra única por factura.
+- Uso comercial futuro: comparar esta distribución contra un baseline manual cronometrado para cuantificar capacidad administrativa recuperada.
