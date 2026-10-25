@@ -63,3 +63,10 @@ test('candidate exposure is never summed across currencies',()=>{
   assert.match(page,/candidateExposureByCurrency/);
   assert.match(page,/monedas/);
 });
+
+
+test('finance cockpit exposes the invoice detail gap as the next action',()=>{
+  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+  assert.match(page,/Próximo paso: completar detalle/);
+  assert.match(page,/Sin líneas de producto MOTIL no fuerza una OC candidata/);
+});
