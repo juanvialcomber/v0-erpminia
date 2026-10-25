@@ -25,16 +25,17 @@ test('native invoice trace is tightly bounded and non-persistent',()=>{
   assert.doesNotMatch(lib,/\.delete\(/);
 });
 
-test('native trace confirms PO only by exact staged purchase order id',()=>{
-  assert.match(lib,/ordersById\.get\(id\)/);
-  assert.match(lib,/\.in\('external_id', ids\)/);
-  assert.match(lib,/nativeTraceOverridesHeuristic: true/);
+test('native trace stays on public service facade and never reads private integration schema',()=>{
+  assert.match(lib,/laudus_purchase_invoice_payment_status_service_v1/);
+  assert.doesNotMatch(lib,/\.schema\('integration'\)/);
+  assert.doesNotMatch(lib,/laudus_purchase_orders/);
+  assert.match(lib,/sourceTraceIsNotPurchaseOrderConfirmation: true/);
 });
 
 test('native trace does not interpret undocumented Laudus step codes',()=>{
   assert.doesNotMatch(lib,/fromStep ===/);
   assert.doesNotMatch(lib,/toStep ===/);
-  assert.match(lib,/unclassifiedTraceCount/);
+  assert.match(lib,/sourceTraceTypeUnclassified: true/);
 });
 
 test('native trace API is Finance scoped and cached briefly',()=>{
@@ -42,9 +43,10 @@ test('native trace API is Finance scoped and cached briefly',()=>{
   assert.match(route,/private, max-age=300/);
 });
 
-test('finance presents native trace as primary evidence without calling it approval',()=>{
-  assert.match(page,/Confirmación Laudus/);
-  assert.match(page,/OC confirmada por trazabilidad Laudus/);
-  assert.match(page,/Confirmado por Laudus/);
-  assert.match(page,/Los demás vínculos se muestran sólo como candidatos para revisión/);
+test('finance presents native Laudus evidence without overclaiming PO confirmation',()=>{
+  assert.match(page,/Evidencia de factura/);
+  assert.match(page,/Con traza Laudus/);
+  assert.match(page,/Traza Laudus disponible/);
+  assert.match(page,/no se interpreta automáticamente como orden de compra ni como aprobación de pago/);
+  assert.doesNotMatch(page,/OC confirmada/);
 });
