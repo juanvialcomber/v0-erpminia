@@ -144,34 +144,63 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, reconciliation, maintenanceCost] = await Promise.all([
-    context.supabase.from('finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
-    context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(120),
-    context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(60),
-    context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(60),
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, reconciliation, maintenanceCost] = await Promise.all([
+    context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
+    context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
+    context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
+    context.supabase.from('procurement_accounts_payable_aging_summary_v1').select('supplier_id,supplier_name,currency,aging_bucket,payable_count,outstanding_amount').eq('organization_id', organizationId).order('outstanding_amount', { ascending: false }).limit(50),
+    context.supabase.from('procurement_cash_forecast_summary_v1').select('currency,open_payables,total_outstanding_amount,overdue_amount,due_next_7_amount,due_next_30_amount,due_next_60_amount,due_next_90_amount,due_after_90_amount,no_due_date_amount,no_due_date_count,next_due_date').eq('organization_id', organizationId).order('currency', { ascending: true }),
+    context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: organizationId, p_limit: 10 }),
+    context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(40),
+    context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
   ]);
-  const failures = [overview.error, costCenters.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
   return {
     capability: 'finance',
-    sources: ['finance_overview', 'canonical_finance_cost_centers', 'finance_asset_reconciliation_v1', 'maintenance_cost_by_cost_center_v1'],
-    toolsUsed: [{ name: 'read_finance_overview', mode: 'read' }, { name: 'read_finance_cost_centers', mode: 'read' }, { name: 'read_finance_reconciliation', mode: 'read' }, { name: 'read_maintenance_cost_centers', mode: 'read' }],
+    sources: [
+      'canonical_finance_overview',
+      'canonical_finance_cost_centers',
+      'canonical_finance_suppliers',
+      'procurement_accounts_payable_aging_summary_v1',
+      'procurement_cash_forecast_summary_v1',
+      'motil_laudus_finance_review_queue',
+      'finance_asset_reconciliation_v1',
+      'maintenance_cost_by_cost_center_v1',
+    ],
+    toolsUsed: [
+      { name: 'read_finance_overview', mode: 'read' },
+      { name: 'read_finance_cost_centers', mode: 'read' },
+      { name: 'read_finance_suppliers', mode: 'read' },
+      { name: 'read_finance_cash_forecast', mode: 'read' },
+      { name: 'read_laudus_finance_review', mode: 'read' },
+      { name: 'read_finance_reconciliation', mode: 'read' },
+    ],
     payload: {
       freshness: {
-        overview_last_financial_activity: overview.data?.last_financial_activity || null,
+        overview_last_event_at: overview.data?.last_event_at || null,
         latest_cost_center_event_at: latestCenterEvent,
+        next_due_date: cashForecast.data?.[0]?.next_due_date || null,
         meaning: 'Cada proyección conserva su propia frescura. Una fuente más reciente no actualiza automáticamente las métricas de otra.',
       },
       overview: overview.data || null,
       cost_centers: centers,
+      top_suppliers: suppliers.data || [],
+      payable_aging: aging.data || [],
+      cash_forecast: cashForecast.data || [],
+      laudus_review: laudusReview.data || null,
       unresolved_asset_reconciliation: reconciliation.data || [],
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
       semantics: {
+        laudus: 'Laudus es fuente financiera trazable. MOTIL prioriza, cruza y explica; no reemplaza la autoridad contable.',
         budget: 'Un presupuesto cero o ausente no debe interpretarse como presupuesto aprobado igual a cero sin validar la fuente contractual/financiera correspondiente.',
         commitments: 'Compromisos de compra son compromisos registrados; no equivalen a gasto reconocido, pagado o devengado salvo evidencia explícita.',
-        cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, compras o mantenimiento.',
+        cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento. No es predicción estadística ni probabilidad futura.',
+        aging: 'Aging describe antigüedad/vencimiento de saldos abiertos; no prueba pérdida, default ni riesgo crediticio.',
+        statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
+        cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
       },
     },
   };
@@ -255,7 +284,11 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
 13. PLAN DE SKILLS es orientación interna, no una fuente. Una skill AVAILABLE puede orientar qué evidencia combinar, pero la afirmación final debe seguir respaldada por EVIDENCIA MOTIL.
 14. Una skill DEGRADED sólo puede usarse para explicar qué información falta; no la presentes como capacidad completa ni extraigas una conclusión positiva de ella.
 15. Una skill DORMANT no debe usarse, nombrarse como disponible ni insinuarse. Si la pregunta depende de ella, explica brevemente que faltan datos sincronizados.
-16. Nunca amplíes evidencia o permisos sólo porque una skill lo sugiera.`;
+16. Nunca amplíes evidencia o permisos sólo porque una skill lo sugiera.
+17. En Finanzas, Laudus sigue siendo la fuente financiera trazable. MOTIL añade dashboard, priorización, forecast, contexto y explicación; no presentes a MOTIL como reemplazo contable.
+18. Un forecast basado en CxP y due_date es forecast contractual. No lo llames predicción estadística, IA predictiva ni confianza probabilística.
+19. Si el usuario pregunta qué viene, usa cash_forecast y aging. Si pregunta qué se sale del patrón, sólo describe concentraciones, excepciones o faltantes observados salvo que exista un modelo estadístico validado.
+20. Para el gerente de Finanzas, cuando la pregunta sea general responde máximo 3 asuntos en formato MONTO/HECHO → POR QUÉ IMPORTA → EVIDENCIA/FUENTE → SIGUIENTE VALIDACIÓN HUMANA.`;
     const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${message}`;
     const result = await callOpenAI({ instructions, input });
     return NextResponse.json({
