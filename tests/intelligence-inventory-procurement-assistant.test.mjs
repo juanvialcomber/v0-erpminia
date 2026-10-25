@@ -76,7 +76,8 @@ test('shared runtime stays read-only canonical freshness-aware and module-first'
   assert.match(runtime, /procurement_accounts_payable_aging_summary_v1/);
   assert.match(runtime, /procurement_cash_forecast_summary_v1/);
   assert.match(runtime, /motil_laudus_finance_review_queue/);
-  assert.match(runtime, /finance_asset_reconciliation_v1/);
+  assert.match(runtime, /motil_laudus_fixed_asset_review_queue/);
+  assert.match(runtime, /maintenance_asset_economic_history_v1/);
   assert.match(runtime, /maintenance_cost_by_cost_center_v1/);
   assert.match(runtime, /latest_snapshot_date/);
   assert.match(runtime, /latest_order_date/);
