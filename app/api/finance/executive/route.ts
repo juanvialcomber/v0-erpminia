@@ -169,6 +169,30 @@ export async function GET(request: NextRequest) {
           ? new Date(acquisition.getFullYear() + usefulLifeYears, acquisition.getMonth(), acquisition.getDate()).toISOString().slice(0, 10)
           : null;
       const maintenance = maintenanceByAsset.get(String(row.canonical_asset_id || '')) || { cost: 0, movements: 0, lastCostDate: null };
+      const acquisitionCost = Number(row.acquisition_cost || 0);
+      const realizableValue = Number(row.realizable_value || 0);
+      const supportsStraightLine = String(row.depreciation_type || '').toUpperCase() === 'LI';
+      const depreciationReady =
+        acquisitionCost > 0 &&
+        usefulLifeYears > 0 &&
+        acquisition !== null &&
+        !Number.isNaN(acquisition.getTime()) &&
+        supportsStraightLine;
+      const annualDepreciation = depreciationReady
+        ? Math.max(0, acquisitionCost - realizableValue) / usefulLifeYears
+        : null;
+      const depreciableElapsedYears =
+        depreciationReady && elapsedYears !== null
+          ? Math.min(usefulLifeYears, elapsedYears)
+          : null;
+      const accumulatedDepreciation =
+        annualDepreciation !== null && depreciableElapsedYears !== null
+          ? Math.min(Math.max(0, acquisitionCost - realizableValue), annualDepreciation * depreciableElapsedYears)
+          : null;
+      const estimatedBookValue =
+        accumulatedDepreciation !== null
+          ? Math.max(realizableValue, acquisitionCost - accumulatedDepreciation)
+          : null;
       return {
         laudusExternalId: row.laudus_external_id || null,
         laudusName: row.laudus_name || null,
@@ -183,7 +207,12 @@ export async function GET(request: NextRequest) {
         lifeConsumedPct,
         estimatedRetirementDate,
         depreciationType: row.depreciation_type || null,
-        acquisitionCost: row.acquisition_cost ?? null,
+        acquisitionCost: acquisitionCost > 0 ? acquisitionCost : null,
+        realizableValue,
+        depreciationStatus: depreciationReady ? 'estimated_from_verified_cost' : 'blocked_missing_acquisition_cost',
+        annualDepreciation,
+        accumulatedDepreciation,
+        estimatedBookValue,
         maintenanceCost: maintenance.cost,
         maintenanceMovements: maintenance.movements,
         lastMaintenanceCostDate: maintenance.lastCostDate,
@@ -195,6 +224,8 @@ export async function GET(request: NextRequest) {
       candidateRows: Number(fixedAssetPayload.summary?.candidate_rows || fixedAssetQueue.length),
       strongCandidates: assetEconomics.length,
       withAcquisitionCost: assetEconomics.filter((row) => Number(row.acquisitionCost || 0) > 0).length,
+      depreciationReady: assetEconomics.filter((row) => row.depreciationStatus === 'estimated_from_verified_cost').length,
+      depreciationBlocked: assetEconomics.filter((row) => row.depreciationStatus === 'blocked_missing_acquisition_cost').length,
       withMaintenanceHistory: assetEconomics.filter((row) => row.maintenanceCost > 0).length,
       fullyConsumedByCalendar: assetEconomics.filter((row) => Number(row.lifeConsumedPct || 0) >= 1).length,
     };
