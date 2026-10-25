@@ -6,7 +6,6 @@ import useSWR from 'swr';
 import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
-import { getEquipmentImage } from '@/lib/maintenance/equipment-images';
 
 type Row = Record<string, string | number | null>;
 
@@ -141,6 +140,7 @@ type Response = {
     maintenanceCost?: number | null;
     maintenanceMovements?: number | null;
     lastMaintenanceCostDate?: string | null;
+    imageUrl?: string | null;
   }>;
   assetReconciliationOpportunities?: Array<{
     canonicalAssetId?: string | null;
@@ -435,6 +435,7 @@ export default function FinanzasPage() {
       maintenanceCost: Number(row.maintenanceCost || 0),
       maintenanceMovements: Number(row.maintenanceMovements || 0),
       lastMaintenanceCostDate: row.lastMaintenanceCostDate || null,
+      imageUrl: row.imageUrl || null,
     }))
     .filter((row) => row.maintenanceCost > 0)
     .slice(0, 6);
@@ -893,18 +894,16 @@ export default function FinanzasPage() {
               <p className="py-8 text-sm text-muted-foreground">Sin conciliaciones económicas priorizables.</p>
             ) : (
               <div className="divide-y">
-                {assetReconciliationOpportunities.slice(0, 5).map((row, index) => {
-                  const equipmentImage = getEquipmentImage(row.name);
-                  return (
+                {assetReconciliationOpportunities.slice(0, 5).map((row, index) => (
                     <div
                       key={row.canonicalAssetId || `${row.code}-${row.name}`}
                       className="grid gap-3 py-3 sm:grid-cols-[28px_52px_minmax(0,1fr)_140px] sm:items-center"
                     >
                       <span className="text-xs font-semibold tabular-nums text-muted-foreground">{index + 1}</span>
                       <div className="hidden h-10 w-12 overflow-hidden rounded-md border bg-muted sm:block">
-                        {equipmentImage ? (
+                        {row.imageUrl ? (
                           <img
-                            src={equipmentImage}
+                            src={row.imageUrl}
                             alt={`Referencia visual de ${row.name}`}
                             className="h-full w-full object-cover"
                             loading="lazy"
@@ -934,8 +933,7 @@ export default function FinanzasPage() {
                         <p className="mt-0.5 text-[11px] text-muted-foreground">mantenimiento histórico</p>
                       </div>
                     </div>
-                  );
-                })}
+                ))}
               </div>
             )}
           </div>
