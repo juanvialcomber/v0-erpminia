@@ -388,22 +388,58 @@ export async function POST(request: NextRequest) {
     }
 
     if (access.canRead('finance')) {
-      const [overview, centers] = await Promise.all([
-        context.supabase.from('finance_overview').select('*').eq('organization_id', org).maybeSingle(),
+      const [overview, centers, suppliers, aging, cashForecast, laudusReview] = await Promise.all([
+        context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', org).maybeSingle(),
         context.supabase
           .from('canonical_finance_cost_centers')
           .select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at')
           .eq('organization_id', org)
           .order('committed_clp', { ascending: false })
-          .limit(80),
+          .limit(40),
+        context.supabase
+          .from('canonical_finance_suppliers')
+          .select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at')
+          .eq('organization_id', org)
+          .order('committed_clp', { ascending: false })
+          .limit(20),
+        context.supabase
+          .from('procurement_accounts_payable_aging_summary_v1')
+          .select('supplier_id,supplier_name,currency,aging_bucket,payable_count,outstanding_amount')
+          .eq('organization_id', org)
+          .order('outstanding_amount', { ascending: false })
+          .limit(40),
+        context.supabase
+          .from('procurement_cash_forecast_summary_v1')
+          .select('currency,open_payables,total_outstanding_amount,overdue_amount,due_next_7_amount,due_next_30_amount,due_next_60_amount,due_next_90_amount,due_after_90_amount,no_due_date_amount,no_due_date_count,next_due_date')
+          .eq('organization_id', org)
+          .order('currency', { ascending: true }),
+        context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: org, p_limit: 10 }),
       ]);
-      if (overview.error || centers.error) throw overview.error || centers.error;
+      const failed = [overview, centers, suppliers, aging, cashForecast, laudusReview].find((result) => result.error);
+      if (failed?.error) throw failed.error;
       evidence.finance = {
+        semantics: {
+          canonical_overview: 'Gasto reconocido y compromisos canónicos MOTIL. No equivale a caja pagada.',
+          cash_forecast: 'Forecast contractual basado en CxP y fechas de vencimiento conocidas. No es predicción estadística.',
+          aging: 'Saldo abierto agrupado por antigüedad/vencimiento. No implica mora crediticia ni pérdida.',
+          laudus_review: 'Cola read-only derivada de evidencia Laudus para revisión humana. No aprueba ni rechaza pagos.',
+          statistical_prediction: 'No disponible salvo que exista modelo validado con backtesting y control de cambios de régimen. Nunca inventar confianza.',
+        },
         overview: overview.data || null,
-        cost_centers: centers.data || [],
+        top_cost_centers: centers.data || [],
+        top_suppliers: suppliers.data || [],
+        payable_aging: aging.data || [],
+        cash_forecast: cashForecast.data || [],
+        laudus_review: laudusReview.data || null,
       };
-      sources.add('finance_overview');
-      sources.add('canonical_finance_cost_centers');
+      [
+        'canonical_finance_overview',
+        'canonical_finance_cost_centers',
+        'canonical_finance_suppliers',
+        'procurement_accounts_payable_aging_summary_v1',
+        'procurement_cash_forecast_summary_v1',
+        'motil_laudus_finance_review_queue',
+      ].forEach((source) => sources.add(source));
       toolsUsed.push({ name: 'read_executive_finance', mode: 'read' });
     }
 
@@ -417,7 +453,12 @@ export async function POST(request: NextRequest) {
 
     const instructions = `Eres el Asistente Senior del Centro Ejecutivo de MOTIL para una operación minera chilena. Tu función es convertir evidencia autorizada en una lista corta de decisiones y validaciones humanas de mayor valor.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente EVIDENCIA MOTIL para afirmaciones operacionales. Nunca insinúes conocimiento de dominios no presentes o no autorizados.\n2. MEMORIA GOBERNADA es contexto laboral estable NO CANÓNICO. Úsala sólo para adaptar lenguaje, foco y presentación. Nunca la uses como hecho operacional, evidencia, permiso, prioridad, causalidad ni autorización. Si contradice evidencia actual, gana la evidencia actual.\n3. CONTEXTO REGULATORIO es una referencia ADVISORY separada. Puede describir estructuras, requisitos y evidencia esperable, pero nunca prueba cumplimiento, incumplimiento, aplicabilidad legal, prioridad, causalidad ni autorización. Si la pregunta es regulatoria, responde OBSERVADO EN MOTIL → REFERENCIA REGULATORIA → BRECHA/INCERTIDUMBRE → VALIDACIÓN HUMANA.\n4. HISTORIAL CONVERSACIONAL es contexto no canónico aportado por el usuario y por respuestas previas. Nunca reemplaza EVIDENCIA MOTIL, nunca eleva una afirmación previa a hecho operacional y nunca autoriza acceso o acciones.\n5. HANDOFF ADVISORY es contexto NO CANÓNICO: sólo define qué revalidar. Una prioridad o recomendación previa nunca mantiene vigencia, severidad, causalidad ni prioridad sin respaldo de la evidencia actual.\n6. Conserva por separado la fecha de corte de cada fuente. No llames "hoy" o "actual" a un dato cuyo corte sea anterior.\n7. No conviertas ausencia de permiso, ausencia de fuente ni vacío de datos en un cero operacional.\n8. No mezcles compromisos de compra, gasto reconocido, pagos, stock, producción o costos como si fueran la misma métrica.\n9. Una alerta, warning, cola o status sólo describe la semántica de su fuente; no es causa raíz ni riesgo probabilístico por sí solo.\n10. Prioriza máximo 3 asuntos cuando la pregunta sea general. Para cada uno: DATO CANÓNICO → POR QUÉ IMPORTA → INCERTIDUMBRE/EVIDENCIA FALTANTE → SIGUIENTE DECISIÓN O VALIDACIÓN HUMANA.\n11. Una prioridad ejecutiva es una recomendación explicable, no una orden ni autorización.\n12. No ejecutes acciones, no apruebes, no cierres, no compres, no ajustes stock y no cambies estados.\n13. Si las fechas de corte entre dominios no son comparables, dilo antes de correlacionarlos.\n14. Para CROSS_DOMAIN_SUPPLY, respeta estrictamente el campo scope. Con scope maintenance_inventory_procurement puedes describir OT → faltante/requerimiento → necesidad → solicitud → orden → entrega/instalación. Con scope maintenance_inventory sólo puedes describir OT → material/faltante y debes declarar que Compras no está visible. Con scope maintenance_procurement sólo puedes describir OT → necesidad/solicitud/orden/entrega y debes declarar que stock/bodega no está visible. Nunca conviertas supply_chain_status en causa raíz. Si falta un eslabón visible, ese es el siguiente punto que requiere validación o acción humana.\n15. Cuando exista CROSS_DOMAIN_SUPPLY y la pregunta sea “qué bloquea”, “por qué”, “qué falta” o equivalente, presenta una cadena causal observada como PROBLEMA → DEPENDENCIA OBSERVADA → ESLABÓN FALTANTE/PENDIENTE → SIGUIENTE VALIDACIÓN HUMANA.\n16. Cuando exista EVIDENCIA EQUIPMENT, úsala para responder por ese activo específico. Separa horómetro/runtime de MTBF/MTTR; work_order_parts no prueba stock disponible; una vista de confiabilidad sin filas significa evidencia no disponible, no cero; recurrencia observada no es predicción de falla; Decision Cases del equipo siguen siendo advisory.\n17. Responde breve, operacional y sin JSON crudo.
 18. PLAN DE SKILLS es orientación interna, no evidencia ni autoridad. Una skill AVAILABLE puede orientar qué evidencia cruzar; una DEGRADED sólo puede aparecer como brecha; una DORMANT no debe participar de una prioridad ejecutiva.
-19. Ninguna skill amplía dominios autorizados, conserva una prioridad previa ni habilita una acción.`;
+19. Ninguna skill amplía dominios autorizados, conserva una prioridad previa ni habilita una acción.
+20. En FINANZAS diferencia estrictamente: gasto reconocido, compromiso, CxP abierta, vencido, forecast contractual y pago. No los sumes ni los llames todos "gasto".
+21. Un forecast de caja basado en due_date es contractual. No lo llames predicción estadística, IA predictiva ni confianza probabilística.
+22. Si el usuario pregunta "qué viene", usa cash_forecast y aging. Si pregunta "qué se sale del patrón", sólo describe concentraciones, faltantes de fecha o excepciones observadas; no declares anomalía estadística sin un modelo validado.
+23. Laudus es fuente financiera trazable; MOTIL añade priorización, contexto y explicación. No sugieras que MOTIL reemplaza Laudus.
+24. Para Finanzas responde como copiloto del gerente: máximo 3 asuntos, cada uno con MONTO/HECHO → POR QUÉ IMPORTA → EVIDENCIA/FUENTE → SIGUIENTE VALIDACIÓN. Si falta evidencia dilo de forma explícita.`;
 
     const result = await callModel(
       instructions,

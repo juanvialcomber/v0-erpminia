@@ -27,11 +27,11 @@ test('canonical finance alerts include treasury so JEFE ADM existing routing rec
   assert.match(migration,/procurement_treasury_alerts_v1/);
 });
 
-test('finance executive exposes treasury summary and supplier aging without assuming one currency',()=>{
+test('finance executive preserves treasury and aging data while the cockpit stays decision focused',()=>{
   assert.match(executiveRoute,/procurement_treasury_summary_v1/);
   assert.match(executiveRoute,/procurement_accounts_payable_aging_summary_v1/);
   assert.match(executiveRoute,/treasuryAging/);
   assert.match(financePage,/currencyMoney/);
-  assert.match(financePage,/Aging por proveedor/);
-  assert.match(financePage,/No hay cuentas por pagar aprobadas/);
+  assert.match(financePage,/CxP aprobadas en MOTIL/);
+  assert.doesNotMatch(financePage,/Aging por proveedor/);
 });

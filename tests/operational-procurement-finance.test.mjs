@@ -26,12 +26,11 @@ test('missing work order cost centers remain explicit exceptions', async () => {
   assert.match(sql, /missing_cost_center_amount/);
 });
 
-test('finance executive exposes operational procurement separately from canonical figures', async () => {
+test('finance executive preserves operational procurement data while cockpit stays decision focused', async () => {
   const api = await readFile(apiPath, 'utf8');
   const page = await readFile(pagePath, 'utf8');
   assert.match(api, /operational_procurement_finance_summary_v1/);
   assert.match(api, /operationalProcurementEvents/);
-  assert.match(page, /Compras operativas/);
-  assert.match(page, /Compromiso pendiente/);
-  assert.match(page, /Monto sin centro de costo/);
+  assert.match(page, /Prioridad inmediata/);
+  assert.doesNotMatch(page, /Monto sin centro de costo/);
 });
