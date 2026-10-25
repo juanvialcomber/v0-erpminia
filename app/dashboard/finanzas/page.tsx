@@ -238,6 +238,9 @@ export default function FinanzasPage() {
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const overview = error ? {} : data?.overview || {};
   const treasury = error ? [] : data?.treasury || [];
@@ -341,6 +344,29 @@ export default function FinanzasPage() {
       };
   const config = concentrationConfig[activeConcentration];
   const rows = rowsByType[activeConcentration].slice(0, 5);
+
+  const analyzeWithMotil = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const response = await fetch('/api/intelligence/executive-assistant', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Analiza exclusivamente Finanzas. Resume máximo 3 asuntos de mayor valor para el gerente de finanzas. Para cada uno indica dato observado, por qué importa, incertidumbre o evidencia faltante y siguiente validación humana. No ejecutes acciones y no inventes predicciones.',
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo ejecutar el análisis MOTIL.');
+      setAiInsight(typeof payload?.answer === 'string' ? payload.answer : 'Sin análisis disponible.');
+    } catch (cause) {
+      setAiError(cause instanceof Error ? cause.message : 'No se pudo ejecutar el análisis MOTIL.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const recordReview = async (
     item: LaudusReviewItem,
@@ -485,6 +511,20 @@ export default function FinanzasPage() {
             <p className="mt-3 text-base font-semibold">{intelligenceSignal.title}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{intelligenceSignal.detail}</p>
             <p className="mt-3 text-xs text-muted-foreground">Señal explicable · recalculada desde evidencia financiera</p>
+            <button
+              type="button"
+              onClick={() => void analyzeWithMotil()}
+              disabled={aiLoading}
+              className="mt-4 inline-flex h-8 items-center rounded-md border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {aiLoading ? 'Analizando…' : 'Analizar con MOTIL'}
+            </button>
+            {aiError ? <p className="mt-2 text-xs text-destructive">{aiError}</p> : null}
+            {aiInsight ? (
+              <div className="mt-3 whitespace-pre-line rounded-md bg-muted/40 p-3 text-xs leading-5 text-foreground">
+                {aiInsight}
+              </div>
+            ) : null}
             <div className="mt-4 border-t pt-3">
               <p className="text-xs font-medium">Predicción estadística</p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
