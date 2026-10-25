@@ -144,7 +144,7 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, invoiceCoverageStartQuery, laudusOpenPage1, laudusOpenPage2, reconciliation, maintenanceCost] = await Promise.all([
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, invoiceCoverageStartQuery, laudusOpenPage1, laudusOpenPage2, maintenanceCost] = await Promise.all([
     context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
     context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
@@ -174,10 +174,9 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       .gt('outstanding_amount', 0)
       .order('outstanding_amount', { ascending: false })
       .range(1000, 1999),
-    context.supabase.from('finance_asset_reconciliation_v1').select('finance_asset_code,finance_asset_name,canonical_asset_code,canonical_asset_name,candidate_count,reconciliation_status,match_method').eq('organization_id', organizationId).neq('reconciliation_status', 'resolved_exact').limit(40),
     context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
   ]);
-  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, invoiceCoverageStartQuery.error, laudusOpenPage1.error, laudusOpenPage2.error, reconciliation.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, invoiceCoverageStartQuery.error, laudusOpenPage1.error, laudusOpenPage2.error, maintenanceCost.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
@@ -352,7 +351,6 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       'motil_laudus_fixed_asset_review_queue',
       'maintenance_asset_economic_history_v1',
       'laudus_purchase_invoice_payment_status_service_v1',
-      'finance_asset_reconciliation_v1',
       'maintenance_cost_by_cost_center_v1',
     ],
     toolsUsed: [
@@ -361,7 +359,6 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       { name: 'read_finance_suppliers', mode: 'read' },
       { name: 'read_finance_cash_forecast', mode: 'read' },
       { name: 'read_laudus_finance_review', mode: 'read' },
-      { name: 'read_finance_reconciliation', mode: 'read' },
     ],
     payload: {
       freshness: {
@@ -391,7 +388,6 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         reconciliation_opportunities: assetReconciliationOpportunities.length,
         reconciliation_opportunity_maintenance_cost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenance_cost, 0),
       },
-      unresolved_asset_reconciliation: reconciliation.data || [],
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
       semantics: {
         laudus: 'Laudus es fuente financiera trazable. MOTIL prioriza, cruza y explica; no reemplaza la autoridad contable.',
