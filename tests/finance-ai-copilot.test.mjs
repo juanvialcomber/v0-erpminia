@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const assistant = fs.readFileSync('app/api/intelligence/executive-assistant/route.ts','utf8');
+const assistant = fs.readFileSync('lib/intelligence/operational-domain-assistant.ts','utf8');
+const financeRoute = fs.readFileSync('app/api/finance/assistant/route.ts','utf8');
 const finance = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
 const proxy = fs.readFileSync('proxy.ts','utf8');
 
@@ -28,7 +29,9 @@ test('Daniel gets one-tap executive questions with provenance',()=>{
   assert.match(finance,/Qué viene/);
   assert.match(finance,/Fuera de patrón/);
   assert.match(finance,/Evidencia: \{aiSources\.join/);
-  assert.match(proxy,/path === '\/api\/intelligence\/executive-assistant'/);
+  assert.match(finance,/\/api\/finance\/assistant/);
+  assert.match(financeRoute,/MODULE_KEYS\.FIN_FINANZAS/);
+  assert.doesNotMatch(proxy,/path === '\/api\/intelligence\/executive-assistant'/);
 });
 
 test('finance copilot remains advisory and read only',()=>{
