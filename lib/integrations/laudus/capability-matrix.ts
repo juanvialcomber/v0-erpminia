@@ -147,6 +147,11 @@ export async function loadLaudusCapabilityMatrix() {
     acc[row.domain] = (acc[row.domain] || 0) + 1;
     return acc;
   }, {});
+  const sourceGroups = rows.reduce<Record<string, number>>((acc, row) => {
+    const group = row.path.split('/').filter(Boolean)[0] || 'otros';
+    acc[group] = (acc[group] || 0) + 1;
+    return acc;
+  }, {});
 
   return {
     source: 'Laudus Swagger',
@@ -161,6 +166,7 @@ export async function loadLaudusCapabilityMatrix() {
       domains: Object.keys(byDomain).length,
     },
     byDomain,
+    sourceGroups,
     rows,
   };
 }
