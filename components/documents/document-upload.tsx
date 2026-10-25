@@ -249,7 +249,7 @@ export function DocumentUpload({ module, category, onUploadSuccess, onCancel }: 
   const validateAndSetFile = (selectedFile: File) => {
     const isValidType = Object.keys(acceptedTypes).includes(selectedFile.type);
     if (!isValidType) {
-      setErrorMessage('Solo se aceptan archivos PDF, Word (.doc, .docx) y Excel (.xls, .xlsx)');
+      setErrorMessage('No podemos usar este archivo. Selecciona un documento o una planilla.');
       setUploadStatus('error');
       setTimeout(() => setUploadStatus('idle'), 5000);
       return;
@@ -257,7 +257,7 @@ export function DocumentUpload({ module, category, onUploadSuccess, onCancel }: 
 
     const maxSize = 50 * 1024 * 1024;
     if (selectedFile.size > maxSize) {
-      setErrorMessage('El archivo no debe superar 50MB');
+      setErrorMessage('El archivo no debe superar los 50 MB.');
       setUploadStatus('error');
       setTimeout(() => setUploadStatus('idle'), 5000);
       return;
@@ -412,7 +412,7 @@ export function DocumentUpload({ module, category, onUploadSuccess, onCancel }: 
                     <Upload className="mx-auto h-10 w-10 text-primary/70" />
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-foreground">Arrastra el archivo aquí o haz clic para seleccionar</p>
-                      <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.doc, .docx), Excel (.xls, .xlsx) | Máx 50MB</p>
+                      <p className="text-xs text-muted-foreground">Documentos y planillas de hasta 50 MB</p>
                     </div>
                   </>
                 )}

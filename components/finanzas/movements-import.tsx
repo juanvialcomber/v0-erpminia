@@ -23,7 +23,7 @@ export function MovementsImport() {
     const name = file.name.toLowerCase();
     const valid = name.endsWith('.csv') || name.endsWith('.xls') || name.endsWith('.xlsx');
     if (!valid) {
-      setResult({ success: false, message: 'Solo aceptamos CSV, XLS o XLSX', error: 'Formato no valido' });
+      setResult({ success: false, message: 'No podemos usar este archivo.', error: 'Elige una planilla o un archivo de movimientos descargado.' });
       return;
     }
 
@@ -44,8 +44,8 @@ export function MovementsImport() {
       if (!response.ok) {
         setResult({
           success: false,
-          message: 'No se pudieron importar los movimientos',
-          error: payload.error || 'Error desconocido',
+          message: 'No se pudieron cargar los movimientos',
+          error: 'Revisa que el archivo incluya las columnas indicadas y vuelve a intentarlo.',
         });
         return;
       }
@@ -55,11 +55,11 @@ export function MovementsImport() {
         message: payload.message || 'Movimientos importados correctamente',
         imported: payload.imported,
       });
-    } catch (error) {
+    } catch {
       setResult({
         success: false,
-        message: 'Error al subir el archivo',
-        error: error instanceof Error ? error.message : String(error),
+        message: 'No se pudo cargar el archivo.',
+        error: 'Revisa tu conexión e inténtalo de nuevo.',
       });
     } finally {
       setIsImporting(false);
@@ -86,7 +86,7 @@ export function MovementsImport() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Upload className="h-5 w-5" />
-          Importar movimientos financieros
+          Cargar movimientos financieros
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -102,7 +102,7 @@ export function MovementsImport() {
         >
           <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
           <p className="font-semibold">Arrastra tu archivo o haz clic para seleccionar</p>
-          <p className="mt-1 text-sm text-muted-foreground">Formato: CSV, XLS o XLSX</p>
+          <p className="mt-1 text-sm text-muted-foreground">Planilla o archivo de movimientos descargado</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -118,9 +118,9 @@ export function MovementsImport() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            <p className="mb-2 font-semibold">Columnas esperadas:</p>
+          <p className="mb-2 font-semibold">Datos que debe incluir:</p>
             <div className="rounded bg-muted p-2 font-mono text-sm">
-              DATE | DESCRIPTION | AMOUNT | TYPE | CATEGORY | COST_CENTER_ID
+              FECHA | DESCRIPCIÓN | MONTO | TIPO | CATEGORÍA | CENTRO DE COSTO
             </div>
           </AlertDescription>
         </Alert>
@@ -136,7 +136,7 @@ export function MovementsImport() {
               <p className={result.success ? 'font-semibold text-green-900' : 'font-semibold text-red-900'}>
                 {result.message}
               </p>
-              {result.imported !== undefined ? <p className="mt-1 text-sm">Importados: {result.imported}</p> : null}
+              {result.imported !== undefined ? <p className="mt-1 text-sm">Movimientos agregados: {result.imported}</p> : null}
               {result.error ? <p className="mt-1 text-sm text-red-700">{result.error}</p> : null}
             </AlertDescription>
           </Alert>
@@ -150,7 +150,7 @@ export function MovementsImport() {
         )}
 
         <Button variant="outline" className="w-full" type="button" onClick={() => fileInputRef.current?.click()}>
-          Seleccionar archivo Excel
+          Seleccionar archivo
         </Button>
       </CardContent>
     </Card>

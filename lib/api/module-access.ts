@@ -45,6 +45,7 @@ export const MODULE_KEYS = {
   PROD_TELEMETRIA: 'prod_telemetria',
   CORE_ALERTAS: 'core_alertas',
   CORE_CENTROS_COSTOS: 'core_centros_costos',
+  CORE_CENTROS_COSTOS_ASIGNACION: 'core_centros_costos_asignacion',
   CORE_DESEMPENO: 'core_desempeno',
 } as const;
 

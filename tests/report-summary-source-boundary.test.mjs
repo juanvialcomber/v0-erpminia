@@ -11,6 +11,6 @@ test('reports never render unavailable document summary as zero', async () => {
   assert.match(page, /setSummary\(null\)/);
   assert.match(page, /isLoading \|\| !summary \? '—'/);
   assert.match(page, /summary\?\.status \|\| 'No disponible'/);
-  assert.match(page, /Los conteos permanecen sin dato hasta recuperar la fuente/);
+  assert.match(page, /Los totales volverán a aparecer cuando se recupere la información/);
   assert.doesNotMatch(page, /useState<ReportSummary>\(\{ total: 0, pending: 0/);
 });

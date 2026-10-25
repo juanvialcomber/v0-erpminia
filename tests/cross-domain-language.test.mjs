@@ -17,7 +17,8 @@ test('global search uses canonical operational names', async () => {
 
 test('reports are presented as a transversal capability, not as procurement', async () => {
   const source = await readFile(reportsUrl, 'utf8');
-  assert.match(source, /Gestión transversal · Análisis y exportación/);
+  assert.match(source, /Documentos y reportes/);
+  assert.match(source, /Descarga información de distintas áreas y revisa los documentos pendientes/);
   assert.doesNotMatch(source, /Abastecimiento · Análisis y exportación/);
   assert.match(source, /<ExportReportForm \/>/);
 });

@@ -47,28 +47,14 @@ type ReviewFeedbackResponse = {
   uniqueInvoices?: number;
 };
 
-type InvoicePoCandidate = {
-  invoiceExternalId?: string;
-  docNumber?: string | null;
-  supplierName?: string | null;
-  outstandingAmount?: number;
-  currency?: string | null;
-  orderNumber?: string | null;
-  score?: number;
-  confidence?: 'strong' | 'review';
-  matchedProducts?: number;
-  invoiceProducts?: number;
-  exactQuantityProducts?: number;
-  exactPriceProducts?: number;
-};
-
 type NativeTraceResponse = {
   summary?: {
     examined?: number;
     nativeLookups?: number;
     detailRecovered?: number;
+    withLines?: number;
     withNativeTrace?: number;
-    withConfirmedPo?: number;
+    missingEvidence?: number;
     apiCalls?: number;
   };
   invoices?: Array<{
@@ -80,28 +66,10 @@ type NativeTraceResponse = {
     sourceDetailAvailable?: boolean;
     itemCount?: number;
     nativeTraceCount?: number;
-    confirmedPurchaseOrders?: Array<{
-      purchaseOrderExternalId?: string;
-      orderNumber?: string | null;
-      evidence?: string;
-    }>;
-    unclassifiedTraceCount?: number;
+    traceAtItemLevel?: boolean;
+    traceAtDocumentLevel?: boolean;
+    sourceError?: string | null;
   }>;
-  readOnly?: boolean;
-};
-
-type InvoicePoControlResponse = {
-  summary?: {
-    openTotal?: number;
-    examined?: number;
-    withLines?: number;
-    withCandidate?: number;
-    strong?: number;
-    review?: number;
-    exposureExaminedByCurrency?: Record<string, number>;
-    candidateExposureByCurrency?: Record<string, number>;
-  };
-  candidates?: InvoicePoCandidate[];
   readOnly?: boolean;
 };
 
@@ -123,7 +91,7 @@ type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
 const fetcher = async (url: string): Promise<Response> => {
   const response = await fetch(url, { credentials: 'include' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas');
+  if (!response.ok) throw new Error('No se pudo cargar la información de Finanzas. Inténtalo de nuevo.');
   return payload;
 };
 
@@ -192,20 +160,10 @@ export default function FinanzasPage() {
     async (url: string) => {
       const response = await fetch(url, { credentials: 'include' });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar la trazabilidad nativa Laudus.');
+      if (!response.ok) throw new Error('No se pudieron consultar los datos de las facturas en Laudus.');
       return payload;
     },
     { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
-  );
-  const poControl = useSWR<InvoicePoControlResponse>(
-    '/api/integrations/laudus/invoice-po-control',
-    async (url: string) => {
-      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el control previo al pago.');
-      return payload;
-    },
-    { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const reviewState = useSWR<ReviewFeedbackResponse>(
     '/api/integrations/laudus/finance-review-feedback',
@@ -228,10 +186,34 @@ export default function FinanzasPage() {
   const treasury = error ? [] : data?.treasury || [];
   const laudus = error ? null : data?.laudusReview || null;
   const laudusSummary = laudus?.summary || {};
-  const attention = (laudus?.reviews || []).slice(0, 5);
   const latestReviewByInvoice = new Map(
     (reviewState.data?.reviews || []).map((row) => [row.purchase_invoice_external_id, row]),
   );
+  const pendingAttention = (laudus?.reviews || [])
+    .filter((item) => {
+      const decision = item.purchase_invoice_external_id
+        ? latestReviewByInvoice.get(item.purchase_invoice_external_id)?.decision
+        : undefined;
+      return decision !== 'accepted' && decision !== 'rejected';
+    })
+    .slice(0, 3);
+  const pendingCurrencies = [
+    ...new Set(
+      pendingAttention
+        .map((item) => String(item.currency || '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const pendingAttentionAmount = pendingAttention.reduce(
+    (sum, item) => sum + Number(item.outstanding_amount || 0),
+    0,
+  );
+  const pendingAttentionValue =
+    pendingAttention.length === 0
+      ? '—'
+      : pendingCurrencies.length === 1
+        ? currencyMoney(pendingAttentionAmount, pendingCurrencies[0])
+        : `${number(pendingAttention.length)} casos`;
 
   const motilOutstanding = treasury.reduce(
     (sum, row) => sum + Number(row.outstanding_amount || 0),
@@ -266,7 +248,7 @@ export default function FinanzasPage() {
 
     let reason = '';
     if (decision === 'rejected') {
-      reason = window.prompt('¿Por qué esta prioridad no aplica?')?.trim() || '';
+      reason = window.prompt('¿Por qué esta factura no requiere seguimiento?')?.trim() || '';
       if (!reason) return;
     }
 
@@ -285,14 +267,13 @@ export default function FinanzasPage() {
           decisionLatencyMs: Date.now() - reviewSessionStartedAt.current,
         }),
       });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la revisión.');
+      if (!response.ok) throw new Error('No se pudo guardar la revisión. Inténtalo de nuevo.');
       setReviewNotice(
         decision === 'accepted'
-          ? 'Revisión registrada.'
+          ? 'Marcada como revisada.'
           : decision === 'deferred'
-            ? 'Caso diferido.'
-            : 'Caso marcado como no aplicable.',
+            ? 'La revisión quedó pendiente.'
+            : 'Marcada como sin seguimiento.',
       );
       await reviewState.mutate();
     } catch (cause) {
@@ -310,23 +291,25 @@ export default function FinanzasPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Finanzas
           </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Qué requiere atención</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Decisiones financieras</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Obligaciones, caja y concentración. Laudus aporta evidencia; MOTIL ordena la revisión y mantiene la decisión humana.
+            {pendingAttention.length > 0
+              ? `${number(pendingAttention.length)} prioridades requieren revisión.`
+              : 'No hay prioridades pendientes en la muestra actual.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <a
+            href="#revisar-prioridades"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+          >
+            Revisar prioridades <ArrowRight className="h-4 w-4" />
+          </a>
           <Link
             href="/dashboard/valor"
             className="inline-flex h-9 items-center rounded-md border px-3 text-sm font-medium hover:bg-muted"
           >
             Valor MOTIL
-          </Link>
-          <Link
-            href="/dashboard/finanzas/trazabilidad"
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-          >
-            Trazabilidad <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
@@ -337,20 +320,23 @@ export default function FinanzasPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
         {[
           [
-            'Exposición Laudus',
+            'Saldo abierto',
             money(laudusSummary.open_amount),
-            `${number(laudusSummary.open_count)} obligaciones abiertas`,
+            `Laudus · ${number(laudusSummary.open_count)} facturas abiertas`,
           ],
           [
-            'Vencido en Laudus',
+            'Vencido',
             money(laudusSummary.overdue_amount),
-            `${number(laudusSummary.overdue_count)} documentos`,
+            `${number(laudusSummary.overdue_count)} facturas`,
           ],
-          ['Costo reconocido MOTIL', money(overview.recognized_clp), 'Hechos operacionales reconocidos'],
-          ['Compras comprometidas', money(overview.committed_clp), 'Compromisos operacionales'],
+          [
+            'Prioridad inmediata',
+            pendingAttentionValue,
+            `${number(pendingAttention.length)} facturas en esta lista`,
+          ],
         ].map(([label, value, detail]) => (
           <div key={label} className="bg-card px-5 py-4">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -362,161 +348,28 @@ export default function FinanzasPage() {
         ))}
       </section>
 
-      <section className="rounded-lg border">
+      <section id="revisar-prioridades" className="rounded-lg border">
         <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control antes de pagar</p>
-            <h2 className="mt-1 text-lg font-semibold">Factura ↔ orden de compra</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              MOTIL busca una OC candidata con evidencia Laudus. Es una ayuda de revisión, no una aprobación de pago.
-            </p>
-          </div>
-          <span className="text-xs text-muted-foreground">Solo lectura</span>
-        </div>
-        {nativeTrace.data?.summary?.nativeLookups ? (
-          <div className="border-b bg-muted/20 px-5 py-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-xs font-medium">Fuente nativa Laudus</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Consulta acotada de facturas prioritarias sin detalle staged. Una OC sólo se confirma cuando el ID trazado por Laudus coincide exactamente con una OC del mismo tenant.
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {number(nativeTrace.data.summary.withConfirmedPo || 0)} confirmadas · {number(nativeTrace.data.summary.detailRecovered || 0)} detalles recuperados
-              </span>
-            </div>
-            {(nativeTrace.data.invoices || []).some((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0) ? (
-              <div className="mt-3 space-y-2">
-                {(nativeTrace.data.invoices || [])
-                  .filter((invoice) => (invoice.confirmedPurchaseOrders || []).length > 0)
-                  .slice(0, 3)
-                  .map((invoice) => (
-                    <div key={invoice.invoiceExternalId} className="flex flex-col gap-1 rounded-md border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-medium">
-                          Factura {invoice.docNumber || 's/n'} · {invoice.supplierName || 'Proveedor'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          OC confirmada por trazabilidad Laudus: {(invoice.confirmedPurchaseOrders || []).map((order) => order.orderNumber || order.purchaseOrderExternalId).join(', ')}
-                        </p>
-                      </div>
-                      <span className="text-xs font-medium">Fuente primaria</span>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-xs text-muted-foreground">
-                La consulta nativa aún no confirma una OC para estas facturas. MOTIL conserva el matcher determinístico como candidato, no como verdad fuente.
-              </p>
-            )}
-          </div>
-        ) : null}
-        {poControl.error ? (
-          <p className="px-5 py-5 text-sm text-muted-foreground">
-            El control previo al pago no está disponible en este momento.
-          </p>
-        ) : !poControl.data ? (
-          <p className="px-5 py-5 text-sm text-muted-foreground">Analizando obligaciones prioritarias…</p>
-        ) : (
-          <div>
-            <div className="grid gap-px border-b bg-border sm:grid-cols-4">
-              {[
-                ['Analizadas', number(poControl.data.summary?.examined || 0)],
-                ['Con detalle', number(poControl.data.summary?.withLines || 0)],
-                ['Con OC candidata', number(poControl.data.summary?.withCandidate || 0)],
-                [
-                  'Exposición candidata',
-                  Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 1
-                    ? currencyMoney(
-                        Object.values(poControl.data.summary?.candidateExposureByCurrency || {})[0],
-                        Object.keys(poControl.data.summary?.candidateExposureByCurrency || {})[0],
-                      )
-                    : Object.entries(poControl.data.summary?.candidateExposureByCurrency || {}).length === 0
-                      ? '—'
-                      : `${Object.keys(poControl.data.summary?.candidateExposureByCurrency || {}).length} monedas`,
-                ],
-              ].map(([label, value]) => (
-                <div key={label} className="bg-card px-4 py-3">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="mt-1 text-lg font-semibold">{value}</p>
-                </div>
-              ))}
-            </div>
-            {(poControl.data.candidates || []).slice(0, 5).length === 0 ? (
-              <p className="px-5 py-5 text-sm text-muted-foreground">
-                No hay candidatas suficientes en las obligaciones analizadas. MOTIL no fuerza una coincidencia.
-              </p>
-            ) : (
-              <div>
-                {(poControl.data.candidates || []).slice(0, 5).map((candidate, index) => (
-                  <div
-                    key={candidate.invoiceExternalId || index}
-                    className="grid gap-2 border-b px-5 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_150px_120px_150px] lg:items-center"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {candidate.supplierName || 'Proveedor'} · Factura {candidate.docNumber || 's/n'}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        OC candidata {candidate.orderNumber || 's/n'} · {number(candidate.matchedProducts || 0)}/{number(candidate.invoiceProducts || 0)} productos · {number(candidate.exactPriceProducts || 0)} precios exactos
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {candidate.confidence === 'strong' ? 'Candidata fuerte' : 'Requiere revisión'}
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums lg:text-right">
-                      Evidencia {number(candidate.score || 0)}/100
-                    </span>
-                    <span className="text-sm font-semibold tabular-nums lg:text-right">
-                      {currencyMoney(candidate.outstandingAmount, candidate.currency)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {Number(poControl.data.summary?.examined || 0) > Number(poControl.data.summary?.withLines || 0) ? (
-              <div className="border-t px-5 py-3 text-xs">
-                <span className="font-medium">
-                  Próximo paso: completar detalle de {number(
-                    Number(poControl.data.summary?.examined || 0) -
-                      Number(poControl.data.summary?.withLines || 0),
-                  )} obligaciones prioritarias.
-                </span>
-                <span className="ml-1 text-muted-foreground">
-                  Sin líneas de producto MOTIL no fuerza una OC candidata.
-                </span>
-              </div>
-            ) : null}
-            <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-              La exposición candidata no es ahorro. Una diferencia sólo genera valor E3 cuando una revisión humana demuestra una corrección antes del pago.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-lg border">
-        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Revisar primero</h2>
+            <h2 className="text-lg font-semibold">Revisar ahora</h2>
             <p className="text-sm text-muted-foreground">
-              Mayores excepciones abiertas de Laudus, ordenadas por vencimiento y monto.
+              Las tres prioridades de mayor impacto que requieren una decisión.
             </p>
           </div>
           <div className="text-right">
-            <span className="text-xs text-muted-foreground">Fuente de solo lectura</span>
+            <span className="text-xs text-muted-foreground">{number(pendingAttention.length)} pendientes</span>
             {reviewNotice ? <p className="mt-1 text-xs text-foreground">{reviewNotice}</p> : null}
           </div>
         </div>
         {isLoading ? (
-          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando prioridades…</p>
-        ) : attention.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground">Cargando facturas...</p>
+        ) : pendingAttention.length === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">
-            No hay obligaciones Laudus abiertas disponibles para priorizar.
+            No hay facturas abiertas de Laudus para revisar.
           </p>
         ) : (
           <div>
-            {attention.map((item, index) => {
+            {pendingAttention.map((item, index) => {
               const priorReview = item.purchase_invoice_external_id
                 ? latestReviewByInvoice.get(item.purchase_invoice_external_id)
                 : undefined;
@@ -531,9 +384,12 @@ export default function FinanzasPage() {
                     {item.supplier_name || 'Proveedor sin identificar'}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {item.doc_number ? `Doc. ${item.doc_number} · ` : ''}
-                    {item.review_reason || 'Revisión requerida'}
-                    {Number(item.days_overdue || 0) > 0 ? ` · ${number(item.days_overdue)} días` : ''}
+                    {item.doc_number ? `Factura ${item.doc_number} · ` : ''}
+                    {Number(item.days_overdue || 0) > 0
+                      ? `Atrasada ${number(item.days_overdue)} días`
+                      : !item.due_date
+                        ? 'Falta fecha de vencimiento'
+                        : 'Saldo pendiente de revisión'}
                   </p>
                 </div>
                 <span className="text-xs text-muted-foreground md:text-right">
@@ -544,10 +400,10 @@ export default function FinanzasPage() {
                 </span>
                 <div className="flex flex-wrap gap-1.5 xl:justify-end">
                   {priorReview?.decision === 'accepted' ? (
-                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Revisado</span>
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Ya revisada</span>
                   ) : null}
                   {priorReview?.decision === 'rejected' ? (
-                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">No aplica</span>
+                    <span className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground">Sin seguimiento</span>
                   ) : null}
                   {priorReview?.decision !== 'accepted' && priorReview?.decision !== 'rejected' ? <button
                     type="button"
@@ -555,7 +411,7 @@ export default function FinanzasPage() {
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
                     className="rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
                   >
-                    Revisado
+                    Marcar revisada
                   </button> : null}
                   <button
                     type="button"
@@ -563,7 +419,7 @@ export default function FinanzasPage() {
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
                     className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
                   >
-                    Después
+                    Posponer
                   </button>
                   <button
                     type="button"
@@ -574,7 +430,7 @@ export default function FinanzasPage() {
                     disabled={!item.purchase_invoice_external_id || reviewingId === item.purchase_invoice_external_id}
                     className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
                   >
-                    {rejectingId === item.purchase_invoice_external_id ? 'Registrando…' : 'No aplica'}
+                    {rejectingId === item.purchase_invoice_external_id ? 'Guardando…' : 'Sin seguimiento'}
                   </button>
                 </div>
               </div>
@@ -584,44 +440,134 @@ export default function FinanzasPage() {
         )}
       </section>
 
+
+
+      <section className="rounded-lg border">
+        <div className="flex flex-col gap-2 border-b px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Antes de pagar</p>
+            <h2 className="mt-1 text-lg font-semibold">Información de las facturas</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Consulta los datos y documentos que Laudus entrega antes de decidir si se paga cada factura. La decisión final se registra en MOTIL.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">Consulta</span>
+        </div>
+
+        {nativeTrace.error ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">
+            Laudus no entregó más datos de estas facturas. Puedes revisarlas igualmente.
+          </p>
+        ) : !nativeTrace.data ? (
+          <p className="px-5 py-5 text-sm text-muted-foreground">
+            Consultando los datos de las facturas...
+          </p>
+        ) : (
+          <div>
+            <div className="grid gap-px border-b bg-border sm:grid-cols-3">
+              {[
+                ['Con detalle', number(nativeTrace.data.summary?.withLines || 0)],
+                ['Con documentos relacionados', number(nativeTrace.data.summary?.withNativeTrace || 0)],
+                ['Sin información adicional', number(nativeTrace.data.summary?.missingEvidence || 0)],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-card px-4 py-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-lg font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              {(nativeTrace.data.invoices || []).slice(0, 3).map((invoice) => (
+                <div
+                  key={invoice.invoiceExternalId}
+                  className="grid gap-2 border-b px-5 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_150px] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {invoice.sourceDetailAvailable
+                        ? Number(invoice.itemCount || 0) > 0
+                          ? `${number(invoice.itemCount || 0)} conceptos de compra`
+                          : 'Laudus no entregó el detalle de los conceptos'
+                        : 'No se pudo consultar el detalle'}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground md:text-right">
+                    {Number(invoice.nativeTraceCount || 0) > 0
+                      ? 'Hay documentos relacionados en Laudus'
+                      : 'No hay documentos relacionados'}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums md:text-right">
+                    {currencyMoney(invoice.outstandingAmount, invoice.currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <details className="border-t px-5 py-3 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none hover:text-foreground">
+                De dónde viene esta información
+              </summary>
+              <p className="mt-2 max-w-3xl">
+                MOTIL muestra el detalle y los documentos que Laudus relaciona con cada factura. Que exista un documento relacionado no significa que la compra o el pago estén aprobados.
+              </p>
+            </details>
+          </div>
+        )}
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="rounded-lg border p-5">
           <div className="flex items-center gap-2">
             <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-base font-semibold">CxP aprobadas en MOTIL</h2>
+            <h2 className="text-base font-semibold">Facturas aprobadas en MOTIL</h2>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Este universo es distinto de la exposición histórica observada en Laudus.
+            Estas facturas se gestionan en MOTIL. Las facturas antiguas de Laudus se muestran por separado.
           </p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Saldo</p>
-              <p className="mt-1 text-xl font-semibold">{money(motilOutstanding)}</p>
+          {motilOutstanding > 0 || motilDueSoon > 0 || motilOverdue > 0 ? (
+            <>
+              <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Saldo</p>
+                  <p className="mt-1 text-xl font-semibold">{money(motilOutstanding)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Vence en 7 días o menos</p>
+                  <p className="mt-1 text-xl font-semibold">{money(motilDueSoon)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Vencido</p>
+                  <p className="mt-1 text-xl font-semibold">{money(motilOverdue)}</p>
+                </div>
+              </div>
+              {ready && canEdit('fin_finanzas') ? (
+                <Link
+                  href="/dashboard/finanzas/pagos"
+                  className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  Ir a pagos <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-4 rounded-md bg-muted/40 px-4 py-3">
+              <p className="text-sm font-medium">No hay facturas aprobadas pendientes de pago en MOTIL</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Las facturas antiguas de Laudus se muestran por separado.
+              </p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Vence ≤ 7 días</p>
-              <p className="mt-1 text-xl font-semibold">{money(motilDueSoon)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Vencido</p>
-              <p className="mt-1 text-xl font-semibold">{money(motilOverdue)}</p>
-            </div>
-          </div>
-          {ready && canEdit('fin_finanzas') ? (
-            <Link
-              href="/dashboard/finanzas/pagos"
-              className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-            >
-              Operar pagos <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          ) : null}
+          )}
         </div>
 
         <div className="rounded-lg border p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Dónde se concentra</h2>
-              <p className="text-xs text-muted-foreground">Top 5 del contexto financiero canónico.</p>
+              <h2 className="text-base font-semibold">Montos por categoría</h2>
+              <p className="text-xs text-muted-foreground">Hasta cinco con los montos más altos.</p>
             </div>
             <div className="flex flex-wrap gap-1">
               {(Object.keys(concentrationConfig) as ConcentrationKey[]).map((key) => (
@@ -638,7 +584,7 @@ export default function FinanzasPage() {
           </div>
           <div className="mt-4">
             {!isLoading && !error && rows.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">Sin datos canónicos vinculados.</p>
+              <p className="py-4 text-sm text-muted-foreground">No hay datos para esta categoría.</p>
             ) : (
               rows.map((row, index) => (
                 <div
@@ -662,7 +608,7 @@ export default function FinanzasPage() {
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <div>
             <p className="font-medium">
-              {number(laudusSummary.no_due_date_count)} obligaciones Laudus no tienen vencimiento.
+              {number(laudusSummary.no_due_date_count)} facturas de Laudus no tienen fecha de vencimiento.
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               MOTIL las mantiene visibles como excepción; no inventa una fecha.
@@ -672,9 +618,10 @@ export default function FinanzasPage() {
       ) : null}
 
       <section className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-4 text-xs text-muted-foreground">
-        <Link href="/dashboard/finanzas/fuentes" className="hover:text-foreground">Fuentes y calidad</Link>
+        <Link href="/dashboard/finanzas/trazabilidad" className="hover:text-foreground">Origen de gastos y compras</Link>
+        <Link href="/dashboard/finanzas/fuentes" className="hover:text-foreground">De dónde salen los montos</Link>
         <Link href="/dashboard/finanzas/documentos" className="hover:text-foreground">Documentos</Link>
-        <Link href="/dashboard/legal" className="hover:text-foreground">Evidencia legal</Link>
+        <Link href="/dashboard/legal" className="hover:text-foreground">Documentos legales</Link>
         <Link href="/dashboard/finanzas/calendario" className="hover:text-foreground">Calendario</Link>
       </section>
     </div>

@@ -10,11 +10,11 @@ import { MovementsImport } from '@/components/finanzas/movements-import';
 const issueCopy: Record<string, { title: string; description: string }> = {
   zero_amount_lines: {
     title: 'Revisar líneas con monto cero',
-    description: 'La fuente canónica contiene registros con monto neto igual a cero. Corrige o vuelve a importar sólo cuando la fuente permita acreditar el valor correcto.',
+    description: 'Hay movimientos con monto cero. Confirma el valor con el documento original antes de corregirlos o volver a cargar el archivo.',
   },
   validation: {
-    title: 'Resolver validación financiera',
-    description: 'Existe una validación financiera pendiente. Revisa el archivo de origen y vuelve a importar sólo si la corrección está sustentada por evidencia contable.',
+    title: 'Revisar datos financieros',
+    description: 'Hay datos pendientes de revisión. Compáralos con el archivo y el respaldo contable antes de volver a cargarlo.',
   },
 };
 
@@ -24,7 +24,7 @@ export default function FinanzasImportPage() {
   const issueContext = issue ? issueCopy[issue] : null;
 
   const downloadTemplate = () => {
-    const headers = ['DATE', 'DESCRIPTION', 'AMOUNT', 'TYPE', 'CATEGORY', 'COST_CENTER_ID'];
+    const headers = ['FECHA', 'DESCRIPCIÓN', 'MONTO', 'TIPO', 'CATEGORÍA', 'CENTRO DE COSTO'];
     const rows = [
       ['2026-06-27', 'Venta de mineral', '1500000', 'ingreso', 'operacion', ''],
       ['2026-06-27', 'Compra repuestos', '250000', 'egreso', 'mantenimiento', 'cc-001'],
@@ -47,15 +47,15 @@ export default function FinanzasImportPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Importar movimientos financieros</h1>
+          <h1 className="text-3xl font-bold">Cargar movimientos financieros</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Carga ingresos y egresos desde Excel para mantener la trazabilidad del flujo de caja con el mismo criterio que el resto de los módulos.
+            Carga ingresos y gastos desde un archivo. Incluye la fecha, el detalle, el monto y el centro de costo para conservar el historial.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadTemplate}>
             <Download className="mr-2 h-4 w-4" />
-            Plantilla Excel
+            Plantilla de movimientos
           </Button>
           <Button asChild>
             <Link href="/dashboard/finanzas">
@@ -72,9 +72,9 @@ export default function FinanzasImportPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="h-5 w-5 text-[var(--brand-verde)]" />
-            Flujo de importación
+            Preparar archivo
           </CardTitle>
-          <CardDescription>El archivo debe traer fecha, descripción, monto, tipo, categoría y centro de costo.</CardDescription>
+          <CardDescription>Incluye estas columnas: fecha, detalle, monto, tipo, categoría y centro de costo.</CardDescription>
         </CardHeader>
         <CardContent>
           <MovementsImport />
@@ -86,10 +86,10 @@ export default function FinanzasImportPage() {
           <CardTitle>Uso recomendado</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>1. Exporta los movimientos desde tu fuente contable o de caja.</p>
-          <p>2. Asegura que `TYPE` sea `ingreso` o `egreso`.</p>
-          <p>3. Sube el archivo desde esta pantalla para poblar el sistema.</p>
-          <p>4. Vuelve al dashboard para revisar ingresos, egresos y balance.</p>
+          <p>1. Descarga los movimientos desde tu sistema contable o banco.</p>
+          <p>2. En la columna “Tipo”, escribe “ingreso” o “egreso”.</p>
+          <p>3. Selecciona el archivo para agregar los movimientos a MOTIL.</p>
+          <p>4. Vuelve al resumen para revisar ingresos, gastos y saldo.</p>
         </CardContent>
       </Card>
     </div>

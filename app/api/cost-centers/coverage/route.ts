@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { financeAmount, financeStatusLabel, maintenancePriorityLabel } from '@/lib/finance-ui-labels';
 import {
   MODULE_KEYS,
   getModuleAccessLevel,
@@ -44,22 +45,23 @@ function labelRow(domain: CoverageDomain, row: Record<string, unknown>) {
     return {
       code: String(row.code || ''),
       label: String(row.name || row.code || 'Fuente de mina'),
-      detail: String(row.status || ''),
+      detail: financeStatusLabel(row.status, 'production'),
     };
   }
   if (domain === 'maintenance') {
     return {
       code: String(row.work_order_number || ''),
       label: String(row.title || row.work_order_number || 'Orden de trabajo'),
-      detail: [row.status, row.priority].filter(Boolean).join(' · '),
+      detail: [financeStatusLabel(row.status, 'maintenance'), row.priority ? maintenancePriorityLabel(row.priority) : null]
+        .filter(Boolean)
+        .join(' · '),
     };
   }
   const amount = Number(row.total_amount || 0);
-  const currency = String(row.currency || 'CLP');
   return {
     code: String(row.order_number || ''),
     label: String(row.order_number || 'Orden de compra'),
-    detail: `${String(row.status || '')}${amount ? ` · ${currency} ${amount.toLocaleString('es-CL')}` : ''}`,
+    detail: `${financeStatusLabel(row.status, 'procurement')}${amount ? ` · ${financeAmount(amount, String(row.currency || 'CLP'))}` : ''}`,
   };
 }
 
@@ -71,6 +73,11 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
+    const assignmentAccessLevel = await getModuleAccessLevel(
+      context.userId,
+      context.role,
+      MODULE_KEYS.CORE_CENTROS_COSTOS_ASIGNACION,
+    );
     const entries = await Promise.all(
       (Object.entries(DOMAIN_CONFIG) as Array<[CoverageDomain, DomainConfig]>).map(async ([domain, config]) => {
         const accessLevel = await getModuleAccessLevel(context.userId, context.role, config.moduleKey);
@@ -98,7 +105,7 @@ export async function GET(request: NextRequest) {
       rows.map((row) => ({
         id: String(row.id),
         domain,
-        canAssign: accessLevel === 'ED' && costCenterAccess.canWrite,
+        canAssign: assignmentAccessLevel === 'ED' && canRead(accessLevel),
         ...labelRow(domain, row),
       })),
     );
@@ -121,8 +128,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const costCenterAccess = await requireModuleAccess(request, MODULE_KEYS.CORE_CENTROS_COSTOS, true);
+  const costCenterAccess = await requireModuleAccess(request, MODULE_KEYS.CORE_CENTROS_COSTOS);
   if (!costCenterAccess.authorized) return costCenterAccess.response;
+  const assignmentAccess = await requireModuleAccess(
+    request,
+    MODULE_KEYS.CORE_CENTROS_COSTOS_ASIGNACION,
+    true,
+  );
+  if (!assignmentAccess.authorized) return assignmentAccess.response;
 
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -137,8 +150,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Dominio, registro y centro de costo son obligatorios' }, { status: 400 });
   }
 
-  const ownerAccess = await requireModuleAccess(request, config.moduleKey, true);
-  if (!ownerAccess.authorized) return ownerAccess.response;
+  const sourceAccessLevel = await getModuleAccessLevel(context.userId, context.role, config.moduleKey);
+  if (!canRead(sourceAccessLevel)) {
+    return NextResponse.json({ error: 'No tienes acceso a este registro' }, { status: 403 });
+  }
 
   try {
     const { data: costCenter, error: costCenterError } = await context.supabase
@@ -150,7 +165,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (costCenterError) throw costCenterError;
     if (!costCenter) {
-      return NextResponse.json({ error: 'Centro de costo canónico no encontrado o inactivo' }, { status: 404 });
+      return NextResponse.json({ error: 'Centro de costo no encontrado o inactivo' }, { status: 404 });
     }
 
     const { data: updated, error: updateError } = await context.supabase

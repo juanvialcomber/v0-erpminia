@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CertifiedFinancialSummary } from '@/components/finance/certified-financial-summary';
 import { StatePanel } from '@/components/ui/state-panel';
+import { financeAmount, financeStatusLabel } from '@/lib/finance-ui-labels';
 
 type CostCenter = {
   cost_center_code: string;
@@ -28,11 +29,10 @@ type Response = { costCenter: CostCenter; actualCosts: ActualCost[]; purchaseOrd
 const fetcher = async (url: string): Promise<Response> => {
   const response = await fetch(url, { credentials: 'include' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el centro de costo');
+  if (!response.ok) throw new Error('No se pudo cargar la información del centro de costo. Inténtalo de nuevo.');
   return payload;
 };
 
-const money = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
 const date = (value: string | null | undefined) => value ? new Intl.DateTimeFormat('es-CL').format(new Date(value)) : '—';
 
 export default function CostCenterProfilePage() {
@@ -45,8 +45,8 @@ export default function CostCenterProfilePage() {
 
   const center = data.costCenter;
   const budgets = [
-    { label: 'Presupuesto operativo', value: money(center.budget_annual) },
-    { label: 'Disponible operativo', value: money(center.budget_available) },
+    { label: 'Presupuesto operativo', value: financeAmount(center.budget_annual) },
+    { label: 'Disponible operativo', value: financeAmount(center.budget_available) },
   ];
 
   return (
@@ -59,9 +59,9 @@ export default function CostCenterProfilePage() {
           <div>
             <p className="font-mono text-xs text-muted-foreground">{center.cost_center_code}</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{center.name}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{center.full_path || 'Centro de costo canónico'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{center.full_path || 'Centro de costo'}</p>
           </div>
-          <Badge variant="outline">{center.financial_status}</Badge>
+          <Badge variant="outline">{financeStatusLabel(center.financial_status, 'financial')}</Badge>
         </div>
       </section>
 
@@ -78,14 +78,14 @@ export default function CostCenterProfilePage() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section>
-          <h2 className="mb-3 text-sm font-semibold">Movimientos reconocidos</h2>
+          <h2 className="mb-3 text-sm font-semibold">Gastos registrados</h2>
           <div className="divide-y divide-border/70 border-t border-border/70">
             {data.actualCosts.length ? data.actualCosts.map((row) => (
               <div key={row.id} className="flex items-start justify-between gap-4 py-3">
                 <div><p className="text-sm font-medium">{row.description || row.category || 'Movimiento'}</p><p className="text-xs text-muted-foreground">{date(row.transaction_date)} · {row.asset_code || row.document_number || 'Sin referencia'}</p></div>
-                <p className="text-sm font-medium tabular-nums">{money(row.total_cost)}</p>
+                <p className="text-sm font-medium tabular-nums">{financeAmount(row.total_cost)}</p>
               </div>
-            )) : <p className="py-3 text-sm text-muted-foreground">Sin movimientos reconocidos asociados.</p>}
+            )) : <p className="py-3 text-sm text-muted-foreground">No hay gastos asociados a este centro de costo.</p>}
           </div>
         </section>
 
@@ -95,7 +95,7 @@ export default function CostCenterProfilePage() {
             {data.purchaseOrders.length ? data.purchaseOrders.map((row) => (
               <div key={row.id} className="flex items-start justify-between gap-4 py-3">
                 <div><p className="text-sm font-medium">{row.order_number}</p><p className="text-xs text-muted-foreground">{row.supplier_name || 'Sin proveedor'} · {date(row.order_date)}</p></div>
-                <p className="text-sm font-medium tabular-nums">{money(row.total_amount)}</p>
+                <p className="text-sm font-medium tabular-nums">{financeAmount(row.total_amount)}</p>
               </div>
             )) : <p className="py-3 text-sm text-muted-foreground">Sin compromisos asociados.</p>}
           </div>
@@ -107,9 +107,9 @@ export default function CostCenterProfilePage() {
             {data.workOrders.length ? data.workOrders.map((row) => (
               <Link key={row.id} href={`/dashboard/mantenimiento/ordenes/${row.id}`} className="block py-3 hover:text-primary">
                 <p className="text-sm font-medium">{row.work_order_number} · {row.title}</p>
-                <p className="text-xs text-muted-foreground">{row.status} · {row.assigned_to_name || 'Sin responsable'}</p>
+                <p className="text-xs text-muted-foreground">{financeStatusLabel(row.status, 'maintenance')} · {row.assigned_to_name || 'Sin responsable'}</p>
               </Link>
-            )) : <p className="py-3 text-sm text-muted-foreground">Sin OT asociadas.</p>}
+            )) : <p className="py-3 text-sm text-muted-foreground">Sin órdenes de trabajo asociadas.</p>}
           </div>
         </section>
 
@@ -119,7 +119,7 @@ export default function CostCenterProfilePage() {
             {data.assets.length ? data.assets.map((row) => (
               <Link key={row.id} href={`/dashboard/mantenimiento/equipos/${row.id}`} className="block py-3 hover:text-primary">
                 <p className="text-sm font-medium">{row.asset_code} · {row.name}</p>
-                <p className="text-xs text-muted-foreground">{row.category || 'Activo'} · {row.status || 'Sin estado'}</p>
+                <p className="text-xs text-muted-foreground">{row.category || 'Activo'} · {financeStatusLabel(row.status, 'asset')}</p>
               </Link>
             )) : <p className="py-3 text-sm text-muted-foreground">Sin activos vinculados.</p>}
           </div>

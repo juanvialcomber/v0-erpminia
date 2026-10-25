@@ -41,4 +41,5 @@ export const MODULE_DEFS = [
   { key: MODULE_KEYS.PROD_TELEMETRIA, label: 'Telemetria de Sensores', group: 'Produccion' },
   { key: MODULE_KEYS.CORE_ALERTAS, label: 'Alertas', group: 'Core' },
   { key: MODULE_KEYS.CORE_CENTROS_COSTOS, label: 'Centros de Costos', group: 'Core' },
+  { key: MODULE_KEYS.CORE_CENTROS_COSTOS_ASIGNACION, label: 'Asignar centros de costo', group: 'Core' },
 ];

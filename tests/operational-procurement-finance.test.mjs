@@ -31,6 +31,6 @@ test('finance executive preserves operational procurement data while cockpit sta
   const page = await readFile(pagePath, 'utf8');
   assert.match(api, /operational_procurement_finance_summary_v1/);
   assert.match(api, /operationalProcurementEvents/);
-  assert.match(page, /Compras comprometidas/);
+  assert.match(page, /Prioridad inmediata/);
   assert.doesNotMatch(page, /Monto sin centro de costo/);
 });

@@ -23,13 +23,13 @@ test('finance provenance preserves recognized and committed source semantics', a
 
 test('finance source UI does not invent original files', async () => {
   const source = await readFile(pageUrl, 'utf8');
-  assert.match(source, /No se presenta como archivo Excel original/);
-  assert.match(source, /tablas canónicas/);
-  assert.match(source, /Documentos Finanzas/);
+  assert.match(source, /Los archivos que subas se guardan por separado y no cambian este historial/);
+  assert.match(source, /qué registros respaldan los gastos y las órdenes de compra/);
+  assert.match(source, /Archivos de Finanzas/);
 });
 
 test('finance navigation exposes provenance', async () => {
   const source = await readFile(layoutUrl, 'utf8');
   assert.match(source, /\/dashboard\/finanzas\/fuentes/);
-  assert.match(source, /Fuentes/);
+  assert.match(source, /Datos de origen/);
 });

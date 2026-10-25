@@ -18,14 +18,14 @@ export default function FinanzasDocumentosImportarPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Importar documentos de finanzas</h1>
+          <h1 className="text-3xl font-bold">Subir documentos de Finanzas</h1>
           <p className="mt-2 max-w-3xl text-muted-foreground">
-            Ruta dedicada para cargar politicas, procedimientos, respaldos y anexos documentales del modulo financiero.
+            Sube políticas, procedimientos y respaldos para tenerlos a mano.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Importador tabular</Link>
+            <Link href="/dashboard/finanzas/importar">Cargar movimientos</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/dashboard/finanzas/documentos">
@@ -43,14 +43,14 @@ export default function FinanzasDocumentosImportarPage() {
             Subir documento financiero
           </CardTitle>
           <CardDescription>
-            Acepta PDF, Word y Excel. El archivo queda asociado al módulo finanzas para revisión y trazabilidad.
+            Quedarán guardados en Finanzas para que puedas consultarlos después.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={handleUploadSuccess} />
           {uploadedName ? (
             <div className="rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-              Ultimo archivo cargado: <span className="font-medium text-foreground">{uploadedName}</span>
+              Último archivo cargado: <span className="font-medium text-foreground">{uploadedName}</span>
             </div>
           ) : null}
         </CardContent>

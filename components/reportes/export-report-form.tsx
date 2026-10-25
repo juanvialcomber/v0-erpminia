@@ -7,8 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const REPORT_TYPES = [
   { value: 'maintenance', label: 'Órdenes de mantenimiento' },
-  { value: 'hse', label: 'Incidentes y hallazgos HSE' },
-  { value: 'audit', label: 'Trazabilidad y movimientos' },
+  { value: 'hse', label: 'Incidentes y observaciones de seguridad' },
+  { value: 'audit', label: 'Movimientos e historial' },
 ];
 
 export function ExportReportForm() {
@@ -44,7 +44,7 @@ export function ExportReportForm() {
       }
     } catch (err) {
       console.error('[v0] Export error:', err);
-      setError(err instanceof Error ? err.message : 'No se pudo generar el reporte');
+      setError('No se pudo descargar el archivo. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -103,11 +103,11 @@ export function ExportReportForm() {
 
           <Button onClick={handleExport} disabled={loading} className="w-full gap-2">
             <Download className="h-4 w-4" />
-            {loading ? 'Generando...' : 'Descargar CSV'}
+            {loading ? 'Preparando...' : 'Descargar archivo'}
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            El archivo se genera con el rango de fechas seleccionado.
+            El archivo incluirá la información del rango de fechas seleccionado.
           </p>
         </div>
       </CardContent>

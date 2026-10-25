@@ -21,7 +21,7 @@ test('finance cockpit moves source readiness out of the primary decision surface
   const source = readFileSync(new URL('../app/dashboard/finanzas/page.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /DataSourceStatusStrip/);
   assert.doesNotMatch(source, /useDataSourceStatus/);
-  assert.match(source, /Fuentes y calidad/);
+  assert.match(source, /De dónde salen los montos/);
 });
 
 test('source strip can surface freshness and review counts without exposing integration internals', () => {

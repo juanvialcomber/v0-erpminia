@@ -23,7 +23,7 @@ test('payments cannot exceed approved balance and require due date',()=>{
 test('bank reconciliation is explicit and does not alter cost recognition',()=>{
   assert.match(migration,/reconciliation_reference/);
   assert.match(migration,/Pago ya conciliado/);
-  assert.match(page,/La conciliación no reconoce gasto/);
+  assert.match(page,/no registra el gasto otra vez/);
 });
 
 test('finance payables API is finance-authorized and tenant scoped',()=>{

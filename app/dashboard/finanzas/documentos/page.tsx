@@ -127,17 +127,17 @@ export default function DocumentosFinanzasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Documentos Finanzas</h1>
+          <h1 className="text-3xl font-bold">Documentos de Finanzas</h1>
           <p className="mt-2 text-muted-foreground">
-            Gestión de políticas, procedimientos e instructivos financieros
+            Guarda y consulta políticas, procedimientos y respaldos financieros.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
+            <Link href="/dashboard/finanzas/documentos/importar">Subir documentos</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Excel finanzas</Link>
+            <Link href="/dashboard/finanzas/importar">Cargar movimientos</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/dashboard/finanzas">
@@ -184,7 +184,7 @@ export default function DocumentosFinanzasPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-yellow-500">{stats.en_revision}</p>
-            <p className="text-xs text-muted-foreground">esperando aprobacion</p>
+            <p className="text-xs text-muted-foreground">esperando aprobación</p>
           </CardContent>
         </Card>
 
@@ -207,7 +207,7 @@ export default function DocumentosFinanzasPage() {
           <TabsTrigger value="all" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Todos</TabsTrigger>
           <TabsTrigger value="vigentes" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Vigentes</TabsTrigger>
           <TabsTrigger value="revision" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">En revisión</TabsTrigger>
-          <TabsTrigger value="upload" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Subir Documentos</TabsTrigger>
+          <TabsTrigger value="upload" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Subir documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -235,16 +235,16 @@ export default function DocumentosFinanzasPage() {
         <TabsContent value="upload" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Subir Nuevo Documento</CardTitle>
-              <CardDescription>Sube politicas, procedimientos e instructivos financieros</CardDescription>
+              <CardTitle>Subir un documento</CardTitle>
+              <CardDescription>Agrega políticas, procedimientos o respaldos financieros.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="mb-4 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" asChild>
-                  <Link href="/dashboard/finanzas/documentos/importar">Abrir importador dedicado</Link>
+                  <Link href="/dashboard/finanzas/documentos/importar">Agregar documentos</Link>
                 </Button>
                 <Button size="sm" variant="ghost" asChild>
-                  <Link href="/dashboard/finanzas/importar">Ir al importador tabular</Link>
+                  <Link href="/dashboard/finanzas/importar">Cargar movimientos</Link>
                 </Button>
               </div>
               <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={loadDocuments} />
