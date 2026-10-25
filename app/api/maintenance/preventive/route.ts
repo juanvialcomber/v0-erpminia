@@ -12,15 +12,17 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const [schedulesResult, assetsResult, candidatesResult, hourSignalsResult, openOrdersResult] = await Promise.all([
+    const [schedulesResult, assetsResult, candidatesResult, hourSignalsResult, openOrdersResult, latestEmailResult, latestWhatsappResult] = await Promise.all([
       context.supabase.from('preventive_maintenance_schedules').select('id, asset_id, canonical_asset_id, task_name, description, frequency_days, frequency_hours, last_executed_date, next_scheduled_date, estimated_duration_hours, priority, enabled, generated_work_order_id, last_generated_at, created_at').eq('organization_id', context.organizationId).order('next_scheduled_date', { ascending: true, nullsFirst: false }),
       context.supabase.from('maintenance_assets').select('id, asset_code, asset_name, asset_type, location, status, manufacturer, model, criticality').eq('organization_id', context.organizationId).order('asset_code'),
       context.supabase.from('maintenance_operation_task_candidates_v1').select('canonical_asset_id, rig_name, component_key, suggested_task, observation_count, out_of_service_count, first_observed_at, last_observed_at, latest_status, latest_observation, latest_source_file, latest_source_sheet, latest_source_row, signal_status, evidence_class').eq('organization_id', context.organizationId).order('last_observed_at', { ascending: false }),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('schedule_id, canonical_asset_id, asset_code, asset_name, task_name, priority, frequency_hours, last_executed_meter, due_meter, source_meter_snapshot, latest_runtime_meter, latest_runtime_recorded_at, latest_runtime_source_type, effective_current_meter, meter_evidence_source, meter_basis_conflict, hour_status, remaining_hours, alert_due, source_reference, generated_work_order_id, enabled').eq('organization_id', context.organizationId).order('remaining_hours', { ascending: true, nullsFirst: false }),
       context.supabase.from('maintenance_work_orders').select('id, work_order_number, canonical_asset_id, title, status').eq('organization_id', context.organizationId).not('status', 'in', '(completed,cancelled)'),
+      context.supabase.from('motil_email_equipment_meter_stage').select('report_date').eq('organization_id', context.organizationId).order('report_date', { ascending: false }).limit(1).maybeSingle(),
+      context.supabase.from('motil_whatsapp_asset_360_latest_v1').select('operation_date').eq('organization_id', context.organizationId).order('operation_date', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
-    const firstError = schedulesResult.error || assetsResult.error || candidatesResult.error || hourSignalsResult.error || openOrdersResult.error;
+    const firstError = schedulesResult.error || assetsResult.error || candidatesResult.error || hourSignalsResult.error || openOrdersResult.error || latestEmailResult.error || latestWhatsappResult.error;
     if (firstError) throw firstError;
 
     const assets = assetsResult.data || [];
@@ -35,11 +37,18 @@ export async function GET(request: NextRequest) {
       openOrdersByAsset.set(order.canonical_asset_id, current);
     }
 
-    const operationCandidates = (candidatesResult.data || []).map((candidate) => ({
-      ...candidate,
-      open_work_orders: openOrdersByAsset.get(candidate.canonical_asset_id) || [],
-      promotion_state: 'pending_human_review',
-    }));
+    const latestOperationalEvidenceDate = [
+      latestEmailResult.data?.report_date,
+      latestWhatsappResult.data?.operation_date,
+    ].filter((value): value is string => Boolean(value)).sort().at(-1) || null;
+
+    const operationCandidates = (candidatesResult.data || [])
+      .filter((candidate) => !latestOperationalEvidenceDate || String(candidate.last_observed_at || '') >= latestOperationalEvidenceDate)
+      .map((candidate) => ({
+        ...candidate,
+        open_work_orders: openOrdersByAsset.get(candidate.canonical_asset_id) || [],
+        promotion_state: 'pending_human_review',
+      }));
 
     const hourSignals = (hourSignalsResult.data || []).map((signal) => {
       const effective = signal.effective_current_meter == null ? null : Number(signal.effective_current_meter);
@@ -73,7 +82,7 @@ export async function GET(request: NextRequest) {
       hourEvidenceWarnings: hourSignals.filter((item) => item.meter_basis_warning).length,
     };
 
-    return NextResponse.json({ schedules, assets, summary, operationCandidates, hourSignals, intelligenceSummary });
+    return NextResponse.json({ schedules, assets, summary, operationCandidates, hourSignals, intelligenceSummary, evidenceCutoff: latestOperationalEvidenceDate });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la planificación preventiva';
     return NextResponse.json({ error: message }, { status: 500 });
