@@ -62,3 +62,11 @@ test('manual finance baseline is explicit, bounded and separate from assisted ti
   assert.match(valuePage,/Finalizar medición/);
   assert.match(valuePage,/por sí sola no demuestra ahorro/);
 });
+
+
+test('time reduction stays gated until manual and assisted samples are sufficient',()=>{
+  assert.match(valuePage,/baselineSampleCount >= 3/);
+  assert.match(valuePage,/assistedTimingSample >= 20/);
+  assert.match(valuePage,/Reducción observada de tiempo/);
+  assert.match(valuePage,/Se habilita sólo con 3 muestras manuales y 20 decisiones asistidas con tiempo válido/);
+});
