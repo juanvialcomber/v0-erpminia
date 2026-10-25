@@ -148,6 +148,21 @@ export async function GET(request: NextRequest) {
       (sum: number, row: any) => sum + (Number.isFinite(Number(row.parts_cost)) ? Number(row.parts_cost) : 0),
       0,
     );
+    const closedWorkOrderIds = new Set(closedRows.map((row: any) => String(row.id || '')).filter(Boolean));
+    const supplyChainFunnel = {
+      workOrdersObserved: supplyRows.length,
+      withRequirements: supplyRows.filter((row: any) => Number(row.material_requirement_count || 0) > 0).length,
+      withShortage: supplyRows.filter((row: any) => Number(row.material_shortage_count || 0) > 0).length,
+      withRequest: supplyRows.filter((row: any) => Number(row.procurement_request_count || 0) > 0).length,
+      withOrder: supplyRows.filter((row: any) => Number(row.procurement_order_count || 0) > 0).length,
+      withDeliveredOrder: supplyRows.filter((row: any) => Number(row.delivered_order_count || 0) > 0).length,
+      withInstalledParts: supplyRows.filter((row: any) => Number(row.parts_installed || 0) > 0).length,
+      closedWithOpenShortage: supplyRows.filter(
+        (row: any) => closedWorkOrderIds.has(String(row.work_order_id || '')) && Number(row.material_shortage_count || 0) > 0,
+      ).length,
+      semantics: 'cross-domain maintenance supply funnel; historical closed shortages are data-quality debt, not active compliance',
+    };
+
     const connectedDomains = [
       maintenanceRows.length > 0 ? 'Mantención' : null,
       withMaterials > 0 || withPartsInstalled > 0 ? 'Bodega' : null,
@@ -359,6 +374,7 @@ export async function GET(request: NextRequest) {
         withPartsInstalled,
         procurementCommitment,
         tracedPartsCost,
+        funnel: supplyChainFunnel,
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
     };
