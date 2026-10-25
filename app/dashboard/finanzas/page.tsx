@@ -14,7 +14,8 @@ import { LaudusAccountingReadinessCard } from '@/components/integrations/laudus-
 type Row = Record<string, string | number | null>;
 type FinanceAlert = { alert_code?: string; title?: string; severity?: string; exception_count?: number; description?: string };
 type Response = { overview?: Row | null; topAssets?: Row[]; topProducts?: Row[]; topSuppliers?: Row[]; topCostCenters?: Row[]; validation?: Row | null; recentEvents?: Row[]; alerts?: FinanceAlert[]; operationalProcurement?: Row | null; operationalProcurementEvents?: Row[]; treasury?: Row[]; treasuryAging?: Row[]; cashForecast?: Row[] };
-type BankReconciliation = { status: 'available' | 'empty' | 'unavailable'; bankStatement: { dateFrom: string | null; dateTo: string | null; initialBalance: number | null } | null; bankOnly: { count: number; amount: number }; journalOnly: { count: number; amount: number }; persisted: false };
+type ReconciliationItem = { date: string | null; description: string | null; document: string | null; amount: number };
+type BankReconciliation = { status: 'available' | 'empty' | 'unavailable'; bankStatement: { dateFrom: string | null; dateTo: string | null; initialBalance: number | null } | null; bankOnly: { count: number; amount: number; items: ReconciliationItem[] }; journalOnly: { count: number; amount: number; items: ReconciliationItem[] }; persisted: false };
 type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
 
 const fetcher = async <T,>(url: string): Promise<T> => { const response = await fetch(url, { credentials: 'include' }); const payload = await response.json().catch(() => null); if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Finanzas'); return payload as T; };
@@ -115,6 +116,19 @@ export default function FinanzasPage() {
             <p className="mt-1 text-2xl font-semibold tracking-tight">{number(bankReconciliation.journalOnly.count)}</p>
             <p className="mt-1 text-xs text-muted-foreground">{money(bankReconciliation.journalOnly.amount)} por revisar</p>
           </div>
+        </div> : null}
+        {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && (bankReconciliation.bankOnly.items.length > 0 || bankReconciliation.journalOnly.items.length > 0) ? <div className="grid gap-3 lg:grid-cols-2">
+          {[
+            ['Cartola sin contabilidad', bankReconciliation.bankOnly.items],
+            ['Contabilidad sin cartola', bankReconciliation.journalOnly.items],
+          ].map(([title, items]) => <div key={String(title)} className="overflow-hidden rounded-lg border">
+            <div className="border-b px-4 py-3"><h3 className="text-sm font-semibold">{String(title)}</h3></div>
+            {(items as ReconciliationItem[]).map((item, index) => <div key={`${String(title)}-${index}`} className="grid gap-1 border-b px-4 py-3 last:border-b-0 sm:grid-cols-[90px_1fr_120px] sm:items-center">
+              <span className="text-xs text-muted-foreground">{item.date ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'short' }).format(new Date(item.date)) : 'Sin fecha'}</span>
+              <div className="min-w-0"><p className="truncate text-sm font-medium">{item.description || 'Sin descripción'}</p><p className="truncate text-xs text-muted-foreground">{item.document || 'Sin documento'}</p></div>
+              <span className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount)}</span>
+            </div>)}
+          </div>)}
         </div> : null}
         {!bankReconciliationLoading && !bankReconciliationError && bankReconciliation?.status === 'available' && bankReconciliation.bankStatement ? <p className="text-xs text-muted-foreground">Cartola evaluada: {bankReconciliation.bankStatement.dateFrom || 'sin inicio'} → {bankReconciliation.bankStatement.dateTo || 'sin cierre'} · Laudus.</p> : null}
       </section>
