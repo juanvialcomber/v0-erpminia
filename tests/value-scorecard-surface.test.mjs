@@ -41,3 +41,18 @@ test('internal value cockpit turns green only for demonstrated or sufficiently g
   assert.match(api, /reviewedAmountClp/);
   assert.match(api, /amount reviewed is value under human control, not savings or avoided cost/);
 });
+
+
+test('maintenance internal value is evidence-based and never equates traced execution with savings', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /maintenance_work_orders/);
+  assert.match(api, /work_order_events/);
+  assert.match(api, /maintenanceValue/);
+  assert.match(api, /observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI/);
+  assert.match(page, /Mantención · evidencia operacional/);
+  assert.match(page, /Horas de ejecución observadas/);
+  assert.match(page, /no se interpreta como horas ahorradas/);
+  assert.match(page, /L4 significa flujo instrumentado con decisión humana; E2, desempeño medido/);
+});
