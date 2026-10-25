@@ -2,21 +2,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
-const allowedRoles = new Set([
-  'superadmin',
-  'admin',
-  'manager',
-  'finanzas-supervisor',
-]);
+const managementRoles = new Set(['superadmin', 'admin', 'manager']);
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   const role = String(context.role || '').trim().toLowerCase();
-  if (!allowedRoles.has(role)) {
-    return NextResponse.json({ error: 'Sin acceso al scorecard de valor' }, { status: 403 });
+  if (!managementRoles.has(role)) {
+    const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+    if (!access.authorized) return access.response;
   }
 
   try {
