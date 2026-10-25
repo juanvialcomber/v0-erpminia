@@ -127,6 +127,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (path.startsWith('/dashboard/compras/')) return true;
   if (path.startsWith('/api/auth/') || path.startsWith('/api/me/') || path === '/api/value/scorecard') return true;
   if (path === '/api/value/finance-baseline') return true;
+  if (path === '/api/documents/stats') return readOnly;
 
   const financeIntegrationRoutes = new Set([
     '/api/integrations/laudus/invoice-po-control',
