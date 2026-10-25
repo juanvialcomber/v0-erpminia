@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
 
 type Row = Record<string, string | number | null>;
@@ -100,6 +100,14 @@ type Response = {
   treasuryAging?: Row[];
   cashForecast?: Row[];
   laudusReview?: LaudusReview | null;
+  laudusAging?: Array<{ bucket?: string; invoices?: number; amount?: number }>;
+  laudusSupplierPressure?: Array<{
+    supplier?: string;
+    invoices?: number;
+    outstanding?: number;
+    overdue?: number;
+    maxDaysOverdue?: number;
+  }>;
 };
 
 type ConcentrationKey = 'assets' | 'products' | 'suppliers' | 'costCenters';
@@ -306,15 +314,29 @@ export default function FinanzasPage() {
         { horizon: '≤ 90 días', amount: Number(primaryForecast.due_next_90_amount || 0) },
       ]
     : [];
-  const supplierConcentration = (data?.topSuppliers || []).slice(0, 5).map((row) => ({
-    supplier: String(row.supplier_name || 'Sin identificar'),
-    amount: Number(row.committed_clp || 0),
+  const laudusAging = (data?.laudusAging || []).map((row) => ({
+    bucket: String(row.bucket || 'Sin clasificar'),
+    invoices: Number(row.invoices || 0),
+    amount: Number(row.amount || 0),
   }));
-  const exposureChart = [
-    { label: 'Saldo abierto', amount: Number(laudusSummary.open_amount || 0) },
-    { label: 'Vencido', amount: Number(laudusSummary.overdue_amount || 0) },
-    { label: 'Prioridad', amount: pendingAttentionAmount },
-  ];
+  const agingTotal = laudusAging.reduce((sum, row) => sum + row.amount, 0);
+  const olderThan90 = laudusAging.find((row) => row.bucket === '>90 días');
+  const olderThan90Share = agingTotal > 0 ? Number(olderThan90?.amount || 0) / agingTotal : null;
+  const supplierPressure = (data?.laudusSupplierPressure || []).slice(0, 8).map((row) => {
+    const outstanding = Number(row.outstanding || 0);
+    const overdue = Number(row.overdue || 0);
+    const current = Math.max(0, outstanding - overdue);
+    const supplier = String(row.supplier || 'Sin identificar');
+    const shortSupplier = supplier.length > 28 ? `${supplier.slice(0, 26)}…` : supplier;
+    const maxDaysOverdue = Number(row.maxDaysOverdue || 0);
+    return {
+      supplier: shortSupplier,
+      overdue,
+      current,
+      invoices: Number(row.invoices || 0),
+      maxDaysOverdue,
+    };
+  });
   const nextDueDate = typeof primaryForecast?.next_due_date === 'string' ? primaryForecast.next_due_date : null;
   const bankStatementDate = bankReconciliation.data?.bankStatement?.dateTo || null;
   const bankStatementAgeDays = bankStatementDate ? Math.max(0, -Number(daysUntil(bankStatementDate) || 0)) : null;
@@ -505,19 +527,35 @@ export default function FinanzasPage() {
         <div className="rounded-lg border p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control financiero</p>
-              <h2 className="mt-1 text-lg font-semibold">Exposición y prioridad</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Lectura ejecutiva sobre datos Laudus. No reemplaza la contabilidad.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Presión financiera</p>
+              <h2 className="mt-1 text-lg font-semibold">Edad del saldo Laudus</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cuánto del saldo abierto está corriente y cuánto lleva semanas o meses vencido.
+              </p>
             </div>
             <Sparkles className="h-4 w-4 text-muted-foreground" />
           </div>
+          {olderThan90Share !== null ? (
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-3xl font-semibold tracking-tight">
+                {new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(olderThan90Share)}
+              </span>
+              <span className="text-xs text-muted-foreground">del saldo abierto tiene más de 90 días</span>
+            </div>
+          ) : null}
           <div className="mt-4 h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={exposureChart} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <BarChart data={laudusAging} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                <XAxis dataKey="bucket" tickLine={false} axisLine={false} fontSize={11} />
                 <YAxis tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} width={64} fontSize={11} />
-                <Tooltip formatter={(value) => [money(Number(value)), 'Monto']} />
+                <Tooltip
+                  formatter={(value) => [money(Number(value)), 'Saldo abierto']}
+                  labelFormatter={(label) => {
+                    const row = laudusAging.find((item) => item.bucket === label);
+                    return row ? `${label} · ${number(row.invoices)} documentos` : String(label);
+                  }}
+                />
                 <Bar dataKey="amount" fill="var(--primary)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -644,21 +682,33 @@ export default function FinanzasPage() {
 
         <div className="rounded-lg border p-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración</p>
-            <h2 className="mt-1 text-lg font-semibold">Compromiso por proveedor</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Top 5 por compromiso registrado en MOTIL.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración accionable</p>
+            <h2 className="mt-1 text-lg font-semibold">Presión por proveedor</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Top 8 por saldo abierto Laudus. Separa monto vencido de monto aún corriente.
+            </p>
           </div>
-          {supplierConcentration.length === 0 ? (
-            <p className="py-10 text-sm text-muted-foreground">Sin concentración de proveedores disponible.</p>
+          {supplierPressure.length === 0 ? (
+            <p className="py-10 text-sm text-muted-foreground">Sin saldo abierto por proveedor disponible.</p>
           ) : (
-            <div className="mt-4 h-64">
+            <div className="mt-4 h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={supplierConcentration} layout="vertical" margin={{ top: 8, right: 8, left: 12, bottom: 8 }}>
+                <BarChart data={supplierPressure} layout="vertical" margin={{ top: 8, right: 8, left: 24, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tickFormatter={(value) => compactClp(Number(value))} tickLine={false} axisLine={false} fontSize={11} />
-                  <YAxis type="category" dataKey="supplier" width={120} tickLine={false} axisLine={false} fontSize={11} />
-                  <Tooltip formatter={(value) => [money(Number(value)), 'Compromiso']} />
-                  <Bar dataKey="amount" fill="var(--primary)" radius={[0, 6, 6, 0]} />
+                  <YAxis type="category" dataKey="supplier" width={150} tickLine={false} axisLine={false} fontSize={10} />
+                  <Tooltip
+                    formatter={(value, name) => [money(Number(value)), name === 'overdue' ? 'Vencido' : 'Corriente']}
+                    labelFormatter={(label) => {
+                      const row = supplierPressure.find((item) => item.supplier === label);
+                      return row
+                        ? `${label} · ${number(row.invoices)} docs · máx. ${number(row.maxDaysOverdue)} días`
+                        : String(label);
+                    }}
+                  />
+                  <Legend formatter={(value) => value === 'overdue' ? 'Vencido' : 'Corriente'} />
+                  <Bar dataKey="overdue" stackId="total" fill="var(--primary)" />
+                  <Bar dataKey="current" stackId="total" fill="var(--muted-foreground)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
