@@ -52,6 +52,7 @@ type NativeTraceResponse = {
     examined?: number;
     nativeLookups?: number;
     detailRecovered?: number;
+    withLines?: number;
     withNativeTrace?: number;
     missingEvidence?: number;
     apiCalls?: number;
@@ -463,7 +464,7 @@ export default function FinanzasPage() {
           <div>
             <div className="grid gap-px border-b bg-border sm:grid-cols-3">
               {[
-                ['Con detalle', number(nativeTrace.data.summary?.detailRecovered || 0)],
+                ['Con líneas', number(nativeTrace.data.summary?.withLines || 0)],
                 ['Con traza Laudus', number(nativeTrace.data.summary?.withNativeTrace || 0)],
                 ['Falta evidencia', number(nativeTrace.data.summary?.missingEvidence || 0)],
               ].map(([label, value]) => (
@@ -486,7 +487,9 @@ export default function FinanzasPage() {
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {invoice.sourceDetailAvailable
-                        ? `${number(invoice.itemCount || 0)} líneas recuperadas`
+                        ? Number(invoice.itemCount || 0) > 0
+                          ? `${number(invoice.itemCount || 0)} líneas recuperadas`
+                          : 'Sin líneas en la respuesta'
                         : 'Detalle no disponible en la consulta actual'}
                     </p>
                   </div>
