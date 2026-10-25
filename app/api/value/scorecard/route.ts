@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
         .from('audit_log')
         .select('action,resource_identifier,new_values,created_at,user_id')
         .eq('organization_id', context.organizationId)
-        .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened','maintenance_standard_plan_decision'])
+        .in('action', ['maintenance_weekly_planning_session_started','maintenance_weekly_planning_decision_opened','maintenance_standard_plan_decision','maintenance_standard_plan_edited'])
         .order('created_at', { ascending: false })
         .limit(2000),
             context.supabase
@@ -372,6 +372,15 @@ export async function GET(request: NextRequest) {
       0,
     );
 
+    const standardPlanEditRows = planningEvidenceRows.filter(
+      (row: any) => row.action === 'maintenance_standard_plan_edited',
+    );
+    const motilEditedPlanIds = new Set(
+      standardPlanEditRows
+        .filter((row: any) => row.new_values?.proposal_source === 'motil')
+        .map((row: any) => String(row.resource_identifier || ''))
+        .filter(Boolean),
+    );
     const standardPlanDecisionRows = planningEvidenceRows.filter(
       (row: any) => row.action === 'maintenance_standard_plan_decision',
     );
@@ -454,6 +463,8 @@ export async function GET(request: NextRequest) {
         motilDecisions: motilStandardPlanDecisions.length,
         approved: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'approved').length,
         rejected: motilStandardPlanDecisions.filter((row: any) => row.new_values?.status === 'rejected').length,
+        editedPlans: motilEditedPlanIds.size,
+        editEvents: standardPlanEditRows.filter((row: any) => row.new_values?.proposal_source === 'motil').length,
         acceptanceRatePct:
           motilStandardPlanDecisions.length > 0
             ? Math.round(
@@ -462,9 +473,13 @@ export async function GET(request: NextRequest) {
                   100,
               )
             : null,
+        correctionRatePct:
+          motilStandardPlanDecisions.length > 0
+            ? Math.round((motilEditedPlanIds.size / motilStandardPlanDecisions.length) * 100)
+            : null,
         medianDecisionCycleSeconds: medianStandardPlanDecisionSeconds,
         evidenceLevel: motilStandardPlanDecisions.length >= 20 ? 'E2' : motilStandardPlanDecisions.length > 0 ? 'E1' : 'E0',
-        semantics: 'human outcome on MOTIL-generated standard plan proposals; acceptance is calibration evidence, not economic impact',
+        semantics: 'human outcome and correction evidence on MOTIL-generated standard plan proposals; acceptance and correction are calibration evidence, not economic impact',
       },
       supplyChain: {
         workOrders: supplyRows.length,
