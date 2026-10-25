@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         .limit(500),
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,status,total_timer_seconds,actual_duration_hours,closed_at')
+        .select('id,canonical_asset_id,status,total_timer_seconds,actual_duration_hours,closed_at,created_at')
         .eq('organization_id', context.organizationId)
         .limit(5000),
       context.supabase
