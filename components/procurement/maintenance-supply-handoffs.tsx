@@ -27,6 +27,8 @@ type SupplyNeed = {
 
 type SupplyNeedsResponse = {
   needs: SupplyNeed[];
+  historicalDebt?: SupplyNeed[];
+  semantics?: string;
   error?: string;
 };
 
@@ -52,10 +54,11 @@ export function MaintenanceSupplyHandoffs() {
     revalidateOnFocus: false,
   });
   const needs = (data?.needs || []).filter((need) => !need.procurement_request_id);
+  const historicalDebt = data?.historicalDebt || [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (!isLoading && !error && needs.length === 0) return null;
+  if (!isLoading && !error && needs.length === 0 && historicalDebt.length === 0) return null;
 
   async function takeNeed(need: SupplyNeed) {
     setBusyId(need.supply_need_id);
@@ -85,7 +88,7 @@ export function MaintenanceSupplyHandoffs() {
             Faltantes reales detectados en una OT que todavía no tienen solicitud operativa de Compras.
           </p>
         </div>
-        <Badge variant={needs.length ? 'destructive' : 'secondary'}>{isLoading ? '—' : needs.length}</Badge>
+        <Badge variant={needs.length ? 'destructive' : 'secondary'}>{isLoading ? '—' : needs.length} activa(s)</Badge>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading ? <div className="h-20 animate-pulse rounded-lg bg-muted" /> : null}
@@ -130,6 +133,27 @@ export function MaintenanceSupplyHandoffs() {
             </div>
           ))}
         </div>
+
+        {historicalDebt.length > 0 ? (
+          <div className="rounded-lg border border-dashed p-3">
+            <p className="text-sm font-medium">Deuda histórica · {historicalDebt.length}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              OT cerradas con faltantes heredados. Se muestran para conciliación de datos y nunca habilitan una compra nueva.
+            </p>
+            <div className="mt-2 space-y-2">
+              {historicalDebt.slice(0, 5).map((need) => (
+                <div key={need.supply_need_id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span>{need.work_order_number || 'OT'} · {need.asset_code || need.asset_name || 'Activo'} · {Number(need.shortage_lines || 0)} línea(s)</span>
+                  {need.work_order_id ? (
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={`/dashboard/mantenimiento/ordenes-trabajo/${need.work_order_id}`}>Revisar OT</Link>
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <p className="text-xs text-muted-foreground">
           Esta acción crea la solicitud operativa para Compras. No adjudica proveedor, no emite OC y no compra automáticamente.
