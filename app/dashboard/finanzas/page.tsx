@@ -239,6 +239,23 @@ export default function FinanzasPage() {
       return decision !== 'accepted' && decision !== 'rejected';
     })
     .slice(0, 3);
+  const pendingCurrencies = [
+    ...new Set(
+      pendingAttention
+        .map((item) => String(item.currency || '').trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
+  const pendingAttentionAmount = pendingAttention.reduce(
+    (sum, item) => sum + Number(item.outstanding_amount || 0),
+    0,
+  );
+  const pendingAttentionValue =
+    pendingAttention.length === 0
+      ? '—'
+      : pendingCurrencies.length === 1
+        ? currencyMoney(pendingAttentionAmount, pendingCurrencies[0])
+        : `${number(pendingAttention.length)} casos`;
 
   const motilOutstanding = treasury.reduce(
     (sum, row) => sum + Number(row.outstanding_amount || 0),
@@ -359,9 +376,9 @@ export default function FinanzasPage() {
             `${number(laudusSummary.overdue_count)} documentos`,
           ],
           [
-            'Compras comprometidas',
-            money(overview.committed_clp),
-            'Compromisos operacionales',
+            'Prioridad inmediata',
+            pendingAttentionValue,
+            `${number(pendingAttention.length)} decisiones por revisar`,
           ],
         ].map(([label, value, detail]) => (
           <div key={label} className="bg-card px-5 py-4">
