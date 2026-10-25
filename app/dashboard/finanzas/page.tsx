@@ -240,6 +240,8 @@ export default function FinanzasPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [aiSources, setAiSources] = useState<string[]>([]);
+  const [aiConversationId, setAiConversationId] = useState<string | null>(null);
+  const [aiQuestion, setAiQuestion] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -368,11 +370,12 @@ export default function FinanzasPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, conversationId: aiConversationId }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudo ejecutar el análisis MOTIL.');
       setAiInsight(typeof payload?.answer === 'string' ? payload.answer : 'Sin análisis disponible.');
+      setAiConversationId(typeof payload?.conversationId === 'string' ? payload.conversationId : aiConversationId);
       setAiSources(
         Array.isArray(payload?.sources)
           ? payload.sources
@@ -557,6 +560,31 @@ export default function FinanzasPage() {
                 </button>
               ))}
             </div>
+            <form
+              className="mt-3 flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const question = aiQuestion.trim();
+                if (!question) return;
+                setAiQuestion('');
+                void analyzeWithMotil(question);
+              }}
+            >
+              <input
+                value={aiQuestion}
+                onChange={(event) => setAiQuestion(event.target.value)}
+                placeholder="Pregunta sobre caja, proveedores o vencimientos"
+                className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-xs outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+                disabled={aiLoading}
+              />
+              <button
+                type="submit"
+                disabled={aiLoading || !aiQuestion.trim()}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
+              >
+                Preguntar
+              </button>
+            </form>
             {aiError ? <p className="mt-2 text-xs text-destructive">{aiError}</p> : null}
             {aiInsight ? (
               <div className="mt-3 rounded-md bg-muted/40 p-3">
