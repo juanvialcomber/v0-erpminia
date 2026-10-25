@@ -32,3 +32,15 @@ test('planning assistant UI exposes current-data semantics and stewardship path'
   assert.match(page, /\/dashboard\/planificacion\/datos/);
   assert.match(dict, /assistant: 'Asistente Ariel'/);
 });
+
+
+test('Ariel planning assistant can propose standard plans without creating or approving them', () => {
+  assert.match(api, /maintenance_work_orders/);
+  assert.match(api, /maintenance_standard_job_plans/);
+  assert.match(api, /PROPUESTAS DE PLAN ESTÁNDAR/);
+  assert.match(api, /duración sugerida sólo si hay evidencia histórica/);
+  assert.match(api, /Antes de sugerir un plan nuevo, revisa los planes estándar existentes/);
+  assert.match(page, /Proponme hasta 3 planes estándar/);
+  assert.match(page, /Abrir planes estándar/);
+  assert.match(page, /Ariel puede abrir el registro de planes, completar los datos faltantes y aprobarla/);
+});
