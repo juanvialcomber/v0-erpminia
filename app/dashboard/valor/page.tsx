@@ -54,6 +54,18 @@ type ApiResponse = {
     reviewedAmountClp?: number;
     acceptedAmountClp?: number;
     semantics?: string;
+    connectedDomains?: string[];
+    connectedDomainCount?: number;
+    supplyChain?: {
+      workOrders?: number;
+      withMaterials?: number;
+      withShortages?: number;
+      withProcurementRequests?: number;
+      withPurchaseOrders?: number;
+      withPartsInstalled?: number;
+      procurementCommitment?: number;
+      tracedPartsCost?: number;
+    };
   } | null;
   financeReviewTiming?: {
     sample?: number;
@@ -290,6 +302,38 @@ export default function ValueScorecardPage() {
             <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Cobertura inter-área de Mantención">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cobertura inter-área</p>
+            <h3 className="mt-1 text-base font-semibold">
+              {number(maintenanceValue.connectedDomainCount || 0)} dominios conectados con evidencia real
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {(maintenanceValue.connectedDomains || []).length > 0
+                ? (maintenanceValue.connectedDomains || []).join(' → ')
+                : 'Sin cadena inter-área demostrada todavía.'}
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-4">
+            {[
+              ['Materiales', maintenanceValue.supplyChain?.withMaterials || 0],
+              ['Shortages', maintenanceValue.supplyChain?.withShortages || 0],
+              ['Solicitudes compra', maintenanceValue.supplyChain?.withProcurementRequests || 0],
+              ['OC', maintenanceValue.supplyChain?.withPurchaseOrders || 0],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="min-w-28 rounded-md bg-muted/40 px-3 py-2">
+                <p className="text-[11px] text-muted-foreground">{label}</p>
+                <p className="mt-0.5 text-lg font-semibold">{number(value)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
+          Objetivo C: Mantención → Bodega → Compras → Finanzas con evidencia de punta a punta. Sólo cuenta un dominio cuando existe un evento real, no por tener el módulo disponible.
+        </p>
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
