@@ -22,6 +22,10 @@ test('fixed-asset economics exposes evidence needed for depreciation without cla
   assert.match(helper, /depreciateWithInflationCorrection/);
   assert.match(helper, /depreciationShape/);
   assert.match(helper, /itemFields/);
+  assert.match(helper, /depreciationSummary/);
+  assert.match(helper, /amountTotal/);
+  assert.match(helper, /accumulatedMax/);
+  assert.match(helper, /accumulatedWithInflationCorrectionMax/);
   assert.doesNotMatch(helper, /bookValue/);
 });
 
