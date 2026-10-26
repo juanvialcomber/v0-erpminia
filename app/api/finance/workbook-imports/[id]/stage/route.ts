@@ -565,7 +565,9 @@ export async function POST(
   const { error: updateError } = await context.supabase
     .from('motil_finance_workbook_imports')
     .update({
-      review_status: 'needs_review',
+      review_status: (metadata.canonical === true || sourceImport.review_status === 'canonical_with_observations')
+        ? 'canonical_with_observations'
+        : 'needs_review',
       metadata: nextMetadata,
       updated_at: new Date().toISOString(),
     })
