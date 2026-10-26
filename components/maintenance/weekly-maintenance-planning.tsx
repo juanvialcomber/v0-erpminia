@@ -92,6 +92,8 @@ function readingText(row: WeeklyDecision) {
 export function WeeklyMaintenancePlanning() {
   const { data, error, isLoading, mutate } = useSWR<WeeklyResponse>('/api/planning/maintenance', fetcher, { revalidateOnFocus: false });
   const rows = data?.weeklyDecisions || [];
+  const nextDecision = rows.find((row) => row.state !== 'scheduled') || null;
+  const queuedRows = nextDecision ? rows.filter((row) => row !== nextDecision) : rows;
   const summary = data?.weeklySummary;
   const sessionIdRef = useRef<string>(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `weekly-${Date.now()}`);
   const sessionStartedAtRef = useRef<number>(Date.now());
@@ -163,14 +165,78 @@ export function WeeklyMaintenancePlanning() {
       ].map(([label, value]) => <Card key={String(label)} className="shadow-none"><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{isLoading || value == null ? '—' : Number(value).toLocaleString('es-CL')}</p></CardContent></Card>)}
     </section>
 
+    {nextDecision ? (
+      <section className="rounded-xl border bg-card p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Siguiente decisión</p>
+        <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_190px] lg:items-center">
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={priorityVariant(nextDecision.priority)}>{nextDecision.priority || 'Sin prioridad'}</Badge>
+              <Badge variant="outline">{stateLabel(nextDecision)}</Badge>
+              {nextDecision.standardPlan?.proposalSource === 'motil' ? <Badge variant="outline">Propuesto por MOTIL</Badge> : null}
+            </div>
+            <p className="mt-3 text-lg font-semibold">{nextDecision.assetCode || nextDecision.assetName || 'Equipo sin nombre'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{nextDecision.site || 'Ubicación no disponible'} · Criticidad {nextDecision.criticality || 'sin dato'}</p>
+            <p className="mt-3 text-sm">{nextDecision.recommendedAction || 'Revisar planificación y evidencia.'}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{readingText(nextDecision)}{nextDecision.currentReadingAt ? ` · lectura ${new Date(nextDecision.currentReadingAt).toLocaleDateString('es-CL')}` : ''}</p>
+          </div>
+          <div className="text-sm">
+            {nextDecision.actualMaterialShortage ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real</p>
+                <p className="mt-1 text-xs text-muted-foreground">Resolver cobertura antes de programar.</p>
+              </>
+            ) : nextDecision.state === 'stale_evidence' ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Evidencia vencida</p>
+                <p className="mt-1 text-xs text-muted-foreground">Actualizar lectura antes de decidir.</p>
+              </>
+            ) : nextDecision.standardPlan?.status === 'approved' ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><CheckCircle2 className="h-4 w-4"/>Lista para programar</p>
+                <p className="mt-1 text-xs text-muted-foreground">Plan aprobado y sin bloqueo material observado.</p>
+              </>
+            ) : (
+              <>
+                <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4"/>Revisión requerida</p>
+                <p className="mt-1 text-xs text-muted-foreground">MOTIL necesita validación humana antes de programar.</p>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end">
+            {nextDecision.state === 'stale_evidence' ? (
+              <Button asChild><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(nextDecision.canonicalAssetId || '')}`} onClick={() => recordDecision(nextDecision, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
+            ) : nextDecision.standardPlan?.status === 'proposed' ? (
+              <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(nextDecision, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+            ) : (
+              <Button asChild><Link href={{
+                pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
+                query: {
+                  assetId: nextDecision.canonicalAssetId || '',
+                  title: nextDecision.interval ? `Mantención ${nextDecision.interval} ${nextDecision.meterUnit || 'h'}` : 'Mantención preventiva',
+                  workType: 'preventive',
+                  priority: nextDecision.priority?.startsWith('P1') || nextDecision.priority?.startsWith('P2') ? 'high' : 'medium',
+                  standardPlanId: nextDecision.standardPlan?.status === 'approved' ? nextDecision.standardPlan.id : '',
+                  standardPlanName: nextDecision.standardPlan?.status === 'approved' ? nextDecision.standardPlan.name : '',
+                  plannedDurationHours: nextDecision.standardPlan?.status === 'approved' && nextDecision.standardPlan.estimatedDurationHours != null
+                    ? String(nextDecision.standardPlan.estimatedDurationHours)
+                    : '',
+                },
+              }} onClick={() => recordDecision(nextDecision, 'schedule')}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>
+            )}
+          </div>
+        </div>
+      </section>
+    ) : null}
+
     <section className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold">Qué debe decidir Ariel</h2>
         <p className="text-sm text-muted-foreground">Ordenado por prioridad operacional. La evidencia de horómetro y planificación se muestra con su fuente; no reemplaza el juicio del supervisor.</p>
       </div>
 
-      {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted"/> : !error && rows.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No hay decisiones semanales priorizadas con la evidencia disponible.</CardContent></Card> : <div className="space-y-3">
-        {rows.map((row, index) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || String(index)} className="shadow-none">
+      {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted"/> : !error && queuedRows.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No hay decisiones semanales priorizadas con la evidencia disponible.</CardContent></Card> : <div className="space-y-3">
+        {queuedRows.map((row, index) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || String(index)} className="shadow-none">
           <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px_190px] lg:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
