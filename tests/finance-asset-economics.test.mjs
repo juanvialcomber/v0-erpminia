@@ -82,3 +82,17 @@ test('maintenance to book ratio is descriptive and never drives replacement',()=
   assert.match(economics,/Mantenimiento reconocido \/ valor libro/);
   assert.match(economics,/No representa TCO ni recomienda reemplazo/);
 });
+
+
+test('finance workbook reimport preserves exact asset identity without cost-center collisions',()=>{
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(stage,/function normalizeExactCode/);
+  assert.match(stage,/const costCenterPrefix = normalizeExactCode/);
+  assert.match(stage,/const costCenterMap = uniqueExactTextMap/);
+  assert.match(stage,/cost_center_code_exact/);
+  assert.match(stage,/license_plate_embedded_exact/);
+  assert.match(stage,/serial_embedded_exact/);
+  assert.match(stage,/canonical_name_embedded_exact/);
+  assert.doesNotMatch(stage,/costCenterPrefix = normalizeIdentifier/);
+  assert.match(stage,/select\('id,name,serial_number,license_plate,cost_center_code'\)/);
+});
