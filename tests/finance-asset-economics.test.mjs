@@ -279,7 +279,7 @@ test('ready asset candidates are prioritized and survive workbook reimport',()=>
   assert.match(api,/ready_for_asset_review/);
   assert.match(api,/candidate_review_source_count/);
   assert.match(candidates,/Lista para revisión/);
-  assert.match(candidates,/Sin contraparte canónica exacta/);
+  assert.match(candidates,/sin contraparte canónica exacta/i);
   assert.match(stage,/candidate_review_status/);
   assert.match(stage,/candidate_review_basis/);
   assert.match(stage,/candidate_review_source_count/);
