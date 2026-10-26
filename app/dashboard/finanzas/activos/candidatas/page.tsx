@@ -50,6 +50,11 @@ type Candidate = {
   reviewStatus: string | null;
   reviewBasis: string | null;
   reviewSourceCount: number | null;
+  operationalEvidence: {
+    purchaseCostCenter: string | null;
+    purchaseOrders: number | null;
+    purchaseLines: number | null;
+  };
   review: null | {
     id: string;
     status: 'open' | 'accepted' | 'resolved' | 'ignored';
@@ -72,6 +77,8 @@ type Response = {
     sourceCodeBookValueClp: number;
     dualSource: number;
     readyForReview: number;
+    readyDualFinance: number;
+    readyPurchaseEvidence: number;
     pendingReview: number;
     acceptedForCreation: number;
     ignoredCandidates: number;
@@ -183,7 +190,7 @@ export default function MissingAssetCandidatesPage(){
       <section className="overflow-hidden rounded-lg border bg-card">
         <div className="border-b px-4 py-3">
           <h2 className="text-sm font-semibold">Prioridad de revisión</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Primero doble fuente; luego identificadores físicos explícitos. Crear la Ficha 360 sigue requiriendo revisión operacional.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Primero evidencia cruzada; luego identificadores físicos explícitos. Crear la Ficha 360 sigue requiriendo revisión operacional.</p>
         </div>
         <div className="divide-y">
           {data.candidates.map((candidate)=>(
@@ -197,7 +204,7 @@ export default function MissingAssetCandidatesPage(){
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[candidate.plate?'PPU '+candidate.plate:null,candidate.serial?'Serie '+candidate.serial:null,candidate.chassis?'Chasis '+candidate.chassis:null,candidate.engine?'Motor '+candidate.engine:null,candidate.modelYear?'Año '+candidate.modelYear:null].filter(Boolean).join(' · ')||'Identificador desde evidencia fuente'}
                   </p>
-                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">Sin contraparte canónica exacta · preparada para revisión operacional</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
+                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">{candidate.reviewBasis==='exact_plate_plus_purchase_cost_center'?'PPU exacta + evidencia operacional de Compras':'Evidencia exacta en seguro + depreciación'} · sin contraparte canónica exacta</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
                 </div>
                 <Value label="Valor libro" value={money(candidate.netBookValueClp)} />
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
@@ -211,8 +218,13 @@ export default function MissingAssetCandidatesPage(){
                     {candidate.canonicalDraft.category ? <span className="text-muted-foreground">{candidate.canonicalDraft.category}</span> : null}
                     {candidate.manufacturer ? <span className="text-muted-foreground">{candidate.manufacturer}{candidate.sourceModel?' · '+candidate.sourceModel:''}</span> : null}
                   </div>
+                  {candidate.operationalEvidence.purchaseCostCenter ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Compras: {candidate.operationalEvidence.purchaseCostCenter} · {number(candidate.operationalEvidence.purchaseOrders||0)} órdenes · {number(candidate.operationalEvidence.purchaseLines||0)} líneas.
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Falta código de activo y lote canónico aprobado. La evidencia financiera queda preservada; la Ficha 360 no se crea desde esta pantalla.
+                    Falta código de activo y lote canónico aprobado. La evidencia queda preservada; la Ficha 360 no se crea desde esta pantalla.
                   </p>
                 </div>
               ) : null}
