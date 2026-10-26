@@ -81,6 +81,9 @@ export async function GET(request: NextRequest) {
     return {
       id: workbook.id,
       filename: workbook.filename,
+      canonical: metadata.canonical === true,
+      canonicalAuthority: typeof metadata.canonical_authority === 'string' ? metadata.canonical_authority : null,
+      canonicalDomain: typeof metadata.canonical_domain === 'string' ? metadata.canonical_domain : null,
       sourceKind: workbook.source_kind,
       cutoffDate: workbook.source_cutoff_date,
       senderDeclaredNotFinal: workbook.sender_declared_not_final,
@@ -111,6 +114,7 @@ export async function GET(request: NextRequest) {
     policy: {
       canonical_table: 'Tabla canónica certificada que conserva la fila o evento fuente. No se presenta como archivo Excel original.',
       document_core: 'Archivos nuevos de Finanzas viven en module_documents y no sustituyen la trazabilidad canónica histórica.',
+      canonical_workbook: 'Los archivos enviados por la autoridad financiera definida se consideran fuente canónica. Las observaciones se muestran para revisión y no invalidan la fuente.',
     },
   });
 }
