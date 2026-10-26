@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 type FinanceControl = {
   readOnly?: boolean;
@@ -269,47 +269,41 @@ export function LaudusFinanceControlCard() {
 
   return (
     <Card className="overflow-hidden border-border/80 bg-card shadow-none">
-      <CardHeader className="border-b bg-muted/20 pb-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas · Laudus</p>
-            <CardTitle className="mt-1 text-2xl">Control financiero</CardTitle>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Exposición, vencimientos y decisiones prioritarias con evidencia vigente. Sin convertir datos fuente en conclusiones contables no conciliadas.
-            </p>
+      <CardContent className="space-y-5 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
+            <p className="text-xs font-medium">Laudus · fuente financiera</p>
           </div>
-          <Badge variant="outline" className="w-fit">
-            {isLoading ? 'Actualizando' : freshnessText(data?.freshness?.latestOperationalSync)}
-          </Badge>
+          <p className="text-xs text-muted-foreground">
+            {isLoading ? 'Actualizando…' : freshnessText(data?.freshness?.latestOperationalSync)}
+          </p>
         </div>
-      </CardHeader>
-
-      <CardContent className="space-y-6 p-5">
-        <section className="grid gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-[1.35fr_1fr]" aria-label="Resumen financiero ejecutivo">
-          <div className="bg-primary/5 p-5 md:p-6">
+        <section className="grid gap-px overflow-hidden rounded-lg border bg-border lg:grid-cols-[1.4fr_1fr]" aria-label="Resumen financiero ejecutivo">
+          <div className="bg-card p-5 md:p-6">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Exposición abierta</p>
             <p className="mt-3 text-4xl font-semibold tracking-tight">{isLoading ? '—' : compactMoney(openPayableAmount)}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               {number(openPayables)} partidas abiertas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Badge variant="secondary">{compactMoney(overduePayableAmount)} vencido</Badge>
-              <Badge variant="outline">{compactMoney(dueSoonPayableAmount)} vence en 7 días</Badge>
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs">
+              <span><strong className="font-semibold text-destructive">{compactMoney(overduePayableAmount)}</strong> <span className="text-muted-foreground">vencido</span></span>
+              <span><strong className="font-semibold text-foreground">{compactMoney(dueSoonPayableAmount)}</strong> <span className="text-muted-foreground">vence en 7 días</span></span>
             </div>
           </div>
           <div className="grid bg-border sm:grid-cols-3 lg:grid-cols-1">
-            <div className="bg-destructive/5 px-4 py-4">
+            <div className="bg-card px-4 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-destructive">Vencidas</p>
               <p className="mt-1 text-xl font-semibold">{number(overduePayables)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{number(overdueSharePct)}% del saldo abierto</p>
             </div>
-            <div className="bg-primary/5 px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">Próximos 7 días</p>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Próximos 7 días</p>
               <p className="mt-1 text-xl font-semibold">{number(dueSoonPayables)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{compactMoney(dueSoonPayableAmount)} por vencer</p>
             </div>
-            <div className="bg-secondary/5 px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary">Mayor concentración</p>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Mayor concentración</p>
               <p className="mt-1 truncate text-sm font-semibold">{topSupplier ? shortSupplier(topSupplier.supplierName) : 'Sin concentración relevante'}</p>
               <p className="mt-1 text-xs text-muted-foreground">{topSupplier ? `${number(topSupplierSharePct)}% · ${compactMoney(topSupplier.amountClp)}` : 'Sin evidencia suficiente'}</p>
             </div>
@@ -323,19 +317,19 @@ export function LaudusFinanceControlCard() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Prioridades</p>
                 <p className="mt-1 text-sm font-medium">Qué debe resolver Daniel primero</p>
               </div>
-              <span className="text-xs text-muted-foreground">Máximo 3 decisiones</span>
+              <span className="text-xs text-muted-foreground">{priorities.length} por resolver</span>
             </div>
-            <div className="divide-y overflow-hidden rounded-xl border">
+            <div className="divide-y overflow-hidden rounded-lg border">
               {priorities.map((item, index) => (
-                <div key={item.key} className="grid gap-3 bg-card px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_auto] md:items-center">
-                  <div className={`flex h-9 w-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums ${index === 0 ? 'border-primary/30 bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'}`}>
+                <div key={item.key} className="grid gap-3 bg-card px-4 py-3.5 md:grid-cols-[36px_minmax(0,1fr)_auto] md:items-center">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold tabular-nums ${index === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                     {String(index + 1).padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.evidence}</p>
                   </div>
-                  <Button asChild size="sm" variant={index === 0 ? 'default' : 'outline'}>
+                  <Button asChild size="sm" variant={index === 0 ? 'default' : 'ghost'}>
                     <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
                   </Button>
                 </div>
@@ -343,23 +337,23 @@ export function LaudusFinanceControlCard() {
             </div>
           </section>
         ) : (
-          <div className="flex items-center gap-2 rounded-xl border p-4 text-sm">
+          <div className="flex items-center gap-2 rounded-lg border p-4 text-sm">
             <BadgeCheck className="h-4 w-4"/>
             Sin decisiones financieras urgentes detectadas en la evidencia Laudus disponible.
           </div>
         )}
 
-        <section className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
-          <div className="bg-primary/5 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-primary">Pagos por revisar</p>
+        <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Pagos por revisar</p>
             <p className="mt-1 text-lg font-semibold">{number(pendingDeposit)}</p>
           </div>
-          <div className="bg-destructive/5 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-destructive">Centros por conciliar</p>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Centros por conciliar</p>
             <p className="mt-1 text-lg font-semibold">{number(costCenterUnresolved)}</p>
           </div>
-          <div className="bg-secondary/5 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-secondary">Activos enlazados</p>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Activos enlazados</p>
             <p className="mt-1 text-lg font-semibold">{number(fixedAssetLinked)} <span className="text-xs font-normal text-muted-foreground">/ {number(fixedAssetTotal)}</span></p>
           </div>
           <div className="bg-card px-4 py-3">
@@ -369,9 +363,18 @@ export function LaudusFinanceControlCard() {
           </div>
         </section>
 
-        <section className="space-y-4" aria-label="Lectura ejecutiva Laudus">
+        <details className="group rounded-lg border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Contexto operativo</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Cambios de 7 días, colas de trabajo y análisis adicional</p>
+            </div>
+            <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
+            <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+          </summary>
+          <section className="space-y-4 border-t p-4" aria-label="Lectura ejecutiva Laudus">
           <div className="grid gap-4 xl:grid-cols-2">
-            <div className="rounded-xl border bg-card p-4">
+            <div className="rounded-lg border bg-card p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cambios observables · 7 días</p>
               <div className="mt-3 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
                 <div className="bg-card px-4 py-3">
@@ -388,7 +391,7 @@ export function LaudusFinanceControlCard() {
               </p>
             </div>
 
-            <div className="rounded-xl border bg-card p-4">
+            <div className="rounded-lg border bg-card p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Listo para trabajar hoy</p>
               <div className="mt-3 divide-y rounded-lg border">
                 <div className="flex items-center justify-between gap-3 px-3 py-3">
@@ -416,7 +419,7 @@ export function LaudusFinanceControlCard() {
             </div>
           </div>
 
-          <details className="group rounded-xl border bg-card">
+          <details className="group rounded-lg border bg-card">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
               <div>
                 <p className="text-sm font-medium">Análisis adicional</p>
@@ -427,7 +430,7 @@ export function LaudusFinanceControlCard() {
             </summary>
             <div className="space-y-4 border-t p-4">
               <div className="grid gap-4 xl:grid-cols-2">
-                          <div className="rounded-xl border bg-card p-4">
+                          <div className="rounded-lg border bg-card p-4">
                             <div className="mb-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Riesgo</p>
                               <h3 className="mt-1 text-base font-semibold">Aging de CxP abierta</h3>
@@ -446,7 +449,7 @@ export function LaudusFinanceControlCard() {
                             </div>
                           </div>
               
-                          <div className="rounded-xl border bg-card p-4">
+                          <div className="rounded-lg border bg-card p-4">
                             <div className="mb-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Estructura temporal</p>
                               <h3 className="mt-1 text-base font-semibold">Vencimientos abiertos por mes</h3>
@@ -466,7 +469,7 @@ export function LaudusFinanceControlCard() {
                           </div>
                         </div>
               
-                        <div className="rounded-xl border bg-card p-4">
+                        <div className="rounded-lg border bg-card p-4">
                           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Lectura MOTIL</p>
                           <p className="mt-2 text-sm font-medium">
                             {number(data?.accountsPayable?.severeAgingSharePct || 0)}% del saldo abierto CLP está en partidas con más de 60 días de atraso.
@@ -477,7 +480,7 @@ export function LaudusFinanceControlCard() {
                           </p>
                         </div>
               
-                        <div className="rounded-xl border bg-card p-4">
+                        <div className="rounded-lg border bg-card p-4">
                           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Explicación</p>
@@ -511,6 +514,7 @@ export function LaudusFinanceControlCard() {
             </div>
           </details>
           </section>
+        </details>
 
         <section className="space-y-3" aria-label="Evidencia y brechas">
           <div>
@@ -520,7 +524,7 @@ export function LaudusFinanceControlCard() {
             </p>
           </div>
 
-          <div className="divide-y overflow-hidden rounded-xl border bg-card">
+          <div className="divide-y overflow-hidden rounded-lg border bg-card">
             {openPayables > 0 ? (
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
