@@ -175,6 +175,10 @@ export async function GET(request: NextRequest) {
       singleAssets,
       conflictAssets,
       unresolvedRows: classified.length,
+      materialReviewComplete: Boolean(stage.material_operational_review_complete),
+      materialReviewFloorClp: Number(stage.material_operational_review_floor_clp || 0),
+      unexplainedOperationalRows: Number(stage.unexplained_operational_rows || 0),
+      unexplainedOperationalBookValueClp: Number(stage.unexplained_operational_book_value_clp || 0),
     },
     unresolved: {
       byReason,
