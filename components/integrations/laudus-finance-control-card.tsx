@@ -15,6 +15,16 @@ type FinanceControl = {
     pendingDeposit?: number;
     latestSync?: string | null;
     actionRequired?: boolean;
+    pendingItems?: Array<{
+      externalId?: string;
+      issuedDate?: string | null;
+      dueDate?: string | null;
+      document?: string | null;
+      notes?: string | null;
+      bankName?: string | null;
+      invoiceAmount?: number | null;
+      currency?: string | null;
+    }>;
   };
   creditNotes?: {
     total?: number;
@@ -162,12 +172,27 @@ export function LaudusFinanceControlCard() {
 
         <div className="space-y-2">
           {pendingDeposit > 0 ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4"/>Pagos por verificar</p>
-                <p className="mt-1 text-xs text-muted-foreground">{number(pendingDeposit)} pagos Laudus no figuran depositados. Revisar antes de cerrar conciliación o caja.</p>
+            <div className="space-y-3 rounded-lg border p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4"/>Pagos por verificar</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{number(pendingDeposit)} pagos Laudus no figuran depositados. Revisar antes de cerrar conciliación o caja.</p>
+                </div>
+                <Button asChild size="sm"><Link href="/dashboard/finanzas/pagos">Revisar pagos <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
               </div>
-              <Button asChild size="sm"><Link href="/dashboard/finanzas/pagos">Revisar pagos <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+              <div className="divide-y rounded-md border">
+                {(data?.payments?.pendingItems || []).map((item) => (
+                  <div key={item.externalId || item.document || item.issuedDate || 'pago'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[110px_140px_minmax(0,1fr)_auto] md:items-center">
+                    <span className="font-medium">{item.document || 'Sin documento'}</span>
+                    <span className="text-muted-foreground">{shortDate(item.issuedDate)}</span>
+                    <span className="min-w-0 truncate text-muted-foreground">{item.notes || item.bankName || 'Sin nota'}</span>
+                    <span className="text-right font-medium">
+                      {item.invoiceAmount && item.currency === 'CLP' ? money(item.invoiceAmount) : 'Monto no informado'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">Estado fuente Laudus: “no depositado”. MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente.</p>
             </div>
           ) : null}
 
