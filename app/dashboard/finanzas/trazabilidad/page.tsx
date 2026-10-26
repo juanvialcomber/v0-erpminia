@@ -1,8 +1,12 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -22,6 +26,18 @@ type LedgerEvent = {
   source_record_id: string;
   amount?: number | string | null;
   description?: string | null;
+};
+
+type ReviewFeedback = {
+  purchase_invoice_external_id?: string;
+  decision?: 'accepted' | 'rejected' | 'deferred';
+  reason?: string | null;
+  actor_name?: string | null;
+  created_at?: string | null;
+};
+
+type ReviewFeedbackResponse = {
+  reviews?: ReviewFeedback[];
 };
 
 type NativeTraceResponse = {
@@ -65,7 +81,65 @@ export default function FinanceTraceabilityPage() {
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
   );
+  const reviewState = useSWR<ReviewFeedbackResponse>(
+    '/api/integrations/laudus/finance-review-feedback',
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const { canEdit, ready } = useModuleAccess();
+  const reviewSessionStartedAt = useRef(Date.now());
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const events: LedgerEvent[] = data?.events || [];
+  const latestReviewByInvoice = new Map(
+    (reviewState.data?.reviews || []).map((row) => [row.purchase_invoice_external_id, row]),
+  );
+
+  const recordReview = async (
+    invoice: NonNullable<NativeTraceResponse['invoices']>[number],
+    decision: 'accepted' | 'rejected' | 'deferred',
+    reason?: string,
+  ) => {
+    const invoiceId = invoice.invoiceExternalId?.trim();
+    if (!invoiceId || !ready || !canEdit('fin_finanzas')) return;
+    if (decision === 'rejected' && !reason?.trim()) {
+      setRejectingId(invoiceId);
+      return;
+    }
+
+    setReviewingId(invoiceId);
+    setReviewNotice(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/finance-review-feedback', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purchaseInvoiceExternalId: invoiceId,
+          decision,
+          reason: reason?.trim() || null,
+          outstandingAmount: Number(invoice.outstandingAmount || 0),
+          decisionLatencyMs: Date.now() - reviewSessionStartedAt.current,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la revisión.');
+      await reviewState.mutate();
+      setRejectingId(null);
+      setRejectReason('');
+      setReviewNotice(
+        decision === 'accepted' ? 'Revisión registrada.' :
+        decision === 'deferred' ? 'Caso pospuesto.' :
+        'Caso marcado como no aplicable.',
+      );
+    } catch (cause) {
+      setReviewNotice(cause instanceof Error ? cause.message : 'No se pudo registrar la revisión.');
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -110,31 +184,104 @@ export default function FinanceTraceabilityPage() {
             </div>
 
             <div>
-              {(nativeTrace.data.invoices || []).slice(0, 5).map((invoice) => (
-                <div
-                  key={invoice.invoiceExternalId}
-                  className="grid gap-2 border-b px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_150px] md:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
-                      {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {invoice.sourceDetailAvailable
-                        ? Number(invoice.itemCount || 0) > 0
-                          ? `${number(invoice.itemCount || 0)} líneas recuperadas`
-                          : 'Sin líneas en la respuesta'
-                        : 'Detalle no disponible en la consulta actual'}
-                    </p>
+              {(nativeTrace.data.invoices || []).slice(0, 5).map((invoice) => {
+                const invoiceId = invoice.invoiceExternalId || '';
+                const priorReview = latestReviewByInvoice.get(invoiceId);
+                const canReview = ready && canEdit('fin_finanzas') && Boolean(invoiceId);
+                return (
+                  <div key={invoiceId} className="border-b px-4 py-4 last:border-b-0">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px_150px_auto] md:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {invoice.sourceDetailAvailable
+                            ? Number(invoice.itemCount || 0) > 0
+                              ? `${number(invoice.itemCount || 0)} líneas recuperadas`
+                              : 'Sin líneas en la respuesta'
+                            : 'Detalle no disponible en la consulta actual'}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground md:text-right">
+                        {Number(invoice.nativeTraceCount || 0) > 0 ? 'Traza Laudus disponible' : 'Falta evidencia'}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums md:text-right">
+                        {currencyMoney(invoice.outstandingAmount, invoice.currency)}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 md:justify-end">
+                        {priorReview?.decision === 'accepted' ? <Badge variant="secondary">Revisado</Badge> : null}
+                        {priorReview?.decision === 'deferred' ? <Badge variant="outline">Pospuesto</Badge> : null}
+                        {priorReview?.decision === 'rejected' ? <Badge variant="outline">No aplica</Badge> : null}
+                        {canReview && priorReview?.decision !== 'accepted' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reviewingId === invoiceId}
+                            onClick={() => void recordReview(invoice, 'accepted')}
+                          >
+                            Revisado
+                          </Button>
+                        ) : null}
+                        {canReview && priorReview?.decision !== 'deferred' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={reviewingId === invoiceId}
+                            onClick={() => void recordReview(invoice, 'deferred')}
+                          >
+                            Posponer
+                          </Button>
+                        ) : null}
+                        {canReview && priorReview?.decision !== 'rejected' ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={reviewingId === invoiceId}
+                            onClick={() => {
+                              setRejectingId(invoiceId);
+                              setRejectReason('');
+                            }}
+                          >
+                            No aplica
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {rejectingId === invoiceId ? (
+                      <div className="mt-3 rounded-md border bg-muted/20 p-3">
+                        <p className="text-xs font-medium">¿Por qué esta prioridad no aplica?</p>
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            value={rejectReason}
+                            onChange={(event) => setRejectReason(event.target.value)}
+                            placeholder="Razón breve y verificable"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={!rejectReason.trim() || reviewingId === invoiceId}
+                            onClick={() => void recordReview(invoice, 'rejected', rejectReason)}
+                          >
+                            Registrar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setRejectingId(null);
+                              setRejectReason('');
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                  <span className="text-xs text-muted-foreground md:text-right">
-                    {Number(invoice.nativeTraceCount || 0) > 0 ? 'Traza Laudus disponible' : 'Falta evidencia'}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums md:text-right">
-                    {currencyMoney(invoice.outstandingAmount, invoice.currency)}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
+              {reviewNotice ? <p className="border-t px-4 py-3 text-xs text-muted-foreground">{reviewNotice}</p> : null}
             </div>
 
             <details className="border-t px-4 py-3 text-xs text-muted-foreground">
