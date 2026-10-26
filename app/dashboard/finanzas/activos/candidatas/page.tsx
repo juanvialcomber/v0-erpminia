@@ -163,7 +163,7 @@ export default function MissingAssetCandidatesPage(){
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail={money(data.summary.candidateBookValueClp)+" de valor libro representado"} />
-        <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.acceptedForCreation)+" aprobadas · "+number(data.summary.ignoredCandidates)+" descartadas"} />
+        <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.readyDualFinance)+" seguro+depreciación · "+number(data.summary.readyPurchaseEvidence)+" PPU+Compras"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
         <Metric label="Conflictos" value={number(data.summary.openIdentityConflicts)} detail="Ficha existente vs fuente nueva" />
       </section>
