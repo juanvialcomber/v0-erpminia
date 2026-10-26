@@ -195,6 +195,66 @@ export function LaudusFinanceControlCard() {
   const fixedAssetLinked = Number(data?.fixedAssets?.linkedToMotil || 0);
   const fixedAssetTotal = Number(data?.fixedAssets?.total || 0);
 
+  const overdueSharePct = openPayableAmount > 0
+    ? Math.round((overduePayableAmount / openPayableAmount) * 1000) / 10
+    : 0;
+
+  const priorities = [
+    overduePayableAmount > 0
+      ? {
+          key: 'overdue',
+          rank: 100 + overdueSharePct,
+          title: 'Revisar CxP vencida',
+          evidence: `${number(overduePayables)} partidas · ${compactMoney(overduePayableAmount)} · ${number(overdueSharePct)}% del saldo abierto`,
+          action: 'Revisar vencidas',
+          href: '/dashboard/finanzas/pagos',
+        }
+      : null,
+    dueSoonPayableAmount > 0
+      ? {
+          key: 'due-soon',
+          rank: 80,
+          title: 'Preparar vencimientos de 7 días',
+          evidence: `${number(dueSoonPayables)} partidas · ${compactMoney(dueSoonPayableAmount)} por vencer`,
+          action: 'Ver próximos pagos',
+          href: '/dashboard/finanzas/pagos',
+        }
+      : null,
+    pendingDeposit > 0
+      ? {
+          key: 'deposit',
+          rank: 70,
+          title: 'Validar pagos no depositados',
+          evidence: `${number(pendingDeposit)} registros Laudus requieren verificación antes de cerrar conciliación`,
+          action: 'Validar pagos',
+          href: '/dashboard/finanzas/pagos',
+        }
+      : null,
+    costCenterUnresolved > 0
+      ? {
+          key: 'cost-centers',
+          rank: 60,
+          title: 'Cerrar atribución por centro de costo',
+          evidence: `${number(costCenterUnresolved)} centros aún no tienen cruce exacto con MOTIL`,
+          action: 'Conciliar centros',
+          href: '/dashboard/finanzas/centros',
+        }
+      : null,
+    !accountingCurrent
+      ? {
+          key: 'accounting',
+          rank: 40,
+          title: 'Mantener contabilidad histórica fuera de decisiones actuales',
+          evidence: `Último asiento: ${shortDate(data?.accounting?.latestEntryDate)} · usar sólo como contexto histórico`,
+          action: 'Ver trazabilidad',
+          href: '/dashboard/finanzas/trazabilidad',
+        }
+      : null,
+  ]
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((left, right) => right.rank - left.rank)
+    .slice(0, 3);
+
   return (
     <Card className="overflow-hidden shadow-none">
       <CardHeader className="border-b pb-4">
@@ -211,6 +271,38 @@ export function LaudusFinanceControlCard() {
       </CardHeader>
 
       <CardContent className="space-y-5 p-5">
+        {priorities.length > 0 ? (
+          <section className="space-y-3" aria-label="Prioridades financieras de hoy">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Prioridades de hoy</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                MOTIL ordena sólo lo que requiere una decisión financiera ahora, usando evidencia vigente de Laudus.
+              </p>
+            </div>
+            <div className="divide-y overflow-hidden rounded-xl border">
+              {priorities.map((item, index) => (
+                <div key={item.key} className="flex flex-col gap-3 bg-card px-4 py-3 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">P{index + 1}</Badge>
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.evidence}</p>
+                  </div>
+                  <Button asChild size="sm" variant={index === 0 ? 'default' : 'outline'}>
+                    <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl border p-4 text-sm">
+            <BadgeCheck className="h-4 w-4"/>
+            Sin decisiones financieras urgentes detectadas en la evidencia Laudus disponible.
+          </div>
+        )}
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-lg border p-4">
             <p className="flex items-center gap-2 text-xs text-muted-foreground"><CircleDollarSign className="h-4 w-4"/>Pagos</p>
