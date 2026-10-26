@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Bot, Send } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -54,12 +55,21 @@ const QUICK = [
 ];
 
 export default function PlanningAssistantPage() {
-  const [message, setMessage] = useState('');
+  const searchParams = useSearchParams();
+  const initialQuestion = searchParams.get('q') || '';
+  const initialQuestionSent = useRef(false);
+  const [message, setMessage] = useState(initialQuestion);
   const [answer, setAnswer] = useState('');
   const [coverage, setCoverage] = useState<AssistantResponse['coverage']>();
   const [planCandidates, setPlanCandidates] = useState<PlanCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!initialQuestion || initialQuestionSent.current) return;
+    initialQuestionSent.current = true;
+    void ask(initialQuestion);
+  }, [initialQuestion]);
 
   async function ask(question = message) {
     const value = question.trim();
