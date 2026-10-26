@@ -331,7 +331,7 @@ test('finance summary surfaces the Asset 360 review queue without mixing it into
   const signal=fs.readFileSync('components/finance/asset-candidate-review-signal.tsx','utf8');
   assert.match(dashboard,/AssetCandidateReviewSignal/);
   assert.match(signal,/Fichas 360 por revisar/);
-  assert.match(signal,/listas con doble respaldo/);
+  assert.match(signal,/altas por decidir/);
   assert.match(signal,/Revisar candidatas/);
   assert.match(signal,/\/dashboard\/finanzas\/activos\/candidatas/);
 });
@@ -358,7 +358,7 @@ test('Asset 360 review summary counts only pending decisions as actionable',()=>
   assert.match(api,/acceptedForCreation/);
   assert.match(api,/ignoredCandidates/);
   assert.match(signal,/pendingReview/);
-  assert.match(signal,/por decidir con doble respaldo/);
+  assert.match(signal,/altas por decidir/);
   assert.match(candidates,/Por decidir/);
   assert.match(candidates,/aprobadas/);
   assert.match(candidates,/descartadas/);
