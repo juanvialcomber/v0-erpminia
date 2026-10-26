@@ -324,3 +324,14 @@ test('ready Asset 360 candidates use auditable review decisions without creating
   assert.match(candidates,/No corresponde/);
   assert.match(candidates,/Reabrir/);
 });
+
+
+test('finance summary surfaces the Asset 360 review queue without mixing it into Laudus control',()=>{
+  const dashboard=fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+  const signal=fs.readFileSync('components/finance/asset-candidate-review-signal.tsx','utf8');
+  assert.match(dashboard,/AssetCandidateReviewSignal/);
+  assert.match(signal,/Fichas 360 por revisar/);
+  assert.match(signal,/listas con doble respaldo/);
+  assert.match(signal,/Revisar candidatas/);
+  assert.match(signal,/\/dashboard\/finanzas\/activos\/candidatas/);
+});
