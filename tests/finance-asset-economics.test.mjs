@@ -250,3 +250,12 @@ test('finance reconciliation exposes material review completion while keeping lo
   assert.match(page,/Revisión ≥/);
   assert.match(page,/Revisión secundaria/);
 });
+
+
+test('finance reconciliation separates capitalized components from complete assets',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/component_or_spare_financial_line/);
+  assert.match(review,/Componente \/ repuesto/);
+  assert.match(review,/no un activo operacional completo/);
+  assert.match(page,/Componente \/ repuesto/);
+});
