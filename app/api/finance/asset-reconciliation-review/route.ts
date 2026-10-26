@@ -7,6 +7,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 function classifyRow(row: {
   cost_center_raw?: string | null;
   source_sheet?: string | null;
+  source_payload?: Record<string, unknown> | null;
 }) {
   const raw = String(row.cost_center_raw || '').trim();
   const normalized = raw.toLowerCase();
@@ -16,6 +17,13 @@ function classifyRow(row: {
   }
   if (normalized.startsWith('vendido')) {
     return { key: 'source_sold', label: 'Fuente: vendido', rank: 4 };
+  }
+  const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
+  if (centerType === 'asset') {
+    return { key: 'asset_center_without_asset', label: 'Centro de activo sin Ficha 360', rank: 5 };
+  }
+  if (centerType) {
+    return { key: 'non_asset_cost_center', label: 'Centro no operacional', rank: 3 };
   }
   if (raw && raw !== '0') {
     return { key: 'cost_center_without_asset', label: 'Centro sin contraparte MOTIL', rank: 3 };
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
 
   const { data: unresolvedRows, error: unresolvedError } = await context.supabase
     .from('motil_finance_asset_stage')
-    .select('id,source_sheet,source_row,description,cost_center_raw,net_book_value,updated_asset,identity_status')
+    .select('id,source_sheet,source_row,description,cost_center_raw,net_book_value,updated_asset,identity_status,source_payload')
     .eq('organization_id', context.organizationId)
     .eq('import_id', source.id)
     .is('canonical_asset_id', null)
@@ -121,6 +129,8 @@ export async function GET(request: NextRequest) {
       unresolved: 'Fila financiera que aún no tiene contraparte canónica verificable en MOTIL. No implica error en la fuente.',
       source_depreciated: 'La propia fuente marca el registro como depreciado; MOTIL conserva ese estado sin inferir baja física.',
       source_sold: 'La propia fuente marca el registro como vendido; MOTIL conserva ese estado sin inferir fecha ni comprador.',
+      asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
+      non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
       missing_identifier: 'La fila no trae centro, patente, serie o nombre canónico suficiente para una conciliación determinística.',
     },
