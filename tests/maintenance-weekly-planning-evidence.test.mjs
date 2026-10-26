@@ -118,3 +118,13 @@ test('weekly plan handoff preserves the selected asset context', () => {
   assert.match(page, /assetId: nextDecision\.canonicalAssetId/);
   assert.match(page, /assetId: row\.canonicalAssetId/);
 });
+
+
+test('weekly planning resolves an existing shortage OT before preparing new work', () => {
+  const api = fs.readFileSync('app/api/planning/maintenance/route.ts','utf8');
+  const page = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  assert.match(api, /shortageWorkOrder/);
+  assert.match(page, /Resolver materiales/);
+  assert.match(page, /nextDecision\.shortageWorkOrder/);
+  assert.match(page, /row\.shortageWorkOrder/);
+});
