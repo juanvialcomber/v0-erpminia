@@ -29,10 +29,12 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (eventsResult.error) throw eventsResult.error;
-    if (overviewResult.error) throw overviewResult.error;
+    if (overviewResult.error) {
+      console.warn('[finance/event-ledger] overview unavailable', overviewResult.error.message);
+    }
 
     return NextResponse.json({
-      overview: overviewResult.data || null,
+      overview: overviewResult.error ? null : overviewResult.data || null,
       events: eventsResult.data || [],
       capped: (eventsResult.data || []).length === 250,
       certification: {
