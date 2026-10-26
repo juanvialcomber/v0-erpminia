@@ -101,6 +101,7 @@ export default function FinanceTraceabilityPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const events: LedgerEvent[] = data?.events || [];
+  const missingEvidenceCount = Number(nativeTrace.data?.summary?.missingEvidence || 0);
   const latestReviewByInvoice = new Map(
     (reviewState.data?.reviews || []).map((row) => [row.purchase_invoice_external_id, row]),
   );
@@ -187,7 +188,7 @@ export default function FinanceTraceabilityPage() {
               ].map(([label, value]) => (
                 <div key={label} className="bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className={`mt-1 text-lg font-semibold ${label === 'Falta evidencia' && Number(nativeTrace.data.summary?.missingEvidence || 0) > 0 ? 'text-destructive' : ''}`}>{value}</p>
+                  <p className={`mt-1 text-lg font-semibold ${label === 'Falta evidencia' && missingEvidenceCount > 0 ? 'text-destructive' : ''}`}>{value}</p>
                 </div>
               ))}
             </div>
