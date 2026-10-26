@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +18,28 @@ type Source = {
   provenanceKind: 'canonical_table';
 };
 
+type WorkbookSource = {
+  id: string;
+  filename: string;
+  sourceKind: string;
+  cutoffDate: string | null;
+  senderDeclaredNotFinal: boolean;
+  sourceRows: number;
+  reviewStatus: string;
+  stage: null | {
+    rows: number;
+    matched: number;
+    unresolved: number;
+    anomalyRows: number;
+    importedAt: string | null;
+  };
+  updatedAt: string | null;
+};
+
 type Response = {
   data: Source[];
+  workbooks: WorkbookSource[];
+  canImportWorkbooks: boolean;
   summary: {
     sources: number;
     auditEvents: number;
@@ -40,7 +61,28 @@ function date(value: string | null) {
 }
 
 export default function FinanceSourcesPage() {
-  const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
+  const { data, error, isLoading, mutate } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
+
+  async function processWorkbook(id: string) {
+    setProcessingId(id);
+    setProcessingError(null);
+    try {
+      const response = await fetch(`/api/finance/workbook-imports/${id}/stage`, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo procesar la fuente');
+      await mutate();
+    } catch (processError) {
+      setProcessingError(processError instanceof Error ? processError.message : 'No se pudo procesar la fuente');
+    } finally {
+      setProcessingId(null);
+    }
+  }
 
   if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Revisando el origen y la cobertura de las cifras financieras." />;
   if (error || !data) return <StatePanel tone="error" title="No fue posible cargar las fuentes" description="Las cifras no se reemplazan por valores vacíos cuando falta información de origen." />;
@@ -77,6 +119,58 @@ export default function FinanceSourcesPage() {
           </p>
         </div>
       ) : null}
+
+      <section className="overflow-hidden rounded-lg border">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">Archivos recibidos</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Evidencia original conservada. Procesar no publica ni reemplaza activos canónicos.</p>
+        </div>
+        {processingError ? (
+          <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{processingError}</div>
+        ) : null}
+        <div className="divide-y">
+          {data.workbooks.length ? data.workbooks.map((workbook) => (
+            <article key={workbook.id} className="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">{workbook.filename}</h3>
+                    <Badge variant="outline">{workbook.senderDeclaredNotFinal ? 'Preliminar' : 'Fuente recibida'}</Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Corte: {date(workbook.cutoffDate)} · {workbook.sourceRows.toLocaleString('es-CL')} filas de origen
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {workbook.stage
+                      ? `Procesadas: ${workbook.stage.rows.toLocaleString('es-CL')} · Identidad resuelta: ${workbook.stage.matched.toLocaleString('es-CL')} · Por revisar: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
+                      : 'Pendiente de procesamiento estructurado'}
+                  </p>
+                  {workbook.stage?.anomalyRows ? (
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                      {workbook.stage.anomalyRows.toLocaleString('es-CL')} fila con anomalía de estructura preservada para revisión.
+                    </p>
+                  ) : null}
+                </div>
+                {data.canImportWorkbooks ? (
+                  <button
+                    type="button"
+                    onClick={() => processWorkbook(workbook.id)}
+                    disabled={processingId !== null}
+                    className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {processingId === workbook.id ? 'Procesando…' : workbook.stage ? 'Reprocesar' : 'Procesar'}
+                  </button>
+                ) : (
+                  <Badge variant="secondary">{workbook.reviewStatus === 'needs_review' ? 'Revisión pendiente' : workbook.reviewStatus}</Badge>
+                )}
+              </div>
+            </article>
+          )) : (
+            <div className="p-4 text-sm text-muted-foreground">No hay archivos financieros registrados.</div>
+          )}
+        </div>
+      </section>
 
       <section className="divide-y overflow-hidden rounded-lg border">
         {data.data.map((source) => (
