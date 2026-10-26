@@ -122,12 +122,24 @@ function isDepreciationBusinessRow(description: unknown, historicalAsset: unknow
   return true;
 }
 
+function excelColumnName(column: number) {
+  let value = column + 1;
+  let name = '';
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
 function formulasForRow(sheet: SheetLike, rowNumber: number) {
   const formulas: Record<string, string> = {};
   for (let column = 0; column < 18; column += 1) {
-    const address = XLSX.utils.encode_cell({ r: rowNumber - 1, c: column });
+    const columnName = excelColumnName(column);
+    const address = `${columnName}${rowNumber}`;
     const cell = sheet[address] as { f?: string } | undefined;
-    if (cell?.f) formulas[XLSX.utils.encode_col(column)] = String(cell.f);
+    if (cell?.f) formulas[columnName] = String(cell.f);
   }
   return formulas;
 }
