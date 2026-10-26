@@ -80,6 +80,14 @@ const RECONCILIATION_PAYLOAD_KEYS = [
   'candidate_review_basis',
   'candidate_review_source_count',
   'candidate_review_verified_at',
+  'candidate_internal_master_search_verified',
+  'candidate_internal_master_search_sources',
+  'candidate_internal_master_search_result',
+  'candidate_internal_master_search_verified_at',
+  'purchase_cost_center_evidence',
+  'purchase_description_exact_plate',
+  'purchase_evidence_lines',
+  'purchase_evidence_orders',
 ] as const;
 
 function preservedReconciliationPayload(payload: unknown) {
