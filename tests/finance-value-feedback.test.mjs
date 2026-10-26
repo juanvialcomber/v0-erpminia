@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const finance = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+const finance = fs.readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx','utf8');
 const route = fs.readFileSync('app/api/integrations/laudus/finance-review-feedback/route.ts','utf8');
 const valueApi = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
 const valuePage = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
@@ -32,14 +32,14 @@ test('value scorecard surfaces real finance review adoption separately from ROI'
 });
 
 
-test('finance cockpit does not inflate adoption with repeated review clicks',()=>{
+test('finance traceability does not inflate adoption with repeated review clicks',()=>{
   assert.match(route,/latestByInvoice/);
   assert.match(finance,/latestReviewByInvoice/);
   assert.match(finance,/priorReview\?\.decision === 'accepted'/);
 });
 
 
-test('finance review timing is bounded, audited and not presented as ROI',()=>{
+test('finance traceability review timing is bounded, audited and not presented as ROI',()=>{
   assert.match(route,/decisionLatencyMs/);
   assert.match(route,/30 \* 60 \* 1000/);
   assert.match(route,/finance_review_decision/);
