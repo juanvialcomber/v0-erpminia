@@ -65,6 +65,11 @@ type Candidate = {
 type Response = {
   summary: {
     candidates: number;
+    candidateBookValueClp: number;
+    readyForReviewBookValueClp: number;
+    identityVerifiedSingleSourceBookValueClp: number;
+    modelOnlyBookValueClp: number;
+    sourceCodeBookValueClp: number;
     dualSource: number;
     readyForReview: number;
     pendingReview: number;
@@ -138,8 +143,19 @@ export default function MissingAssetCandidatesPage(){
     {error ? <StatePanel tone="error" title="No se pudo cargar candidatas" description={error.message} /> : null}
 
     {data ? <>
+      {data.summary.modelOnlyNeedsOperationalIdentity>0 ? (
+        <section className="flex flex-col gap-2 rounded-lg border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Mayor impacto pendiente</p>
+            <p className="mt-1 text-sm font-medium">{number(data.summary.modelOnlyNeedsOperationalIdentity)} modelos concentran {money(data.summary.modelOnlyBookValueClp)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Falta PPU, serie, chasis o número de unidad. No se infiere la identidad.</p>
+          </div>
+          <Badge variant="outline">Identidad operacional</Badge>
+        </section>
+      ) : null}
+
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Candidatas" value={number(data.summary.candidates)} detail="Entidades deduplicadas" />
+        <Metric label="Candidatas" value={number(data.summary.candidates)} detail={money(data.summary.candidateBookValueClp)+" de valor libro representado"} />
         <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.acceptedForCreation)+" aprobadas · "+number(data.summary.ignoredCandidates)+" descartadas"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
         <Metric label="Conflictos" value={number(data.summary.openIdentityConflicts)} detail="Ficha existente vs fuente nueva" />
