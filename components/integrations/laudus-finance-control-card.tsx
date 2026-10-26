@@ -26,6 +26,23 @@ type FinanceControl = {
       currency?: string | null;
     }>;
   };
+  accountsPayable?: {
+    openItems?: number;
+    overdueItems?: number;
+    dueWithin7Days?: number;
+    latestSync?: string | null;
+    oldestOpenItems?: Array<{
+      externalId?: string;
+      supplierName?: string;
+      documentNumber?: string | null;
+      issuedDate?: string | null;
+      dueDate?: string | null;
+      outstandingAmount?: number;
+      currency?: string | null;
+      status?: string | null;
+    }>;
+    semantics?: string;
+  };
   creditNotes?: {
     total?: number;
     documentedAmount?: number;
@@ -126,6 +143,9 @@ export function LaudusFinanceControlCard() {
   }
 
   const pendingDeposit = Number(data?.payments?.pendingDeposit || 0);
+  const openPayables = Number(data?.accountsPayable?.openItems || 0);
+  const overduePayables = Number(data?.accountsPayable?.overdueItems || 0);
+  const dueSoonPayables = Number(data?.accountsPayable?.dueWithin7Days || 0);
   const costCenterUnresolved = Number(data?.costCenters?.unresolved || 0);
   const accountingCurrent = Boolean(data?.accounting?.currentEnoughForExecutiveUse);
   const fixedAssetLinked = Number(data?.fixedAssets?.linkedToMotil || 0);
@@ -147,11 +167,16 @@ export function LaudusFinanceControlCard() {
       </CardHeader>
 
       <CardContent className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-lg border p-4">
             <p className="flex items-center gap-2 text-xs text-muted-foreground"><CircleDollarSign className="h-4 w-4"/>Pagos</p>
             <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(data?.payments?.total)}</p>
             <p className="mt-1 text-xs text-muted-foreground">{number(data?.payments?.deposited)} depositados · {number(pendingDeposit)} por revisar</p>
+          </div>
+          <div className="rounded-lg border p-4">
+            <p className="flex items-center gap-2 text-xs text-muted-foreground"><ReceiptText className="h-4 w-4"/>CxP Laudus</p>
+            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(openPayables)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(overduePayables)} vencidas · {number(dueSoonPayables)} vencen en 7 días</p>
           </div>
           <div className="rounded-lg border p-4">
             <p className="flex items-center gap-2 text-xs text-muted-foreground"><ReceiptText className="h-4 w-4"/>Notas de crédito</p>
@@ -171,6 +196,35 @@ export function LaudusFinanceControlCard() {
         </div>
 
         <div className="space-y-2">
+          {openPayables > 0 ? (
+            <div className="space-y-3 rounded-lg border p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-medium"><ReceiptText className="h-4 w-4"/>CxP Laudus que requiere revisión</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {number(overduePayables)} partidas están vencidas y {number(dueSoonPayables)} vencen en los próximos 7 días. Son saldos fuente Laudus y requieren conciliación antes de tratarlos como compromiso de caja definitivo.
+                  </p>
+                </div>
+                <Button asChild size="sm"><Link href="/dashboard/finanzas/pagos">Revisar CxP <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+              </div>
+              <div className="divide-y rounded-md border">
+                {(data?.accountsPayable?.oldestOpenItems || []).map((item) => (
+                  <div key={item.externalId || item.documentNumber || item.dueDate || 'cxp'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_100px_120px_auto] md:items-center">
+                    <span className="truncate font-medium">{item.supplierName || 'Proveedor Laudus'}</span>
+                    <span className="text-muted-foreground">{item.documentNumber || 'Sin doc.'}</span>
+                    <span className="text-muted-foreground">Vence {shortDate(item.dueDate)}</span>
+                    <span className="text-right font-medium">
+                      {item.currency === 'CLP' ? money(item.outstandingAmount) : item.outstandingAmount ? number(item.outstandingAmount) : 'Monto no informado'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Ordenado por vencimiento más antiguo. MOTIL no suma estos saldos como caja comprometida ni deuda final hasta completar conciliación.
+              </p>
+            </div>
+          ) : null}
+
           {pendingDeposit > 0 ? (
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
