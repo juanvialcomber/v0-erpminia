@@ -195,7 +195,7 @@ export function CostCentersWorkspace() {
   };
 
   if (loading) {
-    return <StatePanel tone="loading" title="Cargando centros de costos" description="Consultando la estructura canónica vigente." />;
+    return <StatePanel tone="loading" title="Cargando centros de costos" description="Consultando la estructura vigente." />;
   }
 
   if (error) {
