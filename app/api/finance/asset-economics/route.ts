@@ -315,6 +315,11 @@ export async function GET(request: NextRequest) {
     const downtimeHours = numeric(operational?.recorded_downtime_hours) || 0;
     const recognizedCostLifetime = numeric(operational?.recognized_cost_clp_lifetime);
     const recognizedCost12m = numeric(operational?.recognized_cost_clp_12m);
+    const netBookValue = numeric(depreciation?.net_book_value);
+    const observedMaintenanceToBookPct =
+      recognizedCostLifetime != null && netBookValue != null && netBookValue > 0
+        ? (recognizedCostLifetime / netBookValue) * 100
+        : null;
     const runtimeReadings = Math.max(numeric(runtime?.reading_count) || 0, meterRows.length);
     const meterUnits = Array.from(new Set(meterRows.map((row) => String(row.meter_unit || '').trim().toLowerCase()).filter(Boolean)));
     const meterValues = meterRows
@@ -376,7 +381,8 @@ export async function GET(request: NextRequest) {
       acquisitionDate: asset.acquisition_date || null,
       acquisitionCostClp: numeric(asset.acquisition_cost),
       expectedLifespanYears: numeric(asset.expected_lifespan_years),
-      netBookValueClp: numeric(depreciation?.net_book_value),
+      netBookValueClp: netBookValue,
+      observedMaintenanceToBookPct,
       updatedAssetValueClp: numeric(depreciation?.updated_asset),
       accumulatedDepreciationClp: numeric(depreciation?.total_accum_depr),
       depreciationCurrentClp: numeric(depreciation?.depreciation_current),
@@ -442,6 +448,7 @@ export async function GET(request: NextRequest) {
       insurance: 'Valor asegurado en UF informado por la fuente canónica de Daniel. No se convierte a CLP ni se interpreta como valor libro.',
       maintenance: 'Costos y OT ya reconocidos por MOTIL para el activo canónico.',
       runtime: 'Lectura disponible y secuencia utilizable son estados distintos. Una secuencia sólo se habilita para tasas si tiene al menos dos fechas y valores distintos, una unidad consistente y sin disminuciones materiales.',
+      maintenance_to_book: 'Gasto histórico reconocido de mantenimiento dividido por valor libro canónico. Es una relación descriptiva sobre evidencia enlazada; no representa TCO ni dispara reemplazo.',
       decision: 'Reglas determinísticas de priorización. No son diagnóstico de falla ni recomendación automática de reemplazo.',
       replacement: 'MOTIL no recomienda reemplazo hasta enlazar valor libro/depreciación y contar con evidencia operacional suficiente.',
     },
