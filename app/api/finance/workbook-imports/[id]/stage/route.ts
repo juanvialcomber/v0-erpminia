@@ -81,6 +81,15 @@ function dateValue(value: unknown) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString().slice(0, 10);
   }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const decoded = XLSX.SSF.parse_date_code(value);
+    if (decoded) {
+      const yyyy = String(decoded.y).padStart(4, '0');
+      const mm = String(decoded.m).padStart(2, '0');
+      const dd = String(decoded.d).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
@@ -455,7 +464,7 @@ export async function POST(
 
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(bytes, { type: 'buffer', cellDates: true, cellFormula: true, raw: true });
+    workbook = XLSX.read(bytes, { type: 'buffer', cellDates: true });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'No se pudo interpretar el Excel' },
