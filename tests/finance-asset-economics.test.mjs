@@ -307,7 +307,7 @@ test('finance candidate queue classifies every review tier explicitly',()=>{
   assert.match(api,/source_code_needs_operational_validation/);
   assert.match(candidates,/Falta identidad operacional/);
   assert.match(candidates,/Código fuente por validar/);
-  assert.match(candidates,/Pendientes de identidad/);
+  assert.match(candidates,/Conflictos/);
 });
 
 
