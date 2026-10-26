@@ -201,6 +201,11 @@ export function WeeklyMaintenancePlanning() {
                 <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real</p>
                 <p className="mt-1 text-xs text-muted-foreground">Resolver cobertura antes de programar.</p>
               </>
+            ) : nextDecision.existingWorkOrder ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><CalendarDays className="h-4 w-4"/>OT ya abierta</p>
+                <p className="mt-1 text-xs text-muted-foreground">Continuar el trabajo existente antes de crear una nueva OT.</p>
+              </>
             ) : nextDecision.state === 'stale_evidence' ? (
               <>
                 <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Evidencia vencida</p>
@@ -288,6 +293,9 @@ export function WeeklyMaintenancePlanning() {
               </> : row.actualMaterialShortage ? <>
                 <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real en OT</p>
                 <p className="text-xs text-muted-foreground">Existe cantidad faltante registrada en requerimientos actuales de la OT.</p>
+              </> : row.existingWorkOrder ? <>
+                <p className="flex items-center gap-2 font-medium"><CalendarDays className="h-4 w-4"/>OT ya abierta</p>
+                <p className="text-xs text-muted-foreground">Continuar la OT existente antes de crear trabajo nuevo.</p>
               </> : row.state === 'stale_evidence' ? <>
                 <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Actualizar lectura</p>
                 <p className="text-xs text-muted-foreground">La prioridad proviene de evidencia antigua y debe validarse antes de programar.</p>
