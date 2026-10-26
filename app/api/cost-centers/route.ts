@@ -28,6 +28,8 @@ type CostCenterResponse = {
   name: string;
   description: string | null;
   status: 'active' | 'inactive';
+  activityEvents?: number;
+  committedClp?: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -37,13 +39,32 @@ export async function GET(request: NextRequest) {
 
     // Real org reads authoritative cost centers from the canonical view.
     if (orgHasCanonicalData(context.organizationId)) {
-      const { data, error } = await context.supabase
-        .from('canonical_cost_centers_current')
-        .select('id, cost_center_code, name, full_path, center_type, is_active')
-        .eq('organization_id', context.organizationId)
-        .order('cost_center_code');
+      const [{ data, error }, { data: financeActivity, error: financeActivityError }] = await Promise.all([
+        context.supabase
+          .from('canonical_cost_centers_current')
+          .select('id, cost_center_code, name, full_path, center_type, is_active')
+          .eq('organization_id', context.organizationId)
+          .order('cost_center_code'),
+        context.supabase
+          .from('canonical_finance_cost_centers')
+          .select('cost_center_code,event_count,committed_clp')
+          .eq('organization_id', context.organizationId),
+      ]);
+
+      if (financeActivityError) {
+        console.error('[API] Cost center finance activity fetch error:', financeActivityError);
+      }
 
       if (!error && Array.isArray(data) && data.length > 0) {
+        const activityByCode = new Map(
+          (Array.isArray(financeActivity) ? financeActivity : []).map((row: any) => [
+            String(row.cost_center_code || '').trim(),
+            {
+              activityEvents: Number(row.event_count || 0),
+              committedClp: Number(row.committed_clp || 0),
+            },
+          ]),
+        );
         const normalized = (data as CanonicalCostCenterRow[])
           .filter((center) => Boolean(center.id && center.cost_center_code && center.name))
           .filter((center) => center.is_active !== false)
@@ -53,6 +74,8 @@ export async function GET(request: NextRequest) {
             name: String(center.name || '').trim(),
             description: center.full_path || center.center_type || null,
             status: 'active',
+            activityEvents: activityByCode.get(String(center.cost_center_code || '').trim())?.activityEvents || 0,
+            committedClp: activityByCode.get(String(center.cost_center_code || '').trim())?.committedClp || 0,
           }));
 
         return NextResponse.json(normalized);
