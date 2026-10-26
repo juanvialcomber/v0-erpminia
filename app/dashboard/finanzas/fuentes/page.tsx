@@ -42,22 +42,22 @@ function date(value: string | null) {
 export default function FinanceSourcesPage() {
   const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
 
-  if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Leyendo la trazabilidad canónica certificada." />;
-  if (error || !data) return <StatePanel tone="error" title="Fuentes financieras no disponibles" description="No se reemplaza provenance faltante por una lista vacía." />;
+  if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Revisando el origen y la cobertura de las cifras financieras." />;
+  if (error || !data) return <StatePanel tone="error" title="No fue posible cargar las fuentes" description="Las cifras no se reemplazan por valores vacíos cuando falta información de origen." />;
 
   return (
     <div className="space-y-5">
       <header className="border-b border-border/70 pb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Provenance</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fuentes</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fuentes y calidad</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Origen certificado del costo reconocido y de las compras comprometidas. MOTIL mantiene separada la tabla canónica de los archivos documentales nuevos.
+          Muestra de dónde provienen las cifras, qué período cubren y si existe respaldo documental asociado.
         </p>
       </header>
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
-          ['Eventos auditables', data.summary.auditEvents],
+          ['Registros trazables', data.summary.auditEvents],
           ['Costo reconocido', data.summary.recognizedEvents],
           ['Compra comprometida', data.summary.committedEvents],
           ['Documentos Finanzas', data.summary.documentCoreRecords],
@@ -71,9 +71,9 @@ export default function FinanceSourcesPage() {
 
       {data.summary.documentCoreRecords === 0 ? (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
-          <p className="text-sm font-medium">La trazabilidad histórica está certificada por tablas canónicas, no por archivos preservados en el Document Core.</p>
+          <p className="text-sm font-medium">Los registros históricos tienen trazabilidad financiera, pero no cuentan con archivos originales asociados.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Los archivos que se suban desde ahora a Finanzas quedarán en el núcleo documental sin alterar los eventos históricos certificados.
+            Los documentos que se incorporen desde ahora quedarán vinculados como respaldo sin modificar el historial existente.
           </p>
         </div>
       ) : null}
@@ -86,11 +86,11 @@ export default function FinanceSourcesPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Database className="h-4 w-4 text-muted-foreground" />
                   <h2 className="text-sm font-semibold">{source.label}</h2>
-                  <Badge variant="secondary">Tabla canónica</Badge>
+                  <Badge variant="secondary">Fuente registrada</Badge>
                   <Badge variant="outline">{source.meaning}</Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {source.sourceTable} · {source.records.toLocaleString('es-CL')} eventos · {source.currency}
+                  {source.records.toLocaleString('es-CL')} registros · {source.currency}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Cobertura: {date(source.firstEventAt)} → {date(source.lastEventAt)}
@@ -98,7 +98,7 @@ export default function FinanceSourcesPage() {
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                <span>No se presenta como archivo Excel original</span>
+                <span>No incluye archivo original</span>
               </div>
             </div>
           </article>
