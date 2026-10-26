@@ -32,6 +32,6 @@ test('finance executive preserves operational procurement data while cockpit sta
   assert.match(api, /operational_procurement_finance_summary_v1/);
   assert.match(api, /operationalProcurementEvents/);
   assert.match(page, /LaudusFinanceControlCard/);
-  assert.match(page, /Estado, decisiones y exposición en una sola lectura/);
+  assert.match(page, /Exposición, decisiones y evidencia/);
   assert.doesNotMatch(page, /Monto sin centro de costo/);
 });
