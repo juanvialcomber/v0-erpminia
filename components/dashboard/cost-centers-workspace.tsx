@@ -41,6 +41,7 @@ function normalize(value: string) {
 export function CostCentersWorkspace() {
   const { costCenters, loading, error, reload } = useCostCenters();
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [adminOpen, setAdminOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,12 +55,15 @@ export function CostCentersWorkspace() {
   );
 
   const filtered = useMemo(() => {
+    const byStatus = statusFilter === 'active'
+      ? visible.filter((center) => isActiveCostCenterStatus(center.status))
+      : visible;
     const term = normalize(query);
-    if (!term) return visible;
-    return visible.filter((center) =>
+    if (!term) return byStatus;
+    return byStatus.filter((center) =>
       normalize(`${center.code} ${center.name} ${center.description || ''}`).includes(term),
     );
-  }, [query, visible]);
+  }, [query, statusFilter, visible]);
 
   const groups = useMemo<Group[]>(() => {
     const result = new Map<string, Group>();
@@ -192,12 +196,11 @@ export function CostCentersWorkspace() {
 
   return (
     <div className="space-y-5">
-      <section aria-label="Resumen de centros de costos" className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Resumen de centros de costos" className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3">
         {[
           ['Centros vigentes', activeCount],
           ['Grupos principales', rootCount],
           ['Subcentros', leafCount],
-          ['Resultados visibles', filtered.length],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-card px-4 py-3">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -206,19 +209,40 @@ export function CostCentersWorkspace() {
         ))}
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por código, nombre o descripción"
-            className="pl-9"
-          />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar código, nombre o descripción"
+              className="pl-9"
+            />
+          </div>
+          <div className="inline-flex w-fit rounded-md border bg-card p-1" aria-label="Filtro de estado">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('active')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === 'active' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Vigentes
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === 'all' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={reload}>
-          <RefreshCw className="mr-2 h-4 w-4" />Actualizar vista
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs tabular-nums text-muted-foreground">{filtered.length} visibles</span>
+          <Button variant="outline" size="sm" onClick={reload}>
+            <RefreshCw className="mr-2 h-4 w-4" />Actualizar
+          </Button>
+        </div>
       </div>
 
       {groups.length === 0 ? (
@@ -230,6 +254,7 @@ export function CostCentersWorkspace() {
             const items = sortCostCenters(group.items);
             const root = items.find((item) => item.code === group.rootCode);
             const children = items.filter((item) => item.code !== group.rootCode);
+            const activeChildren = children.filter((item) => isActiveCostCenterStatus(item.status)).length;
             const rootLabel = root
               ? formatCostCenterLabel(root)
               : `${group.rootCode} - ${repairCostCenterText(group.rootName)}`;
@@ -244,7 +269,9 @@ export function CostCentersWorkspace() {
                 >
                   {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{rootLabel}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">{children.length} subcentros</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {statusFilter === 'active' ? `${activeChildren} vigentes` : `${activeChildren}/${children.length} vigentes`}
+                  </span>
                 </button>
                 {open ? (
                   <div className="border-t bg-muted/10">
