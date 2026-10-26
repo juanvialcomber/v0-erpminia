@@ -17,8 +17,7 @@ test('Daniel Laudus control is finance scoped and read only', () => {
 test('finance control separates current operational data from historical accounting', () => {
   assert.match(loader, /currentEnoughForExecutiveUse/);
   assert.match(loader, /historical accounting rows are not presented as current balances/);
-  assert.match(card, /Contabilidad Laudus histórica/);
-  assert.match(card, /MOTIL no los presenta como saldo contable actual/);
+  assert.match(card, /Histórica\. Último asiento/);
 });
 
 test('credit notes and reconciliation gaps keep conservative semantics', () => {
@@ -55,9 +54,9 @@ test('Laudus payables control is bounded and keeps source-state semantics', () =
   assert.match(loader, /laudus_accounts_payable_service_v1/);
   assert.match(loader, /oldestOpenItems/);
   assert.match(loader, /not reconciled cash commitment or final accounting liability/);
-  assert.match(card, /CxP Laudus que requiere revisión/);
+  assert.match(card, /CxP más antiguas/);
   assert.match(card, /Ordenado por vencimiento más antiguo/);
-  assert.match(card, /MOTIL no suma estos saldos como caja comprometida ni deuda final/);
+  assert.match(card, /MOTIL no trata estos saldos como caja comprometida definitiva sin conciliación/);
 });
 
 
@@ -133,4 +132,12 @@ test('Daniel cockpit exposes actionable queues without claiming automatic closur
   assert.match(card, /Pagos por verificar/);
   assert.match(card, /Centros por conciliar/);
   assert.match(card, /Son colas accionables, no cierres automáticos/);
+});
+
+
+test('secondary evidence stays collapsed and does not compete with the daily decision', () => {
+  assert.match(card, /Evidencia y brechas/);
+  assert.match(card, /Cerrado por defecto/);
+  assert.match(card, /<details className="group">/);
+  assert.match(card, /Cobertura de evidencia/);
 });
