@@ -66,15 +66,35 @@ async function loadOpenPayables(db: SupabaseClient, organizationId: string) {
   return rows;
 }
 
-function monthKey(value: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
+function santiagoDateKey(value: Date | string | number) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Santiago',
     year: 'numeric',
     month: '2-digit',
+    day: '2-digit',
   }).format(date);
+}
+
+function sourceDateKey(value: string | null) {
+  if (!value) return null;
+  return santiagoDateKey(value);
+}
+
+function dateKeyToEpochDay(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+}
+
+function addDaysToDateKey(key: string, days: number) {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function monthKey(value: string | null) {
+  return sourceDateKey(value)?.slice(0, 7) || null;
 }
 
 function monthLabel(key: string) {
@@ -91,6 +111,9 @@ export async function loadLaudusFinanceControl(
   db: SupabaseClient,
   organizationId: string,
 ) {
+  const todayKey = santiagoDateKey(new Date()) || new Date().toISOString().slice(0, 10);
+  const sevenDaysFromTodayKey = addDaysToDateKey(todayKey, 7);
+
   const [
     payments,
     depositedPayments,
@@ -160,7 +183,7 @@ export async function loadLaudusFinanceControl(
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .gt('outstanding_amount', 0)
-        .lt('due_date', new Date().toISOString()),
+        .lt('due_date', todayKey),
     ),
     count(
       db
@@ -168,8 +191,8 @@ export async function loadLaudusFinanceControl(
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .gt('outstanding_amount', 0)
-        .gte('due_date', new Date().toISOString())
-        .lt('due_date', new Date(Date.now() + 7 * 86400000).toISOString()),
+        .gte('due_date', todayKey)
+        .lt('due_date', sevenDaysFromTodayKey),
     ),
     db
       .from('laudus_accounts_payable_service_v1')
@@ -210,27 +233,33 @@ export async function loadLaudusFinanceControl(
     0,
   );
 
-  const now = Date.now();
-  const sevenDaysMs = 7 * 86400000;
+  const todayEpochDay = dateKeyToEpochDay(todayKey);
   const clpPayables = openPayableRows.filter((row) => !row.currency_code || row.currency_code === 'CLP');
   const openAmountClp = clpPayables.reduce((sum, row) => sum + Number(row.outstanding_amount || 0), 0);
   const overdueAmountClp = clpPayables.reduce((sum, row) => {
-    const due = row.due_date ? Date.parse(row.due_date) : NaN;
-    return Number.isFinite(due) && due < now ? sum + Number(row.outstanding_amount || 0) : sum;
+    const dueKey = sourceDateKey(row.due_date);
+    if (!dueKey) return sum;
+    return dateKeyToEpochDay(dueKey) < todayEpochDay ? sum + Number(row.outstanding_amount || 0) : sum;
   }, 0);
   const dueSoonAmountClp = clpPayables.reduce((sum, row) => {
-    const due = row.due_date ? Date.parse(row.due_date) : NaN;
-    return Number.isFinite(due) && due >= now && due < now + sevenDaysMs
+    const dueKey = sourceDateKey(row.due_date);
+    if (!dueKey) return sum;
+    const dueDay = dateKeyToEpochDay(dueKey);
+    return dueDay >= todayEpochDay && dueDay < todayEpochDay + 7
       ? sum + Number(row.outstanding_amount || 0)
       : sum;
   }, 0);
   const newOpenIssued7d = openPayableRows.filter((row) => {
-    const issued = row.issued_date ? Date.parse(row.issued_date) : NaN;
-    return Number.isFinite(issued) && issued >= now - sevenDaysMs && issued <= now;
+    const issuedKey = sourceDateKey(row.issued_date);
+    if (!issuedKey) return false;
+    const issuedDay = dateKeyToEpochDay(issuedKey);
+    return issuedDay >= todayEpochDay - 6 && issuedDay <= todayEpochDay;
   }).length;
   const becameOverdue7d = openPayableRows.filter((row) => {
-    const due = row.due_date ? Date.parse(row.due_date) : NaN;
-    return Number.isFinite(due) && due >= now - sevenDaysMs && due < now;
+    const dueKey = sourceDateKey(row.due_date);
+    if (!dueKey) return false;
+    const dueDay = dateKeyToEpochDay(dueKey);
+    return dueDay >= todayEpochDay - 7 && dueDay < todayEpochDay;
   }).length;
 
   const agingMap = new Map<string, { label: string; items: number; amountClp: number }>([
@@ -241,9 +270,9 @@ export async function loadLaudusFinanceControl(
     ['60_plus', { label: '+60 días', items: 0, amountClp: 0 }],
   ]);
   for (const row of clpPayables) {
-    const due = row.due_date ? Date.parse(row.due_date) : NaN;
-    if (!Number.isFinite(due)) continue;
-    const overdueDays = Math.floor((now - due) / 86400000);
+    const dueKey = sourceDateKey(row.due_date);
+    if (!dueKey) continue;
+    const overdueDays = todayEpochDay - dateKeyToEpochDay(dueKey);
     const bucket =
       overdueDays <= 0 ? 'current'
       : overdueDays <= 7 ? '1_7'
@@ -338,8 +367,9 @@ export async function loadLaudusFinanceControl(
   const latestAccountingEntryDate = latestAccounting.data?.entry_date
     ? String(latestAccounting.data.entry_date)
     : null;
-  const accountingAgeDays = latestAccountingEntryDate
-    ? Math.max(0, Math.floor((Date.now() - Date.parse(latestAccountingEntryDate)) / 86400000))
+  const latestAccountingKey = sourceDateKey(latestAccountingEntryDate);
+  const accountingAgeDays = latestAccountingKey
+    ? Math.max(0, todayEpochDay - dateKeyToEpochDay(latestAccountingKey))
     : null;
 
   return {
