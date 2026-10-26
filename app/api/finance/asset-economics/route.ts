@@ -219,12 +219,15 @@ export async function GET(request: NextRequest) {
       .select('canonical_asset_id,reading_count,latest_meter_hours,observed_operating_hours,usable_for_rate_metrics')
       .eq('organization_id', context.organizationId)
       .in('canonical_asset_id', assetIds),
-    context.supabase
-      .from('motil_finance_asset_stage')
-      .select('canonical_asset_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
-      .eq('organization_id', context.organizationId)
-      .in('canonical_asset_id', assetIds)
-      .not('net_book_value', 'is', null),
+    depreciationSource
+      ? context.supabase
+          .from('motil_finance_asset_stage')
+          .select('canonical_asset_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
+          .eq('organization_id', context.organizationId)
+          .eq('import_id', depreciationSource.id)
+          .in('canonical_asset_id', assetIds)
+          .not('net_book_value', 'is', null)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const queryError = assetsResult.error || operationalResult.error || runtimeResult.error || depreciationResult.error;
@@ -263,11 +266,11 @@ export async function GET(request: NextRequest) {
     const hasCoreEconomics = asset.acquisition_cost != null || asset.acquisition_date != null || depreciation?.net_book_value != null;
 
     const evidence = {
-      insurance: true,
+      insurance: Boolean(stage),
+      bookValue: depreciation?.net_book_value != null,
       criticality: criticalityLevel(criticality) > 0,
       maintenance: hasMaintenanceEvidence,
       runtime: hasRuntime,
-      acquisitionEconomics: hasCoreEconomics,
     };
     const evidenceCount = Object.values(evidence).filter(Boolean).length;
     const decision = buildDecision({
@@ -344,7 +347,7 @@ export async function GET(request: NextRequest) {
       withCriticality: queue.filter((row) => row.evidence.criticality).length,
       withMaintenanceEvidence: queue.filter((row) => row.evidence.maintenance).length,
       withRuntimeEvidence: queue.filter((row) => row.evidence.runtime).length,
-      withCoreEconomics: queue.filter((row) => row.evidence.acquisitionEconomics).length,
+      withCoreEconomics: queue.filter((row) => row.netBookValueClp != null || row.acquisitionCostClp != null || row.acquisitionDate != null).length,
       withBookValue: queue.filter((row) => row.netBookValueClp != null).length,
       depreciationConflicts: queue.filter((row) => row.depreciationConflictCount > 1).length,
       maintenanceAttention: queue.filter((row) => row.decision.key === 'maintenance_attention').length,
