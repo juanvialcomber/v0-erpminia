@@ -114,7 +114,8 @@ test('finance assets exposes unresolved reconciliation without fabricating ident
   assert.match(review,/Fuente: vendido/);
   assert.match(review,/No implica error en la fuente/);
   assert.match(page,/Conciliación pendiente/);
-  assert.match(page,/sin contraparte verificada/);
+  assert.match(page,/Depreciación/);
+  assert.match(page,/Seguro sin clasificar/);
 });
 
 
