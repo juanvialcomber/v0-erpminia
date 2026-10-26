@@ -143,6 +143,9 @@ export async function GET(request: NextRequest) {
     let purchaseEvidenceOrders: number | null = null;
     let purchaseEvidenceLines: number | null = null;
     let purchaseDescriptionExactPlate = false;
+    let internalMasterSearchVerified = false;
+    let internalMasterSearchResult: string | null = null;
+    let internalMasterSearchSources: string[] = [];
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -188,6 +191,14 @@ export async function GET(request: NextRequest) {
       const payloadPurchaseLines = numeric(payload.purchase_evidence_lines);
       if (payloadPurchaseLines != null) purchaseEvidenceLines = Math.max(purchaseEvidenceLines ?? payloadPurchaseLines, payloadPurchaseLines);
       if (payload.purchase_description_exact_plate === true) purchaseDescriptionExactPlate = true;
+      if (payload.candidate_internal_master_search_verified === true) internalMasterSearchVerified = true;
+      internalMasterSearchResult = internalMasterSearchResult || text(payload.candidate_internal_master_search_result);
+      if (Array.isArray(payload.candidate_internal_master_search_sources)) {
+        internalMasterSearchSources = [...new Set([
+          ...internalMasterSearchSources,
+          ...payload.candidate_internal_master_search_sources.map((value: unknown) => String(value)),
+        ])];
+      }
       evidence.push({
         source,
         stageId: row.id,
@@ -251,6 +262,11 @@ export async function GET(request: NextRequest) {
         purchaseOrders: purchaseEvidenceOrders,
         purchaseLines: purchaseEvidenceLines,
       },
+      internalMasterVerification: {
+        verified: internalMasterSearchVerified,
+        result: internalMasterSearchResult,
+        sources: internalMasterSearchSources,
+      },
       review: review ? {
         id: review.id,
         status: review.status,
@@ -295,6 +311,7 @@ export async function GET(request: NextRequest) {
       ignoredCandidates: candidates.filter((row) => row.review?.status === 'ignored').length,
       openIdentityConflicts: identityConflicts.length,
       identityVerifiedSingleSource: candidates.filter((row) => row.identityVerifiedSingleSource).length,
+      exactSingleVerifiedAbsentInternalMasters: candidates.filter((row) => row.identityVerifiedSingleSource && row.internalMasterVerification.verified && row.internalMasterVerification.result === 'no_exact_counterpart').length,
       modelOnlyNeedsOperationalIdentity: candidates.filter((row) => row.modelOnlyNeedsOperationalIdentity).length,
       sourceCodeNeedsOperationalValidation: candidates.filter((row) => row.sourceCodeNeedsOperationalValidation).length,
       insuranceOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'insurance')).length,
