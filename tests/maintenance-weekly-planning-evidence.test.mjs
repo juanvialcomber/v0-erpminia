@@ -92,3 +92,13 @@ test('all standard plan edits remain proposed-only and auditable', () => {
   assert.match(progressive, /edit_type: 'add_material'/);
   assert.ok((progressive.match(/Sólo se editan planes propuestos/g) || []).length >= 5);
 });
+
+
+test('weekly planning shows one next decision before the secondary queue', () => {
+  const page = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  assert.match(page, /Siguiente decisión/);
+  assert.match(page, /nextDecision = rows\.find/);
+  assert.match(page, /queuedRows/);
+  assert.match(page, /Qué debe decidir Ariel/);
+  assert.match(page, /recordDecision\(nextDecision/);
+});
