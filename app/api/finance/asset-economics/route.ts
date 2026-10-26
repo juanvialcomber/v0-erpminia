@@ -60,6 +60,14 @@ function criticalityLabel(value: unknown) {
   return 'Sin definir';
 }
 
+function chunkValues<T>(values: T[], size = 50) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
 function buildDecision(params: {
   criticality: unknown;
   openWorkOrders: number;
@@ -203,60 +211,76 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [assetsResult, operationalResult, runtimeResult, depreciationResult, planningResult, meterResult] = await Promise.all([
-    context.supabase
-      .from('canonical_assets_current')
-      .select('id,asset_code,name,criticality,operational_status,acquisition_date,acquisition_cost,expected_lifespan_years')
-      .eq('organization_id', context.organizationId)
-      .in('id', assetIds),
-    context.supabase
-      .from('asset_operational_state_v1')
-      .select('canonical_asset_id,recognized_cost_event_count,recognized_cost_clp_lifetime,recognized_cost_clp_12m,work_order_count,open_work_order_count,recorded_downtime_hours,availability_pct,criticality,operational_status')
-      .eq('organization_id', context.organizationId)
-      .in('canonical_asset_id', assetIds),
-    context.supabase
-      .from('asset_runtime_summary_v1')
-      .select('canonical_asset_id,reading_count,latest_meter_hours,observed_operating_hours,usable_for_rate_metrics')
-      .eq('organization_id', context.organizationId)
-      .in('canonical_asset_id', assetIds),
-    depreciationSource
-      ? context.supabase
-          .from('motil_finance_asset_stage')
-          .select('canonical_asset_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
-          .eq('organization_id', context.organizationId)
-          .eq('import_id', depreciationSource.id)
-          .in('canonical_asset_id', assetIds)
-          .not('net_book_value', 'is', null)
-      : Promise.resolve({ data: [], error: null }),
-    context.supabase
-      .from('planning_maintenance_source_rows')
-      .select('canonical_asset_id,criticality_raw,current_reading,current_reading_at,meter_unit,updated_at')
-      .eq('organization_id', context.organizationId)
-      .in('canonical_asset_id', assetIds)
-      .order('updated_at', { ascending: false }),
-    context.supabase
-      .from('planning_asset_meter_readings')
-      .select('canonical_asset_id,recorded_at,meter_value,meter_unit')
-      .eq('organization_id', context.organizationId)
-      .in('canonical_asset_id', assetIds)
-      .order('recorded_at', { ascending: true }),
-  ]);
+  const assetRows: any[] = [];
+  const operationalRows: any[] = [];
+  const runtimeRows: any[] = [];
+  const depreciationRowsAll: any[] = [];
+  const planningRowsAll: any[] = [];
+  const meterRowsAll: any[] = [];
 
-  const queryError =
-    assetsResult.error ||
-    operationalResult.error ||
-    runtimeResult.error ||
-    depreciationResult.error ||
-    planningResult.error ||
-    meterResult.error;
-  if (queryError) return NextResponse.json({ error: queryError.message }, { status: 500 });
+  for (const assetChunk of chunkValues(assetIds, 50)) {
+    const [assetsResult, operationalResult, runtimeResult, depreciationResult, planningResult, meterResult] = await Promise.all([
+      context.supabase
+        .from('canonical_assets_current')
+        .select('id,asset_code,name,criticality,operational_status,acquisition_date,acquisition_cost,expected_lifespan_years')
+        .eq('organization_id', context.organizationId)
+        .in('id', assetChunk),
+      context.supabase
+        .from('asset_operational_state_v1')
+        .select('canonical_asset_id,recognized_cost_event_count,recognized_cost_clp_lifetime,recognized_cost_clp_12m,work_order_count,open_work_order_count,recorded_downtime_hours,availability_pct,criticality,operational_status')
+        .eq('organization_id', context.organizationId)
+        .in('canonical_asset_id', assetChunk),
+      context.supabase
+        .from('asset_runtime_summary_v1')
+        .select('canonical_asset_id,reading_count,latest_meter_hours,observed_operating_hours,usable_for_rate_metrics')
+        .eq('organization_id', context.organizationId)
+        .in('canonical_asset_id', assetChunk),
+      depreciationSource
+        ? context.supabase
+            .from('motil_finance_asset_stage')
+            .select('canonical_asset_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
+            .eq('organization_id', context.organizationId)
+            .eq('import_id', depreciationSource.id)
+            .in('canonical_asset_id', assetChunk)
+            .not('net_book_value', 'is', null)
+        : Promise.resolve({ data: [], error: null }),
+      context.supabase
+        .from('planning_maintenance_source_rows')
+        .select('canonical_asset_id,criticality_raw,current_reading,current_reading_at,meter_unit,updated_at')
+        .eq('organization_id', context.organizationId)
+        .in('canonical_asset_id', assetChunk)
+        .order('updated_at', { ascending: false }),
+      context.supabase
+        .from('planning_asset_meter_readings')
+        .select('canonical_asset_id,recorded_at,meter_value,meter_unit')
+        .eq('organization_id', context.organizationId)
+        .in('canonical_asset_id', assetChunk)
+        .order('recorded_at', { ascending: true }),
+    ]);
 
-  const assetsById = new Map<string, AssetRow>((assetsResult.data || []).map((row: any) => [row.id, row]));
-  const operationalById = new Map<string, OperationalRow>((operationalResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
-  const runtimeById = new Map<string, RuntimeRow>((runtimeResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
+    const queryError =
+      assetsResult.error ||
+      operationalResult.error ||
+      runtimeResult.error ||
+      depreciationResult.error ||
+      planningResult.error ||
+      meterResult.error;
+    if (queryError) return NextResponse.json({ error: queryError.message }, { status: 500 });
+
+    assetRows.push(...(assetsResult.data || []));
+    operationalRows.push(...(operationalResult.data || []));
+    runtimeRows.push(...(runtimeResult.data || []));
+    depreciationRowsAll.push(...(depreciationResult.data || []));
+    planningRowsAll.push(...(planningResult.data || []));
+    meterRowsAll.push(...(meterResult.data || []));
+  }
+
+  const assetsById = new Map<string, AssetRow>(assetRows.map((row: any) => [row.id, row]));
+  const operationalById = new Map<string, OperationalRow>(operationalRows.map((row: any) => [row.canonical_asset_id, row]));
+  const runtimeById = new Map<string, RuntimeRow>(runtimeRows.map((row: any) => [row.canonical_asset_id, row]));
 
   const planningByAsset = new Map<string, any[]>();
-  for (const row of planningResult.data || []) {
+  for (const row of planningRowsAll) {
     const assetId = String(row.canonical_asset_id || '');
     if (!assetId) continue;
     const rows = planningByAsset.get(assetId) || [];
@@ -265,7 +289,7 @@ export async function GET(request: NextRequest) {
   }
 
   const meterByAsset = new Map<string, any[]>();
-  for (const row of meterResult.data || []) {
+  for (const row of meterRowsAll) {
     const assetId = String(row.canonical_asset_id || '');
     if (!assetId) continue;
     const rows = meterByAsset.get(assetId) || [];
@@ -277,7 +301,7 @@ export async function GET(request: NextRequest) {
   }
 
   const depreciationByAsset = new Map<string, any[]>();
-  for (const row of depreciationResult.data || []) {
+  for (const row of depreciationRowsAll) {
     const assetId = String(row.canonical_asset_id || '');
     if (!assetId) continue;
     const rows = depreciationByAsset.get(assetId) || [];
