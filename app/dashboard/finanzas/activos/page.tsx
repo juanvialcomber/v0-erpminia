@@ -240,8 +240,10 @@ export default function FinanceAssetsPage(){
             <ReviewMetric label="Línea agregada" value={number(reviewData.unresolved.byReason.aggregate_multi_asset_financial_line||0)} detail="Una fila financiera representa más de un activo" />
             <ReviewMetric label="Identidad insuficiente" value={number(reviewData.unresolved.byReason.insufficient_unit_identity||0)} detail="Parece operacional, pero falta una llave de unidad verificable" />
             <ReviewMetric label="Modelo no representado" value={number(reviewData.unresolved.byReason.unrepresented_operational_model||0)} detail="Modelo específico ausente del maestro operacional" />
+            <ReviewMetric label="Componente / repuesto" value={number(reviewData.unresolved.byReason.component_or_spare_financial_line||0)} detail="Capitalizado financieramente; no crea Ficha 360 de equipo" />
             <ReviewMetric label="Centro de activo sin Ficha 360" value={number(reviewData.unresolved.byReason.asset_center_without_asset||0)} detail="Centro canónico tipado como activo; falta contraparte operacional" />
             <ReviewMetric label="Centro no operacional" value={number(reviewData.unresolved.byReason.non_asset_cost_center||0)} detail="Área o administración; no se fuerza a un equipo" />
+            <ReviewMetric label="Revisión secundaria" value={number(reviewData.summary.unexplainedOperationalRows||0)} detail={money(reviewData.summary.unexplainedOperationalBookValueClp)+' acumulados en filas individuales bajo el umbral material'} />
           </div>
           <details>
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
