@@ -114,58 +114,90 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const { data: source, error: sourceError } = await context.supabase
+  const { data: workbookSources, error: sourceError } = await context.supabase
     .from('motil_finance_workbook_imports')
-    .select('id,filename,source_cutoff_date,review_status,metadata,updated_at')
+    .select('id,filename,source_kind,source_cutoff_date,review_status,metadata,updated_at,created_at')
     .eq('organization_id', context.organizationId)
-    .eq('source_kind', 'insured_asset_inventory')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .in('source_kind', ['insured_asset_inventory', 'fixed_asset_depreciation_model'])
+    .order('created_at', { ascending: false });
 
   if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 500 });
+
+  const insuranceSource = (workbookSources || []).find((row: any) => row.source_kind === 'insured_asset_inventory') || null;
+  const depreciationSource = (workbookSources || []).find((row: any) => row.source_kind === 'fixed_asset_depreciation_model') || null;
+  const source = insuranceSource || depreciationSource;
+
   if (!source) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       source: null,
+      sources: { insurance: null, depreciation: null },
       summary: {
         linkedAssets: 0,
         withCriticality: 0,
         withMaintenanceEvidence: 0,
         withRuntimeEvidence: 0,
         withCoreEconomics: 0,
+        withBookValue: 0,
+        depreciationConflicts: 0,
+        maintenanceAttention: 0,
+        economicsToComplete: 0,
       },
       queue: [],
     });
   }
 
-  const { data: insuredRows, error: insuredError } = await context.supabase
-    .from('motil_finance_asset_stage')
-    .select('id,canonical_asset_id,insured_uf,equipment_type,brand,model,model_year,serial_number,license_plate,identity_status,identity_basis,source_sheet,source_row')
-    .eq('organization_id', context.organizationId)
-    .eq('import_id', source.id)
-    .not('canonical_asset_id', 'is', null);
+  const [insuredResult, depreciationIdentityResult] = await Promise.all([
+    insuranceSource
+      ? context.supabase
+          .from('motil_finance_asset_stage')
+          .select('id,canonical_asset_id,insured_uf,equipment_type,brand,model,model_year,serial_number,license_plate,identity_status,identity_basis,source_sheet,source_row')
+          .eq('organization_id', context.organizationId)
+          .eq('import_id', insuranceSource.id)
+          .not('canonical_asset_id', 'is', null)
+      : Promise.resolve({ data: [], error: null }),
+    depreciationSource
+      ? context.supabase
+          .from('motil_finance_asset_stage')
+          .select('id,canonical_asset_id')
+          .eq('organization_id', context.organizationId)
+          .eq('import_id', depreciationSource.id)
+          .not('canonical_asset_id', 'is', null)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
-  if (insuredError) return NextResponse.json({ error: insuredError.message }, { status: 500 });
+  const stageError = insuredResult.error || depreciationIdentityResult.error;
+  if (stageError) return NextResponse.json({ error: stageError.message }, { status: 500 });
 
   const uniqueStageByAsset = new Map<string, any>();
-  for (const row of insuredRows || []) {
+  for (const row of insuredResult.data || []) {
     const assetId = String(row.canonical_asset_id || '');
     if (!assetId || uniqueStageByAsset.has(assetId)) continue;
     uniqueStageByAsset.set(assetId, row);
   }
-  const assetIds = [...uniqueStageByAsset.keys()];
+
+  const assetIds = Array.from(new Set([
+    ...uniqueStageByAsset.keys(),
+    ...(depreciationIdentityResult.data || [])
+      .map((row: any) => String(row.canonical_asset_id || ''))
+      .filter(Boolean),
+  ]));
 
   if (assetIds.length === 0) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       source,
+      sources: { insurance: insuranceSource, depreciation: depreciationSource },
       summary: {
         linkedAssets: 0,
         withCriticality: 0,
         withMaintenanceEvidence: 0,
         withRuntimeEvidence: 0,
         withCoreEconomics: 0,
+        withBookValue: 0,
+        depreciationConflicts: 0,
+        maintenanceAttention: 0,
+        economicsToComplete: 0,
       },
       queue: [],
     });
