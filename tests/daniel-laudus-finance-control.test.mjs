@@ -103,7 +103,7 @@ test('Laudus date-only values preserve Santiago calendar semantics', () => {
 
 
 test('Daniel receives a bounded daily priority queue before secondary analytics', () => {
-  assert.match(card, /Prioridades de hoy/);
+  assert.match(card, /Qué debe resolver Daniel primero/);
   assert.match(card, /slice\(0, 3\)/);
   assert.match(card, /Revisar CxP vencida/);
   assert.match(card, /Preparar vencimientos de 7 días/);
