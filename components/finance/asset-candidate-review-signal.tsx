@@ -15,6 +15,7 @@ type CandidateSummaryResponse = {
     openIdentityConflicts: number;
     identityVerifiedSingleSource: number;
     modelOnlyNeedsOperationalIdentity: number;
+    modelOnlyBookValueClp: number;
     sourceCodeNeedsOperationalValidation: number;
   };
 };
@@ -27,6 +28,7 @@ const fetcher=async(url:string):Promise<CandidateSummaryResponse>=>{
 };
 
 const number=(value:number)=>new Intl.NumberFormat('es-CL').format(value);
+const compactMoney=(value:number)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',notation:'compact',maximumFractionDigits:1}).format(value);
 
 export function AssetCandidateReviewSignal(){
   const {data,error,isLoading}=useSWR<CandidateSummaryResponse>(
@@ -40,8 +42,10 @@ export function AssetCandidateReviewSignal(){
   const pending=Number(data?.summary?.pendingReview||0);
   const exact=Number(data?.summary?.identityVerifiedSingleSource||0);
   const conflicts=Number(data?.summary?.openIdentityConflicts||0);
+  const modelOnly=Number(data?.summary?.modelOnlyNeedsOperationalIdentity||0);
+  const modelOnlyBookValue=Number(data?.summary?.modelOnlyBookValueClp||0);
 
-  if(!isLoading && pending===0 && conflicts===0) return null;
+  if(!isLoading && pending===0 && conflicts===0 && modelOnly===0) return null;
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Revisión de candidatas Ficha 360">
@@ -52,7 +56,7 @@ export function AssetCandidateReviewSignal(){
         <div className="min-w-0">
           <p className="text-sm font-medium">Fichas 360 por revisar</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {isLoading ? 'Actualizando evidencia…' : pending+' altas por decidir · '+conflicts+' conflictos de identidad · '+number(exact)+' identidades exactas de una fuente'}
+            {isLoading ? 'Actualizando evidencia…' : pending+' altas por decidir · '+conflicts+' conflictos · '+modelOnly+' modelos por identificar ('+compactMoney(modelOnlyBookValue)+') · '+number(exact)+' identidades exactas'}
           </p>
         </div>
       </div>
