@@ -25,6 +25,7 @@ const money = (value: unknown, currency = 'CLP') => {
     return `${currency} ${Number(value || 0).toLocaleString('es-CL')}`;
   }
 };
+const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 });
 const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
 
 type Payable = { id:string; invoice_number:string; supplier_name:string; approved_amount:number; paid_amount:number; outstanding_amount:number; due_date?:string|null; days_to_due?:number|null; status:string; currency:string };
