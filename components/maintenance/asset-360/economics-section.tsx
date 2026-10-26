@@ -46,6 +46,7 @@ export function Asset360EconomicsSection({
       review_flags?: unknown[];
     } | null;
     depreciation_identity_pending?: boolean;
+    depreciation_conflict_count?: number;
   };
 }) {
   const economicLifetime = economicHistory.reduce(
@@ -127,19 +128,25 @@ export function Asset360EconomicsSection({
                   : 'Pendiente de vincular'}
                 meta={financeProfile.depreciation?.source_cutoff_date
                   ? `Fuente ${date(financeProfile.depreciation.source_cutoff_date)}`
-                  : financeProfile.depreciation_identity_pending
-                    ? 'La depreciación canónica aún no está conciliada con este activo'
-                    : null}
+                  : Number(financeProfile.depreciation_conflict_count || 0) > 1
+                    ? `${financeProfile.depreciation_conflict_count} registros canónicos vinculados; Daniel debe resolver cuál aplica`
+                    : financeProfile.depreciation_identity_pending
+                      ? 'La depreciación canónica aún no está conciliada con este activo'
+                      : null}
               />
               <IdentityItem
                 icon={CalendarDays}
                 label="Depreciación del período"
                 value={financeProfile.depreciation?.depreciation_current != null
                   ? money(financeProfile.depreciation.depreciation_current)
-                  : 'Sin vínculo'}
-                meta={financeProfile.depreciation?.review_flags?.length
-                  ? `${financeProfile.depreciation.review_flags.length} observación(es) para Finanzas`
-                  : 'La fuente permanece canónica'}
+                  : Number(financeProfile.depreciation_conflict_count || 0) > 1
+                    ? 'Revisión requerida'
+                    : 'Sin vínculo'}
+                meta={Number(financeProfile.depreciation_conflict_count || 0) > 1
+                  ? 'No se selecciona una fila automáticamente'
+                  : financeProfile.depreciation?.review_flags?.length
+                    ? `${financeProfile.depreciation.review_flags.length} observación(es) para Finanzas`
+                    : 'La fuente permanece canónica'}
               />
             </div>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">
