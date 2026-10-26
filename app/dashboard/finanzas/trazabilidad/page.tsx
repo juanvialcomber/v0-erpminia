@@ -200,7 +200,7 @@ export default function FinanceTraceabilityPage() {
                 const canReview = ready && canEdit('fin_finanzas') && Boolean(invoiceId);
                 return (
                   <div key={invoiceId} className="border-b px-4 py-4 last:border-b-0">
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px_150px_auto] md:items-center">
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_140px_150px_auto] xl:items-center">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">
                           {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
@@ -213,13 +213,13 @@ export default function FinanceTraceabilityPage() {
                             : 'Detalle no disponible en la consulta actual'}
                         </p>
                       </div>
-                      <span className="text-xs text-muted-foreground md:text-right">
+                      <span className="text-xs text-muted-foreground xl:text-right">
                         {Number(invoice.nativeTraceCount || 0) > 0 ? 'Traza Laudus disponible' : 'Falta evidencia'}
                       </span>
-                      <span className="text-sm font-semibold tabular-nums md:text-right">
+                      <span className="text-sm font-semibold tabular-nums xl:text-right">
                         {currencyMoney(invoice.outstandingAmount, invoice.currency)}
                       </span>
-                      <div className="flex flex-wrap gap-1.5 md:justify-end">
+                      <div className="flex flex-wrap gap-1.5 xl:justify-end">
                         {priorReview?.decision === 'accepted' ? <Badge variant="secondary">Revisado</Badge> : null}
                         {priorReview?.decision === 'deferred' ? <Badge variant="outline">Pospuesto</Badge> : null}
                         {priorReview?.decision === 'rejected' ? <Badge variant="outline">No aplica</Badge> : null}
