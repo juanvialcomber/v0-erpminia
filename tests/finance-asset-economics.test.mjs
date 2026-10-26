@@ -360,8 +360,10 @@ test('Asset 360 review summary counts only pending decisions as actionable',()=>
   assert.match(signal,/pendingReview/);
   assert.match(signal,/altas por decidir/);
   assert.match(candidates,/Por decidir/);
-  assert.match(candidates,/aprobadas/);
-  assert.match(candidates,/descartadas/);
+  assert.match(candidates,/readyDualFinance/);
+  assert.match(candidates,/readyPurchaseEvidence/);
+  assert.match(candidates,/seguro\+depreciación/);
+  assert.match(candidates,/PPU\+Compras/);
 });
 
 
