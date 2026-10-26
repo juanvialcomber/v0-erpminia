@@ -151,11 +151,12 @@ export default function FinanceTraceabilityPage() {
 
   return (
     <div className="space-y-6">
-      <section className="border-b pb-5">
-        <p className="text-sm text-muted-foreground">Finanzas · Evidencia canónica</p>
+      <section className="pb-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Trazabilidad</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Los eventos canónicos se expresan en CLP; la evidencia Laudus conserva su moneda de origen.</p>
-        <div className="mt-3 flex gap-2"><Badge variant="secondary">Canónico</Badge><Badge variant="outline">Evidencia de origen</Badge></div>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Origen, evidencia y revisión humana. Laudus conserva su moneda de origen; MOTIL no completa datos faltantes.
+        </p>
       </section>
 
       <section className="overflow-hidden rounded-lg border bg-card" aria-label="Evidencia de factura Laudus">
@@ -167,7 +168,7 @@ export default function FinanceTraceabilityPage() {
               MOTIL consulta el detalle y la trazabilidad documental disponible en Laudus. Finanzas mantiene la decisión.
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">Solo lectura</span>
+          <span className="text-xs text-muted-foreground">Laudus · solo lectura</span>
         </div>
 
         {nativeTrace.error ? (
@@ -186,7 +187,7 @@ export default function FinanceTraceabilityPage() {
               ].map(([label, value]) => (
                 <div key={label} className="bg-card px-4 py-3">
                   <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="mt-1 text-lg font-semibold">{value}</p>
+                  <p className={`mt-1 text-lg font-semibold ${label === 'Falta evidencia' && Number(nativeTrace.data.summary?.missingEvidence || 0) > 0 ? 'text-destructive' : ''}`}>{value}</p>
                 </div>
               ))}
             </div>
@@ -224,7 +225,6 @@ export default function FinanceTraceabilityPage() {
                         {canReview && priorReview?.decision !== 'accepted' ? (
                           <Button
                             size="sm"
-                            variant="outline"
                             disabled={reviewingId === invoiceId}
                             onClick={() => void recordReview(invoice, 'accepted')}
                           >
@@ -309,6 +309,14 @@ export default function FinanceTraceabilityPage() {
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando registros...</p> : null}
 
+      <section className="space-y-3" aria-label="Historial financiero">
+        <div className="flex items-end justify-between gap-3 border-t pt-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Historial</p>
+            <h2 className="mt-1 text-base font-semibold">Eventos financieros</h2>
+          </div>
+          <p className="hidden text-xs text-muted-foreground sm:block">Fuente y estado por evento</p>
+        </div>
       <div className="overflow-hidden rounded-lg border">
         <div className="hidden grid-cols-[110px_130px_1fr_150px] gap-4 border-b bg-muted/40 px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground lg:grid">
           <span>Fecha</span><span>Estado</span><span>Origen</span><span>Monto</span>
@@ -323,6 +331,7 @@ export default function FinanceTraceabilityPage() {
           </div>
         ))}
       </div>
+      </section>
     </div>
   );
 }
