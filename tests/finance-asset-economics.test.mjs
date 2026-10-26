@@ -411,3 +411,13 @@ test('ready Asset 360 reviews distinguish finance dual-source from purchase oper
   assert.match(candidates,/Evidencia exacta en seguro \+ depreciación/);
   assert.match(candidates,/Compras:/);
 });
+
+
+test('Asset 360 draft derives vehicle type only from explicit source wording when structured type is missing',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/normalizedTitle/);
+  assert.match(api,/typeEvidence/);
+  assert.match(api,/CAMIONETAS/);
+  assert.match(api,/CAMIONES/);
+  assert.match(api,/camioneta\|camión\|camion/);
+});
