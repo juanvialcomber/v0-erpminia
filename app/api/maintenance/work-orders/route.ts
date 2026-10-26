@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
 import { resolveWorkshopHeadScope, workshopHeadOrderFilter, workshopSiteFromKnownLocation, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
+import { applyStandardJobPlanToWorkOrder } from '@/lib/maintenance/apply-standard-job-plan';
 
 type WorkOrderRow = {
   id: string;
@@ -74,6 +75,8 @@ type WorkOrderPayload = {
   meter_unit?: string | null;
   costCenterId?: string | null;
   cost_center_id?: string | null;
+  standardPlanId?: string | null;
+  standard_plan_id?: string | null;
 };
 
 function isExplicitDemoRecord(row: WorkOrderRow) {
@@ -203,6 +206,21 @@ async function recordRequestedMaterials(
 }
 
 
+async function applyRequestedStandardPlan(
+  context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
+  workOrderId: string,
+  standardPlanId: string | null,
+) {
+  if (!standardPlanId) return null;
+  return applyStandardJobPlanToWorkOrder({
+    supabase: context.supabase,
+    organizationId: context.organizationId,
+    userId: context.userId,
+    planId: standardPlanId,
+    workOrderId,
+  });
+}
+
 async function recordStructuredMaterials(
   context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
   workOrderId: string,
@@ -292,6 +310,7 @@ export async function POST(request: NextRequest) {
     const assignedPersonId = body.assignedPersonId || body.assigned_person_id || null;
     const requestedMaterials = body.requestedMaterials || body.requested_materials || null;
     const materials = body.materials || [];
+    const standardPlanId = body.standardPlanId || body.standard_plan_id || null;
     const creationRequestId = request.headers.get('idempotency-key')?.trim() || null;
     if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
     if (reviewId && !canonicalAssetId) return NextResponse.json({ error: 'Una revisión de equipo debe conservar su equipo asociado' }, { status: 400 });
@@ -363,6 +382,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let selectedStandardPlan: { id: string; status: string; canonical_asset_id: string | null; estimated_duration_hours: number | string | null } | null = null;
+    if (standardPlanId) {
+      const { data: plan, error: planError } = await context.supabase
+        .from('maintenance_standard_job_plans')
+        .select('id,status,canonical_asset_id,estimated_duration_hours')
+        .eq('organization_id', context.organizationId)
+        .eq('id', standardPlanId)
+        .maybeSingle();
+      if (planError) throw planError;
+      if (!plan || plan.status !== 'approved') {
+        return NextResponse.json({ error: 'El plan estándar ya no está aprobado o no existe.' }, { status: 409 });
+      }
+      if (plan.canonical_asset_id && plan.canonical_asset_id !== canonicalAssetId) {
+        return NextResponse.json({ error: 'El plan estándar corresponde a otro equipo.' }, { status: 409 });
+      }
+      selectedStandardPlan = plan;
+    }
+
     if (reviewId) {
       const { data: review, error: reviewError } = await context.supabase
         .from('drilling_maintenance_review_queue_v1')
@@ -419,9 +456,11 @@ export async function POST(request: NextRequest) {
 
       await recordRequestedMaterials(context, assignedLinkedOrder as WorkOrderRow, requestedMaterials);
       await recordStructuredMaterials(context, assignedLinkedOrder.id, materials);
+      const standardPlanApplication = await applyRequestedStandardPlan(context, assignedLinkedOrder.id, standardPlanId);
 
       return NextResponse.json({
         data: mapWorkOrder(assignedLinkedOrder as WorkOrderRow, asset),
+        standardPlan: standardPlanApplication,
         review: {
           id: reviewId,
           status: result.review_status,
@@ -453,9 +492,11 @@ export async function POST(request: NextRequest) {
       const replayedOrder = existingRequestOrder as WorkOrderRow;
       await recordRequestedMaterials(context, replayedOrder, requestedMaterials);
       await recordStructuredMaterials(context, replayedOrder.id, materials);
+      const standardPlanApplication = await applyRequestedStandardPlan(context, replayedOrder.id, standardPlanId);
       return NextResponse.json(
         {
           data: mapWorkOrder(replayedOrder, asset),
+          standardPlan: standardPlanApplication,
           idempotentReplay: true,
         },
         { status: 200 },
@@ -466,7 +507,13 @@ export async function POST(request: NextRequest) {
 
     const year = new Date().getFullYear();
     const prefix = `OT-${year}-`;
-    const plannedHours = Number(body.plannedDurationHours ?? body.planned_duration_hours ?? 0);
+    const requestedPlannedHours = body.plannedDurationHours ?? body.planned_duration_hours ?? null;
+    const planEstimatedHours = selectedStandardPlan?.estimated_duration_hours ?? null;
+    const plannedHours = Number(
+      requestedPlannedHours !== null && requestedPlannedHours !== ''
+        ? requestedPlannedHours
+        : planEstimatedHours ?? 0,
+    );
     const meterReading = body.meterReading ?? body.meter_reading ?? null;
 
     const { data: latestOrder, error: latestOrderError } = await context.supabase
@@ -543,9 +590,11 @@ export async function POST(request: NextRequest) {
 
     await recordRequestedMaterials(context, createdOrder, requestedMaterials);
     await recordStructuredMaterials(context, createdOrder.id, materials);
+    const standardPlanApplication = await applyRequestedStandardPlan(context, createdOrder.id, standardPlanId);
     return NextResponse.json(
       {
         data: mapWorkOrder(createdOrder, asset),
+        standardPlan: standardPlanApplication,
         idempotentReplay,
       },
       { status: idempotentReplay ? 200 : 201 },

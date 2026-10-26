@@ -126,6 +126,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const searchParams = useSearchParams();
   const initialAssetId = searchParams.get('assetId') || '';
   const reviewId = searchParams.get('reviewId') || '';
+  const standardPlanId = searchParams.get('standardPlanId') || '';
+  const standardPlanName = searchParams.get('standardPlanName') || '';
   const [assignedPersonId, setAssignedPersonId] = useState('');
   const [canonicalAssetId, setCanonicalAssetId] = useState(initialAssetId);
   const [assetQuery, setAssetQuery] = useState('');
@@ -263,6 +265,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       plannedDurationHours: plannedHours ? Number(plannedHours) : 0,
       meterReading: meterReading ? Number(meterReading) : null,
       meterUnit: meterReading ? meterUnit : null,
+      standardPlanId: standardPlanId || null,
     };
     const creationRequestId = getOrCreateRequestId(requestPayload);
 
@@ -313,6 +316,18 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       ) : null}
 
       {reviewError ? <StatePanel tone="error" title={t.loadReviewError} description={reviewError.message} className="min-h-0 py-5" /> : null}
+
+      {standardPlanId ? (
+        <Card className="shadow-none">
+          <CardContent className="p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Plan estándar aprobado</p>
+            <p className="mt-1 text-sm font-medium">{standardPlanName || 'Plan estándar seleccionado'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Al crear la OT, MOTIL vinculará este plan y sus requerimientos verificados. Ariel sigue definiendo responsable, fecha y prioridad.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {reviewId && !reviewError ? (
         <Card className="shadow-none">

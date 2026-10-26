@@ -105,3 +105,60 @@ test('maintenance shortage handoff measures only a real human-confirmed procurem
   assert.match(page, /Shortage → solicitud operativa/);
   assert.match(page, /la creación de la solicitud sigue requiriendo acción humana/);
 });
+
+
+test('internal value page exposes weekly planning learning without calling it ROI', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Planificación semanal aprendiendo con uso real/);
+  assert.match(page, /Aceptación planes MOTIL/);
+  assert.match(page, /calibración L4, no impacto económico/);
+  assert.match(page, /Mantención → Compras → recepción → instalación/);
+  assert.match(page, /deuda de calidad de datos/);
+});
+
+
+test('internal value page exposes measured cross-domain cycle timing', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  assert.match(api, /crossDomainCycle/);
+  assert.match(api, /intakeToOrder/);
+  assert.match(api, /orderToReceipt/);
+  assert.match(api, /receiptToInstall/);
+  assert.match(api, /empty stages are not estimated/);
+  assert.match(page, /Solicitud → OC/);
+  assert.match(page, /OC → recepción/);
+  assert.match(page, /Recepción → instalación/);
+  assert.match(page, /Sin muestra/);
+});
+
+
+test('internal maintenance value page shows L E C gates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Gates L E C de Mantención/);
+  assert.match(page, /L4 en calibración/);
+  assert.match(page, /Cadena incompleta/);
+});
+
+
+test('maintenance value gates link to the workflow that produces the missing evidence', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  assert.match(page, /Generar evidencia L/);
+  assert.match(page, /Completar outcomes E/);
+  assert.match(page, /Cerrar cadena C/);
+  assert.match(page, /dashboard\/mantenimiento\/planificacion/);
+  assert.match(page, /dashboard\/compras/);
+});
+
+
+test('internal value page shows observed standard plan execution quality without estimates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  assert.match(api, /standardPlanOutcomeQuality/);
+  assert.match(api, /medianDurationErrorPct/);
+  assert.match(api, /scheduleAdherencePct/);
+  assert.match(api, /no sample is estimated/);
+  assert.match(page, /Error mediano de duración/);
+  assert.match(page, /Dentro de ±20% del plan/);
+  assert.match(page, /Inicio en fecha programada/);
+  assert.match(page, /Sin muestra/);
+});

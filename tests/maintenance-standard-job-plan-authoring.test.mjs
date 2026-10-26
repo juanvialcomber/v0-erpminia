@@ -53,3 +53,40 @@ test('MOTIL-generated plan proposals are explicit and still require human comple
   assert.match(page,/Propuesto por MOTIL/);
   assert.match(page,/Completar antes de aprobar/);
 });
+
+
+test('weekly planning carries an approved standard plan into new OT creation', () => {
+  const weekly = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  const create = fs.readFileSync('components/maintenance/create-work-order.tsx','utf8');
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts','utf8');
+
+  assert.match(weekly,/standardPlanId/);
+  assert.match(weekly,/standardPlanName/);
+  assert.match(create,/standardPlanId/);
+  assert.match(create,/Plan estándar aprobado/);
+  assert.match(route,/applyRequestedStandardPlan/);
+  assert.match(route,/applyStandardJobPlanToWorkOrder/);
+});
+
+test('standard plan application during OT creation is idempotent and keeps material deduplication', () => {
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts','utf8');
+  assert.match(route,/idempotentReplay/);
+  assert.match(route,/applyRequestedStandardPlan\(context, replayedOrder\.id, standardPlanId\)/);
+  assert.match(apply,/activeApplication/);
+  assert.match(apply,/existingIds/);
+});
+
+
+test('standard plan is validated before a new OT can be inserted', () => {
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts','utf8');
+  const approvalCheck = route.indexOf("plan.status !== 'approved'");
+  const assetCheck = route.indexOf("plan.canonical_asset_id && plan.canonical_asset_id !== canonicalAssetId");
+  const insertOrder = route.indexOf(".from('maintenance_work_orders')\n        .insert({");
+  assert.ok(approvalCheck >= 0);
+  assert.ok(assetCheck >= 0);
+  assert.ok(insertOrder >= 0);
+  assert.ok(approvalCheck < insertOrder);
+  assert.ok(assetCheck < insertOrder);
+  assert.match(route, /planEstimatedHours/);
+  assert.match(route, /plannedHours = Number/);
+});

@@ -71,3 +71,18 @@ test('real plan pilot carries all canonical OT material requirements as reviewab
   assert.match(plansPage, /confirmar o quitar materiales antes de aprobar/);
   assert.match(plansPage, /materials:materialPayload/);
 });
+
+
+test('targeted planning links auto-run the supplied plan question once', () => {
+  assert.match(page, /searchParams\.get\('q'\)/);
+  assert.match(page, /initialQuestionSent/);
+  assert.match(page, /void ask\(initialQuestion\)/);
+});
+
+
+test('targeted plan requests never substitute another asset candidate', () => {
+  assert.match(page, /assetId: targetAssetId/);
+  assert.match(api, /targetAssetId/);
+  assert.match(api, /String\(row\.canonical_asset_id \|\| ''\) === targetAssetId/);
+  assert.match(api, /No reemplaces una falta de evidencia con candidatos de otros activos/);
+});

@@ -207,9 +207,11 @@ export async function GET(request: NextRequest) {
       const assetId = String(row.canonical_asset_id || '');
       const assetOrders = openByAsset.get(assetId) || [];
       const scheduledOrder = assetOrders.find((item) => item.scheduled_date && item.scheduled_date >= fromDate && item.scheduled_date <= weekUntilDate);
+      const existingWorkOrder = assetOrders[0] || null;
       const standardPlan = (plansByAsset.get(assetId) || [])[0] || null;
       const partsStatus = String(row.parts_status_raw || '').trim();
-      const actualMaterialShortage = assetOrders.some((item) => actualShortageWorkOrderIds.has(item.id));
+      const shortageWorkOrder = assetOrders.find((item) => actualShortageWorkOrderIds.has(item.id)) || null;
+      const actualMaterialShortage = Boolean(shortageWorkOrder);
       const readingAt = row.current_reading_at ? new Date(row.current_reading_at) : null;
       const readingAgeDays = readingAt && Number.isFinite(readingAt.getTime())
         ? Math.max(0, Math.floor((from.getTime() - readingAt.getTime()) / 86400000))
@@ -235,6 +237,8 @@ export async function GET(request: NextRequest) {
         sourceFile: row.source_file || null,
         sourceImportedAt: row.imported_at || null,
         scheduledWorkOrder: scheduledOrder || null,
+        existingWorkOrder,
+        shortageWorkOrder,
         openWorkOrderCount: assetOrders.length,
         standardPlan: standardPlan ? {
           id: standardPlan.id,
@@ -244,7 +248,7 @@ export async function GET(request: NextRequest) {
           estimatedDurationHours: standardPlan.estimated_duration_hours == null ? null : Number(standardPlan.estimated_duration_hours),
           proposalSource: standardPlan.proposed_by ? 'human' : 'motil',
         } : null,
-        state: scheduledOrder ? 'scheduled' : actualMaterialShortage ? 'blocked_materials' : evidenceFreshness === 'stale' ? 'stale_evidence' : standardPlan?.status === 'approved' ? 'ready' : 'review',
+        state: scheduledOrder ? 'scheduled' : actualMaterialShortage ? 'blocked_materials' : existingWorkOrder ? 'open_work_order' : evidenceFreshness === 'stale' ? 'stale_evidence' : standardPlan?.status === 'approved' ? 'ready' : 'review',
       };
     })
     .sort((a: any, b: any) =>

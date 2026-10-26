@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { AlertTriangle, CalendarDays, CheckCircle2, PackageSearch, RefreshCw, Wrench } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
@@ -29,8 +30,22 @@ type WeeklyDecision = {
   sourceFile: string | null;
   sourceImportedAt: string | null;
   openWorkOrderCount: number;
-  state: 'scheduled' | 'blocked_materials' | 'ready' | 'review' | 'stale_evidence';
+  state: 'scheduled' | 'blocked_materials' | 'open_work_order' | 'ready' | 'review' | 'stale_evidence';
   scheduledWorkOrder: {
+    id: string;
+    work_order_number: string | null;
+    title: string | null;
+    scheduled_date: string | null;
+    assigned_to_name: string | null;
+  } | null;
+  existingWorkOrder: {
+    id: string;
+    work_order_number: string | null;
+    title: string | null;
+    scheduled_date: string | null;
+    assigned_to_name: string | null;
+  } | null;
+  shortageWorkOrder: {
     id: string;
     work_order_number: string | null;
     title: string | null;
@@ -77,6 +92,7 @@ function priorityVariant(priority: string | null) {
 function stateLabel(row: WeeklyDecision) {
   if (row.state === 'scheduled') return 'Programada';
   if (row.state === 'blocked_materials') return 'Revisar materiales';
+  if (row.state === 'open_work_order') return 'OT abierta';
   if (row.state === 'ready') return 'Lista para programar';
   if (row.state === 'stale_evidence') return 'Actualizar evidencia';
   return row.standardPlan?.status === 'proposed' ? 'Plan MOTIL por aprobar' : 'Requiere revisión';
@@ -91,7 +107,51 @@ function readingText(row: WeeklyDecision) {
 export function WeeklyMaintenancePlanning() {
   const { data, error, isLoading, mutate } = useSWR<WeeklyResponse>('/api/planning/maintenance', fetcher, { revalidateOnFocus: false });
   const rows = data?.weeklyDecisions || [];
+  const nextDecision = rows.find((row) => row.state !== 'scheduled') || null;
+  const queuedRows = nextDecision ? rows.filter((row) => row !== nextDecision) : rows;
   const summary = data?.weeklySummary;
+  const sessionIdRef = useRef<string>(typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `weekly-${Date.now()}`);
+  const sessionStartedAtRef = useRef<number>(Date.now());
+  const sessionRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!data?.weekPeriod || !summary || sessionRecordedRef.current) return;
+    sessionRecordedRef.current = true;
+    void apiFetch('/api/planning/maintenance/evidence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'session_started',
+        sessionId: sessionIdRef.current,
+        weekFrom: data.weekPeriod.from,
+        weekUntil: data.weekPeriod.until,
+        summary,
+      }),
+    }).catch(() => undefined);
+  }, [data?.weekPeriod, summary]);
+
+  function recordDecision(row: WeeklyDecision, decisionAction: 'open_work_order' | 'review_plan' | 'schedule' | 'refresh_reading') {
+    if (!data?.weekPeriod) return;
+    void apiFetch('/api/planning/maintenance/evidence', {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: 'decision_opened',
+        sessionId: sessionIdRef.current,
+        weekFrom: data.weekPeriod.from,
+        weekUntil: data.weekPeriod.until,
+        decisionAction,
+        latencyMs: Date.now() - sessionStartedAtRef.current,
+        assetId: row.canonicalAssetId,
+        assetCode: row.assetCode,
+        priority: row.priority,
+        planningState: row.state,
+        evidenceFreshness: row.evidenceFreshness,
+        proposedByMotil: row.standardPlan?.proposalSource === 'motil',
+      }),
+    }).catch(() => undefined);
+  }
 
   return <main className="space-y-6">
     <header className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-end md:justify-between">
@@ -120,14 +180,95 @@ export function WeeklyMaintenancePlanning() {
       ].map(([label, value]) => <Card key={String(label)} className="shadow-none"><CardContent className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-semibold">{isLoading || value == null ? '—' : Number(value).toLocaleString('es-CL')}</p></CardContent></Card>)}
     </section>
 
+    {nextDecision ? (
+      <section className="rounded-xl border bg-card p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Siguiente decisión</p>
+        <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_190px] lg:items-center">
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={priorityVariant(nextDecision.priority)}>{nextDecision.priority || 'Sin prioridad'}</Badge>
+              <Badge variant="outline">{stateLabel(nextDecision)}</Badge>
+              {nextDecision.standardPlan?.proposalSource === 'motil' ? <Badge variant="outline">Propuesto por MOTIL</Badge> : null}
+            </div>
+            <p className="mt-3 text-lg font-semibold">{nextDecision.assetCode || nextDecision.assetName || 'Equipo sin nombre'}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{nextDecision.site || 'Ubicación no disponible'} · Criticidad {nextDecision.criticality || 'sin dato'}</p>
+            <p className="mt-3 text-sm">{nextDecision.recommendedAction || 'Revisar planificación y evidencia.'}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{readingText(nextDecision)}{nextDecision.currentReadingAt ? ` · lectura ${new Date(nextDecision.currentReadingAt).toLocaleDateString('es-CL')}` : ''}</p>
+          </div>
+          <div className="text-sm">
+            {nextDecision.actualMaterialShortage ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real</p>
+                <p className="mt-1 text-xs text-muted-foreground">Resolver cobertura antes de programar.</p>
+              </>
+            ) : nextDecision.existingWorkOrder ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><CalendarDays className="h-4 w-4"/>OT ya abierta</p>
+                <p className="mt-1 text-xs text-muted-foreground">Continuar el trabajo existente antes de crear una nueva OT.</p>
+              </>
+            ) : nextDecision.state === 'stale_evidence' ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Evidencia vencida</p>
+                <p className="mt-1 text-xs text-muted-foreground">Actualizar lectura antes de decidir.</p>
+              </>
+            ) : nextDecision.standardPlan?.status === 'approved' ? (
+              <>
+                <p className="flex items-center gap-2 font-medium"><CheckCircle2 className="h-4 w-4"/>Lista para programar</p>
+                <p className="mt-1 text-xs text-muted-foreground">Plan aprobado y sin bloqueo material observado.</p>
+              </>
+            ) : (
+              <>
+                <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4"/>Revisión requerida</p>
+                <p className="mt-1 text-xs text-muted-foreground">MOTIL necesita validación humana antes de programar.</p>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end">
+            {nextDecision.shortageWorkOrder ? (
+              <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${nextDecision.shortageWorkOrder.id}`} onClick={() => recordDecision(nextDecision, 'open_work_order')}><PackageSearch className="mr-2 h-4 w-4"/>Resolver materiales</Link></Button>
+            ) : nextDecision.existingWorkOrder ? (
+              <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${nextDecision.existingWorkOrder.id}`} onClick={() => recordDecision(nextDecision, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Continuar OT</Link></Button>
+            ) : nextDecision.state === 'stale_evidence' ? (
+              <Button asChild><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(nextDecision.canonicalAssetId || '')}`} onClick={() => recordDecision(nextDecision, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
+            ) : nextDecision.standardPlan?.status === 'proposed' ? (
+              <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(nextDecision, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+            ) : !nextDecision.standardPlan ? (
+              <Button asChild><Link href={{
+                pathname: '/dashboard/planificacion/asistente',
+                query: {
+                  q: `Prepara una propuesta de plan estándar para ${nextDecision.assetCode || nextDecision.assetName || 'este equipo'} usando sólo evidencia real. No inventes pasos ni materiales.`,
+                  assetId: nextDecision.canonicalAssetId || '',
+                },
+              }} onClick={() => recordDecision(nextDecision, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Preparar plan</Link></Button>
+            ) : (
+              <Button asChild><Link href={{
+                pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
+                query: {
+                  assetId: nextDecision.canonicalAssetId || '',
+                  title: nextDecision.interval ? `Mantención ${nextDecision.interval} ${nextDecision.meterUnit || 'h'}` : 'Mantención preventiva',
+                  workType: 'preventive',
+                  priority: nextDecision.priority?.startsWith('P1') || nextDecision.priority?.startsWith('P2') ? 'high' : 'medium',
+                  standardPlanId: nextDecision.standardPlan.id,
+                  standardPlanName: nextDecision.standardPlan.name,
+                  plannedDurationHours: nextDecision.standardPlan.estimatedDurationHours != null
+                    ? String(nextDecision.standardPlan.estimatedDurationHours)
+                    : '',
+                },
+              }} onClick={() => recordDecision(nextDecision, 'schedule')}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>
+            )}
+          </div>
+        </div>
+      </section>
+    ) : null}
+
     <section className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold">Qué debe decidir Ariel</h2>
         <p className="text-sm text-muted-foreground">Ordenado por prioridad operacional. La evidencia de horómetro y planificación se muestra con su fuente; no reemplaza el juicio del supervisor.</p>
       </div>
 
-      {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted"/> : !error && rows.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No hay decisiones semanales priorizadas con la evidencia disponible.</CardContent></Card> : <div className="space-y-3">
-        {rows.map((row, index) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || String(index)} className="shadow-none">
+      {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted"/> : !error && queuedRows.length === 0 ? <Card className="border-dashed shadow-none"><CardContent className="p-10 text-center text-sm text-muted-foreground">No hay decisiones semanales priorizadas con la evidencia disponible.</CardContent></Card> : <div className="space-y-3">
+        {queuedRows.map((row, index) => <Card key={row.canonicalAssetId || row.assetCode || row.assetName || String(index)} className="shadow-none">
           <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px_190px] lg:items-center">
             <div>
               <div className="flex flex-wrap gap-2">
@@ -152,6 +293,9 @@ export function WeeklyMaintenancePlanning() {
               </> : row.actualMaterialShortage ? <>
                 <p className="flex items-center gap-2 font-medium"><PackageSearch className="h-4 w-4"/>Faltante real en OT</p>
                 <p className="text-xs text-muted-foreground">Existe cantidad faltante registrada en requerimientos actuales de la OT.</p>
+              </> : row.existingWorkOrder ? <>
+                <p className="flex items-center gap-2 font-medium"><CalendarDays className="h-4 w-4"/>OT ya abierta</p>
+                <p className="text-xs text-muted-foreground">Continuar la OT existente antes de crear trabajo nuevo.</p>
               </> : row.state === 'stale_evidence' ? <>
                 <p className="flex items-center gap-2 font-medium"><RefreshCw className="h-4 w-4"/>Actualizar lectura</p>
                 <p className="text-xs text-muted-foreground">La prioridad proviene de evidencia antigua y debe validarse antes de programar.</p>
@@ -165,9 +309,12 @@ export function WeeklyMaintenancePlanning() {
             </div>
 
             <div className="flex justify-end">
-              {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
-                : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
-                : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+              {row.shortageWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.shortageWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><PackageSearch className="mr-2 h-4 w-4"/>Resolver materiales</Link></Button>
+                : row.existingWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.existingWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Continuar OT</Link></Button>
+                : row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
+                : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`} onClick={() => recordDecision(row, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
+                : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+                : !row.standardPlan ? <Button asChild size="sm"><Link href={{ pathname: '/dashboard/planificacion/asistente', query: { q: `Prepara una propuesta de plan estándar para ${row.assetCode || row.assetName || 'este equipo'} usando sólo evidencia real. No inventes pasos ni materiales.`, assetId: row.canonicalAssetId || '' } }} onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Preparar plan</Link></Button>
                 : <Button asChild size="sm"><Link href={{
                     pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
                     query: {
@@ -175,8 +322,13 @@ export function WeeklyMaintenancePlanning() {
                       title: row.interval ? `Mantención ${row.interval} ${row.meterUnit || 'h'}` : 'Mantención preventiva',
                       workType: 'preventive',
                       priority: row.priority?.startsWith('P1') || row.priority?.startsWith('P2') ? 'high' : 'medium',
+                      standardPlanId: row.standardPlan?.status === 'approved' ? row.standardPlan.id : '',
+                      standardPlanName: row.standardPlan?.status === 'approved' ? row.standardPlan.name : '',
+                      plannedDurationHours: row.standardPlan?.status === 'approved' && row.standardPlan.estimatedDurationHours != null
+                        ? String(row.standardPlan.estimatedDurationHours)
+                        : '',
                     },
-                  }}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>}
+                  }} onClick={() => recordDecision(row, 'schedule')}><CalendarDays className="mr-2 h-4 w-4"/>Programar</Link></Button>}
             </div>
           </CardContent>
         </Card>)}
