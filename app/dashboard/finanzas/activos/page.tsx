@@ -212,6 +212,7 @@ export default function FinanceAssetsPage(){
             <ReviewMetric label="Unidad ambigua" value={number(reviewData.unresolved.byReason.ambiguous_existing_asset_family||0)} detail="La familia existe; falta patente, serie o número de unidad" />
             <ReviewMetric label="Línea agregada" value={number(reviewData.unresolved.byReason.aggregate_multi_asset_financial_line||0)} detail="Una fila financiera representa más de un activo" />
             <ReviewMetric label="Identidad insuficiente" value={number(reviewData.unresolved.byReason.insufficient_unit_identity||0)} detail="Parece operacional, pero falta una llave de unidad verificable" />
+            <ReviewMetric label="Modelo no representado" value={number(reviewData.unresolved.byReason.unrepresented_operational_model||0)} detail="Modelo específico ausente del maestro operacional" />
             <ReviewMetric label="Centro de activo sin Ficha 360" value={number(reviewData.unresolved.byReason.asset_center_without_asset||0)} detail="Centro canónico tipado como activo; falta contraparte operacional" />
             <ReviewMetric label="Centro no operacional" value={number(reviewData.unresolved.byReason.non_asset_cost_center||0)} detail="Área o administración; no se fuerza a un equipo" />
           </div>
