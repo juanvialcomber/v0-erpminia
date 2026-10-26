@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CircleDollarSign, Landmark, ReceiptText } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, ReceiptText } from 'lucide-react';
 import {
   Bar,
   BarChart,
