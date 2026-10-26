@@ -127,3 +127,17 @@ test('reconciliation review distinguishes canonical asset centers from non-asset
   assert.match(page,/Centro de activo sin Ficha 360/);
   assert.match(page,/Centro no operacional/);
 });
+
+
+test('financial asset register preserves the full Daniel source independently of Ficha 360',()=>{
+  const api=fs.readFileSync('app/api/finance/asset-register/route.ts','utf8');
+  const register=fs.readFileSync('app/dashboard/finanzas/activos/registro/page.tsx','utf8');
+  assert.match(api,/Registro financiero completo de la fuente de Daniel/);
+  assert.match(api,/PAGE_SIZE = 50/);
+  assert.match(api,/status === 'linked'/);
+  assert.match(api,/status === 'unresolved'/);
+  assert.match(api,/status === 'conflict'/);
+  assert.match(register,/Registro financiero/);
+  assert.match(register,/Fuente completa de Daniel/);
+  assert.match(page,/Registro financiero completo/);
+});
