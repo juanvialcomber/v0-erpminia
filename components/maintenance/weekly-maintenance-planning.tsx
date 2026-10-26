@@ -208,6 +208,13 @@ export function WeeklyMaintenancePlanning() {
               <Button asChild><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(nextDecision.canonicalAssetId || '')}`} onClick={() => recordDecision(nextDecision, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
             ) : nextDecision.standardPlan?.status === 'proposed' ? (
               <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(nextDecision, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+            ) : !nextDecision.standardPlan ? (
+              <Button asChild><Link href={{
+                pathname: '/dashboard/planificacion/asistente',
+                query: {
+                  q: `Prepara una propuesta de plan estándar para ${nextDecision.assetCode || nextDecision.assetName || 'este equipo'} usando sólo evidencia real. No inventes pasos ni materiales.`,
+                },
+              }} onClick={() => recordDecision(nextDecision, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Preparar plan</Link></Button>
             ) : (
               <Button asChild><Link href={{
                 pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
@@ -216,9 +223,9 @@ export function WeeklyMaintenancePlanning() {
                   title: nextDecision.interval ? `Mantención ${nextDecision.interval} ${nextDecision.meterUnit || 'h'}` : 'Mantención preventiva',
                   workType: 'preventive',
                   priority: nextDecision.priority?.startsWith('P1') || nextDecision.priority?.startsWith('P2') ? 'high' : 'medium',
-                  standardPlanId: nextDecision.standardPlan?.status === 'approved' ? nextDecision.standardPlan.id : '',
-                  standardPlanName: nextDecision.standardPlan?.status === 'approved' ? nextDecision.standardPlan.name : '',
-                  plannedDurationHours: nextDecision.standardPlan?.status === 'approved' && nextDecision.standardPlan.estimatedDurationHours != null
+                  standardPlanId: nextDecision.standardPlan.id,
+                  standardPlanName: nextDecision.standardPlan.name,
+                  plannedDurationHours: nextDecision.standardPlan.estimatedDurationHours != null
                     ? String(nextDecision.standardPlan.estimatedDurationHours)
                     : '',
                 },
@@ -277,6 +284,7 @@ export function WeeklyMaintenancePlanning() {
               {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
                 : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`} onClick={() => recordDecision(row, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
                 : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
+                : !row.standardPlan ? <Button asChild size="sm"><Link href={{ pathname: '/dashboard/planificacion/asistente', query: { q: `Prepara una propuesta de plan estándar para ${row.assetCode || row.assetName || 'este equipo'} usando sólo evidencia real. No inventes pasos ni materiales.` } }} onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Preparar plan</Link></Button>
                 : <Button asChild size="sm"><Link href={{
                     pathname: '/dashboard/mantenimiento/ordenes-trabajo/create',
                     query: {
