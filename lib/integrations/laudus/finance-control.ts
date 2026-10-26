@@ -8,23 +8,29 @@ async function count(query: PromiseLike<CountResult>) {
   return result.count ?? 0;
 }
 
+type LaudusSyncTable =
+  | 'laudus_purchase_payments'
+  | 'laudus_accounts_payable'
+  | 'laudus_purchase_invoices'
+  | 'laudus_credit_notes'
+  | 'laudus_cost_centers';
+
 async function latestTimestamp(
   db: SupabaseClient,
-  table: string,
+  table: LaudusSyncTable,
   organizationId: string,
-  field = 'synced_at',
 ) {
   const result = await db
     .schema('integration')
     .from(table)
-    .select(field)
+    .select('synced_at')
     .eq('organization_id', organizationId)
-    .not(field, 'is', null)
-    .order(field, { ascending: false })
+    .not('synced_at', 'is', null)
+    .order('synced_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (result.error) throw new Error(result.error.message);
-  return result.data?.[field] ? String(result.data[field]) : null;
+  return result.data?.synced_at ? String(result.data.synced_at) : null;
 }
 
 export async function loadLaudusFinanceControl(
