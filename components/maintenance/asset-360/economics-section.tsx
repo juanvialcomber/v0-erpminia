@@ -81,6 +81,13 @@ export function Asset360EconomicsSection({
   const economic12mValue = operationalState?.recognized_cost_clp_12m != null
     ? Number(operationalState.recognized_cost_clp_12m)
     : null;
+  const bookValue = financeProfile?.depreciation?.net_book_value != null
+    ? Number(financeProfile.depreciation.net_book_value)
+    : null;
+  const maintenanceToBookPct =
+    economicLifetimeValue != null && bookValue != null && Number.isFinite(bookValue) && bookValue > 0
+      ? (economicLifetimeValue / bookValue) * 100
+      : null;
 
   return (
     <Card className="border-border/80 shadow-none">
@@ -149,6 +156,15 @@ export function Asset360EconomicsSection({
                     : 'La fuente permanece canónica'}
               />
             </div>
+            {maintenanceToBookPct != null ? (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground">Mantenimiento reconocido / valor libro</p>
+                <p className="mt-1 text-sm font-medium tabular-nums">{number(maintenanceToBookPct, 1)}%</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Relación descriptiva entre gasto histórico reconocido en MOTIL y valor libro canónico. No representa TCO ni recomienda reemplazo.
+                </p>
+              </div>
+            ) : null}
             <p className="mt-3 text-xs leading-5 text-muted-foreground">
               Seguro, valor libro y depreciación son conceptos distintos. MOTIL los mantiene separados hasta contar con una conciliación exacta por activo.
             </p>
