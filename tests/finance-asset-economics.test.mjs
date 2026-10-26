@@ -269,3 +269,19 @@ test('finance reconciliation keeps sub-threshold operational rows visible as sec
   assert.match(page,/low_materiality_secondary_review/);
   assert.match(page,/preservados bajo el umbral material actual/);
 });
+
+
+test('ready asset candidates are prioritized and survive workbook reimport',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(api,/readyForReview/);
+  assert.match(api,/ready_for_asset_review/);
+  assert.match(api,/candidate_review_source_count/);
+  assert.match(candidates,/Lista para revisión/);
+  assert.match(candidates,/Sin contraparte canónica exacta/);
+  assert.match(stage,/candidate_review_status/);
+  assert.match(stage,/candidate_review_basis/);
+  assert.match(stage,/candidate_review_source_count/);
+  assert.match(stage,/candidate_review_verified_at/);
+});
