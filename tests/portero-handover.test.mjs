@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import { planPorteroHandover, summarizePortero } from '../lib/intake/portero.mjs';
 
@@ -67,7 +68,7 @@ function route({ role = 'viewer', allowed = true, error = null, rows = [], table
       requireModuleAccess: async (_request, key) => { moduleCalls.push(key); return { authorized: allowed, response: NextResponse.json({ error: 'denied' }, { status: 403 }) }; } },
     '@/lib/intake/portero.mjs': { summarizePortero },
   };
-  new Function('require', 'exports', routeCode)(name => { if (!(name in modules)) throw new Error(name); return modules[name]; }, exports);
+  runInNewContext(routeCode, { require: name => { if (!(name in modules)) throw new Error(name); return modules[name]; }, exports });
   return { GET: exports.GET, calls, moduleCalls };
 }
 
