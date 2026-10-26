@@ -24,7 +24,7 @@ test('finance control separates current operational data from historical account
 test('credit notes and reconciliation gaps keep conservative semantics', () => {
   assert.match(loader, /not savings or recovered cash/);
   assert.match(card, /Documentadas · no es ahorro/);
-  assert.match(card, /pendientes de conciliación/);
+  assert.match(card, /Centros por conciliar/);
   assert.match(card, /No se usarán para atribución ejecutiva hasta resolverlos/);
 });
 
