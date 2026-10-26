@@ -95,6 +95,9 @@ export async function GET(request: NextRequest) {
     let chassis: string | null = null;
     let engine: string | null = null;
     let modelYear: number | null = null;
+    let reviewStatus: string | null = null;
+    let reviewBasis: string | null = null;
+    let reviewSourceCount: number | null = null;
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -126,6 +129,10 @@ export async function GET(request: NextRequest) {
       chassis = chassis || text(row.chassis_number) || text(payload.insurance_chassis_number);
       engine = engine || text(row.engine_number) || text(payload.insurance_engine_number);
       modelYear = modelYear || (row.model_year ? Number(row.model_year) : null);
+      reviewStatus = reviewStatus || text(payload.candidate_review_status);
+      reviewBasis = reviewBasis || text(payload.candidate_review_basis);
+      const payloadSourceCount = numeric(payload.candidate_review_source_count);
+      if (payloadSourceCount != null) reviewSourceCount = Math.max(reviewSourceCount ?? payloadSourceCount, payloadSourceCount);
       evidence.push({
         source,
         stageId: row.id,
@@ -137,6 +144,7 @@ export async function GET(request: NextRequest) {
     }
 
     const dualSource = sourceKinds.size > 1;
+    const readyForReview = reviewStatus === 'ready_for_asset_review';
     return {
       key,
       title: title || plate || serial || 'Activo candidato',
@@ -148,9 +156,13 @@ export async function GET(request: NextRequest) {
       insuredUf,
       netBookValueClp,
       dualSource,
+      readyForReview,
+      reviewStatus,
+      reviewBasis,
+      reviewSourceCount,
       sourceCount: sourceKinds.size,
       evidenceCount: evidence.length,
-      priority: dualSource ? 3 : (plate || serial || chassis ? 2 : 1),
+      priority: readyForReview ? 4 : dualSource ? 3 : (plate || serial || chassis ? 2 : 1),
       evidence,
     };
   }).sort((a, b) =>
@@ -165,6 +177,7 @@ export async function GET(request: NextRequest) {
     summary: {
       candidates: candidates.length,
       dualSource: candidates.filter((row) => row.dualSource).length,
+      readyForReview: candidates.filter((row) => row.readyForReview).length,
       insuranceOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'insurance')).length,
       depreciationOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'depreciation')).length,
     },
@@ -172,6 +185,7 @@ export async function GET(request: NextRequest) {
     semantics: {
       candidate: 'Evidencia de una entidad física que no tiene contraparte canónica verificable. No crea una Ficha 360 automáticamente.',
       dualSource: 'La misma entidad aparece de forma independiente en seguro y depreciación.',
+      readyForReview: 'Candidata con identidad física exacta confirmada en dos fuentes independientes y sin contraparte canónica exacta.',
       approval: 'Crear una Ficha 360 requiere revisión operacional; MOTIL conserva la fuente y no inventa campos faltantes.',
     },
   });
