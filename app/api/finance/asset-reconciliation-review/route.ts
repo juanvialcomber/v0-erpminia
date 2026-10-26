@@ -70,6 +70,20 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 500 });
+
+  const { data: insuranceSource, error: insuranceSourceError } = await context.supabase
+    .from('motil_finance_workbook_imports')
+    .select('id,filename,source_cutoff_date,review_status,metadata,created_at')
+    .eq('organization_id', context.organizationId)
+    .eq('source_kind', 'insured_asset_inventory')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (insuranceSourceError) {
+    return NextResponse.json({ error: insuranceSourceError.message }, { status: 500 });
+  }
+
   if (!source) {
     return NextResponse.json({
       source: null,
@@ -81,6 +95,7 @@ export async function GET(request: NextRequest) {
         conflictAssets: 0,
         unresolvedRows: 0,
       },
+      insurance: null,
       unresolved: { byReason: {}, rows: [] },
     });
   }
@@ -126,6 +141,24 @@ export async function GET(request: NextRequest) {
     )
     .slice(0, 60);
 
+  const insuranceMetadata = insuranceSource?.metadata && typeof insuranceSource.metadata === 'object'
+    ? insuranceSource.metadata as Record<string, unknown>
+    : {};
+  const insuranceStage = insuranceMetadata.stage && typeof insuranceMetadata.stage === 'object'
+    ? insuranceMetadata.stage as Record<string, unknown>
+    : {};
+  const insuranceSummary = insuranceSource ? {
+    filename: insuranceSource.filename,
+    sourceRows: Number(insuranceStage.rows || 0),
+    linkedRows: Number(insuranceStage.identity_linked_rows || 0),
+    linkedAssets: Number(insuranceStage.identity_linked_assets || 0),
+    unresolvedRows: Number(insuranceStage.identity_unresolved_rows || 0),
+    unclassifiedRows: Number(insuranceStage.unclassified_rows || 0),
+    missingCandidates: Number(insuranceStage.missing_canonical_candidate_rows || 0),
+    ambiguousRows: Number(insuranceStage.ambiguous_existing_family_rows || 0),
+    discrepancies: Number(insuranceStage.identity_source_discrepancy_rows || 0),
+  } : null;
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     source: {
@@ -134,6 +167,7 @@ export async function GET(request: NextRequest) {
       cutoffDate: source.source_cutoff_date,
       reviewStatus: source.review_status,
     },
+    insurance: insuranceSummary,
     summary: {
       sourceRows,
       linkedRows,
