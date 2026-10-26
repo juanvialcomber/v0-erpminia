@@ -52,6 +52,7 @@ export async function loadLaudusFinanceControl(
     latestInvoicesSync,
     latestCreditNotesSync,
     latestCostCentersSync,
+    pendingPaymentRows,
   ] = await Promise.all([
     count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('deposited', true)),
@@ -73,10 +74,19 @@ export async function loadLaudusFinanceControl(
     latestTimestamp(db, 'laudus_purchase_invoices', organizationId),
     latestTimestamp(db, 'laudus_credit_notes', organizationId),
     latestTimestamp(db, 'laudus_cost_centers', organizationId),
+    db
+      .schema('integration')
+      .from('laudus_purchase_payments')
+      .select('external_id,issued_date,due_date,document,notes,bank,source_payload')
+      .eq('organization_id', organizationId)
+      .or('deposited.is.false,deposited.is.null')
+      .order('issued_date', { ascending: false })
+      .limit(5),
   ]);
 
   if (creditNoteRows.error) throw new Error(creditNoteRows.error.message);
   if (latestAccounting.error) throw new Error(latestAccounting.error.message);
+  if (pendingPaymentRows.error) throw new Error(pendingPaymentRows.error.message);
 
   const creditNoteAmount = (creditNoteRows.data || []).reduce(
     (sum, row) => sum + Number(row.total_amount || 0),
@@ -111,6 +121,25 @@ export async function loadLaudusFinanceControl(
       pendingDeposit: pendingDepositPayments,
       latestSync: latestPaymentsSync,
       actionRequired: pendingDepositPayments > 0,
+      pendingItems: (pendingPaymentRows.data || []).map((row: any) => ({
+        externalId: String(row.external_id || ''),
+        issuedDate: row.issued_date ? String(row.issued_date) : null,
+        dueDate: row.due_date ? String(row.due_date) : null,
+        document: row.document ? String(row.document) : null,
+        notes: row.notes ? String(row.notes) : null,
+        bankName:
+          row.bank && typeof row.bank === 'object' && !Array.isArray(row.bank)
+            ? String((row.bank as Record<string, unknown>).name || '') || null
+            : null,
+        invoiceAmount:
+          row.source_payload && typeof row.source_payload === 'object' && !Array.isArray(row.source_payload)
+            ? Number((row.source_payload as Record<string, unknown>).purchaseInvoices_amount || 0) || null
+            : null,
+        currency:
+          row.source_payload && typeof row.source_payload === 'object' && !Array.isArray(row.source_payload)
+            ? String((row.source_payload as Record<string, unknown>).purchaseInvoices_currencyCode || '') || null
+            : null,
+      })),
     },
     creditNotes: {
       total: creditNotes,
