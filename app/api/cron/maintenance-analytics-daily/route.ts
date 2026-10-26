@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * Runs once per day to pre-compute analytics and populate aggregation tables
  * Can be called via Vercel Crons or external scheduler
  */
-export async function POST(req: NextRequest) {
+async function runAggregation(req: NextRequest) {
   // Verify cron secret if provided
   const cronSecret = req.headers.get('authorization');
   if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -35,6 +35,14 @@ export async function POST(req: NextRequest) {
     console.error('[v0] Aggregation error:', error);
     return NextResponse.json({ error: 'Aggregation failed' }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return runAggregation(req);
+}
+
+export async function POST(req: NextRequest) {
+  return runAggregation(req);
 }
 
 async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
