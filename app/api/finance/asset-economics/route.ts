@@ -85,7 +85,7 @@ function buildDecision(params: {
     return {
       key: 'complete_economics',
       label: 'Completar economía',
-      reason: 'Seguro canónico vinculado, pero falta costo/fecha de adquisición en el activo canónico',
+      reason: 'Activo financiero vinculado, pero falta valor libro o costo/fecha de adquisición canónica',
       rank: 3,
     };
   }
