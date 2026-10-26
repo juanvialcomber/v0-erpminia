@@ -198,6 +198,8 @@ export function LaudusFinanceControlCard() {
   const overdueSharePct = openPayableAmount > 0
     ? Math.round((overduePayableAmount / openPayableAmount) * 1000) / 10
     : 0;
+  const topSupplier = topSuppliers[0];
+  const topSupplierSharePct = Number(data?.accountsPayable?.topSupplierSharePct || 0);
 
   const priorities = [
     overduePayableAmount > 0
@@ -217,6 +219,16 @@ export function LaudusFinanceControlCard() {
           title: 'Preparar vencimientos de 7 días',
           evidence: `${number(dueSoonPayables)} partidas · ${compactMoney(dueSoonPayableAmount)} por vencer`,
           action: 'Ver próximos pagos',
+          href: '/dashboard/finanzas/pagos',
+        }
+      : null,
+    topSupplierSharePct >= 15 && topSupplier
+      ? {
+          key: 'supplier-concentration',
+          rank: 75 + topSupplierSharePct,
+          title: 'Revisar concentración por proveedor',
+          evidence: `${shortSupplier(topSupplier.supplierName)} concentra ${number(topSupplierSharePct)}% · ${compactMoney(topSupplier.amountClp)} del saldo abierto`,
+          action: 'Ver proveedor',
           href: '/dashboard/finanzas/pagos',
         }
       : null,
