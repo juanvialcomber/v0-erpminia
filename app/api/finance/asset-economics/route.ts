@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [assetsResult, operationalResult, runtimeResult, depreciationResult] = await Promise.all([
+  const [assetsResult, operationalResult, runtimeResult, depreciationResult, planningResult, meterResult] = await Promise.all([
     context.supabase
       .from('canonical_assets_current')
       .select('id,asset_code,name,criticality,operational_status,acquisition_date,acquisition_cost,expected_lifespan_years')
@@ -228,14 +228,54 @@ export async function GET(request: NextRequest) {
           .in('canonical_asset_id', assetIds)
           .not('net_book_value', 'is', null)
       : Promise.resolve({ data: [], error: null }),
+    context.supabase
+      .from('planning_maintenance_source_rows')
+      .select('canonical_asset_id,criticality_raw,current_reading,current_reading_at,meter_unit,updated_at')
+      .eq('organization_id', context.organizationId)
+      .in('canonical_asset_id', assetIds)
+      .order('updated_at', { ascending: false }),
+    context.supabase
+      .from('planning_asset_meter_readings')
+      .select('canonical_asset_id,recorded_at,meter_value,meter_unit')
+      .eq('organization_id', context.organizationId)
+      .in('canonical_asset_id', assetIds)
+      .order('recorded_at', { ascending: true }),
   ]);
 
-  const queryError = assetsResult.error || operationalResult.error || runtimeResult.error || depreciationResult.error;
+  const queryError =
+    assetsResult.error ||
+    operationalResult.error ||
+    runtimeResult.error ||
+    depreciationResult.error ||
+    planningResult.error ||
+    meterResult.error;
   if (queryError) return NextResponse.json({ error: queryError.message }, { status: 500 });
 
   const assetsById = new Map<string, AssetRow>((assetsResult.data || []).map((row: any) => [row.id, row]));
   const operationalById = new Map<string, OperationalRow>((operationalResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
   const runtimeById = new Map<string, RuntimeRow>((runtimeResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
+
+  const planningByAsset = new Map<string, any[]>();
+  for (const row of planningResult.data || []) {
+    const assetId = String(row.canonical_asset_id || '');
+    if (!assetId) continue;
+    const rows = planningByAsset.get(assetId) || [];
+    rows.push(row);
+    planningByAsset.set(assetId, rows);
+  }
+
+  const meterByAsset = new Map<string, any[]>();
+  for (const row of meterResult.data || []) {
+    const assetId = String(row.canonical_asset_id || '');
+    if (!assetId) continue;
+    const rows = meterByAsset.get(assetId) || [];
+    const signature = [assetId, row.recorded_at || '', row.meter_value ?? '', row.meter_unit || ''].join('|');
+    if (!rows.some((item) => item.signature === signature)) {
+      rows.push({ ...row, signature });
+      meterByAsset.set(assetId, rows);
+    }
+  }
+
   const depreciationByAsset = new Map<string, any[]>();
   for (const row of depreciationResult.data || []) {
     const assetId = String(row.canonical_asset_id || '');
@@ -250,18 +290,57 @@ export async function GET(request: NextRequest) {
     const asset = assetsById.get(assetId) || ({ id: assetId } as AssetRow);
     const operational = operationalById.get(assetId);
     const runtime = runtimeById.get(assetId);
+    const planningRows = planningByAsset.get(assetId) || [];
+    const meterRows = (meterByAsset.get(assetId) || []).sort(
+      (a, b) => new Date(a.recorded_at || 0).getTime() - new Date(b.recorded_at || 0).getTime(),
+    );
     const depreciationRows = depreciationByAsset.get(assetId) || [];
     const depreciation = depreciationRows.length === 1 ? depreciationRows[0] : null;
     const depreciationConflictCount = depreciationRows.length > 1 ? depreciationRows.length : 0;
 
-    const criticality = asset.criticality || operational?.criticality || null;
+    const planningCriticalityLevels = Array.from(new Set(
+      planningRows
+        .map((row) => criticalityLevel(row.criticality_raw))
+        .filter((level) => level > 0),
+    ));
+    const planningCriticality =
+      planningCriticalityLevels.length === 1
+        ? criticalityLabel(
+            planningRows.find((row) => criticalityLevel(row.criticality_raw) === planningCriticalityLevels[0])?.criticality_raw,
+          )
+        : null;
+    const criticality = asset.criticality || operational?.criticality || planningCriticality || null;
     const openWorkOrders = numeric(operational?.open_work_order_count) || 0;
     const workOrders = numeric(operational?.work_order_count) || 0;
     const downtimeHours = numeric(operational?.recorded_downtime_hours) || 0;
     const recognizedCostLifetime = numeric(operational?.recognized_cost_clp_lifetime);
     const recognizedCost12m = numeric(operational?.recognized_cost_clp_12m);
-    const runtimeReadings = numeric(runtime?.reading_count) || 0;
-    const hasRuntime = runtimeReadings > 0;
+    const runtimeReadings = Math.max(numeric(runtime?.reading_count) || 0, meterRows.length);
+    const meterUnits = Array.from(new Set(meterRows.map((row) => String(row.meter_unit || '').trim().toLowerCase()).filter(Boolean)));
+    const meterValues = meterRows
+      .map((row) => numeric(row.meter_value))
+      .filter((value): value is number => value != null);
+    const distinctMeterValues = new Set(meterValues.map((value) => String(value))).size;
+    const distinctMeterDates = new Set(
+      meterRows.map((row) => String(row.recorded_at || '').slice(0, 10)).filter(Boolean),
+    ).size;
+    let meterDecreaseCount = 0;
+    for (let index = 1; index < meterValues.length; index += 1) {
+      if (meterValues[index - 1] - meterValues[index] > 1) meterDecreaseCount += 1;
+    }
+    const hasMeterEvidence = runtimeReadings > 0;
+    const usablePlanningMeter =
+      meterRows.length >= 2 &&
+      distinctMeterValues >= 2 &&
+      distinctMeterDates >= 2 &&
+      meterUnits.length === 1 &&
+      meterDecreaseCount === 0;
+    const hasRuntime = Boolean(runtime?.usable_for_rate_metrics) || usablePlanningMeter;
+    const latestPlanningMeter = meterRows.length > 0 ? meterRows[meterRows.length - 1] : null;
+    const observedPlanningUsage =
+      usablePlanningMeter && meterValues.length >= 2
+        ? Math.max(meterValues[meterValues.length - 1] - meterValues[0], 0)
+        : null;
     const hasMaintenanceEvidence = workOrders > 0 || (numeric(operational?.recognized_cost_event_count) || 0) > 0;
     const hasCoreEconomics = asset.acquisition_cost != null || asset.acquisition_date != null || depreciation?.net_book_value != null;
 
@@ -270,7 +349,7 @@ export async function GET(request: NextRequest) {
       bookValue: depreciation?.net_book_value != null,
       criticality: criticalityLevel(criticality) > 0,
       maintenance: hasMaintenanceEvidence,
-      runtime: hasRuntime,
+      runtime: hasMeterEvidence,
     };
     const evidenceCount = Object.values(evidence).filter(Boolean).length;
     const decision = buildDecision({
@@ -310,8 +389,12 @@ export async function GET(request: NextRequest) {
       downtimeHours,
       availabilityPct: numeric(operational?.availability_pct),
       runtimeReadings,
-      latestMeterHours: numeric(runtime?.latest_meter_hours),
-      runtimeUsableForRates: Boolean(runtime?.usable_for_rate_metrics),
+      meterUnit: meterUnits.length === 1 ? meterUnits[0] : null,
+      latestMeterHours: numeric(runtime?.latest_meter_hours) ?? numeric(latestPlanningMeter?.meter_value),
+      observedOperatingHours: numeric(runtime?.observed_operating_hours) ?? observedPlanningUsage,
+      runtimeUsableForRates: Boolean(runtime?.usable_for_rate_metrics) || usablePlanningMeter,
+      meterDecreaseCount,
+      planningCriticalityConflict: planningCriticalityLevels.length > 1,
       evidence,
       evidenceCount,
       evidenceCoveragePct: evidenceCount * 20,
@@ -347,6 +430,7 @@ export async function GET(request: NextRequest) {
       withCriticality: queue.filter((row) => row.evidence.criticality).length,
       withMaintenanceEvidence: queue.filter((row) => row.evidence.maintenance).length,
       withRuntimeEvidence: queue.filter((row) => row.evidence.runtime).length,
+      withUsableRuntime: queue.filter((row) => row.runtimeUsableForRates).length,
       withCoreEconomics: queue.filter((row) => row.netBookValueClp != null || row.acquisitionCostClp != null || row.acquisitionDate != null).length,
       withBookValue: queue.filter((row) => row.netBookValueClp != null).length,
       depreciationConflicts: queue.filter((row) => row.depreciationConflictCount > 1).length,
@@ -357,6 +441,7 @@ export async function GET(request: NextRequest) {
     semantics: {
       insurance: 'Valor asegurado en UF informado por la fuente canónica de Daniel. No se convierte a CLP ni se interpreta como valor libro.',
       maintenance: 'Costos y OT ya reconocidos por MOTIL para el activo canónico.',
+      runtime: 'Lectura disponible y secuencia utilizable son estados distintos. Una secuencia sólo se habilita para tasas si tiene al menos dos fechas y valores distintos, una unidad consistente y sin disminuciones materiales.',
       decision: 'Reglas determinísticas de priorización. No son diagnóstico de falla ni recomendación automática de reemplazo.',
       replacement: 'MOTIL no recomienda reemplazo hasta enlazar valor libro/depreciación y contar con evidencia operacional suficiente.',
     },
