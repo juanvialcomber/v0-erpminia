@@ -499,102 +499,110 @@ export function LaudusFinanceControlCard() {
           </div>
         </section>
 
-        <div className="space-y-2">
-          {openPayables > 0 ? (
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-medium"><ReceiptText className="h-4 w-4"/>CxP Laudus que requiere revisión</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {number(overduePayables)} partidas están vencidas y {number(dueSoonPayables)} vencen en los próximos 7 días. Son saldos fuente Laudus y requieren conciliación antes de tratarlos como compromiso de caja definitivo.
+        <section className="space-y-3" aria-label="Evidencia y brechas">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Evidencia y brechas</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Detalle secundario para validar una decisión. Cerrado por defecto.
+            </p>
+          </div>
+
+          <div className="divide-y overflow-hidden rounded-xl border bg-card">
+            {openPayables > 0 ? (
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">CxP más antiguas</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(overduePayables)} vencidas · {number(dueSoonPayables)} vencen en 7 días</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
+                  <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+                </summary>
+                <div className="border-t px-4 py-3">
+                  <div className="divide-y rounded-md border">
+                    {(data?.accountsPayable?.oldestOpenItems || []).map((item) => (
+                      <div key={item.externalId || item.documentNumber || item.dueDate || 'cxp'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_100px_120px_auto] md:items-center">
+                        <span className="truncate font-medium">{item.supplierName || 'Proveedor Laudus'}</span>
+                        <span className="text-muted-foreground">{item.documentNumber || 'Sin doc.'}</span>
+                        <span className="text-muted-foreground">Vence {shortDate(item.dueDate)}</span>
+                        <span className="text-right font-medium">
+                          {item.currency === 'CLP' ? money(item.outstandingAmount) : item.outstandingAmount ? number(item.outstandingAmount) : 'Monto no informado'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Ordenado por vencimiento más antiguo. MOTIL no trata estos saldos como caja comprometida definitiva sin conciliación.
                   </p>
                 </div>
-                <Button asChild size="sm"><Link href="/dashboard/finanzas/pagos">Revisar CxP <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
-              </div>
-              <div className="divide-y rounded-md border">
-                {(data?.accountsPayable?.oldestOpenItems || []).map((item) => (
-                  <div key={item.externalId || item.documentNumber || item.dueDate || 'cxp'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_100px_120px_auto] md:items-center">
-                    <span className="truncate font-medium">{item.supplierName || 'Proveedor Laudus'}</span>
-                    <span className="text-muted-foreground">{item.documentNumber || 'Sin doc.'}</span>
-                    <span className="text-muted-foreground">Vence {shortDate(item.dueDate)}</span>
-                    <span className="text-right font-medium">
-                      {item.currency === 'CLP' ? money(item.outstandingAmount) : item.outstandingAmount ? number(item.outstandingAmount) : 'Monto no informado'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Ordenado por vencimiento más antiguo. MOTIL no suma estos saldos como caja comprometida ni deuda final hasta completar conciliación.
-              </p>
-            </div>
-          ) : null}
+              </details>
+            ) : null}
 
-          {pendingDeposit > 0 ? (
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4"/>Pagos por verificar</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{number(pendingDeposit)} pagos Laudus no figuran depositados. Revisar antes de cerrar conciliación o caja.</p>
+            {pendingDeposit > 0 ? (
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">Pagos por verificar</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros con estado “no depositado” en Laudus</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
+                  <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+                </summary>
+                <div className="border-t px-4 py-3">
+                  <div className="divide-y rounded-md border">
+                    {(data?.payments?.pendingItems || []).map((item) => (
+                      <div key={item.externalId || item.document || item.issuedDate || 'pago'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[110px_140px_minmax(0,1fr)_auto] md:items-center">
+                        <span className="font-medium">{item.document || 'Sin documento'}</span>
+                        <span className="text-muted-foreground">{shortDate(item.issuedDate)}</span>
+                        <span className="min-w-0 truncate text-muted-foreground">{item.notes || item.bankName || 'Sin nota'}</span>
+                        <span className="text-right font-medium">
+                          {item.invoiceAmount && item.currency === 'CLP' ? money(item.invoiceAmount) : 'Monto no informado'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Estado fuente Laudus. MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente.
+                  </p>
                 </div>
-                <Button asChild size="sm"><Link href="/dashboard/finanzas/pagos">Revisar pagos <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
-              </div>
-              <div className="divide-y rounded-md border">
-                {(data?.payments?.pendingItems || []).map((item) => (
-                  <div key={item.externalId || item.document || item.issuedDate || 'pago'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[110px_140px_minmax(0,1fr)_auto] md:items-center">
-                    <span className="font-medium">{item.document || 'Sin documento'}</span>
-                    <span className="text-muted-foreground">{shortDate(item.issuedDate)}</span>
-                    <span className="min-w-0 truncate text-muted-foreground">{item.notes || item.bankName || 'Sin nota'}</span>
-                    <span className="text-right font-medium">
-                      {item.invoiceAmount && item.currency === 'CLP' ? money(item.invoiceAmount) : 'Monto no informado'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground">Estado fuente Laudus: “no depositado”. MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente.</p>
-            </div>
-          ) : null}
+              </details>
+            ) : null}
 
-          {costCenterUnresolved > 0 ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-sm font-medium"><Building2 className="h-4 w-4"/>Centros de costo por conciliar</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Laudus tiene {number(data?.costCenters?.total)} centros de costo; {number(costCenterUnresolved)} todavía no tienen cruce exacto con MOTIL. No se usarán para atribución ejecutiva hasta resolverlos.
-                </p>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Cobertura de evidencia</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Centros, contabilidad y activos que aún limitan análisis ejecutivo</p>
+                </div>
+                <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
+                <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+              </summary>
+              <div className="grid gap-px border-t bg-border md:grid-cols-3">
+                <div className="bg-card px-4 py-3">
+                  <p className="text-sm font-medium">Centros de costo</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {number(costCenterUnresolved)} sin cruce exacto. No se usarán para atribución ejecutiva hasta resolverlos.
+                  </p>
+                  <Button asChild size="sm" variant="ghost" className="mt-2 h-8 px-0">
+                    <Link href="/dashboard/finanzas/centros">Conciliar <ArrowRight className="ml-2 h-3.5 w-3.5"/></Link>
+                  </Button>
+                </div>
+                <div className="bg-card px-4 py-3">
+                  <p className="text-sm font-medium">Contabilidad</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {accountingCurrent ? 'Vigente para análisis ejecutivo.' : `Histórica. Último asiento: ${shortDate(data?.accounting?.latestEntryDate)}.`}
+                  </p>
+                </div>
+                <div className="bg-card px-4 py-3">
+                  <p className="text-sm font-medium">Activos</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {number(fixedAssetLinked)} de {number(fixedAssetTotal)} enlazados. Sin evidencia suficiente no se declara valor libro real.
+                  </p>
+                </div>
               </div>
-              <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/centros">Conciliar <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
-            </div>
-          ) : null}
-
-          {!accountingCurrent ? (
-            <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4"/>Contabilidad Laudus histórica</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Hay {number(data?.accounting?.entries)} asientos disponibles, pero el último es del {shortDate(data?.accounting?.latestEntryDate)}. MOTIL no los presenta como saldo contable actual.
-                </p>
-              </div>
-              <Badge variant="secondary">Histórico</Badge>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-lg border p-4 text-sm">
-              <BadgeCheck className="h-4 w-4"/>
-              Contabilidad Laudus vigente para análisis ejecutivo.
-            </div>
-          )}
-
-          {fixedAssetTotal > 0 && fixedAssetLinked === 0 ? (
-            <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-medium">Activos fijos disponibles, economía todavía incompleta</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Laudus aporta fecha y vida útil para {number(data?.fixedAssets?.withUsefulLife)} activos, pero aún no hay enlaces canónicos ni costo de adquisición suficiente para declarar valor libro real.
-                </p>
-              </div>
-              <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/trazabilidad">Revisar evidencia <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
-            </div>
-          ) : null}
-        </div>
+            </details>
+          </div>
+        </section>
 
         <p className="text-xs text-muted-foreground">
           Solo lectura. Laudus sigue siendo fuente financiera; MOTIL organiza evidencia y decisiones sin escribir pagos, asientos ni documentos en el ERP.
