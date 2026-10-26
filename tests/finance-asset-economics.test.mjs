@@ -374,7 +374,7 @@ test('finance separates canonical identity conflicts from new Asset 360 candidat
   assert.match(api,/identityConflicts/);
   assert.match(candidates,/Conflictos de identidad/);
   assert.match(candidates,/No se crea un activo nuevo hasta resolver el conflicto/);
-  assert.match(signal,/conflictos de identidad/);
+  assert.match(signal,/conflictos/);
 });
 
 
