@@ -49,3 +49,13 @@ test('finance headline does not claim no urgency when only invoice review is emp
   assert.match(page, /Sin facturas prioritarias/);
   assert.doesNotMatch(page, /Sin decisiones urgentes en la muestra actual/);
 });
+
+
+test('Laudus payables control is bounded and keeps source-state semantics', () => {
+  assert.match(loader, /laudus_accounts_payable_service_v1/);
+  assert.match(loader, /oldestOpenItems/);
+  assert.match(loader, /not reconciled cash commitment or final accounting liability/);
+  assert.match(card, /CxP Laudus que requiere revisión/);
+  assert.match(card, /Ordenado por vencimiento más antiguo/);
+  assert.match(card, /MOTIL no suma estos saldos como caja comprometida ni deuda final/);
+});
