@@ -37,7 +37,9 @@ test('finance payables API is finance-authorized and tenant scoped',()=>{
 
 test('finance navigation exposes the payments workspace with honest empty states',()=>{
   assert.match(layout,/\/dashboard\/finanzas\/pagos/);
-  assert.match(page,/No hay facturas aprobadas para pago/);
+  assert.match(page,/No hay cuentas por pagar aprobadas en MOTIL/);
+  assert.match(page,/Esto no significa que Laudus no tenga exposición abierta/);
+  assert.match(page,/CxP MOTIL pendientes/);
   assert.match(page,/No hay pagos registrados/);
 });
 
