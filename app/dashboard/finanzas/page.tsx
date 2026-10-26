@@ -583,7 +583,7 @@ export default function FinanzasPage() {
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-6 pb-10">
       <section className="border-b px-1 pb-5 pt-1 sm:px-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Finanzas · MOTIL + Laudus</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Finanzas · MOTIL + Laudus</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Resumen financiero</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           Estado, decisiones y exposición en una sola lectura. El detalle operativo vive en cada sección.
@@ -611,7 +611,7 @@ export default function FinanzasPage() {
             ['/dashboard/finanzas/centros', 'Centros de costos', 'Atribución y actividad'],
             ['/dashboard/finanzas/trazabilidad', 'Trazabilidad', 'Origen y evidencia financiera'],
           ].map(([href, label, description]) => (
-            <Link key={href} href={href} className="group bg-card px-4 py-4 transition-colors hover:bg-muted/40">
+            <Link key={href} href={href} className="group bg-card px-4 py-4 transition-colors hover:bg-primary/5">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">{label}</p>
@@ -639,7 +639,7 @@ export default function FinanzasPage() {
               ['/dashboard/finanzas/documentos', 'Documentos'],
               ['/dashboard/finanzas/calendario', 'Calendario'],
             ].map(([href, label]) => (
-              <Link key={href} href={href} className="bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/40">
+              <Link key={href} href={href} className="bg-card px-4 py-3 text-sm font-medium transition-colors hover:bg-primary/5">
                 <span className="flex items-center justify-between gap-2">{label}<ArrowRight className="h-3.5 w-3.5 text-muted-foreground" /></span>
               </Link>
             ))}
