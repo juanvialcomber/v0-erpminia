@@ -229,7 +229,6 @@ export function CostCentersWorkspace() {
       </section>
 
       {topGroups.length > 0 ? (
-      {topGroups.length > 0 ? (
         <section className="space-y-3" aria-label="Familias con mayor actividad">
           <div>
             <p className="text-sm font-semibold">Familias con mayor actividad observada</p>
