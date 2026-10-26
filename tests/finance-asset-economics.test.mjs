@@ -176,3 +176,14 @@ test('reconciliation review separates ambiguous asset families from missing asse
   assert.match(review,/varias Fichas 360 son compatibles/);
   assert.match(page,/Unidad ambigua/);
 });
+
+
+test('reconciliation review classifies aggregate and insufficient identity rows',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/aggregate_multi_asset_financial_line/);
+  assert.match(review,/Línea financiera agregada/);
+  assert.match(review,/insufficient_unit_identity/);
+  assert.match(review,/Identidad insuficiente/);
+  assert.match(page,/Línea agregada/);
+  assert.match(page,/Identidad insuficiente/);
+});
