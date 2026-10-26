@@ -4,6 +4,8 @@ export interface CostCenterRecord {
   name: string;
   description?: string | null;
   status: 'active' | 'inactive';
+  activityEvents?: number;
+  committedClp?: number;
 }
 
 const COLLATOR = new Intl.Collator('es', { numeric: true, sensitivity: 'base' });
