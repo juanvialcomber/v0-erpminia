@@ -26,3 +26,10 @@ test('finance manager proxy allows the Laudus finance control read route', () =>
   assert.match(proxy, /'\/api\/integrations\/laudus\/finance-control'/);
   assert.match(proxy, /financeIntegrationRoutes\.has\(path\)/);
 });
+
+
+test('finance event ledger uses the public secure finance wrappers', () => {
+  assert.doesNotMatch(ledgerRoute, /schema\('intelligence'\)/);
+  assert.match(ledgerRoute, /from\('canonical_clp_cost_ledger'\)/);
+  assert.match(ledgerRoute, /from\('canonical_finance_overview'\)/);
+});
