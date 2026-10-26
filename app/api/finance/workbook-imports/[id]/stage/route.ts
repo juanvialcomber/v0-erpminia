@@ -7,7 +7,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 type WorkbookLike = ReturnType<typeof XLSX.read>;
-type SheetLike = XLSX.WorkSheet;
+type SheetLike = Parameters<typeof XLSX.utils.sheet_to_json>[0];
 
 type StageRow = {
   organization_id: string;
