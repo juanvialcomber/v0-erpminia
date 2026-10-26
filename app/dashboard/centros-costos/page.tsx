@@ -25,8 +25,25 @@ export default function CostCentersPage() {
           </PageHeaderDescription>
         </PageHeaderContent>
       </PageHeader>
-      <CostCenterCoverageQueue />
-      <CostCentersWorkspace />
+      <section className="space-y-3" aria-labelledby="cost-center-actions-title">
+        <div>
+          <p id="cost-center-actions-title" className="text-sm font-semibold">Pendientes de asignación</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Primero se muestran únicamente los registros que requieren una decisión.
+          </p>
+        </div>
+        <CostCenterCoverageQueue />
+      </section>
+
+      <section className="space-y-3" aria-labelledby="cost-center-structure-title">
+        <div>
+          <p id="cost-center-structure-title" className="text-sm font-semibold">Estructura canónica</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Centros vigentes agrupados por familia, con detalle desplegable sólo cuando se necesita.
+          </p>
+        </div>
+        <CostCentersWorkspace />
+      </section>
     </div>
   );
 }
