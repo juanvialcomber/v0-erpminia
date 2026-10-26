@@ -47,6 +47,8 @@ type FinanceControl = {
     aging?: Array<{ label: string; items: number; amountClp: number }>;
     dueByMonth?: Array<{ key: string; label: string; items: number; amountClp: number }>;
     topSuppliers?: Array<{ supplierId: string; supplierName: string; items: number; amountClp: number; sharePct: number }>;
+    severeAgingSharePct?: number;
+    topSupplierSharePct?: number;
     historicalTrendAvailable?: boolean;
     latestSync?: string | null;
     oldestOpenItems?: Array<{
@@ -297,6 +299,17 @@ export function LaudusFinanceControlCard() {
                 </ResponsiveContainer>
               </div>
             </div>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Lectura MOTIL</p>
+            <p className="mt-2 text-sm font-medium">
+              {number(data?.accountsPayable?.severeAgingSharePct || 0)}% del saldo abierto CLP está en partidas con más de 60 días de atraso.
+              {' '}El proveedor con mayor saldo abierto concentra {number(data?.accountsPayable?.topSupplierSharePct || 0)}%.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Son concentraciones observadas en Laudus. No implican causalidad, prioridad de pago ni riesgo financiero definitivo sin conciliación.
+            </p>
           </div>
 
           <div className="rounded-xl border bg-card p-4">
