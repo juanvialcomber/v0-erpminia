@@ -100,3 +100,13 @@ test('Laudus date-only values preserve Santiago calendar semantics', () => {
   assert.match(loader, /dateKeyToEpochDay/);
   assert.match(card, /T12:00:00-03:00/);
 });
+
+
+test('Daniel receives a bounded daily priority queue before secondary analytics', () => {
+  assert.match(card, /Prioridades de hoy/);
+  assert.match(card, /slice\(0, 3\)/);
+  assert.match(card, /Revisar CxP vencida/);
+  assert.match(card, /Preparar vencimientos de 7 días/);
+  assert.match(card, /Cerrar atribución por centro de costo/);
+  assert.match(card, /Sin decisiones financieras urgentes detectadas/);
+});
