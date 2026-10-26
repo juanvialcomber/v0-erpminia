@@ -18,10 +18,10 @@ export default function CostCentersPage() {
     <div className="space-y-6">
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderEyebrow>Control transversal</PageHeaderEyebrow>
+          <PageHeaderEyebrow>Finanzas</PageHeaderEyebrow>
           <PageHeaderTitle>Centros de costos</PageHeaderTitle>
           <PageHeaderDescription>
-            Consulta la estructura canónica vigente y resuelve referencias faltantes de Producción, Mantención y Compras sin inferir asignaciones.
+            Revisa la estructura vigente y resuelve asignaciones pendientes sin completar información por suposición.
           </PageHeaderDescription>
         </PageHeaderContent>
       </PageHeader>
@@ -37,7 +37,7 @@ export default function CostCentersPage() {
 
       <section className="space-y-3" aria-labelledby="cost-center-structure-title">
         <div>
-          <p id="cost-center-structure-title" className="text-sm font-semibold">Estructura canónica</p>
+          <p id="cost-center-structure-title" className="text-sm font-semibold">Estructura vigente</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Centros vigentes agrupados por familia, con detalle desplegable sólo cuando se necesita.
           </p>
