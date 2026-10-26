@@ -112,36 +112,36 @@ export function CostCenterCoverageQueue() {
   };
 
   if (loading) {
-    return <StatePanel tone="loading" title="Revisando cobertura operacional" description="Buscando registros sin centro de costo en los módulos que puedes ver." />;
+    return <StatePanel tone="loading" title="Revisando asignaciones pendientes" description="Buscando registros sin centro de costo en los módulos que puedes ver." />;
   }
 
   if (error && !coverage) {
-    return <StatePanel tone="error" title="No fue posible revisar la cobertura" description={error} actions={<Button variant="outline" onClick={() => void load()}>Reintentar</Button>} />;
+    return <StatePanel tone="error" title="No fue posible revisar las asignaciones" description={error} actions={<Button variant="outline" onClick={() => void load()}>Reintentar</Button>} />;
   }
 
   if (rows.length === 0) {
-    return <StatePanel tone="success" title="Cobertura completa" description="No hay registros visibles pendientes de centro de costo." />;
+    return <StatePanel tone="success" title="Sin asignaciones pendientes" description="Todos los registros visibles tienen centro de costo." />;
   }
 
   return (
     <section className="space-y-4" aria-label="Cobertura de centros de costo">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-semibold">Cobertura operacional</p>
-          <p className="mt-1 text-sm text-muted-foreground">Completa sólo referencias faltantes. MOTIL no infiere ni reemplaza asignaciones existentes.</p>
+          <p className="text-sm font-semibold">Pendientes por asignar</p>
+          <p className="mt-1 text-sm text-muted-foreground">Asigna sólo cuando exista respaldo suficiente. MOTIL no completa ni reemplaza asignaciones por suposición.</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           <Badge variant="outline">{coverage?.summary.production ?? 0} Producción</Badge>
           <Badge variant="outline">{coverage?.summary.maintenance ?? 0} Mantención</Badge>
           <Badge variant="outline">{coverage?.summary.procurement ?? 0} Compras</Badge>
-          <Badge variant={assignable ? 'default' : 'outline'}>{assignable} editables</Badge>
+          <Badge variant={assignable ? 'default' : 'outline'}>{assignable} por asignar</Badge>
         </div>
       </div>
 
       {error ? <StatePanel tone="error" title="No se completó la última asignación" description={error} className="min-h-0" /> : null}
 
-      <div className="overflow-hidden rounded-md border bg-card">
-        <Table>
+      <div className="overflow-x-auto rounded-md border bg-card">
+        <Table className="min-w-[760px]">
           <TableHeader>
             <TableRow>
               <TableHead>Origen</TableHead>
