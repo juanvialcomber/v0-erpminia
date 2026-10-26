@@ -209,7 +209,8 @@ export async function GET(request: NextRequest) {
       const scheduledOrder = assetOrders.find((item) => item.scheduled_date && item.scheduled_date >= fromDate && item.scheduled_date <= weekUntilDate);
       const standardPlan = (plansByAsset.get(assetId) || [])[0] || null;
       const partsStatus = String(row.parts_status_raw || '').trim();
-      const actualMaterialShortage = assetOrders.some((item) => actualShortageWorkOrderIds.has(item.id));
+      const shortageWorkOrder = assetOrders.find((item) => actualShortageWorkOrderIds.has(item.id)) || null;
+      const actualMaterialShortage = Boolean(shortageWorkOrder);
       const readingAt = row.current_reading_at ? new Date(row.current_reading_at) : null;
       const readingAgeDays = readingAt && Number.isFinite(readingAt.getTime())
         ? Math.max(0, Math.floor((from.getTime() - readingAt.getTime()) / 86400000))
@@ -235,6 +236,7 @@ export async function GET(request: NextRequest) {
         sourceFile: row.source_file || null,
         sourceImportedAt: row.imported_at || null,
         scheduledWorkOrder: scheduledOrder || null,
+        shortageWorkOrder,
         openWorkOrderCount: assetOrders.length,
         standardPlan: standardPlan ? {
           id: standardPlan.id,
