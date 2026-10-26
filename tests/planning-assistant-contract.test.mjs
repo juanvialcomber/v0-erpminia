@@ -79,3 +79,13 @@ test('targeted planning links auto-run the supplied plan question once', () => {
   assert.match(page, /initialQuestionSent/);
   assert.match(page, /void ask\(initialQuestion\)/);
 });
+
+
+test('targeted plan requests never substitute another asset candidate', () => {
+  const route = fs.readFileSync('app/api/planificacion/asistente/route.ts','utf8');
+  const page = fs.readFileSync('app/dashboard/planificacion/asistente/page.tsx','utf8');
+  assert.match(page, /assetId: targetAssetId/);
+  assert.match(route, /targetAssetId/);
+  assert.match(route, /String\(row\.canonical_asset_id \|\| ''\) === targetAssetId/);
+  assert.match(route, /No reemplaces una falta de evidencia con candidatos de otros activos/);
+});
