@@ -416,88 +416,101 @@ export function LaudusFinanceControlCard() {
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="rounded-xl border bg-card p-4">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Riesgo</p>
-                <h3 className="mt-1 text-base font-semibold">Aging de CxP abierta</h3>
-                <p className="mt-1 text-xs text-muted-foreground">Distribución actual por antigüedad de vencimiento. Laudus · {shortDate(data?.accountsPayable?.latestSync)}</p>
-              </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={agingData} layout="vertical" margin={{ left: 4, right: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
-                    <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="label" width={78} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
-                    <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card p-4">
-              <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Estructura temporal</p>
-                <h3 className="mt-1 text-base font-semibold">Vencimientos abiertos por mes</h3>
-                <p className="mt-1 text-xs text-muted-foreground">No es una serie histórica de saldo: muestra cuándo venció o vence la cartera que sigue abierta hoy.</p>
-              </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dueByMonth} margin={{ left: 4, right: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.25} />
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                    <YAxis tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} width={64} />
-                    <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
-                    <Bar dataKey="amountClp" fill="currentColor" className="text-muted-foreground" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Lectura MOTIL</p>
-            <p className="mt-2 text-sm font-medium">
-              {number(data?.accountsPayable?.severeAgingSharePct || 0)}% del saldo abierto CLP está en partidas con más de 60 días de atraso.
-              {' '}El proveedor con mayor saldo abierto concentra {number(data?.accountsPayable?.topSupplierSharePct || 0)}%.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Son concentraciones observadas en Laudus. No implican causalidad, prioridad de pago ni riesgo financiero definitivo sin conciliación.
-            </p>
-          </div>
-
-          <div className="rounded-xl border bg-card p-4">
-            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <details className="group rounded-xl border bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Explicación</p>
-                <h3 className="mt-1 text-base font-semibold">Concentración por proveedor</h3>
-                <p className="mt-1 text-xs text-muted-foreground">Saldo abierto actual. Concentración no implica causalidad ni prioridad de pago automática.</p>
+                <p className="text-sm font-medium">Análisis adicional</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Aging, vencimientos y concentración por proveedor</p>
               </div>
-              <Badge variant="outline">Top {topSuppliers.length}</Badge>
+              <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
+              <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+            </summary>
+            <div className="space-y-4 border-t p-4">
+              <div className="grid gap-4 xl:grid-cols-2">
+                          <div className="rounded-xl border bg-card p-4">
+                            <div className="mb-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Riesgo</p>
+                              <h3 className="mt-1 text-base font-semibold">Aging de CxP abierta</h3>
+                              <p className="mt-1 text-xs text-muted-foreground">Distribución actual por antigüedad de vencimiento. Laudus · {shortDate(data?.accountsPayable?.latestSync)}</p>
+                            </div>
+                            <div className="h-64 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={agingData} layout="vertical" margin={{ left: 4, right: 16 }}>
+                                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
+                                  <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
+                                  <YAxis type="category" dataKey="label" width={78} tick={{ fontSize: 11 }} />
+                                  <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
+                                  <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+              
+                          <div className="rounded-xl border bg-card p-4">
+                            <div className="mb-4">
+                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Estructura temporal</p>
+                              <h3 className="mt-1 text-base font-semibold">Vencimientos abiertos por mes</h3>
+                              <p className="mt-1 text-xs text-muted-foreground">No es una serie histórica de saldo: muestra cuándo venció o vence la cartera que sigue abierta hoy.</p>
+                            </div>
+                            <div className="h-64 w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={dueByMonth} margin={{ left: 4, right: 16 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.25} />
+                                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                                  <YAxis tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} width={64} />
+                                  <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
+                                  <Bar dataKey="amountClp" fill="currentColor" className="text-muted-foreground" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        </div>
+              
+                        <div className="rounded-xl border bg-card p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Lectura MOTIL</p>
+                          <p className="mt-2 text-sm font-medium">
+                            {number(data?.accountsPayable?.severeAgingSharePct || 0)}% del saldo abierto CLP está en partidas con más de 60 días de atraso.
+                            {' '}El proveedor con mayor saldo abierto concentra {number(data?.accountsPayable?.topSupplierSharePct || 0)}%.
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Son concentraciones observadas en Laudus. No implican causalidad, prioridad de pago ni riesgo financiero definitivo sin conciliación.
+                          </p>
+                        </div>
+              
+                        <div className="rounded-xl border bg-card p-4">
+                          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Explicación</p>
+                              <h3 className="mt-1 text-base font-semibold">Concentración por proveedor</h3>
+                              <p className="mt-1 text-xs text-muted-foreground">Saldo abierto actual. Concentración no implica causalidad ni prioridad de pago automática.</p>
+                            </div>
+                            <Badge variant="outline">Top {topSuppliers.length}</Badge>
+                          </div>
+                          <div className="h-72 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={topSuppliers.map((item) => ({ ...item, supplierLabel: `${shortSupplier(item.supplierName)} · ${item.sharePct}%` }))}
+                                layout="vertical"
+                                margin={{ left: 8, right: 24 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
+                                <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
+                                <YAxis type="category" dataKey="supplierLabel" width={180} tick={{ fontSize: 11 }} />
+                                <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
+                                <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            {data?.accountsPayable?.historicalTrendAvailable
+                              ? 'Tendencia histórica disponible.'
+                              : 'La tendencia histórica de saldo aún no existe como serie canónica. MOTIL no la simula; empezará a mostrarse cuando existan snapshots comparables.'}
+                          </p>
+                        </div>
+                      
             </div>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={topSuppliers.map((item) => ({ ...item, supplierLabel: `${shortSupplier(item.supplierName)} · ${item.sharePct}%` }))}
-                  layout="vertical"
-                  margin={{ left: 8, right: 24 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
-                  <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
-                  <YAxis type="category" dataKey="supplierLabel" width={180} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
-                  <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {data?.accountsPayable?.historicalTrendAvailable
-                ? 'Tendencia histórica disponible.'
-                : 'La tendencia histórica de saldo aún no existe como serie canónica. MOTIL no la simula; empezará a mostrarse cuando existan snapshots comparables.'}
-            </p>
-          </div>
-        </section>
+          </details>
+          </section>
 
         <section className="space-y-3" aria-label="Evidencia y brechas">
           <div>
