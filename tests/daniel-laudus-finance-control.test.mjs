@@ -83,3 +83,11 @@ test('decision-first finance visuals expose change risk explanation and source f
   assert.match(card, /Laudus ·/);
   assert.match(card, /Concentración no implica causalidad/);
 });
+
+
+test('MOTIL explanation stays factual and non-causal', () => {
+  assert.match(loader, /severeAgingSharePct/);
+  assert.match(loader, /topSupplierSharePct/);
+  assert.match(card, /Lectura MOTIL/);
+  assert.match(card, /No implican causalidad, prioridad de pago ni riesgo financiero definitivo/);
+});
