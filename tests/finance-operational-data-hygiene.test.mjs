@@ -19,3 +19,10 @@ test('finance event ledger remains available when optional overview is restricte
   assert.match(ledgerRoute, /overview: overviewResult\.error \? null/);
   assert.match(ledgerRoute, /events: eventsResult\.data \|\| \[\]/);
 });
+
+
+test('finance manager proxy allows the Laudus finance control read route', () => {
+  const proxy = fs.readFileSync('proxy.ts', 'utf8');
+  assert.match(proxy, /'\/api\/integrations\/laudus\/finance-control'/);
+  assert.match(proxy, /financeIntegrationRoutes\.has\(path\)/);
+});
