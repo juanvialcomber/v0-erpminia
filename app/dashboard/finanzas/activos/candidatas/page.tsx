@@ -13,6 +13,7 @@ type Evidence = {
   stageId: number;
   sheet: string | null;
   row: number | null;
+  sourceFile: string | null;
   description: string | null;
   rationale: string | null;
 };
@@ -25,6 +26,20 @@ type Candidate = {
   chassis: string | null;
   engine: string | null;
   modelYear: number | null;
+  manufacturer: string | null;
+  sourceModel: string | null;
+  equipmentType: string | null;
+  canonicalDraft: {
+    assetType: string | null;
+    category: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    serialNumber: string | null;
+    licensePlate: string | null;
+    sourceName: string | null;
+    requiredBeforeCreation: string[];
+    note: string;
+  };
   insuredUf: number | null;
   netBookValueClp: number | null;
   dualSource: boolean;
@@ -140,6 +155,19 @@ export default function MissingAssetCandidatesPage(){
                 <Value label="Evidencias" value={number(candidate.evidenceCount)} />
               </div>
               {candidate.readyForReview ? (
+                <div className="mt-3 rounded-md border bg-muted/20 p-3">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <span className="font-medium">Borrador de alta</span>
+                    {candidate.canonicalDraft.assetType ? <span className="text-muted-foreground">Tipo {candidate.canonicalDraft.assetType}</span> : null}
+                    {candidate.canonicalDraft.category ? <span className="text-muted-foreground">{candidate.canonicalDraft.category}</span> : null}
+                    {candidate.manufacturer ? <span className="text-muted-foreground">{candidate.manufacturer}{candidate.sourceModel?' · '+candidate.sourceModel:''}</span> : null}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Falta código de activo y lote canónico aprobado. La evidencia financiera queda preservada; la Ficha 360 no se crea desde esta pantalla.
+                  </p>
+                </div>
+              ) : null}
+              {candidate.readyForReview ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {candidate.review?.status === 'accepted' ? (
                     <>
@@ -166,7 +194,7 @@ export default function MissingAssetCandidatesPage(){
                   {candidate.evidence.map((item)=>(
                     <div key={item.source+'-'+item.stageId} className="text-xs leading-5">
                       <span className="font-medium text-foreground">{item.source==='insurance'?'Seguro':'Depreciación'}</span>
-                      <span className="text-muted-foreground"> · {item.sheet||'Sin hoja'} · fila {item.row??'—'}</span>
+                      <span className="text-muted-foreground"> · {item.sourceFile||'Fuente financiera'} · {item.sheet||'Sin hoja'} · fila {item.row??'—'}</span>
                       {item.description?<p className="text-muted-foreground">{item.description}</p>:null}
                       {item.rationale?<p className="text-muted-foreground">{item.rationale}</p>:null}
                     </div>
