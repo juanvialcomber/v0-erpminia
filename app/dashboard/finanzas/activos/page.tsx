@@ -130,6 +130,9 @@ export default function FinanceAssetsPage(){
           <p className="mt-1 text-sm text-muted-foreground">Una cola de decisiones basada en evidencia financiera y operacional ya vinculada.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link href="/dashboard/finanzas/activos/candidatas" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
+            Candidatas Ficha 360
+          </Link>
           <Link href="/dashboard/finanzas/activos/registro" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
             Registro financiero completo
           </Link>
