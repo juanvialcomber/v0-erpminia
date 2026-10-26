@@ -40,6 +40,7 @@ type Response = {
     withCriticality: number;
     withMaintenanceEvidence: number;
     withRuntimeEvidence: number;
+    withUsableRuntime: number;
     withCoreEconomics: number;
     withBookValue: number;
     depreciationConflicts: number;
@@ -87,9 +88,9 @@ export default function FinanceAssetsPage(){
     </section>
 
     <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura económica de activos">
-      <Metric icon={ShieldCheck} label="Activos vinculados" value={number(data.summary.linkedAssets)} detail="Seguro canónico conectado a Ficha 360" />
+      <Metric icon={ShieldCheck} label="Activos vinculados" value={number(data.summary.linkedAssets)} detail="Seguro y/o depreciación conectados a Ficha 360" />
       <Metric icon={Wrench} label="Con historia de mantenimiento" value={number(data.summary.withMaintenanceEvidence)} detail="OT o costo reconocido enlazado" />
-      <Metric icon={Gauge} label="Con uso observado" value={number(data.summary.withRuntimeEvidence)} detail="Lecturas de horómetro disponibles" />
+      <Metric icon={Gauge} label="Con medidor" value={number(data.summary.withRuntimeEvidence)} detail={`${data.summary.withUsableRuntime} con secuencia utilizable para tasas`} />
       <Metric icon={CircleDollarSign} label="Valor libro conciliado" value={number(data.summary.withBookValue)} detail={data.summary.depreciationConflicts > 0 ? `${data.summary.depreciationConflicts} activo(s) con doble registro para Daniel` : 'Depreciación canónica vinculada 1:1'} />
     </section>
 
