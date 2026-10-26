@@ -138,6 +138,22 @@ def version_links(manifest, previous):
             for row in previous if row['id'] != manifest['id']]
 
 
+def merged_profile(manifest, profile, storage_path):
+    current = dict(manifest.get('source_profile') or {})
+    current.update(raw_original_in_motil_storage=True, sha256_verified=True,
+                   storage_bucket=BUCKET, storage_path=storage_path,
+                   operational_validation_v1=profile)
+    if profile['issues']:
+        current.update(requires_review=True, promotion='human_review_required')
+    if any(issue in profile['issues'] for issue in (
+            'sheet_date_mismatch', 'declared_internal_date_mismatch', 'future_report_date')):
+        current['date_mismatch'] = True
+    if current.get('intake_exception') == 'raw_original_not_in_motil_storage':
+        current.pop('intake_exception')
+        current['intake_exception_open'] = False
+    return current
+
+
 class Client:
     def __init__(self):
         self.url = os.environ['SUPABASE_URL'].rstrip('/')
@@ -202,13 +218,7 @@ class Client:
         return version_links(manifest, rows)
 
     def patch(self, manifest, profile, storage_path):
-        current = dict(manifest.get('source_profile') or {})
-        current.update(raw_original_in_motil_storage=True, sha256_verified=True,
-                       storage_bucket=BUCKET, storage_path=storage_path,
-                       operational_validation_v1=profile)
-        if current.get('intake_exception') == 'raw_original_not_in_motil_storage':
-            current.pop('intake_exception')
-            current['intake_exception_open'] = False
+        current = merged_profile(manifest, profile, storage_path)
         # Preserve all unrelated annotations, source dates, authority and states.
         params = {'id': 'eq.' + manifest['id'], 'organization_id': 'eq.' + ORG,
                   'updated_at': 'eq.' + manifest['updated_at']}

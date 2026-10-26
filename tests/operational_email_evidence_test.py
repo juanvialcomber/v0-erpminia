@@ -86,6 +86,20 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(result['date_cell'], 'I3')
             self.assertEqual(result['issues'], [])
 
+    def test_new_conflict_reaches_existing_review_flags_without_erasing_authority(self):
+        old = {'source_profile': {'authority_correction_message_id': 'authority',
+                                  'workflow_status': 'needs_report_correction',
+                                  'promotion': 'domain_review_on_conflict',
+                                  'promoted_to_canonical': False}}
+        profile = {'issues': ['sheet_date_mismatch']}
+        merged = evidence.merged_profile(old, profile, 'private/object.xlsx')
+        self.assertTrue(merged['requires_review'])
+        self.assertTrue(merged['date_mismatch'])
+        self.assertEqual(merged['promotion'], 'human_review_required')
+        self.assertEqual(merged['authority_correction_message_id'], 'authority')
+        self.assertEqual(merged['workflow_status'], 'needs_report_correction')
+        self.assertFalse(merged['promoted_to_canonical'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,6 +5,22 @@ new schedule. The deployed `vercel.json` schedules WhatsApp history, media,
 vision and daily summaries; it contains no operational Gmail intake job.
 Successful WhatsApp summary generation does not establish email coverage.
 
+The production-backed configuration audited on 2026-10-26 declares these
+Vercel schedules in UTC (Santiago is UTC−3 on that date):
+
+| Route under `/api/cron/` | UTC schedule | Purpose |
+| --- | --- | --- |
+| `whatsapp-history` | `7,22,37,52 * * * *` | Passive provider history recovery |
+| `whatsapp-media` | `1,6,11,16,21,26,31,36,41,46,51,56 * * * *` | Two media downloads per batch |
+| `whatsapp-vision` | `* * * * *` | Existing document/image queue |
+| `whatsapp-daily` | `30 9 * * *` | Prior local day summary, 06:30 Santiago |
+| `messages-push` | `* * * * *` | Existing internal notification delivery |
+| `maintenance-analytics-daily` | `0 1 * * *` | Maintenance analytics |
+| `role-kpi-snapshots-daily` | `30 6 * * *` | Role KPI snapshots |
+
+These are configuration evidence, not execution receipts. Supabase also has a
+separate product-media job; it does not establish WhatsApp or email intake.
+
 ## Bounded procedure
 
 1. Enumerate relevant verified sender-domain messages in a precise Santiago
