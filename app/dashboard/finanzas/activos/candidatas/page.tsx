@@ -67,6 +67,9 @@ type Response = {
     candidates: number;
     dualSource: number;
     readyForReview: number;
+    pendingReview: number;
+    acceptedForCreation: number;
+    ignoredCandidates: number;
     identityVerifiedSingleSource: number;
     modelOnlyNeedsOperationalIdentity: number;
     sourceCodeNeedsOperationalValidation: number;
@@ -126,7 +129,7 @@ export default function MissingAssetCandidatesPage(){
     {data ? <>
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail="Entidades deduplicadas" />
-        <Metric label="Listas para revisión" value={number(data.summary.readyForReview)} detail="Identidad exacta en 2 fuentes" />
+        <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.acceptedForCreation)+" aprobadas · "+number(data.summary.ignoredCandidates)+" descartadas"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
         <Metric label="Pendientes de identidad" value={number(data.summary.modelOnlyNeedsOperationalIdentity+data.summary.sourceCodeNeedsOperationalValidation)} detail={number(data.summary.modelOnlyNeedsOperationalIdentity)+" por modelo · "+number(data.summary.sourceCodeNeedsOperationalValidation)+" por código fuente"} />
       </section>
