@@ -187,3 +187,14 @@ test('reconciliation review classifies aggregate and insufficient identity rows'
   assert.match(page,/Línea agregada/);
   assert.match(page,/Identidad insuficiente/);
 });
+
+
+test('workbook reimport preserves unresolved reconciliation metadata as well as verified identities',()=>{
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(stage,/RECONCILIATION_PAYLOAD_KEYS/);
+  assert.match(stage,/preservedReconciliationPayload/);
+  assert.match(stage,/existingStageRows/);
+  assert.match(stage,/reconciliation_disposition/);
+  assert.match(stage,/reconciliation_scope/);
+  assert.match(stage,/if \(!existing\.canonical_asset_id\)/);
+});
