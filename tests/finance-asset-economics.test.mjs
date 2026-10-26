@@ -141,3 +141,11 @@ test('financial asset register preserves the full Daniel source independently of
   assert.match(register,/Fuente completa de Daniel/);
   assert.match(page,/Registro financiero completo/);
 });
+
+
+test('financial register linked rows open their Asset 360',()=>{
+  const register=fs.readFileSync('app/dashboard/finanzas/activos/registro/page.tsx','utf8');
+  assert.match(register,/row\.canonical_asset_id/);
+  assert.match(register,/dashboard\/mantenimiento\/equipos/);
+  assert.match(register,/Abrir Ficha 360/);
+});
