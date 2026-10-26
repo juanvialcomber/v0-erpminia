@@ -18,6 +18,11 @@ function classifyRow(row: {
   if (normalized.startsWith('vendido')) {
     return { key: 'source_sold', label: 'Fuente: vendido', rank: 4 };
   }
+  const disposition = String(row.source_payload?.reconciliation_disposition || '').trim().toLowerCase();
+  if (disposition === 'missing_canonical_asset_candidate') {
+    return { key: 'missing_canonical_asset_candidate', label: 'Posible Ficha 360 faltante', rank: 6 };
+  }
+
   const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
   if (centerType === 'asset') {
     return { key: 'asset_center_without_asset', label: 'Centro de activo sin Ficha 360', rank: 5 };
@@ -129,6 +134,7 @@ export async function GET(request: NextRequest) {
       unresolved: 'Fila financiera que aún no tiene contraparte canónica verificable en MOTIL. No implica error en la fuente.',
       source_depreciated: 'La propia fuente marca el registro como depreciado; MOTIL conserva ese estado sin inferir baja física.',
       source_sold: 'La propia fuente marca el registro como vendido; MOTIL conserva ese estado sin inferir fecha ni comprador.',
+      missing_canonical_asset_candidate: 'La fila contiene un identificador específico que no aparece en activos canónicos ni en alias operacionales verificados. Es candidata a una nueva Ficha 360, no a un match forzado.',
       asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
       non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
