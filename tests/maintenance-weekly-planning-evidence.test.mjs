@@ -136,6 +136,7 @@ test('weekly planning reuses an existing open OT before creating or preparing ne
   assert.match(api, /existingWorkOrder/);
   assert.match(api, /existingWorkOrder \? 'open_work_order'/);
   assert.match(page, /Continuar OT/);
+  assert.match(page, /OT ya abierta/);
   assert.match(page, /nextDecision\.existingWorkOrder/);
   assert.match(page, /row\.existingWorkOrder/);
 });
