@@ -158,3 +158,12 @@ test('workbook reimport preserves previously verified asset identities',()=>{
   assert.match(stage,/preserved_verified_identity/);
   assert.match(stage,/if \(row\.canonical_asset_id\) return row/);
 });
+
+
+test('reconciliation review prioritizes candidates for missing canonical Asset 360',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/missing_canonical_asset_candidate/);
+  assert.match(review,/Posible Ficha 360 faltante/);
+  assert.match(review,/no aparece en activos canónicos ni en alias operacionales verificados/);
+  assert.match(page,/Ficha 360 faltante/);
+});
