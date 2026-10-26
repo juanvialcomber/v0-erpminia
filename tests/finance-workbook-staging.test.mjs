@@ -25,6 +25,9 @@ test('depreciation workbook stays review-only and preserves the known wide-row a
   assert.match(route,/sender_declared_not_final:\s*true/);
   assert.match(route,/sourceRow === 771/);
   assert.match(route,/anomaly_wide_row/);
+  assert.match(route,/net_book_value_mismatch/);
+  assert.match(route,/total_accumulated_depreciation_mismatch/);
+  assert.match(route,/review_flags/);
   assert.match(route,/counts\.fixed_asset_owned !== 739/);
   assert.match(route,/counts\.fixed_asset_used !== 77/);
   assert.match(route,/counts\.fixed_asset_leasing !== 64/);
