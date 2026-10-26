@@ -104,6 +104,44 @@ function normalizedDescription(value: unknown) {
   return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
 }
 
+function normalizeExactCode(value: unknown) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function uniqueExactTextMap<T extends { id: string }>(
+  rows: T[],
+  selector: (row: T) => unknown,
+) {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = normalizeExactCode(selector(row));
+    if (!key) continue;
+    const existing = grouped.get(key) || [];
+    existing.push(row);
+    grouped.set(key, existing);
+  }
+
+  const unique = new Map<string, T>();
+  for (const [key, matches] of grouped) {
+    if (matches.length === 1) unique.set(key, matches[0]);
+  }
+  return unique;
+}
+
+function uniqueEmbeddedIdentifierMatch<T extends { id: string }>(
+  uniqueMap: Map<string, T>,
+  haystack: string,
+  minLength: number,
+) {
+  const matches = new Map<string, T>();
+  for (const [key, row] of uniqueMap) {
+    if (key.length < minLength || !haystack.includes(key)) continue;
+    matches.set(row.id, row);
+    if (matches.size > 1) return null;
+  }
+  return matches.size === 1 ? [...matches.values()][0] : null;
+}
+
 function materialDifference(actual: number | null, expected: number | null, tolerance = 0.01) {
   if (actual === null || expected === null) return false;
   return Math.abs(actual - expected) > tolerance;
@@ -308,9 +346,20 @@ function stageDepreciationWorkbook(params: {
   organizationId: string;
   importId: string;
   sourceSha256: string;
+  canonicalAssets: Array<{
+    id: string;
+    name: string | null;
+    serial_number: string | null;
+    license_plate: string | null;
+    cost_center_code: string | null;
+  }>;
 }) {
-  const { workbook, organizationId, importId, sourceSha256 } = params;
+  const { workbook, organizationId, importId, sourceSha256, canonicalAssets } = params;
   const rows: StageRow[] = [];
+  const plateMap = uniqueIdentifierMap(canonicalAssets, (asset) => asset.license_plate);
+  const serialMap = uniqueIdentifierMap(canonicalAssets, (asset) => asset.serial_number);
+  const nameMap = uniqueIdentifierMap(canonicalAssets, (asset) => asset.name);
+  const costCenterMap = uniqueExactTextMap(canonicalAssets, (asset) => asset.cost_center_code);
   const definitions = [
     { sheetName: 'ACTIVOS FIJOS Septiembre 2026', kind: 'fixed_asset_owned', costCenterColumn: 43 },
     { sheetName: 'AF USADOS Septiembre 2026', kind: 'fixed_asset_used', costCenterColumn: 19 },
@@ -329,6 +378,38 @@ function stageDepreciationWorkbook(params: {
       if (!isDepreciationBusinessRow(row[1], row[4])) continue;
 
       const anomalyWideRow = definition.kind === 'fixed_asset_owned' && sourceRow === 771;
+      const description = textValue(row[1]);
+      const costCenterRaw = textValue(row[definition.costCenterColumn]);
+      const costCenterPrefix = normalizeExactCode(costCenterRaw?.split(/\s+/)[0] || '');
+      const identityHaystack = normalizeIdentifier(`${description || ''} ${costCenterRaw || ''}`);
+      const descriptionIdentity = normalizeIdentifier(description);
+      const costCenterIdentity = normalizeIdentifier(costCenterRaw);
+
+      const costCenterAsset = costCenterPrefix ? costCenterMap.get(costCenterPrefix) || null : null;
+      const plateAsset = !costCenterAsset
+        ? uniqueEmbeddedIdentifierMatch(plateMap, identityHaystack, 5)
+        : null;
+      const serialAsset = !costCenterAsset && !plateAsset
+        ? uniqueEmbeddedIdentifierMatch(serialMap, identityHaystack, 5)
+        : null;
+      const nameAsset = !costCenterAsset && !plateAsset && !serialAsset
+        ? uniqueEmbeddedIdentifierMatch(
+            nameMap,
+            `${descriptionIdentity} ${costCenterIdentity}`,
+            10,
+          )
+        : null;
+      const matchedAsset = costCenterAsset || plateAsset || serialAsset || nameAsset || null;
+      const identityBasis = costCenterAsset
+        ? 'cost_center_code_exact'
+        : plateAsset
+          ? 'license_plate_embedded_exact'
+          : serialAsset
+            ? 'serial_embedded_exact'
+            : nameAsset
+              ? 'canonical_name_embedded_exact'
+              : null;
+
       const updatedAsset = numberValue(row[6]);
       const updatedAccumulatedDepreciation = numberValue(row[11]);
       const netBookValue = numberValue(row[12]);
@@ -365,7 +446,7 @@ function stageDepreciationWorkbook(params: {
         source_sheet: actualSheetName,
         source_row: sourceRow,
         record_kind: definition.kind,
-        description: textValue(row[1]),
+        description,
         acquisition_date: dateValue(row[0]),
         purchase_month: integerValue(row[2]),
         historical_asset: numberValue(row[4]),
@@ -377,17 +458,18 @@ function stageDepreciationWorkbook(params: {
         depreciation_current: currentDepreciation,
         total_accum_depr: totalAccumulatedDepreciation,
         remaining_life_months: numberValue(row[17]),
-        cost_center_raw: textValue(row[definition.costCenterColumn]),
+        cost_center_raw: costCenterRaw,
         formula_cells: formulasForRow(sheet, sourceRow),
         source_payload: {
           source_kind: 'fixed_asset_depreciation_model',
           sender_declared_not_final: true,
           anomaly_wide_row: anomalyWideRow,
           review_flags: reviewFlags,
+          economic_identity_method: identityBasis,
         },
-        identity_status: 'unresolved',
-        canonical_asset_id: null,
-        identity_basis: null,
+        identity_status: matchedAsset ? 'matched' : 'unresolved',
+        canonical_asset_id: matchedAsset?.id || null,
+        identity_basis: identityBasis,
         promoted_to_canonical: false,
       });
     }
@@ -486,7 +568,7 @@ export async function POST(
   const { data: canonicalAssets, error: canonicalError } = await context.supabase
     .schema('canonical')
     .from('assets')
-    .select('id,serial_number,license_plate')
+    .select('id,name,serial_number,license_plate,cost_center_code')
     .eq('organization_id', context.organizationId);
 
   if (canonicalError) return NextResponse.json({ error: canonicalError.message }, { status: 500 });
@@ -507,6 +589,7 @@ export async function POST(
         organizationId: context.organizationId,
         importId: sourceImport.id,
         sourceSha256: sourceImport.source_sha256,
+        canonicalAssets: canonicalAssets || [],
       });
     } else {
       return NextResponse.json({ error: `Tipo de fuente no soportado: ${sourceImport.source_kind}` }, { status: 422 });
