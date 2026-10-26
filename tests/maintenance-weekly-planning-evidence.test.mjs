@@ -102,3 +102,12 @@ test('weekly planning shows one next decision before the secondary queue', () =>
   assert.match(page, /Qué debe decidir Ariel/);
   assert.match(page, /recordDecision\(nextDecision/);
 });
+
+
+test('weekly planning does not schedule a priority asset before a standard plan exists', () => {
+  const page = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  assert.match(page, /!nextDecision\.standardPlan/);
+  assert.match(page, /Preparar plan/);
+  assert.match(page, /dashboard\/planificacion\/asistente/);
+  assert.match(page, /No inventes pasos ni materiales/);
+});
