@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
+import { useState } from 'react';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
+import { Button } from '@/components/ui/button';
 
 type Evidence = {
   source: 'insurance' | 'depreciation';
@@ -33,6 +35,13 @@ type Candidate = {
   reviewStatus: string | null;
   reviewBasis: string | null;
   reviewSourceCount: number | null;
+  review: null | {
+    id: string;
+    status: 'open' | 'accepted' | 'resolved' | 'ignored';
+    resolutionNote: string | null;
+    reviewedBy: string | null;
+    reviewedAt: string | null;
+  };
   sourceCount: number;
   evidenceCount: number;
   evidence: Evidence[];
@@ -64,7 +73,25 @@ const money=(value:number|null)=>value==null?'Sin base':new Intl.NumberFormat('e
 const uf=(value:number|null)=>value==null?'Sin base':new Intl.NumberFormat('es-CL',{maximumFractionDigits:2}).format(value)+' UF';
 
 export default function MissingAssetCandidatesPage(){
-  const {data,error,isLoading}=useSWR<Response>('/api/finance/missing-asset-candidates',fetcher,{revalidateOnFocus:false});
+  const {data,error,isLoading,mutate}=useSWR<Response>('/api/finance/missing-asset-candidates',fetcher,{revalidateOnFocus:false});
+  const [savingKey,setSavingKey]=useState<string|null>(null);
+
+  const decide=async(key:string,decision:'accept'|'ignore'|'reopen')=>{
+    setSavingKey(key);
+    try{
+      const response=await fetch('/api/finance/missing-asset-candidates',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body:JSON.stringify({key,decision}),
+      });
+      const payload=await response.json().catch(()=>null);
+      if(!response.ok) throw new Error(payload?.error||'No se pudo guardar la revisión');
+      await mutate();
+    } finally {
+      setSavingKey(null);
+    }
+  };
 
   return <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-10">
     <section>
@@ -112,6 +139,27 @@ export default function MissingAssetCandidatesPage(){
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
                 <Value label="Evidencias" value={number(candidate.evidenceCount)} />
               </div>
+              {candidate.readyForReview ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {candidate.review?.status === 'accepted' ? (
+                    <>
+                      <Badge variant="secondary">Aprobada para alta</Badge>
+                      <Button size="sm" variant="outline" disabled={savingKey===candidate.key} onClick={()=>decide(candidate.key,'reopen')}>Reabrir</Button>
+                    </>
+                  ) : candidate.review?.status === 'ignored' ? (
+                    <>
+                      <Badge variant="outline">No corresponde</Badge>
+                      <Button size="sm" variant="outline" disabled={savingKey===candidate.key} onClick={()=>decide(candidate.key,'reopen')}>Reabrir</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" disabled={savingKey===candidate.key} onClick={()=>decide(candidate.key,'accept')}>Aprobar para alta</Button>
+                      <Button size="sm" variant="outline" disabled={savingKey===candidate.key} onClick={()=>decide(candidate.key,'ignore')}>No corresponde</Button>
+                    </>
+                  )}
+                  {candidate.review?.reviewedAt ? <span className="text-xs text-muted-foreground">Última revisión registrada</span> : null}
+                </div>
+              ) : null}
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Ver evidencia</summary>
                 <div className="mt-2 space-y-2 rounded-md border bg-muted/20 p-3">
