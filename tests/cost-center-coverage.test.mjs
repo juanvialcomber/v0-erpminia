@@ -26,7 +26,7 @@ test('assignment requires cost-center write access and owner-module write access
 test('coverage assignment only fills missing references and never overwrites existing ownership', () => {
   assert.match(route, /\.is\('cost_center_id', null\)/);
   assert.doesNotMatch(route, /upsert\(/);
-  assert.match(queue, /MOTIL no infiere ni reemplaza asignaciones existentes/);
+  assert.match(queue, /MOTIL no completa ni reemplaza asignaciones por suposición/);
 });
 
 test('finance cost-center context surfaces the operational coverage queue', () => {
