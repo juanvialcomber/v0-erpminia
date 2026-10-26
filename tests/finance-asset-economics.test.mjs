@@ -240,3 +240,13 @@ test('missing Asset 360 candidates are deduplicated across insurance and depreci
   assert.match(candidates,/Nada se crea automáticamente/);
   assert.match(page,/Candidatas Ficha 360/);
 });
+
+
+test('finance reconciliation exposes material review completion while keeping low-value backlog visible',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/materialReviewComplete/);
+  assert.match(review,/materialReviewFloorClp/);
+  assert.match(review,/unexplainedOperationalBookValueClp/);
+  assert.match(page,/Revisión ≥/);
+  assert.match(page,/Revisión secundaria/);
+});
