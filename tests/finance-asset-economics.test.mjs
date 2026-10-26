@@ -423,3 +423,16 @@ test('Asset 360 draft derives vehicle type only from explicit source wording whe
   assert.match(api,/CAMIONES/);
   assert.match(api,/camioneta\|camión\|camion/);
 });
+
+
+test('ready Asset 360 reviews distinguish purchase cost-center and purchase-description evidence',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/purchaseDescriptionExactPlate/);
+  assert.match(api,/readyPurchaseCostCenter/);
+  assert.match(api,/readyPurchaseDescription/);
+  assert.match(api,/exact_plate_plus_purchase_description/);
+  assert.match(candidates,/centro de costo en Compras/);
+  assert.match(candidates,/PPU exacta en orden de compra/);
+  assert.match(candidates,/orden Compras/);
+});
