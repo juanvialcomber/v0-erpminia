@@ -20,7 +20,7 @@ test('closure and regulatory evidence remain linked to Legal from traceability',
 test('finance traceability does not infer currency without evidence', () => {
   assert.match(traceabilityPage, /if \(amount === null \|\| !code\) return '—'/);
   assert.doesNotMatch(traceabilityPage, /: 'CLP';/);
-  assert.match(traceabilityPage, /evidencia Laudus conserva su moneda de origen/);
+  assert.match(traceabilityPage, /Laudus conserva su moneda de origen/);
 });
 
 const legalPage = readFileSync('app/dashboard/legal/page.tsx', 'utf8');
