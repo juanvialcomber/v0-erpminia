@@ -207,3 +207,12 @@ test('reconciliation review separates unrepresented operational models',()=>{
   assert.match(review,/no aparece en activos canónicos ni alias verificados/);
   assert.match(page,/Modelo no representado/);
 });
+
+
+test('insurance reimport preserves rich equipment description in the canonical stage row',()=>{
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(stage,/description = textValue\(row\[1\]\)/);
+  assert.match(stage,/if \(!description \|\| itemNumber < 1 \|\| itemNumber > 91\) continue/);
+  assert.match(stage,/description,\n\s+equipment_type: equipmentType/);
+  assert.match(stage,/source_kind: 'insured_asset_inventory',[\s\S]*description,/);
+});
