@@ -110,3 +110,10 @@ test('Daniel receives a bounded daily priority queue before secondary analytics'
   assert.match(card, /Cerrar atribución por centro de costo/);
   assert.match(card, /Sin decisiones financieras urgentes detectadas/);
 });
+
+
+test('Daniel priority queue can surface supplier concentration without inferring causality', () => {
+  assert.match(card, /Revisar concentración por proveedor/);
+  assert.match(card, /topSupplierSharePct >= 15/);
+  assert.match(card, /del saldo abierto/);
+});
