@@ -43,9 +43,9 @@ test('pending Laudus payments are shown as source-state cases, not inferred debt
 });
 
 
-test('finance headline does not claim no urgency when only invoice review is empty', () => {
-  assert.match(page, /Sin facturas prioritarias en revisión/);
-  assert.match(page, /Sin facturas prioritarias/);
+test('finance summary stays neutral and does not overclaim urgency', () => {
+  assert.match(page, /Resumen financiero/);
+  assert.match(page, /Estado, decisiones y exposición en una sola lectura/);
   assert.doesNotMatch(page, /Sin decisiones urgentes en la muestra actual/);
 });
 
