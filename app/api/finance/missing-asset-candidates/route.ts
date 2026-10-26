@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
     let purchaseCostCenterEvidence: string | null = null;
     let purchaseEvidenceOrders: number | null = null;
     let purchaseEvidenceLines: number | null = null;
+    let purchaseDescriptionExactPlate = false;
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -186,6 +187,7 @@ export async function GET(request: NextRequest) {
       if (payloadPurchaseOrders != null) purchaseEvidenceOrders = Math.max(purchaseEvidenceOrders ?? payloadPurchaseOrders, payloadPurchaseOrders);
       const payloadPurchaseLines = numeric(payload.purchase_evidence_lines);
       if (payloadPurchaseLines != null) purchaseEvidenceLines = Math.max(purchaseEvidenceLines ?? payloadPurchaseLines, payloadPurchaseLines);
+      if (payload.purchase_description_exact_plate === true) purchaseDescriptionExactPlate = true;
       evidence.push({
         source,
         stageId: row.id,
@@ -245,6 +247,7 @@ export async function GET(request: NextRequest) {
       reviewSourceCount,
       operationalEvidence: {
         purchaseCostCenter: purchaseCostCenterEvidence,
+        purchaseDescriptionExactPlate,
         purchaseOrders: purchaseEvidenceOrders,
         purchaseLines: purchaseEvidenceLines,
       },
@@ -284,7 +287,9 @@ export async function GET(request: NextRequest) {
       dualSource: candidates.filter((row) => row.dualSource).length,
       readyForReview: candidates.filter((row) => row.readyForReview).length,
       readyDualFinance: candidates.filter((row) => row.reviewBasis === 'dual_source_exact_identity').length,
-      readyPurchaseEvidence: candidates.filter((row) => row.reviewBasis === 'exact_plate_plus_purchase_cost_center').length,
+      readyPurchaseEvidence: candidates.filter((row) => ['exact_plate_plus_purchase_cost_center','exact_plate_plus_purchase_description'].includes(String(row.reviewBasis))).length,
+      readyPurchaseCostCenter: candidates.filter((row) => row.reviewBasis === 'exact_plate_plus_purchase_cost_center').length,
+      readyPurchaseDescription: candidates.filter((row) => row.reviewBasis === 'exact_plate_plus_purchase_description').length,
       pendingReview: candidates.filter((row) => row.readyForReview && (!row.review || row.review.status === 'open')).length,
       acceptedForCreation: candidates.filter((row) => row.review?.status === 'accepted').length,
       ignoredCandidates: candidates.filter((row) => row.review?.status === 'ignored').length,
