@@ -28,6 +28,8 @@ type Candidate = {
   dualSource: boolean;
   readyForReview: boolean;
   identityVerifiedSingleSource: boolean;
+  modelOnlyNeedsOperationalIdentity: boolean;
+  sourceCodeNeedsOperationalValidation: boolean;
   reviewStatus: string | null;
   reviewBasis: string | null;
   reviewSourceCount: number | null;
@@ -42,6 +44,8 @@ type Response = {
     dualSource: number;
     readyForReview: number;
     identityVerifiedSingleSource: number;
+    modelOnlyNeedsOperationalIdentity: number;
+    sourceCodeNeedsOperationalValidation: number;
     insuranceOnly: number;
     depreciationOnly: number;
   };
@@ -82,7 +86,7 @@ export default function MissingAssetCandidatesPage(){
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail="Entidades deduplicadas" />
         <Metric label="Listas para revisión" value={number(data.summary.readyForReview)} detail="Identidad exacta en 2 fuentes" />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
-        <Metric label="Fuente única restante" value={number(data.summary.insuranceOnly+data.summary.depreciationOnly-data.summary.identityVerifiedSingleSource)} detail="Aún requiere más evidencia de identidad" />
+        <Metric label="Pendientes de identidad" value={number(data.summary.modelOnlyNeedsOperationalIdentity+data.summary.sourceCodeNeedsOperationalValidation)} detail={number(data.summary.modelOnlyNeedsOperationalIdentity)+" por modelo · "+number(data.summary.sourceCodeNeedsOperationalValidation)+" por código fuente"} />
       </section>
 
       <section className="overflow-hidden rounded-lg border bg-card">
@@ -97,12 +101,12 @@ export default function MissingAssetCandidatesPage(){
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium">{candidate.title}</p>
-                    {candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.identityVerifiedSingleSource ? <Badge variant="outline"><ShieldCheck className="mr-1 h-3 w-3"/>Identidad exacta · 1 fuente</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
+                    {candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.identityVerifiedSingleSource ? <Badge variant="outline"><ShieldCheck className="mr-1 h-3 w-3"/>Identidad exacta · 1 fuente</Badge> : candidate.modelOnlyNeedsOperationalIdentity ? <Badge variant="outline">Falta identidad operacional</Badge> : candidate.sourceCodeNeedsOperationalValidation ? <Badge variant="outline">Código fuente por validar</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[candidate.plate?'PPU '+candidate.plate:null,candidate.serial?'Serie '+candidate.serial:null,candidate.chassis?'Chasis '+candidate.chassis:null,candidate.engine?'Motor '+candidate.engine:null,candidate.modelYear?'Año '+candidate.modelYear:null].filter(Boolean).join(' · ')||'Identificador desde evidencia fuente'}
                   </p>
-                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">Sin contraparte canónica exacta · preparada para revisión operacional</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : null}
+                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">Sin contraparte canónica exacta · preparada para revisión operacional</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
                 </div>
                 <Value label="Valor libro" value={money(candidate.netBookValueClp)} />
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
