@@ -370,26 +370,49 @@ export function LaudusFinanceControlCard() {
         </section>
 
         <section className="space-y-4" aria-label="Lectura ejecutiva Laudus">
-          <div className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-4">
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cambio · 7 días</p>
-              <p className="mt-2 text-xl font-semibold">{number(data?.accountsPayable?.newOpenIssued7d || 0)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">partidas abiertas emitidas esta semana</p>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cambios observables · 7 días</p>
+              <div className="mt-3 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2">
+                <div className="bg-card px-4 py-3">
+                  <p className="text-2xl font-semibold">{number(data?.accountsPayable?.newOpenIssued7d || 0)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">partidas abiertas emitidas</p>
+                </div>
+                <div className="bg-card px-4 py-3">
+                  <p className="text-2xl font-semibold">{number(data?.accountsPayable?.becameOverdue7d || 0)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">entraron en mora</p>
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Cambio observable por fechas de emisión y vencimiento. Aún no existe una serie diaria histórica comparable de saldo.
+              </p>
             </div>
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Entraron en mora</p>
-              <p className="mt-2 text-xl font-semibold">{number(data?.accountsPayable?.becameOverdue7d || 0)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">vencieron durante los últimos 7 días</p>
-            </div>
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Vencen próximos 7 días</p>
-              <p className="mt-2 text-xl font-semibold">{number(dueSoonPayables)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{compactMoney(dueSoonPayableAmount)} en estado fuente Laudus</p>
-            </div>
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición abierta</p>
-              <p className="mt-2 text-xl font-semibold">{compactMoney(openPayableAmount)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{compactMoney(overduePayableAmount)} corresponde a partidas vencidas</p>
+
+            <div className="rounded-xl border bg-card p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Listo para trabajar hoy</p>
+              <div className="mt-3 divide-y rounded-lg border">
+                <div className="flex items-center justify-between gap-3 px-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium">Pagos por verificar</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros con estado Laudus por revisar</p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/dashboard/finanzas/pagos">Revisar</Link>
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium">Centros por conciliar</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(costCenterUnresolved)} centros sin cruce exacto MOTIL</p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/dashboard/finanzas/centros">Conciliar</Link>
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Son colas accionables, no cierres automáticos. Daniel conserva la decisión y la evidencia queda trazable.
+              </p>
             </div>
           </div>
 
