@@ -96,6 +96,11 @@ function normalizedDescription(value: unknown) {
   return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
 }
 
+function materialDifference(actual: number | null, expected: number | null, tolerance = 0.01) {
+  if (actual === null || expected === null) return false;
+  return Math.abs(actual - expected) > tolerance;
+}
+
 function isDepreciationBusinessRow(description: unknown, historicalAsset: unknown) {
   const descriptionText = textValue(description);
   if (!descriptionText || numberValue(historicalAsset) === null) return false;
@@ -304,6 +309,34 @@ function stageDepreciationWorkbook(params: {
       if (!isDepreciationBusinessRow(row[1], row[4])) continue;
 
       const anomalyWideRow = definition.kind === 'fixed_asset_owned' && sourceRow === 771;
+      const updatedAsset = numberValue(row[6]);
+      const updatedAccumulatedDepreciation = numberValue(row[11]);
+      const netBookValue = numberValue(row[12]);
+      const currentDepreciation = numberValue(row[15]);
+      const totalAccumulatedDepreciation = numberValue(row[16]);
+      const reviewFlags: string[] = [];
+
+      if (
+        materialDifference(
+          netBookValue,
+          updatedAsset !== null && updatedAccumulatedDepreciation !== null
+            ? updatedAsset - updatedAccumulatedDepreciation
+            : null,
+        )
+      ) {
+        reviewFlags.push('net_book_value_mismatch');
+      }
+      if (
+        materialDifference(
+          totalAccumulatedDepreciation,
+          updatedAccumulatedDepreciation !== null && currentDepreciation !== null
+            ? updatedAccumulatedDepreciation + currentDepreciation
+            : null,
+        )
+      ) {
+        reviewFlags.push('total_accumulated_depreciation_mismatch');
+      }
+      if (anomalyWideRow) reviewFlags.push('wide_row_structure');
 
       rows.push({
         organization_id: organizationId,
@@ -316,13 +349,13 @@ function stageDepreciationWorkbook(params: {
         acquisition_date: dateValue(row[0]),
         purchase_month: integerValue(row[2]),
         historical_asset: numberValue(row[4]),
-        updated_asset: numberValue(row[6]),
+        updated_asset: updatedAsset,
         net_fixed_asset: numberValue(row[8]),
         historical_accum_depr: numberValue(row[9]),
-        updated_accum_depr: numberValue(row[11]),
-        net_book_value: numberValue(row[12]),
-        depreciation_current: numberValue(row[15]),
-        total_accum_depr: numberValue(row[16]),
+        updated_accum_depr: updatedAccumulatedDepreciation,
+        net_book_value: netBookValue,
+        depreciation_current: currentDepreciation,
+        total_accum_depr: totalAccumulatedDepreciation,
         remaining_life_months: numberValue(row[17]),
         cost_center_raw: textValue(row[definition.costCenterColumn]),
         formula_cells: formulasForRow(sheet, sourceRow),
@@ -330,6 +363,7 @@ function stageDepreciationWorkbook(params: {
           source_kind: 'fixed_asset_depreciation_model',
           sender_declared_not_final: true,
           anomaly_wide_row: anomalyWideRow,
+          review_flags: reviewFlags,
         },
         identity_status: 'unresolved',
         canonical_asset_id: null,
@@ -490,7 +524,10 @@ export async function POST(
     return acc;
   }, {});
   const matched = stagedRows.filter((row) => row.identity_status === 'matched').length;
-  const anomalyRows = stagedRows.filter((row) => row.source_payload.anomaly_wide_row === true).length;
+  const anomalyRows = stagedRows.filter((row) => {
+    const flags = Array.isArray(row.source_payload.review_flags) ? row.source_payload.review_flags : [];
+    return row.source_payload.anomaly_wide_row === true || flags.length > 0;
+  }).length;
 
   const nextMetadata = {
     ...metadata,
