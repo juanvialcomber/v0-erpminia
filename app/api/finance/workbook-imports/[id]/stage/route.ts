@@ -217,7 +217,7 @@ function formulasForRow(sheet: SheetLike, rowNumber: number) {
   return formulas;
 }
 
-function findSheet(workbook: XLSX.WorkBook, name: string) {
+function findSheet(workbook: WorkbookLike, name: string) {
   const exact = workbook.SheetNames.find((sheetName) => sheetName === name);
   if (exact) return exact;
   const normalizedTarget = name.trim().toLowerCase();
