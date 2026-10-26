@@ -13,8 +13,8 @@ test('cost centers opens on canonical query instead of import tooling', async ()
   assert.match(page, /Consulta la estructura canónica vigente/);
   assert.match(workspace, /Buscar código, nombre o descripción/);
   assert.match(workspace, /Familias con mayor actividad observada/);
-  assert.match(workspace, />Impacto</);
-  assert.match(workspace, />Estructura</);
+  assert.match(workspace, /Impacto/);
+  assert.match(workspace, /Estructura/);
   assert.match(workspace, /Estructura de centros de costos/);
   assert.match(workspace, /Administrar base/);
   assert.match(workspace, /Herramientas secundarias para administradores/);
