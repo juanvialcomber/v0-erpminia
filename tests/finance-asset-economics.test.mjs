@@ -149,3 +149,12 @@ test('financial register linked rows open their Asset 360',()=>{
   assert.match(register,/dashboard\/mantenimiento\/equipos/);
   assert.match(register,/Abrir Ficha 360/);
 });
+
+
+test('workbook reimport preserves previously verified asset identities',()=>{
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(stage,/existingResolvedRows/);
+  assert.match(stage,/resolvedIdentityBySource/);
+  assert.match(stage,/preserved_verified_identity/);
+  assert.match(stage,/if \(row\.canonical_asset_id\) return row/);
+});
