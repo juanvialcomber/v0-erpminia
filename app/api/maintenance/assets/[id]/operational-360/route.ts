@@ -462,7 +462,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       materialMeterDecreases: materialMeterDecreaseCount,
     });
 
-    const [{ data: insuranceEvidence, error: insuranceEvidenceError }, { data: depreciationEvidence, error: depreciationEvidenceError }] = await Promise.all([
+    const [{ data: insuranceEvidence, error: insuranceEvidenceError }, depreciationEvidenceResult] = await Promise.all([
       context.supabase
         .from('motil_finance_asset_stage')
         .select('import_id,insured_uf,identity_status,identity_basis,source_sheet,source_row')
@@ -478,17 +478,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         .eq('organization_id', context.organizationId)
         .eq('canonical_asset_id', id)
         .not('net_book_value', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+        .order('source_row', { ascending: true })
+        .limit(10),
     ]);
 
     if (insuranceEvidenceError) console.warn('[asset-360] insurance finance evidence unavailable', { assetId: id, error: insuranceEvidenceError });
-    if (depreciationEvidenceError) console.warn('[asset-360] depreciation finance evidence unavailable', { assetId: id, error: depreciationEvidenceError });
+    if (depreciationEvidenceResult.error) console.warn('[asset-360] depreciation finance evidence unavailable', { assetId: id, error: depreciationEvidenceResult.error });
+
+    const depreciationRows = depreciationEvidenceResult.data || [];
+    const depreciationEvidence = depreciationRows.length === 1 ? depreciationRows[0] : null;
+    const depreciationConflictCount = depreciationRows.length > 1 ? depreciationRows.length : 0;
 
     const financeImportIds = Array.from(new Set([
       insuranceEvidence?.import_id,
-      depreciationEvidence?.import_id,
+      ...depreciationRows.map((row: any) => row.import_id),
     ].filter(Boolean)));
     const financeImportsResult = financeImportIds.length
       ? await context.supabase
@@ -538,7 +541,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ? (depreciationEvidence.source_payload as Record<string, unknown>).review_flags
           : [],
       } : null,
-      depreciation_identity_pending: Boolean(insuranceEvidence && !depreciationEvidence),
+      depreciation_identity_pending: Boolean(insuranceEvidence && depreciationRows.length === 0),
+      depreciation_conflict_count: depreciationConflictCount,
     };
 
     const summary = {
