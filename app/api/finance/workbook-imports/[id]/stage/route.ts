@@ -427,7 +427,7 @@ export async function POST(
 
   const { data: sourceImport, error: importError } = await context.supabase
     .from('motil_finance_workbook_imports')
-    .select('id,organization_id,filename,source_sha256,source_kind,sender_declared_not_final,metadata')
+    .select('id,organization_id,filename,source_sha256,source_kind,sender_declared_not_final,review_status,metadata')
     .eq('id', id)
     .eq('organization_id', context.organizationId)
     .maybeSingle();
