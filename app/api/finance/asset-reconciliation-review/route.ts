@@ -36,6 +36,9 @@ function classifyRow(row: {
   if (disposition === 'insufficient_unit_identity') {
     return { key: 'insufficient_unit_identity', label: 'Identidad insuficiente', rank: 4 };
   }
+  if (disposition === 'unrepresented_operational_model') {
+    return { key: 'unrepresented_operational_model', label: 'Modelo no representado', rank: 4 };
+  }
 
   const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
   if (centerType === 'asset') {
@@ -152,6 +155,7 @@ export async function GET(request: NextRequest) {
       ambiguous_existing_asset_family: 'La familia o modelo existe en MOTIL, pero varias Fichas 360 son compatibles. Se requiere una patente, serie, número de unidad u otra evidencia para elegir una sola.',
       aggregate_multi_asset_financial_line: 'La propia fila financiera agrupa más de un activo o componentes heterogéneos. No puede promoverse a una única Ficha 360 sin desagregar la fuente.',
       insufficient_unit_identity: 'La fila parece operacional, pero no trae una llave suficiente para distinguir una unidad concreta sin inferencia.',
+      unrepresented_operational_model: 'La fuente identifica un modelo operacional específico que no aparece en activos canónicos ni alias verificados. Puede requerir una o más Fichas 360, pero la cantidad de unidades no se infiere.',
       asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
       non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
