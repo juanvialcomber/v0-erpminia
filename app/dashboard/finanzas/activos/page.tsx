@@ -18,6 +18,7 @@ type QueueRow = {
   recognizedCostLifetimeClp: number | null;
   recognizedCost12mClp: number | null;
   netBookValueClp: number | null;
+  observedMaintenanceToBookPct: number | null;
   depreciationCurrentClp: number | null;
   depreciationConflictCount: number;
   workOrderCount: number;
@@ -121,7 +122,13 @@ export default function FinanceAssetsPage(){
             <Value
               label="Valor libro"
               value={row.depreciationConflictCount > 1 ? 'Revisar' : money(row.netBookValueClp)}
-              detail={row.depreciationConflictCount > 1 ? `${row.depreciationConflictCount} registros canónicos` : undefined}
+              detail={
+                row.depreciationConflictCount > 1
+                  ? `${row.depreciationConflictCount} registros canónicos`
+                  : row.observedMaintenanceToBookPct != null
+                    ? `Mantención reconocida: ${number(row.observedMaintenanceToBookPct,1)}% del valor libro`
+                    : undefined
+              }
             />
             <Value label="Costo 12m" value={money(row.recognizedCost12mClp)} />
             <Value label="OT abiertas" value={number(row.openWorkOrderCount)} detail={row.downtimeHours>0?`${number(row.downtimeHours,1)} h detención`:undefined} />
