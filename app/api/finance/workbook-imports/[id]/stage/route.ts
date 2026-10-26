@@ -7,7 +7,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 type WorkbookLike = ReturnType<typeof XLSX.read>;
-type SheetLike = WorkbookLike['Sheets'][string];
+type SheetLike = XLSX.WorkSheet;
 
 type StageRow = {
   organization_id: string;
@@ -242,7 +242,7 @@ function stageInsuranceWorkbook(params: {
   for (const definition of definitions) {
     const actualSheetName = findSheet(workbook, definition.sheetName);
     if (!actualSheetName) throw new Error(`Falta hoja requerida: ${definition.sheetName}`);
-    const sheet = workbook.Sheets[actualSheetName];
+    const sheet = workbook.Sheets[actualSheetName] as SheetLike;
     const values = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
 
     for (let index = 0; index < values.length; index += 1) {
@@ -369,7 +369,7 @@ function stageDepreciationWorkbook(params: {
   for (const definition of definitions) {
     const actualSheetName = findSheet(workbook, definition.sheetName);
     if (!actualSheetName) throw new Error(`Falta hoja requerida: ${definition.sheetName}`);
-    const sheet = workbook.Sheets[actualSheetName];
+    const sheet = workbook.Sheets[actualSheetName] as SheetLike;
     const values = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
 
     for (let index = 0; index < values.length; index += 1) {
