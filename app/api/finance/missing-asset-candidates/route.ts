@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
 
     const dualSource = sourceKinds.size > 1;
     const readyForReview = reviewStatus === 'ready_for_asset_review';
+    const identityVerifiedSingleSource = reviewStatus === 'identity_verified_single_source';
     return {
       key,
       title: title || plate || serial || 'Activo candidato',
@@ -157,12 +158,13 @@ export async function GET(request: NextRequest) {
       netBookValueClp,
       dualSource,
       readyForReview,
+      identityVerifiedSingleSource,
       reviewStatus,
       reviewBasis,
       reviewSourceCount,
       sourceCount: sourceKinds.size,
       evidenceCount: evidence.length,
-      priority: readyForReview ? 4 : dualSource ? 3 : (plate || serial || chassis ? 2 : 1),
+      priority: readyForReview ? 5 : identityVerifiedSingleSource ? 4 : dualSource ? 3 : (plate || serial || chassis ? 2 : 1),
       evidence,
     };
   }).sort((a, b) =>
@@ -178,6 +180,7 @@ export async function GET(request: NextRequest) {
       candidates: candidates.length,
       dualSource: candidates.filter((row) => row.dualSource).length,
       readyForReview: candidates.filter((row) => row.readyForReview).length,
+      identityVerifiedSingleSource: candidates.filter((row) => row.identityVerifiedSingleSource).length,
       insuranceOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'insurance')).length,
       depreciationOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'depreciation')).length,
     },
@@ -186,6 +189,7 @@ export async function GET(request: NextRequest) {
       candidate: 'Evidencia de una entidad física que no tiene contraparte canónica verificable. No crea una Ficha 360 automáticamente.',
       dualSource: 'La misma entidad aparece de forma independiente en seguro y depreciación.',
       readyForReview: 'Candidata con identidad física exacta confirmada en dos fuentes independientes y sin contraparte canónica exacta.',
+      identityVerifiedSingleSource: 'Candidata con PPU, serie o chasis exacto verificado contra el maestro, pero respaldada por una sola fuente.',
       approval: 'Crear una Ficha 360 requiere revisión operacional; MOTIL conserva la fuente y no inventa campos faltantes.',
     },
   });
