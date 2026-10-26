@@ -28,3 +28,17 @@ test('finance assets workspace exposes evidence and links back to Ficha 360',()=
   assert.match(page,/La cola de reemplazo se habilitará sólo cuando la depreciación de Daniel esté conciliada por activo/);
   assert.match(nav,/\/dashboard\/finanzas\/activos/);
 });
+
+
+test('asset 360 exposes canonical finance evidence without conflating insurance and book value',()=>{
+  const route=fs.readFileSync('app/api/maintenance/assets/[id]/operational-360/route.ts','utf8');
+  const overview=fs.readFileSync('components/maintenance/asset-360-overview.tsx','utf8');
+  const economics=fs.readFileSync('components/maintenance/asset-360/economics-section.tsx','utf8');
+  assert.match(route,/financeProfile/);
+  assert.match(route,/insured_uf/);
+  assert.match(route,/net_book_value/);
+  assert.match(overview,/financeProfile=\{data\.financeProfile\}/);
+  assert.match(economics,/Economía canónica del activo/);
+  assert.match(economics,/Seguro, valor libro y depreciación son conceptos distintos/);
+  assert.match(economics,/Pendiente de vincular/);
+});
