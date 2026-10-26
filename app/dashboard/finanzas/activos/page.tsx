@@ -40,6 +40,17 @@ type ReviewRow = {
 };
 
 type ReviewResponse = {
+  insurance: null | {
+    filename: string;
+    sourceRows: number;
+    linkedRows: number;
+    linkedAssets: number;
+    unresolvedRows: number;
+    unclassifiedRows: number;
+    missingCandidates: number;
+    ambiguousRows: number;
+    discrepancies: number;
+  };
   summary: {
     sourceRows: number;
     linkedRows: number;
@@ -191,9 +202,15 @@ export default function FinanceAssetsPage(){
         </div>
         {reviewData ? (
           <div className="flex flex-wrap gap-2 text-xs">
-            <Badge variant="outline">{number(reviewData.summary.linkedRows)} filas enlazadas</Badge>
-            <Badge variant="secondary">{number(reviewData.summary.unresolvedRows)} sin contraparte verificada</Badge>
-            <Badge variant={reviewData.summary.conflictAssets?'destructive':'outline'}>{number(reviewData.summary.conflictAssets)} conflictos</Badge>
+            <Badge variant="outline">Depreciación {number(reviewData.summary.linkedRows)}/{number(reviewData.summary.sourceRows)}</Badge>
+            {reviewData.insurance ? (
+              <Badge variant="outline">Seguro {number(reviewData.insurance.linkedRows)}/{number(reviewData.insurance.sourceRows)}</Badge>
+            ) : null}
+            {reviewData.insurance ? (
+              <Badge variant={reviewData.insurance.unclassifiedRows ? 'destructive' : 'secondary'}>
+                Seguro sin clasificar {number(reviewData.insurance.unclassifiedRows)}
+              </Badge>
+            ) : null}
           </div>
         ) : null}
       </div>
