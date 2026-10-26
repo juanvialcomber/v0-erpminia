@@ -309,3 +309,18 @@ test('finance candidate queue classifies every review tier explicitly',()=>{
   assert.match(candidates,/Código fuente por validar/);
   assert.match(candidates,/Pendientes de identidad/);
 });
+
+
+test('ready Asset 360 candidates use auditable review decisions without creating assets',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/data_reconciliation_reviews/);
+  assert.match(api,/missing_canonical_asset_candidate/);
+  assert.match(api,/accepted/);
+  assert.match(api,/ignored/);
+  assert.match(api,/reviewed_by: context\.userId/);
+  assert.match(api,/La Ficha 360 aún no ha sido creada/);
+  assert.match(candidates,/Aprobar para alta/);
+  assert.match(candidates,/No corresponde/);
+  assert.match(candidates,/Reabrir/);
+});
