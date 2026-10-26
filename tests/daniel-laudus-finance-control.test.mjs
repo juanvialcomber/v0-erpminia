@@ -141,3 +141,10 @@ test('secondary evidence stays collapsed and does not compete with the daily dec
   assert.match(card, /<details className="group">/);
   assert.match(card, /Cobertura de evidencia/);
 });
+
+
+test('secondary analytics stay collapsed so decisions remain visually dominant', () => {
+  assert.match(card, /Análisis adicional/);
+  assert.match(card, /Aging, vencimientos y concentración por proveedor/);
+  assert.match(card, /group-open:hidden/);
+});
