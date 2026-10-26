@@ -64,6 +64,25 @@ export default function PayablesPage() {
   const unreconciled = payments.filter((row) => !row.reconciled_at);
   const payableWithBalance = payables.filter((row) => row.due_date && Number(row.outstanding_amount) > 0);
 
+  const overdueBySupplier = useMemo(() => {
+    const groups = new Map<string, { supplierName: string; items: number; amount: number; oldestDays: number }>();
+    for (const row of overdue) {
+      const key = row.supplier_name || 'Sin proveedor';
+      const current = groups.get(key) || { supplierName: key, items: 0, amount: 0, oldestDays: 0 };
+      current.items += 1;
+      current.amount += Number(row.outstanding_amount || 0);
+      current.oldestDays = Math.max(current.oldestDays, Math.abs(Number(row.days_to_due || 0)));
+      groups.set(key, current);
+    }
+    const total = [...groups.values()].reduce((sum, item) => sum + item.amount, 0);
+    return [...groups.values()]
+      .map((item) => ({ ...item, sharePct: total > 0 ? Math.round((item.amount / total) * 1000) / 10 : 0 }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 8);
+  }, [overdue]);
+
+  const overdueSupplierConcentration = overdueBySupplier.slice(0, 5).reduce((sum, item) => sum + item.sharePct, 0);
+
   const post = async (body: unknown) => {
     setBusy(true); setMessage(null);
     try {
@@ -137,6 +156,41 @@ export default function PayablesPage() {
       <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{overdue.length}</p></CardContent></Card>
       <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Pagos por conciliar</p><p className="mt-1 text-2xl font-semibold">{unreconciled.length}</p></CardContent></Card>
     </div>
+
+    {overdueBySupplier.length ? (
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración vencida</p>
+              <CardTitle className="mt-1">Proveedores que explican la mayor exposición</CardTitle>
+              <CardDescription>
+                Top 5 concentra {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
+              </CardDescription>
+            </div>
+            <Badge variant="outline">{overdue.length} partidas vencidas</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y rounded-lg border">
+            {overdueBySupplier.map((item, index) => (
+              <div key={item.supplierName} className="grid gap-2 px-4 py-3 sm:grid-cols-[42px_minmax(0,1fr)_120px_110px] sm:items-center">
+                <div className="text-xs font-semibold tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.supplierName}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{item.items} partidas · hasta {item.oldestDays} días de atraso</p>
+                </div>
+                <div className="text-sm font-semibold tabular-nums sm:text-right">{money(item.amount, 'CLP')}</div>
+                <div className="text-xs tabular-nums text-muted-foreground sm:text-right">{number(item.sharePct)}%</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Concentración observada sobre obligaciones vencidas en MOTIL. No implica prioridad automática de pago ni evaluación de riesgo del proveedor.
+          </p>
+        </CardContent>
+      </Card>
+    ) : null}
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
