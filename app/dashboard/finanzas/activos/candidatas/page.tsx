@@ -27,6 +27,7 @@ type Candidate = {
   netBookValueClp: number | null;
   dualSource: boolean;
   readyForReview: boolean;
+  identityVerifiedSingleSource: boolean;
   reviewStatus: string | null;
   reviewBasis: string | null;
   reviewSourceCount: number | null;
@@ -40,6 +41,7 @@ type Response = {
     candidates: number;
     dualSource: number;
     readyForReview: number;
+    identityVerifiedSingleSource: number;
     insuranceOnly: number;
     depreciationOnly: number;
   };
@@ -79,8 +81,8 @@ export default function MissingAssetCandidatesPage(){
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail="Entidades deduplicadas" />
         <Metric label="Listas para revisión" value={number(data.summary.readyForReview)} detail="Identidad exacta en 2 fuentes" />
-        <Metric label="Sólo seguro" value={number(data.summary.insuranceOnly)} detail="Identidad desde la póliza" />
-        <Metric label="Sólo depreciación" value={number(data.summary.depreciationOnly)} detail="Identidad desde la fuente de Daniel" />
+        <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
+        <Metric label="Fuente única restante" value={number(data.summary.insuranceOnly+data.summary.depreciationOnly-data.summary.identityVerifiedSingleSource)} detail="Aún requiere más evidencia de identidad" />
       </section>
 
       <section className="overflow-hidden rounded-lg border bg-card">
@@ -95,12 +97,12 @@ export default function MissingAssetCandidatesPage(){
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium">{candidate.title}</p>
-                    {candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
+                    {candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.identityVerifiedSingleSource ? <Badge variant="outline"><ShieldCheck className="mr-1 h-3 w-3"/>Identidad exacta · 1 fuente</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[candidate.plate?'PPU '+candidate.plate:null,candidate.serial?'Serie '+candidate.serial:null,candidate.chassis?'Chasis '+candidate.chassis:null,candidate.engine?'Motor '+candidate.engine:null,candidate.modelYear?'Año '+candidate.modelYear:null].filter(Boolean).join(' · ')||'Identificador desde evidencia fuente'}
                   </p>
-                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">Sin contraparte canónica exacta · preparada para revisión operacional</p> : null}
+                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">Sin contraparte canónica exacta · preparada para revisión operacional</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : null}
                 </div>
                 <Value label="Valor libro" value={money(candidate.netBookValueClp)} />
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
