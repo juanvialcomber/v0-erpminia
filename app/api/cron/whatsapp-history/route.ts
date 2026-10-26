@@ -14,6 +14,14 @@ export async function GET(request: NextRequest) {
   }
   try {
     const result = await syncGreenApiGroupHistory();
+    // Successful invocations used to leave no execution evidence in runtime
+    // logs. Log bounded counters only: no chat IDs, text, filenames or secrets.
+    console.info('[greenapi-history] completed', {
+      groups: result.groups, failures: result.failures, inserted: result.inserted,
+      fetched: result.results.reduce((sum, group) => sum + group.fetched, 0),
+      eligible: result.results.reduce((sum, group) => sum + group.eligible, 0),
+      truncated_groups: result.truncated_groups,
+    });
     return NextResponse.json({ ok: result.failures === 0, ...result },
       { status: result.failures > 0 ? 502 : 200, headers: GREEN_NO_STORE });
   } catch (error) {
