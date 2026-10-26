@@ -29,10 +29,11 @@ test('finance executive API exposes forecast tenant scoped through organization 
   assert.match(route,/cashForecast: cashForecast\.data \|\| \[\]/);
 });
 
-test('finance cockpit keeps short-term treasury visible without expanding the full forecast',()=>{
-  assert.match(page,/CxP aprobadas en MOTIL/);
-  assert.match(page,/Vence ≤ 7 días/);
-  assert.match(page,/Este universo es distinto de la exposición histórica observada en Laudus/);
+test('payments keeps short-term treasury actionable without expanding the full forecast on summary',()=>{
+  assert.match(payments,/days_to_due/);
+  assert.match(payments,/Vencidas/);
+  assert.match(payments,/Sin vencimiento/);
+  assert.match(page,/LaudusFinanceControlCard/);
   assert.doesNotMatch(page,/Próx\. 30 días/);
   assert.doesNotMatch(page,/Próx\. 60 días/);
   assert.doesNotMatch(page,/Próx\. 90 días/);
