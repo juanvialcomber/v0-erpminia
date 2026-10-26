@@ -111,3 +111,10 @@ test('weekly planning does not schedule a priority asset before a standard plan 
   assert.match(page, /dashboard\/planificacion\/asistente/);
   assert.match(page, /No inventes pasos ni materiales/);
 });
+
+
+test('weekly plan handoff preserves the selected asset context', () => {
+  const page = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  assert.match(page, /assetId: nextDecision\.canonicalAssetId/);
+  assert.match(page, /assetId: row\.canonicalAssetId/);
+});
