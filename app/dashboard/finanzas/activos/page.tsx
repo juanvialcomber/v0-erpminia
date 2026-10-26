@@ -208,6 +208,7 @@ export default function FinanceAssetsPage(){
             <ReviewMetric label="Fuente depreciación" value={number(reviewData.summary.sourceRows)} detail="Filas conservadas desde el archivo de Daniel" />
             <ReviewMetric label="Activos enlazados" value={number(reviewData.summary.linkedAssets)} detail={`${number(reviewData.summary.singleAssets)} con valor 1:1`} />
             <ReviewMetric label="Sin identificador operacional" value={number(reviewData.unresolved.byReason.missing_identifier||0)} detail="Sin centro, patente, serie o nombre suficiente" />
+            <ReviewMetric label="Ficha 360 faltante" value={number(reviewData.unresolved.byReason.missing_canonical_asset_candidate||0)} detail="Identificador específico sin contraparte canónica ni alias operacional" />
             <ReviewMetric label="Centro de activo sin Ficha 360" value={number(reviewData.unresolved.byReason.asset_center_without_asset||0)} detail="Centro canónico tipado como activo; falta contraparte operacional" />
             <ReviewMetric label="Centro no operacional" value={number(reviewData.unresolved.byReason.non_asset_cost_center||0)} detail="Área o administración; no se fuerza a un equipo" />
           </div>
