@@ -335,3 +335,16 @@ test('finance summary surfaces the Asset 360 review queue without mixing it into
   assert.match(signal,/Revisar candidatas/);
   assert.match(signal,/\/dashboard\/finanzas\/activos\/candidatas/);
 });
+
+
+test('Asset 360 candidate draft exposes verified fields and blocks canonical creation prerequisites',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/canonicalDraft/);
+  assert.match(api,/requiredBeforeCreation: \['asset_code', 'canonical_import_batch'\]/);
+  assert.match(api,/No se crea la Ficha 360 hasta asignar código de activo y lineage canónico aprobado/);
+  assert.match(candidates,/Borrador de alta/);
+  assert.match(candidates,/Falta código de activo y lote canónico aprobado/);
+  assert.match(candidates,/la Ficha 360 no se crea desde esta pantalla/i);
+  assert.match(candidates,/sourceFile/);
+});
