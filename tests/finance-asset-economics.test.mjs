@@ -71,3 +71,14 @@ test('incomplete economics message does not assume the asset came from insurance
   assert.match(api,/Activo financiero vinculado, pero falta valor libro o costo\/fecha de adquisición canónica/);
   assert.doesNotMatch(api,/Seguro canónico vinculado, pero falta costo\/fecha/);
 });
+
+
+test('maintenance to book ratio is descriptive and never drives replacement',()=>{
+  const economics=fs.readFileSync('components/maintenance/asset-360/economics-section.tsx','utf8');
+  assert.match(api,/observedMaintenanceToBookPct/);
+  assert.match(api,/recognizedCostLifetime \/ netBookValue/);
+  assert.match(api,/no representa TCO ni dispara reemplazo/);
+  assert.match(page,/Mantención reconocida:/);
+  assert.match(economics,/Mantenimiento reconocido \/ valor libro/);
+  assert.match(economics,/No representa TCO ni recomienda reemplazo/);
+});
