@@ -268,11 +268,11 @@ export function LaudusFinanceControlCard() {
     .slice(0, 3);
 
   return (
-    <Card className="overflow-hidden shadow-none">
-      <CardHeader className="border-b pb-5">
+    <Card className="overflow-hidden border-border/80 bg-card shadow-none">
+      <CardHeader className="border-b bg-muted/20 pb-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas · Laudus</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas · Laudus</p>
             <CardTitle className="mt-1 text-2xl">Control financiero</CardTitle>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Exposición, vencimientos y decisiones prioritarias con evidencia vigente. Sin convertir datos fuente en conclusiones contables no conciliadas.
@@ -286,8 +286,8 @@ export function LaudusFinanceControlCard() {
 
       <CardContent className="space-y-6 p-5">
         <section className="grid gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-[1.35fr_1fr]" aria-label="Resumen financiero ejecutivo">
-          <div className="bg-card p-5 md:p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Exposición abierta</p>
+          <div className="bg-primary/5 p-5 md:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Exposición abierta</p>
             <p className="mt-3 text-4xl font-semibold tracking-tight">{isLoading ? '—' : compactMoney(openPayableAmount)}</p>
             <p className="mt-2 text-sm text-muted-foreground">
               {number(openPayables)} partidas abiertas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
@@ -298,18 +298,18 @@ export function LaudusFinanceControlCard() {
             </div>
           </div>
           <div className="grid bg-border sm:grid-cols-3 lg:grid-cols-1">
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Vencidas</p>
+            <div className="bg-destructive/5 px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-destructive">Vencidas</p>
               <p className="mt-1 text-xl font-semibold">{number(overduePayables)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{number(overdueSharePct)}% del saldo abierto</p>
             </div>
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Próximos 7 días</p>
+            <div className="bg-primary/5 px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">Próximos 7 días</p>
               <p className="mt-1 text-xl font-semibold">{number(dueSoonPayables)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{compactMoney(dueSoonPayableAmount)} por vencer</p>
             </div>
-            <div className="bg-card px-4 py-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Mayor concentración</p>
+            <div className="bg-secondary/5 px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-secondary">Mayor concentración</p>
               <p className="mt-1 truncate text-sm font-semibold">{topSupplier ? shortSupplier(topSupplier.supplierName) : 'Sin concentración relevante'}</p>
               <p className="mt-1 text-xs text-muted-foreground">{topSupplier ? `${number(topSupplierSharePct)}% · ${compactMoney(topSupplier.amountClp)}` : 'Sin evidencia suficiente'}</p>
             </div>
@@ -328,7 +328,7 @@ export function LaudusFinanceControlCard() {
             <div className="divide-y overflow-hidden rounded-xl border">
               {priorities.map((item, index) => (
                 <div key={item.key} className="grid gap-3 bg-card px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_auto] md:items-center">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums ${index === 0 ? 'border-primary/30 bg-primary/10 text-primary' : 'bg-muted/40 text-muted-foreground'}`}>
                     {String(index + 1).padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
@@ -350,16 +350,16 @@ export function LaudusFinanceControlCard() {
         )}
 
         <section className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
-          <div className="bg-card px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Pagos por revisar</p>
+          <div className="bg-primary/5 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-primary">Pagos por revisar</p>
             <p className="mt-1 text-lg font-semibold">{number(pendingDeposit)}</p>
           </div>
-          <div className="bg-card px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Centros por conciliar</p>
+          <div className="bg-destructive/5 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-destructive">Centros por conciliar</p>
             <p className="mt-1 text-lg font-semibold">{number(costCenterUnresolved)}</p>
           </div>
-          <div className="bg-card px-4 py-3">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Activos enlazados</p>
+          <div className="bg-secondary/5 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-secondary">Activos enlazados</p>
             <p className="mt-1 text-lg font-semibold">{number(fixedAssetLinked)} <span className="text-xs font-normal text-muted-foreground">/ {number(fixedAssetTotal)}</span></p>
           </div>
           <div className="bg-card px-4 py-3">
