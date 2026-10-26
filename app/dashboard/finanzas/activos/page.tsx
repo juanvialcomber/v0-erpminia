@@ -243,7 +243,7 @@ export default function FinanceAssetsPage(){
             <ReviewMetric label="Componente / repuesto" value={number(reviewData.unresolved.byReason.component_or_spare_financial_line||0)} detail="Capitalizado financieramente; no crea Ficha 360 de equipo" />
             <ReviewMetric label="Centro de activo sin Ficha 360" value={number(reviewData.unresolved.byReason.asset_center_without_asset||0)} detail="Centro canónico tipado como activo; falta contraparte operacional" />
             <ReviewMetric label="Centro no operacional" value={number(reviewData.unresolved.byReason.non_asset_cost_center||0)} detail="Área o administración; no se fuerza a un equipo" />
-            <ReviewMetric label="Revisión secundaria" value={number(reviewData.summary.unexplainedOperationalRows||0)} detail={money(reviewData.summary.unexplainedOperationalBookValueClp)+' acumulados en filas individuales bajo el umbral material'} />
+            <ReviewMetric label="Revisión secundaria" value={number(reviewData.unresolved.byReason.low_materiality_secondary_review||0)} detail={money(reviewData.summary.unexplainedOperationalBookValueClp)+' preservados bajo el umbral material actual'} />
           </div>
           <details>
             <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
