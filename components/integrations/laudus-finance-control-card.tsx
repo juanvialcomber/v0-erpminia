@@ -137,7 +137,9 @@ function shortSupplier(value: string) {
 
 function shortDate(value?: string | null) {
   if (!value) return 'Sin fecha';
-  const date = new Date(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00-03:00`)
+    : new Date(value);
   if (!Number.isFinite(date.getTime())) return 'Fecha por revisar';
   return new Intl.DateTimeFormat('es-CL', {
     day: '2-digit',
