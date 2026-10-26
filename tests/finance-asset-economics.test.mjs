@@ -43,3 +43,12 @@ test('asset 360 exposes canonical finance evidence without conflating insurance 
   assert.match(economics,/Seguro, valor libro y depreciación son conceptos distintos/);
   assert.match(economics,/Pendiente de vincular/);
 });
+
+
+test('asset economics exposes book value only for single reconciled depreciation identity',()=>{
+  assert.match(api,/depreciationRows\.length === 1/);
+  assert.match(api,/depreciationConflictCount/);
+  assert.match(api,/netBookValueClp/);
+  assert.match(page,/Valor libro conciliado/);
+  assert.match(page,/registros canónicos/);
+});
