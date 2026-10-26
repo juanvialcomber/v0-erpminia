@@ -348,3 +348,18 @@ test('Asset 360 candidate draft exposes verified fields and blocks canonical cre
   assert.match(candidates,/la Ficha 360 no se crea desde esta pantalla/i);
   assert.match(candidates,/sourceFile/);
 });
+
+
+test('Asset 360 review summary counts only pending decisions as actionable',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const signal=fs.readFileSync('components/finance/asset-candidate-review-signal.tsx','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/pendingReview/);
+  assert.match(api,/acceptedForCreation/);
+  assert.match(api,/ignoredCandidates/);
+  assert.match(signal,/pendingReview/);
+  assert.match(signal,/por decidir con doble respaldo/);
+  assert.match(candidates,/Por decidir/);
+  assert.match(candidates,/aprobadas/);
+  assert.match(candidates,/descartadas/);
+});
