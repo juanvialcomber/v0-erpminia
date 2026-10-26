@@ -7,7 +7,9 @@ const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
 const nav=fs.readFileSync('app/dashboard/finanzas/layout.tsx','utf8');
 
 test('asset economics queue uses canonical Daniel insurance and never converts UF to CLP',()=>{
-  assert.match(api,/source_kind', 'insured_asset_inventory'/);
+  assert.match(api,/insured_asset_inventory/);
+  assert.match(api,/fixed_asset_depreciation_model/);
+  assert.match(api,/depreciationIdentityResult/);
   assert.match(api,/insured_uf/);
   assert.doesNotMatch(api,/ufToClp|uf_to_clp|exchangeRate|exchange_rate/);
   assert.match(api,/No se convierte a CLP/);
