@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
 
   const insurance = (imports || []).find((row: any) => row.source_kind === 'insured_asset_inventory') || null;
   const depreciation = (imports || []).find((row: any) => row.source_kind === 'fixed_asset_depreciation_model') || null;
+  const filenameByImportId = new Map((imports || []).map((row: any) => [row.id, row.filename]));
   const importIds = [insurance?.id, depreciation?.id].filter(Boolean) as string[];
 
   if (importIds.length === 0) {
@@ -110,6 +111,9 @@ export async function GET(request: NextRequest) {
     let chassis: string | null = null;
     let engine: string | null = null;
     let modelYear: number | null = null;
+    let manufacturer: string | null = null;
+    let sourceModel: string | null = null;
+    let equipmentType: string | null = null;
     let reviewStatus: string | null = null;
     let reviewBasis: string | null = null;
     let reviewSourceCount: number | null = null;
@@ -118,6 +122,7 @@ export async function GET(request: NextRequest) {
       stageId: number;
       sheet: string | null;
       row: number | null;
+      sourceFile: string | null;
       description: string | null;
       rationale: string | null;
     }> = [];
@@ -144,6 +149,9 @@ export async function GET(request: NextRequest) {
       chassis = chassis || text(row.chassis_number) || text(payload.insurance_chassis_number);
       engine = engine || text(row.engine_number) || text(payload.insurance_engine_number);
       modelYear = modelYear || (row.model_year ? Number(row.model_year) : null);
+      manufacturer = manufacturer || text(row.brand);
+      sourceModel = sourceModel || text(row.model);
+      equipmentType = equipmentType || text(row.equipment_type);
       reviewStatus = reviewStatus || text(payload.candidate_review_status);
       reviewBasis = reviewBasis || text(payload.candidate_review_basis);
       const payloadSourceCount = numeric(payload.candidate_review_source_count);
@@ -153,6 +161,7 @@ export async function GET(request: NextRequest) {
         stageId: row.id,
         sheet: row.source_sheet,
         row: row.source_row,
+        sourceFile: text(filenameByImportId.get(row.import_id)),
         description: text(row.description) || text(payload.description),
         rationale: text(payload.reconciliation_evidence),
       });
@@ -160,6 +169,9 @@ export async function GET(request: NextRequest) {
 
     const review = reviewByIssueKey.get('asset_missing_candidate:' + key) || null;
     const dualSource = sourceKinds.size > 1;
+    const normalizedEquipmentType = String(equipmentType || '').toLowerCase();
+    const draftAssetType = /camioneta|camión|camion/.test(normalizedEquipmentType) ? 'vehicle' : null;
+    const draftCategory = normalizedEquipmentType.includes('camioneta') ? 'CAMIONETAS' : null;
     const readyForReview = reviewStatus === 'ready_for_asset_review';
     const identityVerifiedSingleSource = reviewStatus === 'identity_verified_single_source';
     const modelOnlyNeedsOperationalIdentity = reviewStatus === 'model_only_needs_operational_identity';
@@ -172,6 +184,20 @@ export async function GET(request: NextRequest) {
       chassis,
       engine,
       modelYear,
+      manufacturer,
+      sourceModel,
+      equipmentType,
+      canonicalDraft: {
+        assetType: draftAssetType,
+        category: draftCategory,
+        manufacturer,
+        model: sourceModel,
+        serialNumber: serial,
+        licensePlate: plate,
+        sourceName: title,
+        requiredBeforeCreation: ['asset_code', 'canonical_import_batch'],
+        note: 'No se crea la Ficha 360 hasta asignar código de activo y lineage canónico aprobado.',
+      },
       insuredUf,
       netBookValueClp,
       dualSource,
