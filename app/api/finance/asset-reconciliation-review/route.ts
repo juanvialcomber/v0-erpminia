@@ -22,6 +22,14 @@ function classifyRow(row: {
   if (disposition === 'missing_canonical_asset_candidate') {
     return { key: 'missing_canonical_asset_candidate', label: 'Posible Ficha 360 faltante', rank: 6 };
   }
+  if (disposition === 'ambiguous_existing_asset_family') {
+    const count = Number(row.source_payload?.reconciliation_candidate_count || 0);
+    return {
+      key: 'ambiguous_existing_asset_family',
+      label: count > 1 ? `Unidad ambigua · ${count} candidatas` : 'Unidad ambigua',
+      rank: 5,
+    };
+  }
 
   const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
   if (centerType === 'asset') {
@@ -135,6 +143,7 @@ export async function GET(request: NextRequest) {
       source_depreciated: 'La propia fuente marca el registro como depreciado; MOTIL conserva ese estado sin inferir baja física.',
       source_sold: 'La propia fuente marca el registro como vendido; MOTIL conserva ese estado sin inferir fecha ni comprador.',
       missing_canonical_asset_candidate: 'La fila contiene un identificador específico que no aparece en activos canónicos ni en alias operacionales verificados. Es candidata a una nueva Ficha 360, no a un match forzado.',
+      ambiguous_existing_asset_family: 'La familia o modelo existe en MOTIL, pero varias Fichas 360 son compatibles. Se requiere una patente, serie, número de unidad u otra evidencia para elegir una sola.',
       asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
       non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
