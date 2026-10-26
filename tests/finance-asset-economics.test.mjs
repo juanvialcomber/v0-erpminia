@@ -96,3 +96,11 @@ test('finance workbook reimport preserves exact asset identity without cost-cent
   assert.doesNotMatch(stage,/costCenterPrefix = normalizeIdentifier/);
   assert.match(stage,/select\('id,name,serial_number,license_plate,cost_center_code'\)/);
 });
+
+
+test('asset economics bounds growing asset lookups to batches of 50',()=>{
+  assert.match(api,/function chunkValues/);
+  assert.match(api,/for \(const assetChunk of chunkValues\(assetIds, 50\)\)/);
+  assert.match(api,/\.in\('id', assetChunk\)/);
+  assert.match(api,/\.in\('canonical_asset_id', assetChunk\)/);
+});
