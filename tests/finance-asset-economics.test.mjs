@@ -104,3 +104,15 @@ test('asset economics bounds growing asset lookups to batches of 50',()=>{
   assert.match(api,/\.in\('id', assetChunk\)/);
   assert.match(api,/\.in\('canonical_asset_id', assetChunk\)/);
 });
+
+
+test('finance assets exposes unresolved reconciliation without fabricating identity',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/Sin identificador operacional/);
+  assert.match(review,/Centro sin contraparte MOTIL/);
+  assert.match(review,/Fuente: depreciado/);
+  assert.match(review,/Fuente: vendido/);
+  assert.match(review,/No implica error en la fuente/);
+  assert.match(page,/Conciliación pendiente/);
+  assert.match(page,/sin contraparte verificada/);
+});
