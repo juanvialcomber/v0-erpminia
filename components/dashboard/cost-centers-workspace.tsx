@@ -200,6 +200,26 @@ export function CostCentersWorkspace() {
 
   if (error) {
     return (
+      <StatePanel
+        tone="error"
+        title="No fue posible cargar los centros de costos"
+        description={error}
+        actions={<Button variant="outline" onClick={reload}><RefreshCw className="mr-2 h-4 w-4" />Reintentar</Button>}
+      />
+    );
+  }
+
+  if (visible.length === 0) {
+    return (
+      <StatePanel
+        tone="neutral"
+        title="Sin centros de costos visibles"
+        description="No hay una estructura operacional disponible para esta organización."
+      />
+    );
+  }
+
+  return (
     <div className="space-y-5">
       <section aria-label="Resumen de centros de costos" className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3">
         {[
