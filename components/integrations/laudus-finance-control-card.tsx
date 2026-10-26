@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CircleDollarSign, Landmark, ReceiptText, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CircleDollarSign, Landmark, ReceiptText } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -311,19 +311,14 @@ export function LaudusFinanceControlCard() {
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={topSuppliers.map((item) => ({ ...item, supplierLabel: shortSupplier(item.supplierName) }))}
+                  data={topSuppliers.map((item) => ({ ...item, supplierLabel: `${shortSupplier(item.supplierName)} · ${item.sharePct}%` }))}
                   layout="vertical"
                   margin={{ left: 8, right: 24 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
                   <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="supplierLabel" width={180} tick={{ fontSize: 11 }} />
-                  <Tooltip
-                    formatter={(value, _name, item) => [
-                      money(value),
-                      `${item.payload.items} partidas · ${item.payload.sharePct}% del saldo abierto`,
-                    ]}
-                  />
+                  <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
                   <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
