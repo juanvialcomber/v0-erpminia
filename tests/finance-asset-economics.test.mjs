@@ -363,3 +363,16 @@ test('Asset 360 review summary counts only pending decisions as actionable',()=>
   assert.match(candidates,/aprobadas/);
   assert.match(candidates,/descartadas/);
 });
+
+
+test('finance separates canonical identity conflicts from new Asset 360 candidates',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  const signal=fs.readFileSync('components/finance/asset-candidate-review-signal.tsx','utf8');
+  assert.match(api,/canonical_identity_source_conflict/);
+  assert.match(api,/openIdentityConflicts/);
+  assert.match(api,/identityConflicts/);
+  assert.match(candidates,/Conflictos de identidad/);
+  assert.match(candidates,/No se crea un activo nuevo hasta resolver el conflicto/);
+  assert.match(signal,/conflictos de identidad/);
+});
