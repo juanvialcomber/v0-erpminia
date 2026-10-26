@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { ArrowRight, BrainCircuit, CircleDollarSign, Clock3, TriangleAlert } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
 
 type Row = Record<string, string | number | null>;
 
@@ -617,6 +618,8 @@ export default function FinanzasPage() {
           {error.message}
         </div>
       ) : null}
+
+      <LaudusFinanceControlCard />
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-3" aria-label="Resumen financiero">
         {[
