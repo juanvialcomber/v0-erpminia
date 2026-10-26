@@ -1,0 +1,128 @@
+export const dynamic = 'force-dynamic';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+
+function classifyRow(row: {
+  cost_center_raw?: string | null;
+  source_sheet?: string | null;
+}) {
+  const raw = String(row.cost_center_raw || '').trim();
+  const normalized = raw.toLowerCase();
+
+  if (normalized.startsWith('depreciado')) {
+    return { key: 'source_depreciated', label: 'Fuente: depreciado', rank: 4 };
+  }
+  if (normalized.startsWith('vendido')) {
+    return { key: 'source_sold', label: 'Fuente: vendido', rank: 4 };
+  }
+  if (raw && raw !== '0') {
+    return { key: 'cost_center_without_asset', label: 'Centro sin contraparte MOTIL', rank: 3 };
+  }
+  return { key: 'missing_identifier', label: 'Sin identificador operacional', rank: 2 };
+}
+
+export async function GET(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (!access.authorized) return access.response;
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const { data: source, error: sourceError } = await context.supabase
+    .from('motil_finance_workbook_imports')
+    .select('id,filename,source_cutoff_date,review_status,metadata,created_at')
+    .eq('organization_id', context.organizationId)
+    .eq('source_kind', 'fixed_asset_depreciation_model')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 500 });
+  if (!source) {
+    return NextResponse.json({
+      source: null,
+      summary: {
+        sourceRows: 0,
+        linkedRows: 0,
+        linkedAssets: 0,
+        singleAssets: 0,
+        conflictAssets: 0,
+        unresolvedRows: 0,
+      },
+      unresolved: { byReason: {}, rows: [] },
+    });
+  }
+
+  const { data: unresolvedRows, error: unresolvedError } = await context.supabase
+    .from('motil_finance_asset_stage')
+    .select('id,source_sheet,source_row,description,cost_center_raw,net_book_value,updated_asset,identity_status')
+    .eq('organization_id', context.organizationId)
+    .eq('import_id', source.id)
+    .is('canonical_asset_id', null)
+    .order('source_sheet', { ascending: true })
+    .order('source_row', { ascending: true });
+
+  if (unresolvedError) return NextResponse.json({ error: unresolvedError.message }, { status: 500 });
+
+  const metadata = source.metadata && typeof source.metadata === 'object'
+    ? source.metadata as Record<string, unknown>
+    : {};
+  const stage = metadata.stage && typeof metadata.stage === 'object'
+    ? metadata.stage as Record<string, unknown>
+    : {};
+
+  const sourceRows = Number(stage.rows || 0);
+  const linkedRows = Number(stage.identity_linked_rows || 0);
+  const linkedAssets = Number(stage.identity_linked_assets || 0);
+  const singleAssets = Number(stage.identity_single_assets || 0);
+  const conflictAssets = Number(stage.identity_conflict_assets || 0);
+
+  const classified = (unresolvedRows || []).map((row: any) => ({
+    ...row,
+    reason: classifyRow(row),
+  }));
+  const byReason = classified.reduce<Record<string, number>>((acc, row) => {
+    acc[row.reason.key] = (acc[row.reason.key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const reviewRows = classified
+    .sort((a, b) =>
+      b.reason.rank - a.reason.rank ||
+      String(a.source_sheet || '').localeCompare(String(b.source_sheet || '')) ||
+      Number(a.source_row || 0) - Number(b.source_row || 0)
+    )
+    .slice(0, 60);
+
+  return NextResponse.json({
+    generatedAt: new Date().toISOString(),
+    source: {
+      id: source.id,
+      filename: source.filename,
+      cutoffDate: source.source_cutoff_date,
+      reviewStatus: source.review_status,
+    },
+    summary: {
+      sourceRows,
+      linkedRows,
+      linkedAssets,
+      singleAssets,
+      conflictAssets,
+      unresolvedRows: classified.length,
+    },
+    unresolved: {
+      byReason,
+      rows: reviewRows,
+      limitedTo: 60,
+    },
+    semantics: {
+      unresolved: 'Fila financiera que aún no tiene contraparte canónica verificable en MOTIL. No implica error en la fuente.',
+      source_depreciated: 'La propia fuente marca el registro como depreciado; MOTIL conserva ese estado sin inferir baja física.',
+      source_sold: 'La propia fuente marca el registro como vendido; MOTIL conserva ese estado sin inferir fecha ni comprador.',
+      cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
+      missing_identifier: 'La fila no trae centro, patente, serie o nombre canónico suficiente para una conciliación determinística.',
+    },
+  });
+}
