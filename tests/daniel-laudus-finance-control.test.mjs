@@ -59,3 +59,27 @@ test('Laudus payables control is bounded and keeps source-state semantics', () =
   assert.match(card, /Ordenado por vencimiento más antiguo/);
   assert.match(card, /MOTIL no suma estos saldos como caja comprometida ni deuda final/);
 });
+
+
+test('Daniel finance control uses evidence-backed visual analytics instead of fabricated history', () => {
+  assert.match(loader, /historicalTrendAvailable: false/);
+  assert.match(loader, /aging: Array\.from\(agingMap\.values\(\)\)/);
+  assert.match(loader, /dueByMonth/);
+  assert.match(loader, /topSuppliers/);
+  assert.match(card, /Aging de CxP abierta/);
+  assert.match(card, /Vencimientos abiertos por mes/);
+  assert.match(card, /Concentración por proveedor/);
+  assert.match(card, /No es una serie histórica de saldo/);
+  assert.match(card, /MOTIL no la simula/);
+});
+
+test('decision-first finance visuals expose change risk explanation and source freshness', () => {
+  assert.match(card, /Cambio · 7 días/);
+  assert.match(card, /Entraron en mora/);
+  assert.match(card, /Vencen próximos 7 días/);
+  assert.match(card, /Exposición abierta/);
+  assert.match(card, /Riesgo/);
+  assert.match(card, /Explicación/);
+  assert.match(card, /Laudus ·/);
+  assert.match(card, /Concentración no implica causalidad/);
+});
