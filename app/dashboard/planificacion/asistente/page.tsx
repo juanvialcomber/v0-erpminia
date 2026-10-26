@@ -57,6 +57,7 @@ const QUICK = [
 export default function PlanningAssistantPage() {
   const searchParams = useSearchParams();
   const initialQuestion = searchParams.get('q') || '';
+  const targetAssetId = searchParams.get('assetId') || '';
   const initialQuestionSent = useRef(false);
   const [message, setMessage] = useState(initialQuestion);
   const [answer, setAnswer] = useState('');
@@ -81,7 +82,7 @@ export default function PlanningAssistantPage() {
       const response = await apiFetch('/api/planificacion/asistente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: value }),
+        body: JSON.stringify({ message: value, assetId: targetAssetId || null }),
       });
       const payload = await response.json().catch(() => null) as AssistantResponse | null;
       if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar el asistente');
