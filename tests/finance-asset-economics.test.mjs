@@ -116,3 +116,14 @@ test('finance assets exposes unresolved reconciliation without fabricating ident
   assert.match(page,/Conciliación pendiente/);
   assert.match(page,/sin contraparte verificada/);
 });
+
+
+test('reconciliation review distinguishes canonical asset centers from non-asset centers',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/asset_center_without_asset/);
+  assert.match(review,/non_asset_cost_center/);
+  assert.match(review,/Centro de activo sin Ficha 360/);
+  assert.match(review,/Centro no operacional/);
+  assert.match(page,/Centro de activo sin Ficha 360/);
+  assert.match(page,/Centro no operacional/);
+});
