@@ -42,3 +42,10 @@ test('pending Laudus payments are shown as source-state cases, not inferred debt
   assert.match(card, /MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente/);
   assert.match(card, /Monto no informado/);
 });
+
+
+test('finance headline does not claim no urgency when only invoice review is empty', () => {
+  assert.match(page, /Sin facturas prioritarias en revisión/);
+  assert.match(page, /Sin facturas prioritarias/);
+  assert.doesNotMatch(page, /Sin decisiones urgentes en la muestra actual/);
+});
