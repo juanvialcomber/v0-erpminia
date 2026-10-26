@@ -15,7 +15,11 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-const money = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
+const money = (value: unknown) => {
+  const amount = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  if (amount === null) return '—';
+  return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
+};
 const date = (value: unknown) => value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(new Date(String(value))) : 'Sin fecha';
 
 type LedgerEvent = {
@@ -59,14 +63,18 @@ type NativeTraceResponse = {
   readOnly?: boolean;
 };
 
-const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL');
+const number = (value: unknown) => {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  return numeric === null ? '—' : numeric.toLocaleString('es-CL');
+};
 const currencyMoney = (value: unknown, currency: unknown) => {
-  const amount = Number(value || 0);
-  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : 'CLP';
+  const amount = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : null;
+  if (amount === null || !code) return '—';
   try {
-    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: code, maximumFractionDigits: code === 'CLP' ? 0 : 2 }).format(amount);
   } catch {
-    return `${code} ${amount.toLocaleString('es-CL')}`;
+    return '—';
   }
 };
 
@@ -146,8 +154,8 @@ export default function FinanceTraceabilityPage() {
       <section className="border-b pb-5">
         <p className="text-sm text-muted-foreground">Finanzas · Evidencia canónica</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Trazabilidad</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Cada monto está en CLP y conserva su tabla y registro de origen.</p>
-        <div className="mt-3 flex gap-2"><Badge variant="secondary">CANONICAL</Badge><Badge variant="outline">CLP</Badge></div>
+        <p className="mt-2 text-sm text-muted-foreground">Los eventos canónicos se expresan en CLP; la evidencia Laudus conserva su moneda de origen.</p>
+        <div className="mt-3 flex gap-2"><Badge variant="secondary">Canónico</Badge><Badge variant="outline">Evidencia de origen</Badge></div>
       </section>
 
       <section className="overflow-hidden rounded-lg border bg-card" aria-label="Evidencia de factura Laudus">
@@ -289,6 +297,9 @@ export default function FinanceTraceabilityPage() {
               <p className="mt-2 max-w-3xl">
                 MOTIL consulta el detalle y las relaciones documentales que Laudus informa para la factura. Una traza Laudus disponible no se interpreta automáticamente como orden de compra ni como aprobación de pago.
               </p>
+              <a href="/dashboard/legal" className="mt-2 inline-block font-medium hover:text-foreground">
+                Revisar evidencia legal
+              </a>
             </details>
           </>
         )}
