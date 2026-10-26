@@ -58,6 +58,10 @@ type ReviewResponse = {
     singleAssets: number;
     conflictAssets: number;
     unresolvedRows: number;
+    materialReviewComplete: boolean;
+    materialReviewFloorClp: number;
+    unexplainedOperationalRows: number;
+    unexplainedOperationalBookValueClp: number;
   };
   unresolved: {
     byReason: Record<string,number>;
@@ -206,6 +210,9 @@ export default function FinanceAssetsPage(){
         {reviewData ? (
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="outline">Depreciación {number(reviewData.summary.linkedRows)}/{number(reviewData.summary.sourceRows)}</Badge>
+            {reviewData.summary.materialReviewComplete ? (
+              <Badge variant="secondary">Revisión ≥ {money(reviewData.summary.materialReviewFloorClp)} completa</Badge>
+            ) : null}
             {reviewData.insurance ? (
               <Badge variant="outline">Seguro {number(reviewData.insurance.linkedRows)}/{number(reviewData.insurance.sourceRows)}</Badge>
             ) : null}
