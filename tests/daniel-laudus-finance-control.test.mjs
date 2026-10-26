@@ -37,7 +37,7 @@ test('Daniel finance workspace surfaces the Laudus control block', () => {
 
 test('pending Laudus payments are shown as source-state cases, not inferred debt', () => {
   assert.match(loader, /pendingItems/);
-  assert.match(card, /Estado fuente Laudus: “no depositado”/);
+  assert.match(card, /estado “no depositado” en Laudus/);
   assert.match(card, /MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente/);
   assert.match(card, /Monto no informado/);
 });
