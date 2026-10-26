@@ -388,3 +388,12 @@ test('Asset 360 candidate review surfaces material identity blockers before low-
   assert.match(candidates,/modelOnlyBookValueClp/);
   assert.match(candidates,/No se infiere la identidad/);
 });
+
+
+test('finance summary keeps material model-only asset blockers visible',()=>{
+  const signal=fs.readFileSync('components/finance/asset-candidate-review-signal.tsx','utf8');
+  assert.match(signal,/modelOnlyBookValueClp/);
+  assert.match(signal,/modelOnly===0/);
+  assert.match(signal,/modelos por identificar/);
+  assert.match(signal,/compactMoney\(modelOnlyBookValue\)/);
+});
