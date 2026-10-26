@@ -128,3 +128,14 @@ test('weekly planning resolves an existing shortage OT before preparing new work
   assert.match(page, /nextDecision\.shortageWorkOrder/);
   assert.match(page, /row\.shortageWorkOrder/);
 });
+
+
+test('weekly planning reuses an existing open OT before creating or preparing new work', () => {
+  const api = fs.readFileSync('app/api/planning/maintenance/route.ts','utf8');
+  const page = fs.readFileSync('components/maintenance/weekly-maintenance-planning.tsx','utf8');
+  assert.match(api, /existingWorkOrder/);
+  assert.match(api, /existingWorkOrder \? 'open_work_order'/);
+  assert.match(page, /Continuar OT/);
+  assert.match(page, /nextDecision\.existingWorkOrder/);
+  assert.match(page, /row\.existingWorkOrder/);
+});
