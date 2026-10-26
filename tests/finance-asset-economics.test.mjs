@@ -296,3 +296,16 @@ test('finance candidates keep single-source exact identities below dual-source r
   assert.match(candidates,/Identidad exacta · 1 fuente/);
   assert.match(candidates,/falta segunda fuente o validación operacional/);
 });
+
+
+test('finance candidate queue classifies every review tier explicitly',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/modelOnlyNeedsOperationalIdentity/);
+  assert.match(api,/sourceCodeNeedsOperationalValidation/);
+  assert.match(api,/model_only_needs_operational_identity/);
+  assert.match(api,/source_code_needs_operational_validation/);
+  assert.match(candidates,/Falta identidad operacional/);
+  assert.match(candidates,/Código fuente por validar/);
+  assert.match(candidates,/Pendientes de identidad/);
+});
