@@ -74,7 +74,6 @@ test('real plan pilot carries all canonical OT material requirements as reviewab
 
 
 test('targeted planning links auto-run the supplied plan question once', () => {
-  const page = fs.readFileSync('app/dashboard/planificacion/asistente/page.tsx','utf8');
   assert.match(page, /searchParams\.get\('q'\)/);
   assert.match(page, /initialQuestionSent/);
   assert.match(page, /void ask\(initialQuestion\)/);
@@ -82,10 +81,8 @@ test('targeted planning links auto-run the supplied plan question once', () => {
 
 
 test('targeted plan requests never substitute another asset candidate', () => {
-  const route = fs.readFileSync('app/api/planificacion/asistente/route.ts','utf8');
-  const page = fs.readFileSync('app/dashboard/planificacion/asistente/page.tsx','utf8');
   assert.match(page, /assetId: targetAssetId/);
-  assert.match(route, /targetAssetId/);
-  assert.match(route, /String\(row\.canonical_asset_id \|\| ''\) === targetAssetId/);
-  assert.match(route, /No reemplaces una falta de evidencia con candidatos de otros activos/);
+  assert.match(api, /targetAssetId/);
+  assert.match(api, /String\(row\.canonical_asset_id \|\| ''\) === targetAssetId/);
+  assert.match(api, /No reemplaces una falta de evidencia con candidatos de otros activos/);
 });
