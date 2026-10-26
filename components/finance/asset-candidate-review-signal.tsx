@@ -12,6 +12,7 @@ type CandidateSummaryResponse = {
     pendingReview: number;
     acceptedForCreation: number;
     ignoredCandidates: number;
+    openIdentityConflicts: number;
     identityVerifiedSingleSource: number;
     modelOnlyNeedsOperationalIdentity: number;
     sourceCodeNeedsOperationalValidation: number;
@@ -38,8 +39,9 @@ export function AssetCandidateReviewSignal(){
 
   const pending=Number(data?.summary?.pendingReview||0);
   const exact=Number(data?.summary?.identityVerifiedSingleSource||0);
+  const conflicts=Number(data?.summary?.openIdentityConflicts||0);
 
-  if(!isLoading && pending===0) return null;
+  if(!isLoading && pending===0 && conflicts===0) return null;
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Revisión de candidatas Ficha 360">
@@ -50,7 +52,7 @@ export function AssetCandidateReviewSignal(){
         <div className="min-w-0">
           <p className="text-sm font-medium">Fichas 360 por revisar</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {isLoading ? 'Actualizando evidencia…' : pending+' por decidir con doble respaldo · '+number(exact)+' identidades exactas de una fuente'}
+            {isLoading ? 'Actualizando evidencia…' : pending+' altas por decidir · '+conflicts+' conflictos de identidad · '+number(exact)+' identidades exactas de una fuente'}
           </p>
         </div>
       </div>
