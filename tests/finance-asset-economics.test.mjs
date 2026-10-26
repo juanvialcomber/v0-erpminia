@@ -259,3 +259,13 @@ test('finance reconciliation separates capitalized components from complete asse
   assert.match(review,/no un activo operacional completo/);
   assert.match(page,/Componente \/ repuesto/);
 });
+
+
+test('finance reconciliation keeps sub-threshold operational rows visible as secondary review',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/low_materiality_secondary_review/);
+  assert.match(review,/Revisión secundaria/);
+  assert.match(review,/CLP 100\.000/);
+  assert.match(page,/low_materiality_secondary_review/);
+  assert.match(page,/preservados bajo el umbral material actual/);
+});
