@@ -52,6 +52,7 @@ type Candidate = {
   reviewSourceCount: number | null;
   operationalEvidence: {
     purchaseCostCenter: string | null;
+    purchaseDescriptionExactPlate: boolean;
     purchaseOrders: number | null;
     purchaseLines: number | null;
   };
@@ -79,6 +80,8 @@ type Response = {
     readyForReview: number;
     readyDualFinance: number;
     readyPurchaseEvidence: number;
+    readyPurchaseCostCenter: number;
+    readyPurchaseDescription: number;
     pendingReview: number;
     acceptedForCreation: number;
     ignoredCandidates: number;
@@ -163,7 +166,7 @@ export default function MissingAssetCandidatesPage(){
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail={money(data.summary.candidateBookValueClp)+" de valor libro representado"} />
-        <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.readyDualFinance)+" seguro+depreciación · "+number(data.summary.readyPurchaseEvidence)+" PPU+Compras"} />
+        <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.readyDualFinance)+" seguro+depreciación · "+number(data.summary.readyPurchaseCostCenter)+" centro Compras · "+number(data.summary.readyPurchaseDescription)+" orden Compras"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
         <Metric label="Conflictos" value={number(data.summary.openIdentityConflicts)} detail="Ficha existente vs fuente nueva" />
       </section>
@@ -204,7 +207,7 @@ export default function MissingAssetCandidatesPage(){
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[candidate.plate?'PPU '+candidate.plate:null,candidate.serial?'Serie '+candidate.serial:null,candidate.chassis?'Chasis '+candidate.chassis:null,candidate.engine?'Motor '+candidate.engine:null,candidate.modelYear?'Año '+candidate.modelYear:null].filter(Boolean).join(' · ')||'Identificador desde evidencia fuente'}
                   </p>
-                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">{candidate.reviewBasis==='exact_plate_plus_purchase_cost_center'?'PPU exacta + evidencia operacional de Compras':'Evidencia exacta en seguro + depreciación'} · sin contraparte canónica exacta</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
+                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">{candidate.reviewBasis==='exact_plate_plus_purchase_cost_center'?'PPU exacta + centro de costo en Compras':candidate.reviewBasis==='exact_plate_plus_purchase_description'?'PPU exacta en orden de compra':'Evidencia exacta en seguro + depreciación'} · sin contraparte canónica exacta</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">Identificador físico exacto verificado · falta segunda fuente o validación operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
                 </div>
                 <Value label="Valor libro" value={money(candidate.netBookValueClp)} />
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
@@ -221,6 +224,10 @@ export default function MissingAssetCandidatesPage(){
                   {candidate.operationalEvidence.purchaseCostCenter ? (
                     <p className="mt-1 text-xs text-muted-foreground">
                       Compras: {candidate.operationalEvidence.purchaseCostCenter} · {number(candidate.operationalEvidence.purchaseOrders||0)} órdenes · {number(candidate.operationalEvidence.purchaseLines||0)} líneas.
+                    </p>
+                  ) : candidate.operationalEvidence.purchaseDescriptionExactPlate ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Compras: PPU exacta en {number(candidate.operationalEvidence.purchaseOrders||0)} órdenes · {number(candidate.operationalEvidence.purchaseLines||0)} líneas.
                     </p>
                   ) : null}
                   <p className="mt-1 text-xs text-muted-foreground">
