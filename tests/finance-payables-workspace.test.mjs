@@ -40,3 +40,12 @@ test('finance navigation exposes the payments workspace with honest empty states
   assert.match(page,/No hay facturas aprobadas para pago/);
   assert.match(page,/No hay pagos registrados/);
 });
+
+
+test('payables workspace reduces overdue review by supplier concentration',()=>{
+  assert.match(page,/Concentración vencida/);
+  assert.match(page,/Proveedores que explican la mayor exposición/);
+  assert.match(page,/Top 5 concentra/);
+  assert.match(page,/Prioriza revisión por proveedor antes de recorrer factura por factura/);
+  assert.match(page,/No implica prioridad automática de pago ni evaluación de riesgo del proveedor/);
+});
