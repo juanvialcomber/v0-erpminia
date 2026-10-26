@@ -17,6 +17,9 @@ type QueueRow = {
   acquisitionCostClp: number | null;
   recognizedCostLifetimeClp: number | null;
   recognizedCost12mClp: number | null;
+  netBookValueClp: number | null;
+  depreciationCurrentClp: number | null;
+  depreciationConflictCount: number;
   workOrderCount: number;
   openWorkOrderCount: number;
   downtimeHours: number;
@@ -38,6 +41,8 @@ type Response = {
     withMaintenanceEvidence: number;
     withRuntimeEvidence: number;
     withCoreEconomics: number;
+    withBookValue: number;
+    depreciationConflicts: number;
     maintenanceAttention: number;
     economicsToComplete: number;
   };
@@ -85,7 +90,7 @@ export default function FinanceAssetsPage(){
       <Metric icon={ShieldCheck} label="Activos vinculados" value={number(data.summary.linkedAssets)} detail="Seguro canónico conectado a Ficha 360" />
       <Metric icon={Wrench} label="Con historia de mantenimiento" value={number(data.summary.withMaintenanceEvidence)} detail="OT o costo reconocido enlazado" />
       <Metric icon={Gauge} label="Con uso observado" value={number(data.summary.withRuntimeEvidence)} detail="Lecturas de horómetro disponibles" />
-      <Metric icon={CircleDollarSign} label="Economía base completa" value={number(data.summary.withCoreEconomics)} detail="Costo o fecha de adquisición canónica" />
+      <Metric icon={CircleDollarSign} label="Valor libro conciliado" value={number(data.summary.withBookValue)} detail={data.summary.depreciationConflicts > 0 ? `${data.summary.depreciationConflicts} activo(s) con doble registro para Daniel` : 'Depreciación canónica vinculada 1:1'} />
     </section>
 
     <section className="rounded-lg border bg-card">
@@ -103,7 +108,7 @@ export default function FinanceAssetsPage(){
       {data.queue.length===0?<StatePanel tone="neutral" title="Aún no hay activos financieros vinculados" className="border-0" />:
       <div className="divide-y">
         {data.queue.map((row)=>(
-          <article key={row.assetId} className="grid gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.4fr)_140px_150px_120px_minmax(220px,1fr)_42px] xl:items-center">
+          <article key={row.assetId} className="grid gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.3fr)_130px_145px_145px_110px_minmax(220px,1fr)_42px] xl:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="truncate font-medium">{row.assetName}</p>
@@ -112,6 +117,11 @@ export default function FinanceAssetsPage(){
               <p className="mt-1 text-xs text-muted-foreground">{row.assetCode||'Sin código'} · evidencia {row.evidenceCoveragePct}%</p>
             </div>
             <Value label="Seguro" value={uf(row.insuredUf)} />
+            <Value
+              label="Valor libro"
+              value={row.depreciationConflictCount > 1 ? 'Revisar' : money(row.netBookValueClp)}
+              detail={row.depreciationConflictCount > 1 ? `${row.depreciationConflictCount} registros canónicos` : undefined}
+            />
             <Value label="Costo 12m" value={money(row.recognizedCost12mClp)} />
             <Value label="OT abiertas" value={number(row.openWorkOrderCount)} detail={row.downtimeHours>0?`${number(row.downtimeHours,1)} h detención`:undefined} />
             <div>
