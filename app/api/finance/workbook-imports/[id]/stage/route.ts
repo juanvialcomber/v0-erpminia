@@ -85,13 +85,9 @@ function dateValue(value: unknown) {
     return value.toISOString().slice(0, 10);
   }
   if (typeof value === 'number' && Number.isFinite(value)) {
-    const decoded = XLSX.SSF.parse_date_code(value);
-    if (decoded) {
-      const yyyy = String(decoded.y).padStart(4, '0');
-      const mm = String(decoded.m).padStart(2, '0');
-      const dd = String(decoded.d).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
+    const excelEpochUtc = Date.UTC(1899, 11, 30);
+    const decoded = new Date(excelEpochUtc + Math.trunc(value) * 86_400_000);
+    if (!Number.isNaN(decoded.getTime())) return decoded.toISOString().slice(0, 10);
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
