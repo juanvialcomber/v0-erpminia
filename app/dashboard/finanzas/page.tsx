@@ -596,12 +596,12 @@ export default function FinanzasPage() {
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {pendingAttention.length > 0
                 ? `${number(pendingAttention.length)} prioridades requieren revisión. El resto del detalle queda disponible bajo demanda.`
-                : 'Sin decisiones urgentes en la muestra actual. El detalle financiero permanece disponible para auditoría.'}
+                : 'Sin facturas prioritarias en revisión. El resto de señales financieras se muestra por fuente y evidencia.'}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-start gap-2 sm:flex-row sm:items-center">
             <span className="inline-flex h-8 items-center rounded-full border px-3 text-xs font-medium text-muted-foreground">
-              {pendingAttention.length > 0 ? `${number(pendingAttention.length)} por revisar` : 'Sin urgencias'}
+              {pendingAttention.length > 0 ? `${number(pendingAttention.length)} facturas por revisar` : 'Sin facturas prioritarias'}
             </span>
             <a
               href="#revisar-prioridades"
