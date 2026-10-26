@@ -167,3 +167,12 @@ test('reconciliation review prioritizes candidates for missing canonical Asset 3
   assert.match(review,/no aparece en activos canónicos ni en alias operacionales verificados/);
   assert.match(page,/Ficha 360 faltante/);
 });
+
+
+test('reconciliation review separates ambiguous asset families from missing assets',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/ambiguous_existing_asset_family/);
+  assert.match(review,/Unidad ambigua/);
+  assert.match(review,/varias Fichas 360 son compatibles/);
+  assert.match(page,/Unidad ambigua/);
+});
