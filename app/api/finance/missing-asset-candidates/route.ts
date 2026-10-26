@@ -249,10 +249,20 @@ export async function GET(request: NextRequest) {
     a.title.localeCompare(b.title, 'es')
   );
 
+  const sumBookValue = (predicate: (row: typeof candidates[number]) => boolean) =>
+    candidates
+      .filter(predicate)
+      .reduce((sum, row) => sum + Number(row.netBookValueClp || 0), 0);
+
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     summary: {
       candidates: candidates.length,
+      candidateBookValueClp: sumBookValue(() => true),
+      readyForReviewBookValueClp: sumBookValue((row) => row.readyForReview),
+      identityVerifiedSingleSourceBookValueClp: sumBookValue((row) => row.identityVerifiedSingleSource),
+      modelOnlyBookValueClp: sumBookValue((row) => row.modelOnlyNeedsOperationalIdentity),
+      sourceCodeBookValueClp: sumBookValue((row) => row.sourceCodeNeedsOperationalValidation),
       dualSource: candidates.filter((row) => row.dualSource).length,
       readyForReview: candidates.filter((row) => row.readyForReview).length,
       pendingReview: candidates.filter((row) => row.readyForReview && (!row.review || row.review.status === 'open')).length,
