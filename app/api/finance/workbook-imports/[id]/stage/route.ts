@@ -601,6 +601,47 @@ export async function POST(
     );
   }
 
+  const { data: existingResolvedRows, error: existingResolvedError } = await context.supabase
+    .from('motil_finance_asset_stage')
+    .select('source_sheet,source_row,record_kind,canonical_asset_id,identity_status,identity_basis,source_payload')
+    .eq('import_id', sourceImport.id)
+    .eq('promoted_to_canonical', false)
+    .not('canonical_asset_id', 'is', null);
+
+  if (existingResolvedError) {
+    return NextResponse.json({ error: existingResolvedError.message }, { status: 500 });
+  }
+
+  const resolvedIdentityBySource = new Map(
+    (existingResolvedRows || []).map((row: any) => [
+      [row.source_sheet, row.source_row, row.record_kind].join('|'),
+      row,
+    ]),
+  );
+
+  stagedRows = stagedRows.map((row) => {
+    if (row.canonical_asset_id) return row;
+    const existing = resolvedIdentityBySource.get(
+      [row.source_sheet, row.source_row, row.record_kind].join('|'),
+    );
+    if (!existing?.canonical_asset_id) return row;
+
+    return {
+      ...row,
+      canonical_asset_id: existing.canonical_asset_id,
+      identity_status: existing.identity_status || 'resolved_exact',
+      identity_basis: existing.identity_basis || 'preserved_verified_identity',
+      source_payload: {
+        ...row.source_payload,
+        ...(existing.source_payload && typeof existing.source_payload === 'object'
+          ? existing.source_payload
+          : {}),
+        preserved_verified_identity: true,
+        preserved_verified_identity_at: new Date().toISOString(),
+      },
+    };
+  });
+
   const { error: clearError } = await context.supabase
     .from('motil_finance_asset_stage')
     .delete()
