@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DocumentUpload } from '@/components/documents/document-upload';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DocumentList, Document } from '@/components/documents/document-list';
 import { DocumentReviewModal, type DocumentReviewDocument } from '@/components/documents/document-review-modal';
-import { FileText, CheckCircle2, AlertCircle, ArrowRight, Clock } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface DocumentStats {
@@ -132,20 +131,9 @@ export default function DocumentosFinanzasPage() {
             Políticas, procedimientos e instructivos financieros con revisión y respaldo.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Importar planilla</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas">
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Volver a resumen
-            </Link>
-          </Button>
-        </div>
+        <Button asChild>
+          <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -207,7 +195,6 @@ export default function DocumentosFinanzasPage() {
           <TabsTrigger value="all" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Todos</TabsTrigger>
           <TabsTrigger value="vigentes" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Vigentes</TabsTrigger>
           <TabsTrigger value="revision" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">En revisión</TabsTrigger>
-          <TabsTrigger value="upload" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Subir documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -232,25 +219,6 @@ export default function DocumentosFinanzasPage() {
           />
         </TabsContent>
 
-        <TabsContent value="upload" className="space-y-4">
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle>Subir documento</CardTitle>
-              <CardDescription>Sube políticas, procedimientos e instructivos financieros</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" asChild>
-                  <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
-                </Button>
-                <Button size="sm" variant="ghost" asChild>
-                  <Link href="/dashboard/finanzas/importar">Importar planilla</Link>
-                </Button>
-              </div>
-              <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={loadDocuments} />
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       <DocumentReviewModal
