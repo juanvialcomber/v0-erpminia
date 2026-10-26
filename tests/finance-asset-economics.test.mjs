@@ -436,3 +436,18 @@ test('ready Asset 360 reviews distinguish purchase cost-center and purchase-desc
   assert.match(candidates,/PPU exacta en orden de compra/);
   assert.match(candidates,/orden Compras/);
 });
+
+
+test('single-source exact candidates preserve verified absence across internal asset masters',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  const stage=fs.readFileSync('app/api/finance/workbook-imports/[id]/stage/route.ts','utf8');
+  assert.match(api,/internalMasterVerification/);
+  assert.match(api,/exactSingleVerifiedAbsentInternalMasters/);
+  assert.match(api,/no_exact_counterpart/);
+  assert.match(candidates,/0 contrapartes en canónico, mantenimiento y planificación/);
+  assert.match(candidates,/verificadas en 3 maestros internos/);
+  assert.match(stage,/candidate_internal_master_search_verified/);
+  assert.match(stage,/purchase_cost_center_evidence/);
+  assert.match(stage,/purchase_description_exact_plate/);
+});
