@@ -285,3 +285,14 @@ test('ready asset candidates are prioritized and survive workbook reimport',()=>
   assert.match(stage,/candidate_review_source_count/);
   assert.match(stage,/candidate_review_verified_at/);
 });
+
+
+test('finance candidates keep single-source exact identities below dual-source review tier',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/identityVerifiedSingleSource/);
+  assert.match(api,/identity_verified_single_source/);
+  assert.match(api,/PPU, serie o chasis exacto verificado/);
+  assert.match(candidates,/Identidad exacta · 1 fuente/);
+  assert.match(candidates,/falta segunda fuente o validación operacional/);
+});
