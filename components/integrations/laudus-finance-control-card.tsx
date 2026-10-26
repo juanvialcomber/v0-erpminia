@@ -269,36 +269,70 @@ export function LaudusFinanceControlCard() {
 
   return (
     <Card className="overflow-hidden shadow-none">
-      <CardHeader className="border-b pb-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <CardHeader className="border-b pb-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Laudus · control financiero</p>
-            <CardTitle className="mt-1 text-xl">Qué requiere decisión</CardTitle>
-            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              MOTIL separa información vigente, conciliaciones pendientes y datos históricos para que Daniel no tome decisiones sobre evidencia incompleta.
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Finanzas · Laudus</p>
+            <CardTitle className="mt-1 text-2xl">Control financiero</CardTitle>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Exposición, vencimientos y decisiones prioritarias con evidencia vigente. Sin convertir datos fuente en conclusiones contables no conciliadas.
             </p>
           </div>
-          <Badge variant="outline">{isLoading ? 'Actualizando' : freshnessText(data?.freshness?.latestOperationalSync)}</Badge>
+          <Badge variant="outline" className="w-fit">
+            {isLoading ? 'Actualizando' : freshnessText(data?.freshness?.latestOperationalSync)}
+          </Badge>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-5 p-5">
+      <CardContent className="space-y-6 p-5">
+        <section className="grid gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-[1.35fr_1fr]" aria-label="Resumen financiero ejecutivo">
+          <div className="bg-card p-5 md:p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Exposición abierta</p>
+            <p className="mt-3 text-4xl font-semibold tracking-tight">{isLoading ? '—' : compactMoney(openPayableAmount)}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {number(openPayables)} partidas abiertas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Badge variant="secondary">{compactMoney(overduePayableAmount)} vencido</Badge>
+              <Badge variant="outline">{compactMoney(dueSoonPayableAmount)} vence en 7 días</Badge>
+            </div>
+          </div>
+          <div className="grid bg-border sm:grid-cols-3 lg:grid-cols-1">
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Vencidas</p>
+              <p className="mt-1 text-xl font-semibold">{number(overduePayables)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{number(overdueSharePct)}% del saldo abierto</p>
+            </div>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Próximos 7 días</p>
+              <p className="mt-1 text-xl font-semibold">{number(dueSoonPayables)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{compactMoney(dueSoonPayableAmount)} por vencer</p>
+            </div>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Mayor concentración</p>
+              <p className="mt-1 truncate text-sm font-semibold">{topSupplier ? shortSupplier(topSupplier.supplierName) : 'Sin concentración relevante'}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{topSupplier ? `${number(topSupplierSharePct)}% · ${compactMoney(topSupplier.amountClp)}` : 'Sin evidencia suficiente'}</p>
+            </div>
+          </div>
+        </section>
+
         {priorities.length > 0 ? (
           <section className="space-y-3" aria-label="Prioridades financieras de hoy">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Prioridades de hoy</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                MOTIL ordena sólo lo que requiere una decisión financiera ahora, usando evidencia vigente de Laudus.
-              </p>
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Prioridades</p>
+                <p className="mt-1 text-sm font-medium">Qué debe resolver Daniel primero</p>
+              </div>
+              <span className="text-xs text-muted-foreground">Máximo 3 decisiones</span>
             </div>
             <div className="divide-y overflow-hidden rounded-xl border">
               {priorities.map((item, index) => (
-                <div key={item.key} className="flex flex-col gap-3 bg-card px-4 py-3 md:flex-row md:items-center md:justify-between">
+                <div key={item.key} className="grid gap-3 bg-card px-4 py-4 md:grid-cols-[44px_minmax(0,1fr)_auto] md:items-center">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-md border text-xs font-semibold tabular-nums">
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">P{index + 1}</Badge>
-                      <p className="truncate text-sm font-medium">{item.title}</p>
-                    </div>
+                    <p className="truncate text-sm font-medium">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.evidence}</p>
                   </div>
                   <Button asChild size="sm" variant={index === 0 ? 'default' : 'outline'}>
@@ -315,33 +349,25 @@ export function LaudusFinanceControlCard() {
           </div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <div className="rounded-lg border p-4">
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><CircleDollarSign className="h-4 w-4"/>Pagos</p>
-            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(data?.payments?.total)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{number(data?.payments?.deposited)} depositados · {number(pendingDeposit)} por revisar</p>
+        <section className="grid gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Pagos por revisar</p>
+            <p className="mt-1 text-lg font-semibold">{number(pendingDeposit)}</p>
           </div>
-          <div className="rounded-lg border p-4">
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><ReceiptText className="h-4 w-4"/>CxP Laudus</p>
-            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(openPayables)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{number(overduePayables)} vencidas · {number(dueSoonPayables)} vencen en 7 días</p>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Centros por conciliar</p>
+            <p className="mt-1 text-lg font-semibold">{number(costCenterUnresolved)}</p>
           </div>
-          <div className="rounded-lg border p-4">
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><ReceiptText className="h-4 w-4"/>Notas de crédito</p>
-            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(data?.creditNotes?.total)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{money(data?.creditNotes?.documentedAmount)} documentados · no es ahorro</p>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Activos enlazados</p>
+            <p className="mt-1 text-lg font-semibold">{number(fixedAssetLinked)} <span className="text-xs font-normal text-muted-foreground">/ {number(fixedAssetTotal)}</span></p>
           </div>
-          <div className="rounded-lg border p-4">
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><Building2 className="h-4 w-4"/>Centros de costo</p>
-            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(data?.costCenters?.total)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{number(costCenterUnresolved)} pendientes de conciliación</p>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Notas de crédito</p>
+            <p className="mt-1 text-lg font-semibold">{money(data?.creditNotes?.documentedAmount)}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Documentadas · no es ahorro</p>
           </div>
-          <div className="rounded-lg border p-4">
-            <p className="flex items-center gap-2 text-xs text-muted-foreground"><Landmark className="h-4 w-4"/>Activos Laudus</p>
-            <p className="mt-2 text-2xl font-semibold">{isLoading ? '—' : number(fixedAssetTotal)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{number(fixedAssetLinked)} enlazados a activos MOTIL</p>
-          </div>
-        </div>
+        </section>
 
         <section className="space-y-4" aria-label="Lectura ejecutiva Laudus">
           <div className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-4">
