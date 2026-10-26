@@ -30,7 +30,7 @@ test('credit notes and reconciliation gaps keep conservative semantics', () => {
 test('Daniel finance workspace surfaces the Laudus control block', () => {
   assert.match(page, /LaudusFinanceControlCard/);
   assert.match(page, /<LaudusFinanceControlCard \/>/);
-  assert.match(card, /Control financiero/);
+  assert.match(card, /Laudus · fuente financiera/);
   assert.match(card, /Pagos por verificar/);
 });
 
@@ -45,7 +45,7 @@ test('pending Laudus payments are shown as source-state cases, not inferred debt
 
 test('finance summary stays neutral and does not overclaim urgency', () => {
   assert.match(page, /Resumen financiero/);
-  assert.match(page, /Estado, decisiones y exposición en una sola lectura/);
+  assert.match(page, /Exposición, decisiones y evidencia/);
   assert.doesNotMatch(page, /Sin decisiones urgentes en la muestra actual/);
 });
 
@@ -122,7 +122,7 @@ test('Daniel cockpit follows MOTIL decision-first visual hierarchy', () => {
   assert.match(card, /Resumen financiero ejecutivo/);
   assert.match(card, /Exposición abierta/);
   assert.match(card, /Qué debe resolver Daniel primero/);
-  assert.match(card, /Máximo 3 decisiones/);
+  assert.match(card, /por resolver/);
   assert.match(card, /Cobertura financiera/);
 });
 
