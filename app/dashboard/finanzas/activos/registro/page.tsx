@@ -134,7 +134,7 @@ export default function FinancialAssetRegisterPage(){
           <div className="divide-y">
             {data.rows.map((row)=>{
               const statusInfo=statusLabel(row);
-              return <div key={row.id} className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(0,1.5fr)_150px_150px_150px_170px] xl:items-center">
+              return <div key={row.id} className="grid gap-3 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_145px_145px_145px_155px_42px] xl:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium">{row.description||'Sin descripción'}</p>
@@ -146,6 +146,15 @@ export default function FinancialAssetRegisterPage(){
                 <Value label="Depreciación período" value={money(row.depreciation_current)} />
                 <Value label="Acumulada" value={money(row.total_accum_depr)} />
                 <Value label="Vida remanente" value={row.remaining_life_months==null?'Sin base':`${row.remaining_life_months} meses`} />
+                {row.canonical_asset_id ? (
+                  <Link
+                    href={`/dashboard/mantenimiento/equipos/${encodeURIComponent(row.canonical_asset_id)}/ficha`}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-muted"
+                    aria-label={`Abrir Ficha 360 de ${row.description||'activo'}`}
+                  >
+                    <ArrowLeft className="h-4 w-4 rotate-180"/>
+                  </Link>
+                ) : <span />}
               </div>;
             })}
             {data.rows.length===0?<StatePanel tone="neutral" title="No hay filas para este filtro" className="border-0" />:null}
