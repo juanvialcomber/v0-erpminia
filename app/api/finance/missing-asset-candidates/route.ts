@@ -200,8 +200,13 @@ export async function GET(request: NextRequest) {
     const review = reviewByIssueKey.get('asset_missing_candidate:' + key) || null;
     const dualSource = sourceKinds.size > 1;
     const normalizedEquipmentType = String(equipmentType || '').toLowerCase();
-    const draftAssetType = /camioneta|camión|camion/.test(normalizedEquipmentType) ? 'vehicle' : null;
-    const draftCategory = normalizedEquipmentType.includes('camioneta') ? 'CAMIONETAS' : null;
+    const normalizedTitle = String(title || '').toLowerCase();
+    const typeEvidence = normalizedEquipmentType || normalizedTitle;
+    const draftAssetType = /camioneta|camión|camion/.test(typeEvidence) ? 'vehicle' : null;
+    const draftCategory =
+      typeEvidence.includes('camioneta') ? 'CAMIONETAS' :
+      /camión|camion/.test(typeEvidence) ? 'CAMIONES' :
+      null;
     const readyForReview = reviewStatus === 'ready_for_asset_review';
     const identityVerifiedSingleSource = reviewStatus === 'identity_verified_single_source';
     const modelOnlyNeedsOperationalIdentity = reviewStatus === 'model_only_needs_operational_identity';
