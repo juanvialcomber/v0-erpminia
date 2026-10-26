@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, CircleDollarSign, Gauge, ShieldCheck, Wrench } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, Gauge, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -132,7 +132,7 @@ export default function FinanceAssetsPage(){
   </div>;
 }
 
-function Metric({icon:Icon,label,value,detail}:{icon:any;label:string;value:string;detail:string}){
+function Metric({icon:Icon,label,value,detail}:{icon:LucideIcon;label:string;value:string;detail:string}){
   return <div className="bg-card p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4"/>{label}</div><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
 }
 
