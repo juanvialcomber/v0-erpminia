@@ -4,13 +4,13 @@ import fs from 'node:fs';
 
 test('finance cockpit separates Laudus exposure from canonical MOTIL payables', () => {
   const page = fs.readFileSync('app/dashboard/finanzas/page.tsx', 'utf8');
+  const card = fs.readFileSync('components/integrations/laudus-finance-control-card.tsx', 'utf8');
   const api = fs.readFileSync('app/api/finance/executive/route.ts', 'utf8');
 
   assert.match(api, /motil_laudus_finance_review_queue/);
-  assert.match(page, /Saldo abierto/);
-  assert.match(page, /CxP aprobadas en MOTIL/);
-  assert.match(page, /Las obligaciones históricas de Laudus se mantienen separadas de las CxP aprobadas en MOTIL/);
-  assert.match(page, /Revisar ahora/);
+  assert.match(card, /Exposición abierta/);
+  assert.match(card, /Qué debe resolver Daniel primero/);
+  assert.match(page, /Pagos.*Proveedores.*Centros de costos.*Trazabilidad/s);
   assert.doesNotMatch(page, /Preparado para nuevas fuentes/);
   assert.doesNotMatch(page, /Trazabilidad económica y SERNAGEOMIN/);
 });
