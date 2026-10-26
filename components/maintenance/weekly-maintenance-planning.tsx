@@ -30,8 +30,15 @@ type WeeklyDecision = {
   sourceFile: string | null;
   sourceImportedAt: string | null;
   openWorkOrderCount: number;
-  state: 'scheduled' | 'blocked_materials' | 'ready' | 'review' | 'stale_evidence';
+  state: 'scheduled' | 'blocked_materials' | 'open_work_order' | 'ready' | 'review' | 'stale_evidence';
   scheduledWorkOrder: {
+    id: string;
+    work_order_number: string | null;
+    title: string | null;
+    scheduled_date: string | null;
+    assigned_to_name: string | null;
+  } | null;
+  existingWorkOrder: {
     id: string;
     work_order_number: string | null;
     title: string | null;
@@ -85,6 +92,7 @@ function priorityVariant(priority: string | null) {
 function stateLabel(row: WeeklyDecision) {
   if (row.state === 'scheduled') return 'Programada';
   if (row.state === 'blocked_materials') return 'Revisar materiales';
+  if (row.state === 'open_work_order') return 'OT abierta';
   if (row.state === 'ready') return 'Lista para programar';
   if (row.state === 'stale_evidence') return 'Actualizar evidencia';
   return row.standardPlan?.status === 'proposed' ? 'Plan MOTIL por aprobar' : 'Requiere revisión';
@@ -213,6 +221,8 @@ export function WeeklyMaintenancePlanning() {
           <div className="flex justify-end">
             {nextDecision.shortageWorkOrder ? (
               <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${nextDecision.shortageWorkOrder.id}`} onClick={() => recordDecision(nextDecision, 'open_work_order')}><PackageSearch className="mr-2 h-4 w-4"/>Resolver materiales</Link></Button>
+            ) : nextDecision.existingWorkOrder ? (
+              <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${nextDecision.existingWorkOrder.id}`} onClick={() => recordDecision(nextDecision, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Continuar OT</Link></Button>
             ) : nextDecision.state === 'stale_evidence' ? (
               <Button asChild><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(nextDecision.canonicalAssetId || '')}`} onClick={() => recordDecision(nextDecision, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
             ) : nextDecision.standardPlan?.status === 'proposed' ? (
@@ -292,6 +302,7 @@ export function WeeklyMaintenancePlanning() {
 
             <div className="flex justify-end">
               {row.shortageWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.shortageWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><PackageSearch className="mr-2 h-4 w-4"/>Resolver materiales</Link></Button>
+                : row.existingWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.existingWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Continuar OT</Link></Button>
                 : row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`} onClick={() => recordDecision(row, 'open_work_order')}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
                 : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`} onClick={() => recordDecision(row, 'refresh_reading')}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
                 : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar" onClick={() => recordDecision(row, 'review_plan')}><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
