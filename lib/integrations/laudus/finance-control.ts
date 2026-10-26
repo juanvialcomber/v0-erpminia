@@ -319,6 +319,10 @@ export async function loadLaudusFinanceControl(
     amountClp: value.amountClp,
     sharePct: openAmountClp > 0 ? Math.round((value.amountClp / openAmountClp) * 1000) / 10 : 0,
   }));
+  const severeAgingAmount = agingMap.get('60_plus')?.amountClp || 0;
+  const severeAgingSharePct =
+    openAmountClp > 0 ? Math.round((severeAgingAmount / openAmountClp) * 1000) / 10 : 0;
+  const topSupplierSharePct = topSuppliers[0]?.sharePct || 0;
 
   const freshCandidates = [
     latestPaymentsSync,
@@ -380,6 +384,8 @@ export async function loadLaudusFinanceControl(
       aging: Array.from(agingMap.values()),
       dueByMonth,
       topSuppliers,
+      severeAgingSharePct,
+      topSupplierSharePct,
       historicalTrendAvailable: false,
       latestSync: latestPayablesSync,
       oldestOpenItems: (oldestOpenPayableRows.data || []).map((row: any) => ({
