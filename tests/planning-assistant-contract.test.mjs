@@ -71,3 +71,11 @@ test('real plan pilot carries all canonical OT material requirements as reviewab
   assert.match(plansPage, /confirmar o quitar materiales antes de aprobar/);
   assert.match(plansPage, /materials:materialPayload/);
 });
+
+
+test('targeted planning links auto-run the supplied plan question once', () => {
+  const page = fs.readFileSync('app/dashboard/planificacion/asistente/page.tsx','utf8');
+  assert.match(page, /searchParams\.get\('q'\)/);
+  assert.match(page, /initialQuestionSent/);
+  assert.match(page, /void ask\(initialQuestion\)/);
+});
