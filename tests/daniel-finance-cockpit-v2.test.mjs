@@ -6,7 +6,7 @@ const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
 
 test('Daniel finance cockpit leads with a clear summary and sections',()=>{
   assert.match(page,/Resumen financiero/);
-  assert.match(page,/Estado, decisiones y exposición en una sola lectura/);
+  assert.match(page,/Exposición, decisiones y evidencia/);
   assert.match(page,/Secciones de Finanzas/);
   assert.match(page,/Ir al detalle/);
   assert.match(page,/LaudusFinanceControlCard/);
