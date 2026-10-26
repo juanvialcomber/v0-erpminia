@@ -53,6 +53,41 @@ function roleCanImport(role?: string | null) {
   return ['superadmin', 'admin'].includes(String(role || '').trim().toLowerCase());
 }
 
+const RECONCILIATION_PAYLOAD_KEYS = [
+  'reconciliation_scope',
+  'reconciliation_scope_version',
+  'reconciliation_scope_classified_at',
+  'reconciliation_disposition',
+  'reconciliation_evidence_token',
+  'reconciliation_candidate_key',
+  'reconciliation_evidence',
+  'reconciliation_candidate_count',
+  'reconciliation_family_token',
+  'reconciliation_disposition_at',
+  'canonical_cost_center_id',
+  'canonical_cost_center_code',
+  'canonical_cost_center_name',
+  'canonical_cost_center_type',
+  'canonical_cost_center_active',
+  'cost_center_reconciled_at',
+  'economic_identity_verified',
+  'economic_identity_verified_at',
+  'economic_identity_method',
+  'economic_identity_conflict',
+  'economic_identity_conflict_rows',
+  'approval_basis',
+] as const;
+
+function preservedReconciliationPayload(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return {};
+  const source = payload as Record<string, unknown>;
+  const preserved: Record<string, unknown> = {};
+  for (const key of RECONCILIATION_PAYLOAD_KEYS) {
+    if (source[key] !== undefined) preserved[key] = source[key];
+  }
+  return preserved;
+}
+
 function textValue(value: unknown) {
   if (value === null || value === undefined) return null;
   const valueText = String(value).trim();
@@ -601,19 +636,18 @@ export async function POST(
     );
   }
 
-  const { data: existingResolvedRows, error: existingResolvedError } = await context.supabase
+  const { data: existingStageRows, error: existingStageError } = await context.supabase
     .from('motil_finance_asset_stage')
     .select('source_sheet,source_row,record_kind,canonical_asset_id,identity_status,identity_basis,source_payload')
     .eq('import_id', sourceImport.id)
-    .eq('promoted_to_canonical', false)
-    .not('canonical_asset_id', 'is', null);
+    .eq('promoted_to_canonical', false);
 
-  if (existingResolvedError) {
-    return NextResponse.json({ error: existingResolvedError.message }, { status: 500 });
+  if (existingStageError) {
+    return NextResponse.json({ error: existingStageError.message }, { status: 500 });
   }
 
-  const resolvedIdentityBySource = new Map(
-    (existingResolvedRows || []).map((row: any) => [
+  const existingStageBySource = new Map(
+    (existingStageRows || []).map((row: any) => [
       [row.source_sheet, row.source_row, row.record_kind].join('|'),
       row,
     ]),
@@ -621,10 +655,23 @@ export async function POST(
 
   stagedRows = stagedRows.map((row) => {
     if (row.canonical_asset_id) return row;
-    const existing = resolvedIdentityBySource.get(
+
+    const existing = existingStageBySource.get(
       [row.source_sheet, row.source_row, row.record_kind].join('|'),
     );
-    if (!existing?.canonical_asset_id) return row;
+    if (!existing) return row;
+
+    const preservedPayload = preservedReconciliationPayload(existing.source_payload);
+
+    if (!existing.canonical_asset_id) {
+      return {
+        ...row,
+        source_payload: {
+          ...row.source_payload,
+          ...preservedPayload,
+        },
+      };
+    }
 
     return {
       ...row,
@@ -633,9 +680,7 @@ export async function POST(
       identity_basis: existing.identity_basis || 'preserved_verified_identity',
       source_payload: {
         ...row.source_payload,
-        ...(existing.source_payload && typeof existing.source_payload === 'object'
-          ? existing.source_payload
-          : {}),
+        ...preservedPayload,
         preserved_verified_identity: true,
         preserved_verified_identity_at: new Date().toISOString(),
       },
