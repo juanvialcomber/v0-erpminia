@@ -70,12 +70,23 @@ type Response = {
     pendingReview: number;
     acceptedForCreation: number;
     ignoredCandidates: number;
+    openIdentityConflicts: number;
     identityVerifiedSingleSource: number;
     modelOnlyNeedsOperationalIdentity: number;
     sourceCodeNeedsOperationalValidation: number;
     insuranceOnly: number;
     depreciationOnly: number;
   };
+  identityConflicts: Array<{
+    id: string;
+    issueKey: string;
+    entityId: string | null;
+    status: string;
+    resolutionNote: string | null;
+    evidenceReference: string | null;
+    reviewedBy: string | null;
+    reviewedAt: string | null;
+  }>;
   candidates: Candidate[];
 };
 
@@ -131,8 +142,27 @@ export default function MissingAssetCandidatesPage(){
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail="Entidades deduplicadas" />
         <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.acceptedForCreation)+" aprobadas · "+number(data.summary.ignoredCandidates)+" descartadas"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail="PPU, serie o chasis sin contraparte canónica" />
-        <Metric label="Pendientes de identidad" value={number(data.summary.modelOnlyNeedsOperationalIdentity+data.summary.sourceCodeNeedsOperationalValidation)} detail={number(data.summary.modelOnlyNeedsOperationalIdentity)+" por modelo · "+number(data.summary.sourceCodeNeedsOperationalValidation)+" por código fuente"} />
+        <Metric label="Conflictos" value={number(data.summary.openIdentityConflicts)} detail="Ficha existente vs fuente nueva" />
       </section>
+
+      {data.identityConflicts.length ? (
+        <section className="overflow-hidden rounded-lg border bg-card">
+          <div className="border-b px-4 py-3">
+            <h2 className="text-sm font-semibold">Conflictos de identidad</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Una Ficha 360 existente y una fuente nueva discrepan. No se crea un activo nuevo hasta resolver el conflicto.</p>
+          </div>
+          <div className="divide-y">
+            {data.identityConflicts.map((conflict)=>(
+              <div key={conflict.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Revisión humana</Badge>
+                  <p className="text-sm font-medium">{conflict.evidenceReference||conflict.issueKey}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-lg border bg-card">
         <div className="border-b px-4 py-3">
