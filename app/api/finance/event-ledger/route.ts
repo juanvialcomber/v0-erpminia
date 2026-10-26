@@ -11,9 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const q = searchParams.get('q')?.trim();
-    const intelligence = context.supabase.schema('intelligence');
-
-    let query = intelligence
+    let query = context.supabase
       .from('canonical_clp_cost_ledger')
       .select('*')
       .eq('organization_id', context.organizationId)
@@ -25,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     const [eventsResult, overviewResult] = await Promise.all([
       query,
-      intelligence.from('canonical_finance_overview').select('*').eq('organization_id', context.organizationId).maybeSingle(),
+      context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', context.organizationId).maybeSingle(),
     ]);
 
     if (eventsResult.error) throw eventsResult.error;
