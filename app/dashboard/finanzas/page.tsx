@@ -5,6 +5,7 @@ import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finan
 const primarySections = [
   ['/dashboard/finanzas/pagos', 'Pagos', 'Vencimientos, pagos y conciliación'],
   ['/dashboard/finanzas/proveedores', 'Proveedores', 'Exposición y concentración'],
+  ['/dashboard/finanzas/activos', 'Activos', 'Valor, seguro y mantenimiento'],
   ['/dashboard/finanzas/centros', 'Centros de costos', 'Atribución y actividad'],
   ['/dashboard/finanzas/trazabilidad', 'Trazabilidad', 'Origen y evidencia financiera'],
 ] as const;
@@ -42,7 +43,7 @@ export default function FinancePage() {
           <p className="hidden text-xs text-muted-foreground sm:block">Una tarea por sección</p>
         </div>
 
-        <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-5">
           {primarySections.map(([href, label, description]) => (
             <Link key={href} href={href} className="group bg-card px-4 py-4 transition-colors hover:bg-primary/5">
               <div className="flex items-center justify-between gap-3">
