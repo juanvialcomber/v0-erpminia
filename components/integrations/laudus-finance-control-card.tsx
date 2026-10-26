@@ -2,7 +2,16 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CircleDollarSign, Landmark, ReceiptText } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BadgeCheck, Building2, CircleDollarSign, Landmark, ReceiptText, TrendingUp } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +39,15 @@ type FinanceControl = {
     openItems?: number;
     overdueItems?: number;
     dueWithin7Days?: number;
+    openAmountClp?: number;
+    overdueAmountClp?: number;
+    dueSoonAmountClp?: number;
+    newOpenIssued7d?: number;
+    becameOverdue7d?: number;
+    aging?: Array<{ label: string; items: number; amountClp: number }>;
+    dueByMonth?: Array<{ key: string; label: string; items: number; amountClp: number }>;
+    topSuppliers?: Array<{ supplierId: string; supplierName: string; items: number; amountClp: number; sharePct: number }>;
+    historicalTrendAvailable?: boolean;
     latestSync?: string | null;
     oldestOpenItems?: Array<{
       externalId?: string;
@@ -99,6 +117,22 @@ function money(value: unknown) {
   }).format(Math.abs(numeric));
 }
 
+function compactMoney(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return new Intl.NumberFormat('es-CL', {
+    notation: 'compact',
+    compactDisplay: 'short',
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 1,
+  }).format(Math.abs(numeric));
+}
+
+function shortSupplier(value: string) {
+  return value.length > 24 ? `${value.slice(0, 22)}…` : value;
+}
+
 function shortDate(value?: string | null) {
   if (!value) return 'Sin fecha';
   const date = new Date(value);
@@ -146,6 +180,12 @@ export function LaudusFinanceControlCard() {
   const openPayables = Number(data?.accountsPayable?.openItems || 0);
   const overduePayables = Number(data?.accountsPayable?.overdueItems || 0);
   const dueSoonPayables = Number(data?.accountsPayable?.dueWithin7Days || 0);
+  const openPayableAmount = Number(data?.accountsPayable?.openAmountClp || 0);
+  const overduePayableAmount = Number(data?.accountsPayable?.overdueAmountClp || 0);
+  const dueSoonPayableAmount = Number(data?.accountsPayable?.dueSoonAmountClp || 0);
+  const agingData = data?.accountsPayable?.aging || [];
+  const dueByMonth = data?.accountsPayable?.dueByMonth || [];
+  const topSuppliers = data?.accountsPayable?.topSuppliers || [];
   const costCenterUnresolved = Number(data?.costCenters?.unresolved || 0);
   const accountingCurrent = Boolean(data?.accounting?.currentEnoughForExecutiveUse);
   const fixedAssetLinked = Number(data?.fixedAssets?.linkedToMotil || 0);
@@ -194,6 +234,107 @@ export function LaudusFinanceControlCard() {
             <p className="mt-1 text-xs text-muted-foreground">{number(fixedAssetLinked)} enlazados a activos MOTIL</p>
           </div>
         </div>
+
+        <section className="space-y-4" aria-label="Lectura ejecutiva Laudus">
+          <div className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-4">
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cambio · 7 días</p>
+              <p className="mt-2 text-xl font-semibold">{number(data?.accountsPayable?.newOpenIssued7d || 0)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">partidas abiertas emitidas esta semana</p>
+            </div>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Entraron en mora</p>
+              <p className="mt-2 text-xl font-semibold">{number(data?.accountsPayable?.becameOverdue7d || 0)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">vencieron durante los últimos 7 días</p>
+            </div>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Vencen próximos 7 días</p>
+              <p className="mt-2 text-xl font-semibold">{number(dueSoonPayables)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{compactMoney(dueSoonPayableAmount)} en estado fuente Laudus</p>
+            </div>
+            <div className="bg-card px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición abierta</p>
+              <p className="mt-2 text-xl font-semibold">{compactMoney(openPayableAmount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{compactMoney(overduePayableAmount)} corresponde a partidas vencidas</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-xl border bg-card p-4">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Riesgo</p>
+                <h3 className="mt-1 text-base font-semibold">Aging de CxP abierta</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Distribución actual por antigüedad de vencimiento. Laudus · {shortDate(data?.accountsPayable?.latestSync)}</p>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={agingData} layout="vertical" margin={{ left: 4, right: 16 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
+                    <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
+                    <YAxis type="category" dataKey="label" width={78} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
+                    <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-4">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Estructura temporal</p>
+                <h3 className="mt-1 text-base font-semibold">Vencimientos abiertos por mes</h3>
+                <p className="mt-1 text-xs text-muted-foreground">No es una serie histórica de saldo: muestra cuándo venció o vence la cartera que sigue abierta hoy.</p>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dueByMonth} margin={{ left: 4, right: 16 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.25} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                    <YAxis tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} width={64} />
+                    <Tooltip formatter={(value) => [money(value), 'Saldo abierto']} />
+                    <Bar dataKey="amountClp" fill="currentColor" className="text-muted-foreground" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Explicación</p>
+                <h3 className="mt-1 text-base font-semibold">Concentración por proveedor</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Saldo abierto actual. Concentración no implica causalidad ni prioridad de pago automática.</p>
+              </div>
+              <Badge variant="outline">Top {topSuppliers.length}</Badge>
+            </div>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={topSuppliers.map((item) => ({ ...item, supplierLabel: shortSupplier(item.supplierName) }))}
+                  layout="vertical"
+                  margin={{ left: 8, right: 24 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.25} />
+                  <XAxis type="number" tickFormatter={(value) => compactMoney(value)} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="supplierLabel" width={180} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    formatter={(value, _name, item) => [
+                      money(value),
+                      `${item.payload.items} partidas · ${item.payload.sharePct}% del saldo abierto`,
+                    ]}
+                  />
+                  <Bar dataKey="amountClp" fill="currentColor" className="text-foreground" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {data?.accountsPayable?.historicalTrendAvailable
+                ? 'Tendencia histórica disponible.'
+                : 'La tendencia histórica de saldo aún no existe como serie canónica. MOTIL no la simula; empezará a mostrarse cuando existan snapshots comparables.'}
+            </p>
+          </div>
+        </section>
 
         <div className="space-y-2">
           {openPayables > 0 ? (
