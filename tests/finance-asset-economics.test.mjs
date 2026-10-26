@@ -226,3 +226,16 @@ test('finance reconciliation summarizes insurance and depreciation without addin
   assert.match(page,/Depreciación/);
   assert.match(page,/Seguro sin clasificar/);
 });
+
+
+test('missing Asset 360 candidates are deduplicated across insurance and depreciation without auto-creation',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/missing_canonical_asset_candidate/);
+  assert.match(api,/dualSource/);
+  assert.match(api,/No crea una Ficha 360 automáticamente/);
+  assert.match(candidates,/Candidatas Ficha 360/);
+  assert.match(candidates,/Doble respaldo/);
+  assert.match(candidates,/Nada se crea automáticamente/);
+  assert.match(page,/Candidatas Ficha 360/);
+});
