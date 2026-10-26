@@ -24,12 +24,47 @@ type LedgerEvent = {
   description?: string | null;
 };
 
+type NativeTraceResponse = {
+  summary?: {
+    withLines?: number;
+    withNativeTrace?: number;
+    missingEvidence?: number;
+  };
+  invoices?: Array<{
+    invoiceExternalId?: string;
+    docNumber?: string | null;
+    supplierName?: string | null;
+    outstandingAmount?: number;
+    currency?: string | null;
+    sourceDetailAvailable?: boolean;
+    itemCount?: number;
+    nativeTraceCount?: number;
+  }>;
+  readOnly?: boolean;
+};
+
+const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL');
+const currencyMoney = (value: unknown, currency: unknown) => {
+  const amount = Number(value || 0);
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : 'CLP';
+  try {
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
+  } catch {
+    return `${code} ${amount.toLocaleString('es-CL')}`;
+  }
+};
+
 export default function FinanceTraceabilityPage() {
   const params = useSearchParams();
   const q = params.get('q') || '';
   const status = params.get('status') || 'all';
   const url = `/api/finance/event-ledger?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`;
   const { data, error, isLoading } = useSWR(url, fetcher);
+  const nativeTrace = useSWR<NativeTraceResponse>(
+    '/api/integrations/laudus/native-invoice-trace',
+    fetcher,
+    { revalidateOnFocus: false, refreshInterval: 30 * 60 * 1000 },
+  );
   const events: LedgerEvent[] = data?.events || [];
 
   return (
@@ -39,6 +74,77 @@ export default function FinanceTraceabilityPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Trazabilidad</h1>
         <p className="mt-2 text-sm text-muted-foreground">Cada monto está en CLP y conserva su tabla y registro de origen.</p>
         <div className="mt-3 flex gap-2"><Badge variant="secondary">CANONICAL</Badge><Badge variant="outline">CLP</Badge></div>
+      </section>
+
+      <section className="overflow-hidden rounded-lg border bg-card" aria-label="Evidencia de factura Laudus">
+        <div className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Antes de pagar</p>
+            <h2 className="mt-1 text-lg font-semibold">Evidencia de factura</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              MOTIL consulta el detalle y la trazabilidad documental disponible en Laudus. Finanzas mantiene la decisión.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground">Solo lectura</span>
+        </div>
+
+        {nativeTrace.error ? (
+          <p className="px-4 py-5 text-sm text-muted-foreground">
+            Laudus no entregó evidencia adicional para esta muestra. La revisión financiera sigue disponible.
+          </p>
+        ) : !nativeTrace.data ? (
+          <p className="px-4 py-5 text-sm text-muted-foreground">Consultando evidencia de las facturas prioritarias…</p>
+        ) : (
+          <>
+            <div className="grid gap-px border-b bg-border sm:grid-cols-3">
+              {[
+                ['Con líneas', number(nativeTrace.data.summary?.withLines || 0)],
+                ['Con traza Laudus', number(nativeTrace.data.summary?.withNativeTrace || 0)],
+                ['Falta evidencia', number(nativeTrace.data.summary?.missingEvidence || 0)],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-card px-4 py-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-lg font-semibold">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              {(nativeTrace.data.invoices || []).slice(0, 5).map((invoice) => (
+                <div
+                  key={invoice.invoiceExternalId}
+                  className="grid gap-2 border-b px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_150px_150px] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {invoice.supplierName || 'Proveedor'} · Factura {invoice.docNumber || 's/n'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {invoice.sourceDetailAvailable
+                        ? Number(invoice.itemCount || 0) > 0
+                          ? `${number(invoice.itemCount || 0)} líneas recuperadas`
+                          : 'Sin líneas en la respuesta'
+                        : 'Detalle no disponible en la consulta actual'}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground md:text-right">
+                    {Number(invoice.nativeTraceCount || 0) > 0 ? 'Traza Laudus disponible' : 'Falta evidencia'}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums md:text-right">
+                    {currencyMoney(invoice.outstandingAmount, invoice.currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <details className="border-t px-4 py-3 text-xs text-muted-foreground">
+              <summary className="cursor-pointer select-none hover:text-foreground">Cómo se determinó</summary>
+              <p className="mt-2 max-w-3xl">
+                MOTIL consulta el detalle y las relaciones documentales que Laudus informa para la factura. Una traza Laudus disponible no se interpreta automáticamente como orden de compra ni como aprobación de pago.
+              </p>
+            </details>
+          </>
+        )}
       </section>
 
       {q ? <div className="rounded-lg border p-3 text-sm">Filtro activo: <span className="font-medium">{q}</span></div> : null}
