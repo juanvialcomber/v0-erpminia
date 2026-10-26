@@ -397,3 +397,17 @@ test('finance summary keeps material model-only asset blockers visible',()=>{
   assert.match(signal,/modelos por identificar/);
   assert.match(signal,/compactMoney\(modelOnlyBookValue\)/);
 });
+
+
+test('ready Asset 360 reviews distinguish finance dual-source from purchase operational evidence',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/purchaseCostCenterEvidence/);
+  assert.match(api,/readyDualFinance/);
+  assert.match(api,/readyPurchaseEvidence/);
+  assert.match(api,/exact_plate_plus_purchase_cost_center/);
+  assert.match(candidates,/Primero evidencia cruzada/);
+  assert.match(candidates,/PPU exacta \+ evidencia operacional de Compras/);
+  assert.match(candidates,/Evidencia exacta en seguro \+ depreciación/);
+  assert.match(candidates,/Compras:/);
+});
