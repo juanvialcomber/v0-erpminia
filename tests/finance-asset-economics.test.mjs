@@ -216,3 +216,13 @@ test('insurance reimport preserves rich equipment description in the canonical s
   assert.match(stage,/description,\n\s+equipment_type: equipmentType/);
   assert.match(stage,/source_kind: 'insured_asset_inventory',[\s\S]*description,/);
 });
+
+
+test('finance reconciliation summarizes insurance and depreciation without adding another review table',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/insured_asset_inventory/);
+  assert.match(review,/insuranceSummary/);
+  assert.match(review,/unclassifiedRows/);
+  assert.match(page,/Depreciación/);
+  assert.match(page,/Seguro sin clasificar/);
+});
