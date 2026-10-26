@@ -101,6 +101,28 @@ export async function GET(request: NextRequest) {
     (reviewRows || []).map((row: any) => [row.issue_key, row])
   );
 
+  const { data: conflictRows, error: conflictError } = await context.supabase
+    .from('data_reconciliation_reviews')
+    .select('id,issue_key,entity_id,status,resolution_note,evidence_reference,reviewed_by,reviewed_at')
+    .eq('organization_id', context.organizationId)
+    .eq('entity_type', 'asset')
+    .eq('issue_type', 'canonical_identity_source_conflict')
+    .eq('status', 'open')
+    .order('created_at', { ascending: true });
+
+  if (conflictError) return NextResponse.json({ error: conflictError.message }, { status: 500 });
+
+  const identityConflicts = (conflictRows || []).map((row: any) => ({
+    id: row.id,
+    issueKey: row.issue_key,
+    entityId: row.entity_id,
+    status: row.status,
+    resolutionNote: row.resolution_note,
+    evidenceReference: row.evidence_reference,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+  }));
+
   const candidates = [...grouped.entries()].map(([key, evidenceRows]) => {
     const sourceKinds = new Set<string>();
     let insuredUf: number | null = null;
@@ -236,12 +258,14 @@ export async function GET(request: NextRequest) {
       pendingReview: candidates.filter((row) => row.readyForReview && (!row.review || row.review.status === 'open')).length,
       acceptedForCreation: candidates.filter((row) => row.review?.status === 'accepted').length,
       ignoredCandidates: candidates.filter((row) => row.review?.status === 'ignored').length,
+      openIdentityConflicts: identityConflicts.length,
       identityVerifiedSingleSource: candidates.filter((row) => row.identityVerifiedSingleSource).length,
       modelOnlyNeedsOperationalIdentity: candidates.filter((row) => row.modelOnlyNeedsOperationalIdentity).length,
       sourceCodeNeedsOperationalValidation: candidates.filter((row) => row.sourceCodeNeedsOperationalValidation).length,
       insuranceOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'insurance')).length,
       depreciationOnly: candidates.filter((row) => row.evidence.every((item) => item.source === 'depreciation')).length,
     },
+    identityConflicts,
     candidates,
     semantics: {
       candidate: 'Evidencia de una entidad física que no tiene contraparte canónica verificable. No crea una Ficha 360 automáticamente.',
@@ -250,6 +274,7 @@ export async function GET(request: NextRequest) {
       identityVerifiedSingleSource: 'Candidata con PPU, serie o chasis exacto verificado contra el maestro, pero respaldada por una sola fuente.',
       modelOnlyNeedsOperationalIdentity: 'La fuente identifica un modelo específico, pero falta PPU, serie, chasis o número de unidad para crear una Ficha 360 sin inferencia.',
       sourceCodeNeedsOperationalValidation: 'Existe un código interno estable en la fuente financiera, pero no es un identificador físico ni un ID Laudus verificado.',
+      conflict: 'Un conflicto de identidad indica que una Ficha canónica existente y una fuente nueva discrepan en marca, modelo o configuración. No se crea otra Ficha 360 hasta resolverlo.',
       approval: 'Crear una Ficha 360 requiere revisión operacional; MOTIL conserva la fuente y no inventa campos faltantes.',
     },
   });
