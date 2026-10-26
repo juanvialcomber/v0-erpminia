@@ -59,6 +59,10 @@ export async function loadLaudusFinanceControl(
     latestCreditNotesSync,
     latestCostCentersSync,
     pendingPaymentRows,
+    openPayables,
+    overduePayables,
+    dueSoonPayables,
+    oldestOpenPayableRows,
   ] = await Promise.all([
     count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('deposited', true)),
@@ -88,11 +92,62 @@ export async function loadLaudusFinanceControl(
       .or('deposited.is.false,deposited.is.null')
       .order('issued_date', { ascending: false })
       .limit(5),
+    count(
+      db
+        .from('laudus_accounts_payable_service_v1')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gt('outstanding_amount', 0),
+    ),
+    count(
+      db
+        .from('laudus_accounts_payable_service_v1')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gt('outstanding_amount', 0)
+        .lt('due_date', new Date().toISOString()),
+    ),
+    count(
+      db
+        .from('laudus_accounts_payable_service_v1')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gt('outstanding_amount', 0)
+        .gte('due_date', new Date().toISOString())
+        .lt('due_date', new Date(Date.now() + 7 * 86400000).toISOString()),
+    ),
+    db
+      .from('laudus_accounts_payable_service_v1')
+      .select('external_id,supplier_external_id,document_number,issued_date,due_date,outstanding_amount,currency_code,status')
+      .eq('organization_id', organizationId)
+      .gt('outstanding_amount', 0)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .limit(5),
   ]);
 
   if (creditNoteRows.error) throw new Error(creditNoteRows.error.message);
   if (latestAccounting.error) throw new Error(latestAccounting.error.message);
   if (pendingPaymentRows.error) throw new Error(pendingPaymentRows.error.message);
+  if (oldestOpenPayableRows.error) throw new Error(oldestOpenPayableRows.error.message);
+
+  const supplierIds = Array.from(
+    new Set((oldestOpenPayableRows.data || []).map((row: any) => String(row.supplier_external_id || '')).filter(Boolean)),
+  );
+  const supplierLookup = supplierIds.length
+    ? await db
+        .schema('integration')
+        .from('laudus_suppliers')
+        .select('external_id,name,legal_name')
+        .eq('organization_id', organizationId)
+        .in('external_id', supplierIds)
+    : { data: [], error: null };
+  if (supplierLookup.error) throw new Error(supplierLookup.error.message);
+  const supplierByExternalId = new Map(
+    (supplierLookup.data || []).map((row: any) => [
+      String(row.external_id || ''),
+      String(row.name || row.legal_name || row.external_id || 'Proveedor'),
+    ]),
+  );
 
   const creditNoteAmount = (creditNoteRows.data || []).reduce(
     (sum, row) => sum + Number(row.total_amount || 0),
@@ -146,6 +201,23 @@ export async function loadLaudusFinanceControl(
             ? String((row.source_payload as Record<string, unknown>).purchaseInvoices_currencyCode || '') || null
             : null,
       })),
+    },
+    accountsPayable: {
+      openItems: openPayables,
+      overdueItems: overduePayables,
+      dueWithin7Days: dueSoonPayables,
+      latestSync: latestPayablesSync,
+      oldestOpenItems: (oldestOpenPayableRows.data || []).map((row: any) => ({
+        externalId: String(row.external_id || ''),
+        supplierName: supplierByExternalId.get(String(row.supplier_external_id || '')) || 'Proveedor Laudus',
+        documentNumber: row.document_number ? String(row.document_number) : null,
+        issuedDate: row.issued_date ? String(row.issued_date) : null,
+        dueDate: row.due_date ? String(row.due_date) : null,
+        outstandingAmount: Number(row.outstanding_amount || 0),
+        currency: row.currency_code ? String(row.currency_code) : null,
+        status: row.status ? String(row.status) : null,
+      })),
+      semantics: 'open and overdue counts from Laudus source state; not reconciled cash commitment or final accounting liability',
     },
     creditNotes: {
       total: creditNotes,
