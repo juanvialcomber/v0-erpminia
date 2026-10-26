@@ -6,6 +6,9 @@ import * as XLSX from 'xlsx';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
+type WorkbookLike = ReturnType<typeof XLSX.read>;
+type SheetLike = WorkbookLike['Sheets'][string];
+
 type StageRow = {
   organization_id: string;
   import_id: string;
@@ -123,11 +126,11 @@ function isDepreciationBusinessRow(description: unknown, historicalAsset: unknow
   return true;
 }
 
-function formulasForRow(sheet: XLSX.WorkSheet, rowNumber: number) {
+function formulasForRow(sheet: SheetLike, rowNumber: number) {
   const formulas: Record<string, string> = {};
   for (let column = 0; column < 18; column += 1) {
     const address = XLSX.utils.encode_cell({ r: rowNumber - 1, c: column });
-    const cell = sheet[address] as XLSX.CellObject | undefined;
+    const cell = sheet[address] as { f?: string } | undefined;
     if (cell?.f) formulas[XLSX.utils.encode_col(column)] = String(cell.f);
   }
   return formulas;
@@ -161,7 +164,7 @@ function uniqueIdentifierMap<T extends { id: string }>(
 }
 
 function stageInsuranceWorkbook(params: {
-  workbook: XLSX.WorkBook;
+  workbook: WorkbookLike;
   organizationId: string;
   importId: string;
   sourceSha256: string;
@@ -293,7 +296,7 @@ function stageInsuranceWorkbook(params: {
 }
 
 function stageDepreciationWorkbook(params: {
-  workbook: XLSX.WorkBook;
+  workbook: WorkbookLike;
   organizationId: string;
   importId: string;
   sourceSha256: string;
@@ -462,7 +465,7 @@ export async function POST(
     );
   }
 
-  let workbook: XLSX.WorkBook;
+  let workbook: WorkbookLike;
   try {
     workbook = XLSX.read(bytes, { type: 'buffer', cellDates: true });
   } catch (error) {
