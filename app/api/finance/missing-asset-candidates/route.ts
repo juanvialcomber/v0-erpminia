@@ -139,6 +139,9 @@ export async function GET(request: NextRequest) {
     let reviewStatus: string | null = null;
     let reviewBasis: string | null = null;
     let reviewSourceCount: number | null = null;
+    let purchaseCostCenterEvidence: string | null = null;
+    let purchaseEvidenceOrders: number | null = null;
+    let purchaseEvidenceLines: number | null = null;
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -178,6 +181,11 @@ export async function GET(request: NextRequest) {
       reviewBasis = reviewBasis || text(payload.candidate_review_basis);
       const payloadSourceCount = numeric(payload.candidate_review_source_count);
       if (payloadSourceCount != null) reviewSourceCount = Math.max(reviewSourceCount ?? payloadSourceCount, payloadSourceCount);
+      purchaseCostCenterEvidence = purchaseCostCenterEvidence || text(payload.purchase_cost_center_evidence);
+      const payloadPurchaseOrders = numeric(payload.purchase_evidence_orders);
+      if (payloadPurchaseOrders != null) purchaseEvidenceOrders = Math.max(purchaseEvidenceOrders ?? payloadPurchaseOrders, payloadPurchaseOrders);
+      const payloadPurchaseLines = numeric(payload.purchase_evidence_lines);
+      if (payloadPurchaseLines != null) purchaseEvidenceLines = Math.max(purchaseEvidenceLines ?? payloadPurchaseLines, payloadPurchaseLines);
       evidence.push({
         source,
         stageId: row.id,
@@ -230,6 +238,11 @@ export async function GET(request: NextRequest) {
       reviewStatus,
       reviewBasis,
       reviewSourceCount,
+      operationalEvidence: {
+        purchaseCostCenter: purchaseCostCenterEvidence,
+        purchaseOrders: purchaseEvidenceOrders,
+        purchaseLines: purchaseEvidenceLines,
+      },
       review: review ? {
         id: review.id,
         status: review.status,
@@ -265,6 +278,8 @@ export async function GET(request: NextRequest) {
       sourceCodeBookValueClp: sumBookValue((row) => row.sourceCodeNeedsOperationalValidation),
       dualSource: candidates.filter((row) => row.dualSource).length,
       readyForReview: candidates.filter((row) => row.readyForReview).length,
+      readyDualFinance: candidates.filter((row) => row.reviewBasis === 'dual_source_exact_identity').length,
+      readyPurchaseEvidence: candidates.filter((row) => row.reviewBasis === 'exact_plate_plus_purchase_cost_center').length,
       pendingReview: candidates.filter((row) => row.readyForReview && (!row.review || row.review.status === 'open')).length,
       acceptedForCreation: candidates.filter((row) => row.review?.status === 'accepted').length,
       ignoredCandidates: candidates.filter((row) => row.review?.status === 'ignored').length,
