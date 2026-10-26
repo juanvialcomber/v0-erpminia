@@ -21,6 +21,9 @@ type Source = {
 type WorkbookSource = {
   id: string;
   filename: string;
+  canonical: boolean;
+  canonicalAuthority: string | null;
+  canonicalDomain: string | null;
   sourceKind: string;
   cutoffDate: string | null;
   senderDeclaredNotFinal: boolean;
@@ -136,19 +139,23 @@ export default function FinanceSourcesPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold">{workbook.filename}</h3>
-                    <Badge variant="outline">{workbook.senderDeclaredNotFinal ? 'Preliminar' : 'Fuente recibida'}</Badge>
+                    <Badge variant={workbook.canonical ? 'default' : 'outline'}>
+                      {workbook.canonical ? `Canónico · ${workbook.canonicalAuthority || 'Finanzas'}` : workbook.senderDeclaredNotFinal ? 'Preliminar' : 'Fuente recibida'}
+                    </Badge>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Corte: {date(workbook.cutoffDate)} · {workbook.sourceRows.toLocaleString('es-CL')} filas de origen
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {workbook.stage
-                      ? `Procesadas: ${workbook.stage.rows.toLocaleString('es-CL')} · Identidad resuelta: ${workbook.stage.matched.toLocaleString('es-CL')} · Por revisar: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
+                      ? workbook.canonical
+                        ? `Canónico: ${workbook.stage.rows.toLocaleString('es-CL')} registros · Identidad vinculada: ${workbook.stage.matched.toLocaleString('es-CL')} · Identidad pendiente: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
+                        : `Procesadas: ${workbook.stage.rows.toLocaleString('es-CL')} · Identidad resuelta: ${workbook.stage.matched.toLocaleString('es-CL')} · Por revisar: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
                       : 'Pendiente de procesamiento estructurado'}
                   </p>
                   {workbook.stage?.anomalyRows ? (
                     <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                      {workbook.stage.anomalyRows.toLocaleString('es-CL')} fila con anomalía de estructura preservada para revisión.
+                      {workbook.stage.anomalyRows.toLocaleString('es-CL')} observación{workbook.stage.anomalyRows === 1 ? '' : 'es'} para revisión de Daniel. La fuente permanece canónica.
                     </p>
                   ) : null}
                 </div>
