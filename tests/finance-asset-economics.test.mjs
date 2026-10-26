@@ -54,3 +54,20 @@ test('asset economics exposes book value only for single reconciled depreciation
   assert.match(page,/Valor libro conciliado/);
   assert.match(page,/registros canónicos/);
 });
+
+
+test('asset economics reuses planning criticality and separates meter evidence from usable runtime',()=>{
+  assert.match(api,/planning_maintenance_source_rows/);
+  assert.match(api,/planning_asset_meter_readings/);
+  assert.match(api,/distinctMeterValues >= 2/);
+  assert.match(api,/distinctMeterDates >= 2/);
+  assert.match(api,/meterDecreaseCount === 0/);
+  assert.match(api,/withUsableRuntime/);
+  assert.match(page,/Con medidor/);
+  assert.match(page,/secuencia utilizable para tasas/);
+});
+
+test('incomplete economics message does not assume the asset came from insurance',()=>{
+  assert.match(api,/Activo financiero vinculado, pero falta valor libro o costo\/fecha de adquisición canónica/);
+  assert.doesNotMatch(api,/Seguro canónico vinculado, pero falta costo\/fecha/);
+});
