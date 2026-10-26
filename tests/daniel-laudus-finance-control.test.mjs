@@ -73,15 +73,15 @@ test('Daniel finance control uses evidence-backed visual analytics instead of fa
   assert.match(card, /MOTIL no la simula/);
 });
 
-test('decision-first finance visuals expose change risk explanation and source freshness', () => {
-  assert.match(card, /Cambio · 7 días/);
-  assert.match(card, /Entraron en mora/);
-  assert.match(card, /Vencen próximos 7 días/);
+test('decision-first finance visuals expose observable change, risk and source freshness', () => {
+  assert.match(card, /Cambios observables · 7 días/);
+  assert.match(card, /entraron en mora/);
   assert.match(card, /Exposición abierta/);
   assert.match(card, /Riesgo/);
   assert.match(card, /Explicación/);
   assert.match(card, /Laudus ·/);
   assert.match(card, /Concentración no implica causalidad/);
+  assert.match(card, /Aún no existe una serie diaria histórica comparable de saldo/);
 });
 
 
@@ -125,4 +125,12 @@ test('Daniel cockpit follows MOTIL decision-first visual hierarchy', () => {
   assert.match(card, /Qué debe resolver Daniel primero/);
   assert.match(card, /Máximo 3 decisiones/);
   assert.match(card, /Cobertura financiera/);
+});
+
+
+test('Daniel cockpit exposes actionable queues without claiming automatic closure', () => {
+  assert.match(card, /Listo para trabajar hoy/);
+  assert.match(card, /Pagos por verificar/);
+  assert.match(card, /Centros por conciliar/);
+  assert.match(card, /Son colas accionables, no cierres automáticos/);
 });
