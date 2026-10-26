@@ -42,6 +42,9 @@ function classifyRow(row: {
   if (disposition === 'component_or_spare_financial_line') {
     return { key: 'component_or_spare_financial_line', label: 'Componente / repuesto', rank: 3 };
   }
+  if (disposition === 'low_materiality_secondary_review') {
+    return { key: 'low_materiality_secondary_review', label: 'Revisión secundaria', rank: 1 };
+  }
 
   const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
   if (centerType === 'asset') {
@@ -198,6 +201,7 @@ export async function GET(request: NextRequest) {
       insufficient_unit_identity: 'La fila parece operacional, pero no trae una llave suficiente para distinguir una unidad concreta sin inferencia.',
       unrepresented_operational_model: 'La fuente identifica un modelo operacional específico que no aparece en activos canónicos ni alias verificados. Puede requerir una o más Fichas 360, pero la cantidad de unidades no se infiere.',
       component_or_spare_financial_line: 'La fila representa un componente o repuesto capitalizado, no un activo operacional completo. Se conserva financieramente sin crear una Ficha 360 de equipo.',
+      low_materiality_secondary_review: 'La fila operacional queda bajo el umbral material actual de CLP 100.000 por registro. Se conserva completa para revisión secundaria y no se infiere una identidad.',
       asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
       non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
