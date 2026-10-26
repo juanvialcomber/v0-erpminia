@@ -229,6 +229,7 @@ export function CostCentersWorkspace() {
       </section>
 
       {topGroups.length > 0 ? (
+      {topGroups.length > 0 ? (
         <section className="space-y-3" aria-label="Familias con mayor actividad">
           <div>
             <p className="text-sm font-semibold">Familias con mayor actividad observada</p>
@@ -245,7 +246,17 @@ export function CostCentersWorkspace() {
                 className="bg-card px-4 py-3 text-left hover:bg-muted/30"
               >
                 <p className="truncate text-sm font-medium">{group.rootName}</p>
-                <p className="mt-2 text-lg font-semibold tabular-nums">{'
+                <p className="mt-2 text-lg font-semibold tabular-nums">{'$'}{compactClp(group.committedClp)}</p>
+                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {group.activityEvents.toLocaleString('es-CL')} movimientos
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
