@@ -45,8 +45,8 @@ test('matcher refuses incompatible currencies and uses weighted aggregate price'
   assert.match(lib,/value\.lineTotal \/ value\.quantity/);
 });
 
-test('finance cockpit keeps deterministic PO matcher out of the interactive surface',()=>{
-  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+test('finance traceability keeps deterministic PO matcher out of the interactive surface',()=>{
+  const page = fs.readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx','utf8');
   assert.match(page,/Antes de pagar/);
   assert.match(page,/Evidencia de factura/);
   assert.doesNotMatch(page,/invoice-po-control/);
@@ -58,13 +58,13 @@ test('candidate exposure keeps currency boundaries inside the offline matcher on
   assert.match(lib,/amountsByCurrency/);
   assert.match(lib,/candidateExposureByCurrency/);
   assert.doesNotMatch(lib,/candidateExposure: candidates\.reduce/);
-  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+  const page = fs.readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx','utf8');
   assert.doesNotMatch(page,/candidateExposureByCurrency/);
 });
 
 
-test('finance cockpit exposes missing source evidence honestly',()=>{
-  const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+test('finance traceability exposes missing source evidence honestly',()=>{
+  const page = fs.readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx','utf8');
   assert.match(page,/Falta evidencia/);
   assert.match(page,/Detalle no disponible en la consulta actual/);
 });
