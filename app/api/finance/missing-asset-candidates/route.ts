@@ -85,6 +85,21 @@ export async function GET(request: NextRequest) {
     grouped.set(key, existing);
   }
 
+  const issueKeys = [...grouped.keys()].map((key) => 'asset_missing_candidate:' + key);
+  const { data: reviewRows, error: reviewError } = await context.supabase
+    .from('data_reconciliation_reviews')
+    .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
+    .eq('organization_id', context.organizationId)
+    .eq('entity_type', 'asset')
+    .eq('issue_type', 'missing_canonical_asset_candidate')
+    .in('issue_key', issueKeys);
+
+  if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
+
+  const reviewByIssueKey = new Map(
+    (reviewRows || []).map((row: any) => [row.issue_key, row])
+  );
+
   const candidates = [...grouped.entries()].map(([key, evidenceRows]) => {
     const sourceKinds = new Set<string>();
     let insuredUf: number | null = null;
@@ -143,6 +158,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const review = reviewByIssueKey.get('asset_missing_candidate:' + key) || null;
     const dualSource = sourceKinds.size > 1;
     const readyForReview = reviewStatus === 'ready_for_asset_review';
     const identityVerifiedSingleSource = reviewStatus === 'identity_verified_single_source';
@@ -166,6 +182,13 @@ export async function GET(request: NextRequest) {
       reviewStatus,
       reviewBasis,
       reviewSourceCount,
+      review: review ? {
+        id: review.id,
+        status: review.status,
+        resolutionNote: review.resolution_note,
+        reviewedBy: review.reviewed_by,
+        reviewedAt: review.reviewed_at,
+      } : null,
       sourceCount: sourceKinds.size,
       evidenceCount: evidence.length,
       priority: readyForReview ? 5 : identityVerifiedSingleSource ? 4 : dualSource ? 3 : modelOnlyNeedsOperationalIdentity ? 2 : sourceCodeNeedsOperationalValidation ? 1 : (plate || serial || chassis ? 2 : 0),
@@ -201,4 +224,88 @@ export async function GET(request: NextRequest) {
       approval: 'Crear una Ficha 360 requiere revisión operacional; MOTIL conserva la fuente y no inventa campos faltantes.',
     },
   });
+}
+
+
+export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (!access.authorized) return access.response;
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const body = await request.json().catch(() => null);
+  const key = text(body?.key);
+  const decision = text(body?.decision);
+  const note = text(body?.note);
+
+  if (!key || !['accept', 'ignore', 'reopen'].includes(String(decision))) {
+    return NextResponse.json({ error: 'Decisión inválida' }, { status: 400 });
+  }
+
+  const issueKey = 'asset_missing_candidate:' + key;
+  const status =
+    decision === 'accept' ? 'accepted' :
+    decision === 'ignore' ? 'ignored' :
+    'open';
+
+  const resolutionNote =
+    decision === 'accept'
+      ? (note || 'Candidata aprobada para alta operacional. La Ficha 360 aún no ha sido creada.')
+      : decision === 'ignore'
+        ? (note || 'Candidata descartada para alta de Ficha 360.')
+        : null;
+
+  const now = new Date().toISOString();
+
+  const { data: existing, error: existingError } = await context.supabase
+    .from('data_reconciliation_reviews')
+    .select('id')
+    .eq('organization_id', context.organizationId)
+    .eq('issue_key', issueKey)
+    .maybeSingle();
+
+  if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
+
+  let result: any = null;
+  if (existing?.id) {
+    const { data, error } = await context.supabase
+      .from('data_reconciliation_reviews')
+      .update({
+        status,
+        resolution_note: resolutionNote,
+        reviewed_by: context.userId,
+        reviewed_at: now,
+        updated_at: now,
+      })
+      .eq('organization_id', context.organizationId)
+      .eq('id', existing.id)
+      .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    result = data;
+  } else {
+    const { data, error } = await context.supabase
+      .from('data_reconciliation_reviews')
+      .insert({
+        organization_id: context.organizationId,
+        issue_key: issueKey,
+        entity_type: 'asset',
+        entity_id: null,
+        issue_type: 'missing_canonical_asset_candidate',
+        status,
+        resolution_note: resolutionNote,
+        evidence_reference: 'Revisión desde Finanzas · Candidatas Ficha 360',
+        reviewed_by: context.userId,
+        reviewed_at: now,
+        created_at: now,
+        updated_at: now,
+      })
+      .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    result = data;
+  }
+
+  return NextResponse.json({ review: result });
 }
