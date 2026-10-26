@@ -376,3 +376,15 @@ test('finance separates canonical identity conflicts from new Asset 360 candidat
   assert.match(candidates,/No se crea un activo nuevo hasta resolver el conflicto/);
   assert.match(signal,/conflictos de identidad/);
 });
+
+
+test('Asset 360 candidate review surfaces material identity blockers before low-value queue detail',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const candidates=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/candidateBookValueClp/);
+  assert.match(api,/modelOnlyBookValueClp/);
+  assert.match(api,/sumBookValue/);
+  assert.match(candidates,/Mayor impacto pendiente/);
+  assert.match(candidates,/modelOnlyBookValueClp/);
+  assert.match(candidates,/No se infiere la identidad/);
+});
