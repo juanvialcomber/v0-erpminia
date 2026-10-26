@@ -4,12 +4,13 @@ import fs from 'node:fs';
 
 const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
 
-test('Daniel finance cockpit leads with one decision and max three priorities',()=>{
-  assert.match(page,/Decisiones financieras/);
-  assert.match(page,/Revisar prioridades/);
-  assert.match(page,/id="revisar-prioridades"/);
+test('Daniel finance cockpit leads with a clear summary and sections',()=>{
+  assert.match(page,/Resumen financiero/);
+  assert.match(page,/Estado, decisiones y exposición en una sola lectura/);
+  assert.match(page,/Secciones de Finanzas/);
+  assert.match(page,/Ir al detalle/);
+  assert.match(page,/Herramientas avanzadas/);
   assert.match(page,/slice\(0, 3\)/);
-  assert.match(page,/Las tres prioridades de mayor impacto/);
 });
 
 test('technical language is hidden from the normal finance surface',()=>{
@@ -90,4 +91,16 @@ test('finance charts respect Patagua semantic colors',()=>{
   assert.match(page,/var\(--secondary\)/);
   assert.match(page,/var\(--destructive\)/);
   assert.doesNotMatch(page,/blue-|purple-|violet-|bg-gradient|from-|to-/);
+});
+
+
+test('summary precedes module sections and advanced tools stay collapsed',()=>{
+  const summary = page.indexOf('<LaudusFinanceControlCard />');
+  const sections = page.indexOf('Secciones de Finanzas');
+  const advanced = page.indexOf('Herramientas avanzadas');
+  assert.ok(summary >= 0);
+  assert.ok(sections > summary);
+  assert.ok(advanced > sections);
+  assert.match(page,/Pagos.*Proveedores.*Centros de costos.*Trazabilidad/s);
+  assert.match(page,/Reportes, fuentes, documentos y calendario/);
 });
