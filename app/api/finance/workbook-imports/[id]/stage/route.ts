@@ -286,6 +286,7 @@ function stageInsuranceWorkbook(params: {
       const itemNumber = integerValue(row[0]);
       if (itemNumber === null) continue;
 
+      let description: string | null = null;
       let equipmentType: string | null = null;
       let brand: string | null = null;
       let model: string | null = null;
@@ -298,14 +299,14 @@ function stageInsuranceWorkbook(params: {
       let entersMine: boolean | null = null;
 
       if (definition.kind === 'insured_equipment') {
-        equipmentType = textValue(row[1]);
+        description = textValue(row[1]);
         modelYear = integerValue(row[2]);
         serialNumber = textValue(row[3]);
         engineNumber = textValue(row[4]);
         chassisNumber = textValue(row[5]);
         insuredUf = numberValue(row[6]);
         entersMine = booleanSiNo(row[7]);
-        if (!equipmentType || itemNumber < 1 || itemNumber > 91) continue;
+        if (!description || itemNumber < 1 || itemNumber > 91) continue;
       } else {
         equipmentType = textValue(row[1]);
         brand = textValue(row[2]);
@@ -336,6 +337,7 @@ function stageInsuranceWorkbook(params: {
         record_kind: definition.kind,
         asset_class: definition.assetClass,
         item_number: itemNumber,
+        description,
         equipment_type: equipmentType,
         brand,
         model,
@@ -350,6 +352,7 @@ function stageInsuranceWorkbook(params: {
         source_payload: {
           source_kind: 'insured_asset_inventory',
           item_number: itemNumber,
+          description,
         },
         identity_status: matchedAsset ? 'matched' : 'unresolved',
         canonical_asset_id: matchedAsset?.id || null,
