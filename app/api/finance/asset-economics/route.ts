@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const [assetsResult, operationalResult, runtimeResult] = await Promise.all([
+  const [assetsResult, operationalResult, runtimeResult, depreciationResult] = await Promise.all([
     context.supabase
       .from('canonical_assets_current')
       .select('id,asset_code,name,criticality,operational_status,acquisition_date,acquisition_cost,expected_lifespan_years')
@@ -187,20 +187,37 @@ export async function GET(request: NextRequest) {
       .select('canonical_asset_id,reading_count,latest_meter_hours,observed_operating_hours,usable_for_rate_metrics')
       .eq('organization_id', context.organizationId)
       .in('canonical_asset_id', assetIds),
+    context.supabase
+      .from('motil_finance_asset_stage')
+      .select('canonical_asset_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
+      .eq('organization_id', context.organizationId)
+      .in('canonical_asset_id', assetIds)
+      .not('net_book_value', 'is', null),
   ]);
 
-  const queryError = assetsResult.error || operationalResult.error || runtimeResult.error;
+  const queryError = assetsResult.error || operationalResult.error || runtimeResult.error || depreciationResult.error;
   if (queryError) return NextResponse.json({ error: queryError.message }, { status: 500 });
 
   const assetsById = new Map<string, AssetRow>((assetsResult.data || []).map((row: any) => [row.id, row]));
   const operationalById = new Map<string, OperationalRow>((operationalResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
   const runtimeById = new Map<string, RuntimeRow>((runtimeResult.data || []).map((row: any) => [row.canonical_asset_id, row]));
+  const depreciationByAsset = new Map<string, any[]>();
+  for (const row of depreciationResult.data || []) {
+    const assetId = String(row.canonical_asset_id || '');
+    if (!assetId) continue;
+    const rows = depreciationByAsset.get(assetId) || [];
+    rows.push(row);
+    depreciationByAsset.set(assetId, rows);
+  }
 
   const queue = assetIds.map((assetId) => {
     const stage = uniqueStageByAsset.get(assetId);
     const asset = assetsById.get(assetId) || ({ id: assetId } as AssetRow);
     const operational = operationalById.get(assetId);
     const runtime = runtimeById.get(assetId);
+    const depreciationRows = depreciationByAsset.get(assetId) || [];
+    const depreciation = depreciationRows.length === 1 ? depreciationRows[0] : null;
+    const depreciationConflictCount = depreciationRows.length > 1 ? depreciationRows.length : 0;
 
     const criticality = asset.criticality || operational?.criticality || null;
     const openWorkOrders = numeric(operational?.open_work_order_count) || 0;
@@ -211,7 +228,7 @@ export async function GET(request: NextRequest) {
     const runtimeReadings = numeric(runtime?.reading_count) || 0;
     const hasRuntime = runtimeReadings > 0;
     const hasMaintenanceEvidence = workOrders > 0 || (numeric(operational?.recognized_cost_event_count) || 0) > 0;
-    const hasCoreEconomics = asset.acquisition_cost != null || asset.acquisition_date != null;
+    const hasCoreEconomics = asset.acquisition_cost != null || asset.acquisition_date != null || depreciation?.net_book_value != null;
 
     const evidence = {
       insurance: true,
@@ -245,6 +262,12 @@ export async function GET(request: NextRequest) {
       acquisitionDate: asset.acquisition_date || null,
       acquisitionCostClp: numeric(asset.acquisition_cost),
       expectedLifespanYears: numeric(asset.expected_lifespan_years),
+      netBookValueClp: numeric(depreciation?.net_book_value),
+      updatedAssetValueClp: numeric(depreciation?.updated_asset),
+      accumulatedDepreciationClp: numeric(depreciation?.total_accum_depr),
+      depreciationCurrentClp: numeric(depreciation?.depreciation_current),
+      remainingLifeMonths: numeric(depreciation?.remaining_life_months),
+      depreciationConflictCount,
       recognizedCostLifetimeClp: recognizedCostLifetime,
       recognizedCost12mClp: recognizedCost12m,
       workOrderCount: workOrders,
@@ -290,6 +313,8 @@ export async function GET(request: NextRequest) {
       withMaintenanceEvidence: queue.filter((row) => row.evidence.maintenance).length,
       withRuntimeEvidence: queue.filter((row) => row.evidence.runtime).length,
       withCoreEconomics: queue.filter((row) => row.evidence.acquisitionEconomics).length,
+      withBookValue: queue.filter((row) => row.netBookValueClp != null).length,
+      depreciationConflicts: queue.filter((row) => row.depreciationConflictCount > 1).length,
       maintenanceAttention: queue.filter((row) => row.decision.key === 'maintenance_attention').length,
       economicsToComplete: queue.filter((row) => row.decision.key === 'complete_economics').length,
     },
