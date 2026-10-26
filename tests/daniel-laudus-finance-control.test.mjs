@@ -91,3 +91,12 @@ test('MOTIL explanation stays factual and non-causal', () => {
   assert.match(card, /Lectura MOTIL/);
   assert.match(card, /No implican causalidad, prioridad de pago ni riesgo financiero definitivo/);
 });
+
+
+test('Laudus date-only values preserve Santiago calendar semantics', () => {
+  assert.match(loader, /function santiagoDateKey/);
+  assert.match(loader, /function sourceDateKey/);
+  assert.match(loader, /todayEpochDay/);
+  assert.match(loader, /dateKeyToEpochDay/);
+  assert.match(card, /T12:00:00-03:00/);
+});
