@@ -198,3 +198,12 @@ test('workbook reimport preserves unresolved reconciliation metadata as well as 
   assert.match(stage,/reconciliation_scope/);
   assert.match(stage,/if \(!existing\.canonical_asset_id\)/);
 });
+
+
+test('reconciliation review separates unrepresented operational models',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/unrepresented_operational_model/);
+  assert.match(review,/Modelo no representado/);
+  assert.match(review,/no aparece en activos canónicos ni alias verificados/);
+  assert.match(page,/Modelo no representado/);
+});
