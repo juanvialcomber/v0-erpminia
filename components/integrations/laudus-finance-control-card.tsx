@@ -233,7 +233,7 @@ export function LaudusFinanceControlCard() {
                   Laudus aporta fecha y vida útil para {number(data?.fixedAssets?.withUsefulLife)} activos, pero aún no hay enlaces canónicos ni costo de adquisición suficiente para declarar valor libro real.
                 </p>
               </div>
-              <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/centros">Revisar evidencia <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+              <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/trazabilidad">Revisar evidencia <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
             </div>
           ) : null}
         </div>
