@@ -118,7 +118,12 @@ export default function FinanceAssetsPage(){
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Economía de activos</h1>
           <p className="mt-1 text-sm text-muted-foreground">Una cola de decisiones basada en evidencia financiera y operacional ya vinculada.</p>
         </div>
-        {data.source?.canonical?<Badge variant="outline">Canónico · {data.source.authority||'Finanzas'}</Badge>:null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/dashboard/finanzas/activos/registro" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
+            Registro financiero completo
+          </Link>
+          {data.source?.canonical?<Badge variant="outline">Canónico · {data.source.authority||'Finanzas'}</Badge>:null}
+        </div>
       </div>
     </section>
 
