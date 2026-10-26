@@ -39,6 +39,9 @@ function classifyRow(row: {
   if (disposition === 'unrepresented_operational_model') {
     return { key: 'unrepresented_operational_model', label: 'Modelo no representado', rank: 4 };
   }
+  if (disposition === 'component_or_spare_financial_line') {
+    return { key: 'component_or_spare_financial_line', label: 'Componente / repuesto', rank: 3 };
+  }
 
   const centerType = String(row.source_payload?.canonical_cost_center_type || '').trim().toLowerCase();
   if (centerType === 'asset') {
@@ -194,6 +197,7 @@ export async function GET(request: NextRequest) {
       aggregate_multi_asset_financial_line: 'La propia fila financiera agrupa más de un activo o componentes heterogéneos. No puede promoverse a una única Ficha 360 sin desagregar la fuente.',
       insufficient_unit_identity: 'La fila parece operacional, pero no trae una llave suficiente para distinguir una unidad concreta sin inferencia.',
       unrepresented_operational_model: 'La fuente identifica un modelo operacional específico que no aparece en activos canónicos ni alias verificados. Puede requerir una o más Fichas 360, pero la cantidad de unidades no se infiere.',
+      component_or_spare_financial_line: 'La fila representa un componente o repuesto capitalizado, no un activo operacional completo. Se conserva financieramente sin crear una Ficha 360 de equipo.',
       asset_center_without_asset: 'El centro de costo canónico está tipado como activo, pero todavía no existe una Ficha 360 canónica que permita enlazar la fila con seguridad.',
       non_asset_cost_center: 'El centro de costo existe canónicamente como área o administración; no se fuerza a una Ficha 360 de equipo.',
       cost_center_without_asset: 'Existe un centro de costo en la fuente, pero no una contraparte canónica exacta en el registro operacional de activos.',
