@@ -211,6 +211,7 @@ type Asset360Response = {
       review_flags?: unknown[];
     } | null;
     depreciation_identity_pending?: boolean;
+    depreciation_conflict_count?: number;
   };
   identityHistory?: Asset360IdentityHistoryRow[];
   operatingSpine?: {
