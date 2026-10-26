@@ -76,6 +76,10 @@ const RECONCILIATION_PAYLOAD_KEYS = [
   'economic_identity_conflict',
   'economic_identity_conflict_rows',
   'approval_basis',
+  'candidate_review_status',
+  'candidate_review_basis',
+  'candidate_review_source_count',
+  'candidate_review_verified_at',
 ] as const;
 
 function preservedReconciliationPayload(payload: unknown) {
