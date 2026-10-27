@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { ArrowRight, BadgeCheck } from 'lucide-react';
 import {
@@ -170,6 +171,9 @@ function freshnessText(value?: string | null) {
 }
 
 export function LaudusFinanceControlCard() {
+  const cockpitOpenedAt = useRef(Date.now());
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [decisionByPriority, setDecisionByPriority] = useState<Record<string, string>>({});
   const { data, error, isLoading } = useSWR<FinanceControl>(
     '/api/integrations/laudus/finance-control',
     fetcher,
@@ -211,6 +215,52 @@ export function LaudusFinanceControlCard() {
     : 0;
   const topSupplier = topSuppliers[0];
   const topSupplierSharePct = Number(data?.accountsPayable?.topSupplierSharePct || 0);
+  const fixedAssetCoveragePct = fixedAssetTotal > 0 ? Math.round((fixedAssetLinked / fixedAssetTotal) * 1000) / 10 : null;
+  const coveredDomains = [
+    data?.accountsPayable?.latestSync ? 'CxP' : null,
+    data?.payments?.latestSync ? 'Pagos' : null,
+    data?.costCenters?.total && costCenterUnresolved === 0 ? 'Centros' : null,
+    fixedAssetCoveragePct != null && fixedAssetCoveragePct >= 80 ? 'Activos' : null,
+  ].filter(Boolean);
+  const coverageLevel = coveredDomains.length >= 4 && fixedAssetCoveragePct != null && fixedAssetCoveragePct >= 95
+    ? 'C5'
+    : coveredDomains.length >= 4
+      ? 'C4'
+      : coveredDomains.length >= 3
+        ? 'C3'
+        : coveredDomains.length >= 2
+          ? 'C2'
+          : 'C1';
+  const evidenceLevel = Object.keys(decisionByPriority).length > 0 ? 'E2' : 'E1';
+  const workflowLevel = Object.keys(decisionByPriority).length > 0 ? 'L4' : 'L3';
+
+  const recordPriorityDecision = async (priorityKey: string, decision: 'accepted' | 'deferred' | 'rejected') => {
+    let reason = '';
+    if (decision === 'rejected') {
+      reason = window.prompt('¿Por qué esta prioridad no aplica?', '')?.trim() || '';
+      if (!reason) return;
+    }
+    setDecisionNotice(null);
+    try {
+      const response = await fetch('/api/value/finance-priority-decision', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priorityKey,
+          decision,
+          reason,
+          decisionLatencyMs: Math.max(0, Date.now() - cockpitOpenedAt.current),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
+      setDecisionByPriority((current) => ({ ...current, [priorityKey]: decision }));
+      setDecisionNotice('Decisión registrada. No se modificó Laudus ni el dato canónico.');
+    } catch (decisionError) {
+      setDecisionNotice(decisionError instanceof Error ? decisionError.message : 'No fue posible registrar la decisión.');
+    }
+  };
 
   const priorities = [
     freshnessIsStale
@@ -353,9 +403,26 @@ export function LaudusFinanceControlCard() {
                     <p className="truncate text-sm font-medium">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.evidence}</p>
                   </div>
-                  <Button asChild size="sm" variant={index === 0 ? 'default' : 'ghost'}>
-                    <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {decisionByPriority[item.key] ? (
+                      <Badge variant="outline">Registrada</Badge>
+                    ) : (
+                      <>
+                        <Button type="button" size="sm" variant={index === 0 ? 'default' : 'outline'} onClick={() => void recordPriorityDecision(item.key, 'accepted')}>
+                          Tomar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => void recordPriorityDecision(item.key, 'deferred')}>
+                          Postergar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => void recordPriorityDecision(item.key, 'rejected')}>
+                          No aplica
+                        </Button>
+                      </>
+                    )}
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -366,6 +433,32 @@ export function LaudusFinanceControlCard() {
             Sin decisiones financieras urgentes detectadas en la evidencia Laudus disponible.
           </div>
         )}
+
+        {decisionNotice ? <p className="text-xs text-muted-foreground">{decisionNotice}</p> : null}
+
+        <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3" aria-label="LEC Finanzas">
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Level</p>
+            <p className="mt-1 text-lg font-semibold">{workflowLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {workflowLevel === 'L4' ? 'Existe decisión humana explícita sobre una prioridad MOTIL.' : 'MOTIL prioriza; falta registrar una decisión humana.'}
+            </p>
+          </div>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Evidence</p>
+            <p className="mt-1 text-lg font-semibold">{evidenceLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {evidenceLevel === 'E2' ? 'Decisión humana registrada y trazable.' : 'Fuentes y prioridades registradas; aún sin decisión de Daniel en esta sesión.'}
+            </p>
+          </div>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Coverage</p>
+            <p className="mt-1 text-lg font-semibold">{coverageLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {coveredDomains.length}/4 dominios materiales cubiertos. Activos: {fixedAssetCoveragePct == null ? 'N/D' : `${number(fixedAssetCoveragePct)}%`} enlazados.
+            </p>
+          </div>
+        </section>
 
         <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
           <div className="bg-card px-4 py-3">
