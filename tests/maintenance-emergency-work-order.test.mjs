@@ -9,6 +9,7 @@ const viewer = await readFile(new URL('../app/api/maintenance/viewer-context/rou
 const createUi = await readFile(new URL('../components/maintenance/create-work-order.tsx', import.meta.url), 'utf8');
 const queueUi = await readFile(new URL('../components/maintenance/work-orders-queue.tsx', import.meta.url), 'utf8');
 const display = await readFile(new URL('../lib/maintenance/work-order-display.ts', import.meta.url), 'utf8');
+const timeline = await readFile(new URL('../components/shared/entity-timeline.tsx', import.meta.url), 'utf8');
 
 test('mechanics may create emergency OTe without gaining normal OT creation', () => {
   assert.match(access, /isEmergencyWorkOrderCreatorCargo/);
@@ -42,4 +43,29 @@ test('OT inbox exposes emergency creation separately from planned OT creation', 
   assert.match(queueUi, /OTe emergencia/);
   assert.match(createUi, /Registrar OTe/);
   assert.match(createUi, /workType: emergencyMode \? 'emergency'/);
+});
+
+
+test('OTe requires explicit operator-reported detection time and persists it as evidence', () => {
+  assert.match(createUi, /Fecha y hora de detección/);
+  assert.match(createUi, /detectedAt: emergencyMode/);
+  assert.match(createUi, /MOTIL no inferirá esta hora desde la creación de la OTe/);
+  assert.match(createRoute, /Indica cuándo se detectó la emergencia/);
+  assert.match(createRoute, /event_type: 'emergency_detected'/);
+  assert.match(createRoute, /operator-reported emergency detection time; not inferred from OT creation/);
+  assert.match(createRoute, /La detección de la OTe no puede estar en el futuro/);
+});
+
+
+test('OTe detection evidence is append-once and not silently rewritten', () => {
+  assert.match(createRoute, /eq\('event_type', 'emergency_detected'\)/);
+  assert.match(createRoute, /if \(existing\) return/);
+  assert.match(createRoute, /source_record_id: workOrder\.id/);
+  assert.doesNotMatch(createRoute, /from\('work_order_events'\)\.update\(/);
+});
+
+
+test('OTe detection is visible with time in the canonical entity timeline', () => {
+  assert.match(timeline, /emergency_detected: 'Emergencia detectada'/);
+  assert.match(timeline, /timeStyle: 'short'/);
 });

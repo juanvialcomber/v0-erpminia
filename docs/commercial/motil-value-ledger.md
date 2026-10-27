@@ -202,3 +202,68 @@ Estos umbrales habilitan escala inicial, no E4.
 - Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
 - Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
 - Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
+
+
+## 2026-10-27 — Mantención: cobertura de evidencia y gate LECTER
+
+- Universo operacional observado en `maintenance_work_orders`: 21 OT creadas con identidad operativa.
+- Responsable asignado: 21/21 (100%).
+- Equipo asociado: 21/21 (100%).
+- Cronómetro utilizado: 12/21 (57%).
+- Causa raíz registrada: 10/21 (48%).
+- Acción preventiva registrada: 9/21 (43%).
+- Horómetro registrado en OT: 0/21 (0%).
+- OT cerradas: 9/21.
+- OTe reales observadas al momento de la medición: 0; el flujo acaba de entrar a producción y se medirá como cohorte separada.
+- Tiempo medio cronometrado cuando existe registro: 115,4 minutos. Es tiempo observado de ejecución, no ahorro.
+- Tiempo medio creación → cierre entre las 9 OT cerradas: 72,48 horas. Incluye espera/proceso y no se interpreta como duración mecánica.
+- Clasificación LECTER actual: L4 / E2 / V4.
+- Atribución económica: NO MEDIBLE AÚN.
+- Pricing readiness: MARKET_ANCHORED.
+- Gate para avanzar a E3/V5: medir minutos administrativos por OT antes de MOTIL versus con MOTIL sobre cohortes comparables.
+- Regla de Numerin: toda cobertura publica numerador y denominador; ausencia de horómetro se mantiene como 0 observado, no se reemplaza por una inferencia.
+- Diseño: el cockpit existente `/dashboard/valor` se amplía; no se crea un segundo dashboard ni una segunda fuente maestra.
+
+
+## 2026-10-27 — Mantención: baseline administrativo manual instrumentado
+
+- Se añadió un baseline explícito para cronometrar administración manual de OT fuera de MOTIL.
+- Alcance: abrir, asignar, documentar, actualizar y cerrar administrativamente una OT por el método manual.
+- Exclusión obligatoria: no incluye reparación mecánica ni tiempo técnico de ejecución.
+- Persistencia: `audit_log`, acción `maintenance_admin_manual_baseline`.
+- Evidencia por muestra: duración total, número de OT y segundos administrativos por OT.
+- Gate inicial: mínimo 3 muestras comparables antes de usar la mediana como baseline operativo.
+- Seguridad: visible y registrable sólo desde el cockpit interno admin/superadmin; no altera OT ni datos canónicos.
+- Próximo paso: instrumentar una métrica equivalente del tiempo administrativo dentro de MOTIL para comparar baseline manual vs flujo asistido sin mezclar tiempo de reparación.
+
+
+## 2026-10-27 — Mantención: timing asistido comparable
+
+- Se instrumentó la creación de OT desde la primera interacción activa en el formulario hasta la creación exitosa.
+- Persistencia: `audit_log`, acción `maintenance_ot_create_interaction`, una muestra por OT creada sin replay idempotente.
+- Límite de calidad: se aceptan duraciones de 1 segundo a 30 minutos; fuera de ese rango no se promueven como muestra.
+- Semántica: mide interacción activa de apertura, captura inicial y asignación; excluye reparación mecánica y espera.
+- El baseline manual fue alineado al mismo alcance: apertura de OT, datos iniciales y asignación fuera de MOTIL.
+- Gate de comparación: ≥3 muestras manuales y ≥10 aperturas MOTIL instrumentadas.
+- Fórmula: `(mediana_manual - mediana_motil) / mediana_manual`.
+- Valores negativos se conservan; si MOTIL tarda más, debe mostrarse.
+- No se monetiza esta reducción hasta contar con costo/hora cargado válido, período comparable y suficiente atribución.
+- Investigación de diseño: arXiv:2609.07984 respalda event logs orientados a acción gobernada; arXiv:2509.08482 refuerza que las características del log afectan la evaluación y no deben confundirse con causalidad.
+
+
+## 2026-10-27 — OTe: cadena de evidencia desde detección a aprobación
+
+- La OTe exige hora de detección informada explícitamente por el operador.
+- MOTIL no infiere la detección a partir de la hora de creación.
+- Persistencia: `work_order_events.event_type = emergency_detected`, con `event_at` igual a la hora informada y actor trazable.
+- Validación: no acepta detección futura y limita retroactividad a 30 días.
+- Tramos medidos por cohorte OTe:
+  1. detección -> registro;
+  2. registro -> primer `timer_play`;
+  3. primer inicio -> cierre;
+  4. cierre -> aprobación humana;
+  5. detección -> aprobación.
+- La aprobación proviene de `work_order_supervisor_reviews.status = approved` y `reviewed_at`.
+- Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
+- No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
+- Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.

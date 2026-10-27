@@ -74,6 +74,8 @@ type WorkOrderPayload = {
   meter_unit?: string | null;
   costCenterId?: string | null;
   cost_center_id?: string | null;
+  detectedAt?: string | null;
+  detected_at?: string | null;
 };
 
 function isExplicitDemoRecord(row: WorkOrderRow) {
@@ -125,6 +127,72 @@ async function loadReviewMap(context: Awaited<ReturnType<typeof getOrganizationC
   if (error) throw error;
 
   return new Map(((data || []) as SupervisorReviewRow[]).map((review) => [review.work_order_id, review]));
+}
+
+
+async function recordEmergencyDetection(
+  context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
+  workOrder: WorkOrderRow,
+  detectedAtIso: string | null,
+) {
+  if (!detectedAtIso) return;
+
+  const { data: existing, error: existingError } = await context.supabase
+    .from('work_order_events')
+    .select('id')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', workOrder.id)
+    .eq('event_type', 'emergency_detected')
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return;
+
+  const { error } = await context.supabase.from('work_order_events').insert({
+    organization_id: context.organizationId,
+    work_order_id: workOrder.id,
+    canonical_asset_id: workOrder.canonical_asset_id,
+    event_type: 'emergency_detected',
+    event_at: detectedAtIso,
+    actor_id: context.authUserId,
+    source_table: 'maintenance_work_orders',
+    source_record_id: workOrder.id,
+    summary: 'Hora de detección de emergencia informada por operador',
+    payload: {
+      detected_at: detectedAtIso,
+      recorded_at: new Date().toISOString(),
+      semantics: 'operator-reported emergency detection time; not inferred from OT creation',
+    },
+  });
+  if (error) throw error;
+}
+
+async function recordAdminInteractionTiming(
+  context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
+  request: NextRequest,
+  workOrderId: string,
+) {
+  const raw = request.headers.get('x-motil-admin-interaction-ms');
+  if (!raw) return;
+  const durationMs = Number(raw);
+  if (!Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) return;
+
+  const { error } = await context.supabase.from('audit_log').insert({
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    action: 'maintenance_ot_create_interaction',
+    resource_type: 'maintenance_work_order',
+    resource_identifier: workOrderId,
+    new_values: {
+      duration_ms: Math.round(durationMs),
+      seconds: Math.round(durationMs / 1000),
+      metric_version: 'maintenance-admin-assisted-v1',
+      semantics: 'active user interaction from first input on OT creation form to successful creation; excludes mechanical execution and waiting',
+    },
+    user_agent: request.headers.get('user-agent'),
+    status: 'completed',
+  });
+  if (error) console.error('[maintenance/work-orders:admin-interaction]', error);
 }
 
 async function resolveExecutionPersonId(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }) {
@@ -289,6 +357,17 @@ export async function POST(request: NextRequest) {
     const workType = body.workType || body.work_type || 'corrective';
     const isGeneralWork = workType === 'general';
     const isEmergencyWork = workType === 'emergency';
+    const detectedAtRaw = body.detectedAt || body.detected_at || null;
+    let detectedAtIso: string | null = null;
+    if (isEmergencyWork) {
+      if (!detectedAtRaw) return NextResponse.json({ error: 'Indica cuándo se detectó la emergencia' }, { status: 400 });
+      const detectedMs = Date.parse(detectedAtRaw);
+      const nowMs = Date.now();
+      if (!Number.isFinite(detectedMs)) return NextResponse.json({ error: 'La hora de detección de la OTe no es válida' }, { status: 400 });
+      if (detectedMs > nowMs + 5 * 60 * 1000) return NextResponse.json({ error: 'La detección de la OTe no puede estar en el futuro' }, { status: 400 });
+      if (detectedMs < nowMs - 30 * 24 * 60 * 60 * 1000) return NextResponse.json({ error: 'La detección de la OTe no puede tener más de 30 días' }, { status: 400 });
+      detectedAtIso = new Date(detectedMs).toISOString();
+    }
     const reviewId = body.reviewId || body.review_id || null;
     let assignedPersonId = body.assignedPersonId || body.assigned_person_id || null;
     const requestedMaterials = body.requestedMaterials || body.requested_materials || null;
@@ -427,6 +506,12 @@ export async function POST(request: NextRequest) {
 
       await recordRequestedMaterials(context, assignedLinkedOrder as WorkOrderRow, requestedMaterials);
       await recordStructuredMaterials(context, assignedLinkedOrder.id, materials);
+      if (isEmergencyWork) {
+        await recordEmergencyDetection(context, assignedLinkedOrder as WorkOrderRow, detectedAtIso);
+      }
+      if (!review.linked_work_order_id) {
+        await recordAdminInteractionTiming(context, request, assignedLinkedOrder.id);
+      }
 
       return NextResponse.json({
         data: mapWorkOrder(assignedLinkedOrder as WorkOrderRow, asset),
@@ -461,6 +546,9 @@ export async function POST(request: NextRequest) {
       const replayedOrder = existingRequestOrder as WorkOrderRow;
       await recordRequestedMaterials(context, replayedOrder, requestedMaterials);
       await recordStructuredMaterials(context, replayedOrder.id, materials);
+      if (isEmergencyWork) {
+        await recordEmergencyDetection(context, replayedOrder, detectedAtIso);
+      }
       return NextResponse.json(
         {
           data: mapWorkOrder(replayedOrder, asset),
@@ -551,6 +639,12 @@ export async function POST(request: NextRequest) {
 
     await recordRequestedMaterials(context, createdOrder, requestedMaterials);
     await recordStructuredMaterials(context, createdOrder.id, materials);
+    if (isEmergencyWork) {
+      await recordEmergencyDetection(context, createdOrder, detectedAtIso);
+    }
+    if (!idempotentReplay) {
+      await recordAdminInteractionTiming(context, request, createdOrder.id);
+    }
     return NextResponse.json(
       {
         data: mapWorkOrder(createdOrder, asset),

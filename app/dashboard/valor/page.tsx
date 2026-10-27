@@ -65,6 +65,25 @@ type ApiResponse = {
     closedWorkOrders?: number;
     timerInstrumentedWorkOrders?: number;
     timerCoverage?: number | null;
+    assignmentCoverage?: number | null;
+    assetCoverage?: number | null;
+    rootCauseCoverage?: number | null;
+    preventiveActionCoverage?: number | null;
+    meterCoverage?: number | null;
+    assignmentCoverageCount?: number;
+    assetCoverageCount?: number;
+    rootCauseCoverageCount?: number;
+    preventiveActionCoverageCount?: number;
+    meterCoverageCount?: number;
+    emergencyWorkOrders?: number;
+    emergencyCycle?: {
+      detectedToRegistered?: { samples?: number; medianSeconds?: number | null };
+      registeredToStart?: { samples?: number; medianSeconds?: number | null };
+      startToClose?: { samples?: number; medianSeconds?: number | null };
+      closeToApproval?: { samples?: number; medianSeconds?: number | null };
+      endToEnd?: { samples?: number; medianSeconds?: number | null };
+      semantics?: string;
+    };
     observedExecutionSeconds?: number;
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
@@ -97,6 +116,17 @@ type ApiResponse = {
       procurementCommitment?: number;
       tracedPartsCost?: number;
     };
+    adminInteraction?: {
+      creationSamples?: number;
+      medianCreateSeconds?: number | null;
+      semantics?: string;
+    };
+    valueGate?: {
+      attribution?: string;
+      pricingReadiness?: string;
+      nextMeasurement?: string;
+      semantics?: string;
+    };
     semantics?: string;
   } | null;
   history?: { count?: number; series?: Array<Record<string, unknown>> } | null;
@@ -119,6 +149,13 @@ const money = (value: unknown) =>
     ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value)
     : '—';
 
+const duration = (seconds: number | null | undefined) => {
+  if (seconds == null || !Number.isFinite(seconds)) return '—';
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(seconds / 60)} min`;
+  return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(seconds / 3600)} h`;
+};
+
 export default function ValueScorecardPage() {
   const { data, error, isLoading } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
     refreshInterval: 15 * 60 * 1000,
@@ -132,6 +169,15 @@ export default function ValueScorecardPage() {
   const baselineStartedAt = useRef<number | null>(null);
   const [baselineRunning, setBaselineRunning] = useState(false);
   const [baselineNotice, setBaselineNotice] = useState<string | null>(null);
+  const maintenanceBaseline = useSWR<BaselineResponse>('/api/value/maintenance-baseline', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline de Mantención.');
+    return payload;
+  });
+  const maintenanceBaselineStartedAt = useRef<number | null>(null);
+  const [maintenanceBaselineRunning, setMaintenanceBaselineRunning] = useState(false);
+  const [maintenanceBaselineNotice, setMaintenanceBaselineNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -176,6 +222,19 @@ export default function ValueScorecardPage() {
   const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
   const maintenanceValue = data?.maintenanceValue || {};
   const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
+  const maintenanceManualSamples = maintenanceBaseline.data?.sampleCount || 0;
+  const maintenanceManualMedian = maintenanceBaseline.data?.medianSecondsPerCase ?? null;
+  const maintenanceAssistedSamples = maintenanceValue.adminInteraction?.creationSamples || 0;
+  const maintenanceAssistedMedian = maintenanceValue.adminInteraction?.medianCreateSeconds ?? null;
+  const maintenanceCreateComparisonReady =
+    maintenanceManualSamples >= 3 &&
+    maintenanceAssistedSamples >= 10 &&
+    maintenanceManualMedian != null &&
+    maintenanceAssistedMedian != null &&
+    maintenanceManualMedian > 0;
+  const maintenanceCreateReductionPct = maintenanceCreateComparisonReady
+    ? Math.round(((maintenanceManualMedian - maintenanceAssistedMedian) / maintenanceManualMedian) * 100)
+    : null;
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
@@ -202,6 +261,31 @@ export default function ValueScorecardPage() {
       await baseline.mutate();
     } catch (cause) {
       setBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline.');
+    }
+  };
+
+  const saveMaintenanceBaseline = async () => {
+    if (!maintenanceBaselineStartedAt.current) return;
+    const durationMs = Date.now() - maintenanceBaselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántas OT abriste y asignaste manualmente?', '3');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setMaintenanceBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline de Mantención.');
+      setMaintenanceBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por apertura manual de OT.`);
+      maintenanceBaselineStartedAt.current = null;
+      setMaintenanceBaselineRunning(false);
+      await maintenanceBaseline.mutate();
+    } catch (cause) {
+      setMaintenanceBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de Mantención.');
     }
   };
 
@@ -327,6 +411,138 @@ export default function ValueScorecardPage() {
             <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
         </div>
+      </section>
+
+      <section aria-label="Cobertura de evidencia de Mantención" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cobertura · calidad de evidencia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Qué parte del trabajo ya podemos medir</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Numerador y universo real. Cobertura no significa ahorro ni mejora causal.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ['Responsable', maintenanceValue.assignmentCoverage, maintenanceValue.assignmentCoverageCount],
+            ['Equipo', maintenanceValue.assetCoverage, maintenanceValue.assetCoverageCount],
+            ['Causa raíz', maintenanceValue.rootCauseCoverage, maintenanceValue.rootCauseCoverageCount],
+            ['Acción preventiva', maintenanceValue.preventiveActionCoverage, maintenanceValue.preventiveActionCoverageCount],
+            ['Horómetro', maintenanceValue.meterCoverage, maintenanceValue.meterCoverageCount],
+          ].map(([label, pctValue, countValue]) => <div key={String(label)} className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">{String(label)}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{pctValue == null ? '—' : `${number(pctValue)}%`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(countValue || 0)} de {number(maintenanceValue.workOrders || 0)} OT observadas.</p>
+          </div>)}
+        </div>
+        <div className="border-t px-5 py-4 text-sm">
+          <p className="font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {maintenanceValue.valueGate?.nextMeasurement || 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
+          </p>
+        </div>
+      </section>
+
+      <section aria-label="Cohorte OTe de emergencia" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">OTe · cohorte de emergencia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Detección → aprobación</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sólo tiempos respaldados por eventos reales. Un tramo sin timestamp queda sin medir.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ['Detección → registro', maintenanceValue.emergencyCycle?.detectedToRegistered],
+            ['Registro → inicio', maintenanceValue.emergencyCycle?.registeredToStart],
+            ['Inicio → cierre', maintenanceValue.emergencyCycle?.startToClose],
+            ['Cierre → aprobación', maintenanceValue.emergencyCycle?.closeToApproval],
+            ['Detección → aprobación', maintenanceValue.emergencyCycle?.endToEnd],
+          ].map(([label, metric]) => {
+            const row = metric as { samples?: number; medianSeconds?: number | null } | undefined;
+            return <div key={String(label)} className="bg-card px-5 py-5">
+              <p className="text-xs text-muted-foreground">{String(label)}</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(row?.medianSeconds)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{number(row?.samples || 0)} OTe medibles.</p>
+            </div>;
+          })}
+        </div>
+        <div className="border-t px-5 py-4 text-xs text-muted-foreground">
+          OTe observadas: {number(maintenanceValue.emergencyWorkOrders || 0)}. La hora de detección es informada por el operador; MOTIL no la infiere desde la creación.
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Baseline administrativo de Mantención">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Baseline E3 · Mantención</p>
+            <h2 className="mt-1 text-lg font-semibold">Baseline manual de apertura de OT</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cronometra sólo abrir una OT, registrar sus datos iniciales y asignar responsable por el método manual. No incluye reparación, espera, actualizaciones posteriores ni cierre.
+            </p>
+          </div>
+          {!maintenanceBaselineRunning ? (
+            <button
+              type="button"
+              onClick={() => {
+                maintenanceBaselineStartedAt.current = Date.now();
+                setMaintenanceBaselineRunning(true);
+                setMaintenanceBaselineNotice('Medición activa. Abre y asigna las OT manualmente sin usar MOTIL y vuelve al terminar.');
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Iniciar baseline Mantención
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void saveMaintenanceBaseline()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Finalizar medición
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Muestras manuales</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceBaseline.data?.sampleCount || 0)}</p>
+          </div>
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana manual por apertura</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceBaseline.data?.medianSecondsPerCase == null ? '—' : `${number(maintenanceBaseline.data.medianSecondsPerCase)} s`}
+            </p>
+          </div>
+        </div>
+        {maintenanceBaselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{maintenanceBaselineNotice}</p> : null}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Creación asistida en MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceValue.adminInteraction?.medianCreateSeconds == null ? '—' : `${number(maintenanceValue.adminInteraction.medianCreateSeconds)} s`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mediana sobre {number(maintenanceValue.adminInteraction?.creationSamples || 0)} OT con interacción instrumentada.
+            </p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Comparación manual vs MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceCreateReductionPct == null ? 'HOLD' : `${number(maintenanceCreateReductionPct)}%`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {maintenanceCreateReductionPct == null
+                ? `Requiere ≥3 muestras manuales y ≥10 aperturas MOTIL instrumentadas. Actual: ${maintenanceManualSamples}/3 y ${maintenanceAssistedSamples}/10.`
+                : 'Reducción observada del tiempo de apertura y asignación. Puede ser negativa si MOTIL demora más.'}
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
+        </p>
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">

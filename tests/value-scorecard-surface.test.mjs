@@ -105,3 +105,75 @@ test('maintenance shortage handoff measures only a real human-confirmed procurem
   assert.match(page, /Shortage → solicitud operativa/);
   assert.match(page, /la creación de la solicitud sigue requiriendo acción humana/);
 });
+
+
+test('maintenance value cockpit publishes evidence coverage with explicit numerator semantics and no ROI claim', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /assignmentCoverage/);
+  assert.match(api, /assetCoverage/);
+  assert.match(api, /rootCauseCoverage/);
+  assert.match(api, /preventiveActionCoverage/);
+  assert.match(api, /meterCoverage/);
+  assert.match(api, /attribution: 'NO_MEDIBLE_AUN'/);
+  assert.match(api, /pricingReadiness: 'MARKET_ANCHORED'/);
+  assert.match(api, /Minutos administrativos por OT antes de MOTIL versus con MOTIL/);
+  assert.match(api, /\.not\('created_by', 'is', null\)/);
+  assert.match(page, /Cobertura · calidad de evidencia/);
+  assert.match(page, /Numerador y universo real/);
+  assert.match(page, /Cobertura no significa ahorro ni mejora causal/);
+  assert.match(page, /Gate de valor/);
+});
+
+
+test('maintenance administrative baseline is isolated from mechanical execution and admin-only value evidence', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const route = fs.readFileSync('app/api/value/maintenance-baseline/route.ts', 'utf8');
+
+  assert.match(route, /maintenance_admin_manual_baseline/);
+  assert.match(route, /manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure/);
+  assert.match(route, /const managementRoles = new Set\(\['superadmin', 'admin'\]\)/);
+  assert.match(route, /seconds_per_case/);
+  assert.match(page, /Baseline manual de apertura de OT/);
+  assert.match(page, /No incluye reparación, espera, actualizaciones posteriores ni cierre/);
+  assert.match(page, /Gate inicial: ≥3 muestras manuales comparables/);
+});
+
+
+test('maintenance assisted creation timing is comparable only after matched-scope sample gates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const create = fs.readFileSync('components/maintenance/create-work-order.tsx', 'utf8');
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts', 'utf8');
+
+  assert.match(create, /X-Motil-Admin-Interaction-Ms/);
+  assert.match(route, /maintenance_ot_create_interaction/);
+  assert.match(route, /excludes mechanical execution and waiting/);
+  assert.match(api, /maintenanceCreateTimingValues/);
+  assert.match(api, /medianCreateSeconds/);
+  assert.match(page, /maintenanceManualSamples >= 3/);
+  assert.match(page, /maintenanceAssistedSamples >= 10/);
+  assert.match(page, /Reducción observada del tiempo de apertura y asignación/);
+  assert.match(page, /Puede ser negativa si MOTIL demora más/);
+});
+
+
+test('OTe value cohort measures only observed event-chain intervals through human approval', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /emergency_detected/);
+  assert.match(api, /work_order_supervisor_reviews/);
+  assert.match(api, /status === 'approved'/);
+  assert.match(api, /detectedToRegistered/);
+  assert.match(api, /registeredToStart/);
+  assert.match(api, /startToClose/);
+  assert.match(api, /closeToApproval/);
+  assert.match(api, /endToEnd/);
+  assert.match(api, /missing timestamps remain unmeasured/);
+  assert.match(page, /OTe · cohorte de emergencia/);
+  assert.match(page, /Detección → aprobación/);
+  assert.match(page, /Un tramo sin timestamp queda sin medir/);
+  assert.match(page, /MOTIL no la infiere desde la creación/);
+});

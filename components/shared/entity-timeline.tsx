@@ -28,7 +28,7 @@ const fetcher = async (url: string): Promise<Response> => {
 };
 
 const date = (value?: string | null) =>
-  value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(new Date(value)) : 'Sin fecha';
+  value ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Sin fecha';
 
 const money = (value: unknown, currency = 'CLP') =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -45,6 +45,9 @@ const eventLabels: Record<string, string> = {
   installation: 'Instalación',
   return: 'Devolución',
   completed: 'Cierre',
+  emergency_detected: 'Emergencia detectada',
+  timer_play: 'Trabajo iniciado',
+  work_order_closed: 'Trabajo cerrado',
 };
 
 export function EntityTimeline({ entity, id, limit = 20 }: { entity: Entity; id: string; limit?: number }) {
