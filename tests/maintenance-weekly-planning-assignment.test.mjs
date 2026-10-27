@@ -26,7 +26,8 @@ test('manual work-order creation requires assignee and date, with equipment or e
   assert.match(form, /scheduledDate,\s*plannedDurationHours/);
   assert.match(api, /if \(!canonicalAssetId && !isGeneralWork\)/);
   assert.match(api, /getMaintenanceWorkOrderCreationCapability\(context\)/);
-  assert.match(api, /if \(!creationCapability\.canCreate\)/);
+  assert.match(api, /const canCreateRequestedType = isEmergencyWork[\s\S]*creationCapability\.canCreateEmergency[\s\S]*creationCapability\.canCreate/);
+  assert.match(api, /if \(!canCreateRequestedType\)/);
   assert.match(api, /assigned_person_id: assignedPersonId/);
   assert.match(api, /scheduled_date: body\.scheduledDate \|\| body\.scheduled_date \|\| null/);
   assert.match(api, /\.eq\('organization_id', context\.organizationId\)/);
