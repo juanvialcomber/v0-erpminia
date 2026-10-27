@@ -463,10 +463,13 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
               const duration = Math.max(1, diffDays(clippedStart, clippedEnd) + 1);
               const width = Math.max(dayWidth - 12, duration * dayWidth - 12);
               const left = LABEL_WIDTH + startIndex * dayWidth + 6;
-              const barPrimary = duration === 1 ? (item.reference?.replace(/^OT-\d{4}-/, 'OT ') || item.kind) : item.title;
+              const compactReference = item.reference
+                ?.replace(/^OTE-(\d{4})-(\d+)$/i, 'OTe $2')
+                .replace(/^OT-(\d{4})-(\d+)$/i, 'OT $2');
+              const barPrimary = duration === 1 ? (compactReference || item.kind) : item.title;
               const barSecondary = item.historical && item.completed_at
-                ? `Completada ${formatShortDate(item.completed_at)}`
-                : `${item.reference || item.kind} · ${item.status_label}`;
+                ? `${item.kind} · Completada ${formatShortDate(item.completed_at)}`
+                : `${item.kind} · ${item.status_label}`;
 
               return (
                 <div key={item.id} className="relative border-b" style={{ width: totalWidth, height: ROW_HEIGHT }}>
@@ -496,7 +499,7 @@ export function ComfortableOperationalCalendar({ initialArea }: { initialArea?: 
                         {item.actionable_for_me && item.action_label ? <Badge variant="outline" className="shrink-0 text-[10px]">{item.action_label}</Badge> : null}
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-muted-foreground">
-                        {item.reference || item.kind}
+                        {item.reference ? `${item.kind} · ${item.reference}` : item.kind}
                         {item.owner ? ` · ${item.owner}` : ''}
                         {item.location ? ` · ${item.location}` : ''}
                       </p>
