@@ -132,10 +132,28 @@ test('maintenance administrative baseline is isolated from mechanical execution 
   const route = fs.readFileSync('app/api/value/maintenance-baseline/route.ts', 'utf8');
 
   assert.match(route, /maintenance_admin_manual_baseline/);
-  assert.match(route, /manual OT administration measured outside MOTIL assistance; excludes mechanical execution time/);
+  assert.match(route, /manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure/);
   assert.match(route, /const managementRoles = new Set\(\['superadmin', 'admin'\]\)/);
   assert.match(route, /seconds_per_case/);
-  assert.match(page, /Tiempo administrativo por OT fuera de MOTIL/);
-  assert.match(page, /No incluye reparación mecánica/);
-  assert.match(page, /Gate inicial: ≥3 muestras comparables/);
+  assert.match(page, /Baseline manual de apertura de OT/);
+  assert.match(page, /No incluye reparación, espera, actualizaciones posteriores ni cierre/);
+  assert.match(page, /Gate inicial: ≥3 muestras manuales comparables/);
+});
+
+
+test('maintenance assisted creation timing is comparable only after matched-scope sample gates', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const create = fs.readFileSync('components/maintenance/create-work-order.tsx', 'utf8');
+  const route = fs.readFileSync('app/api/maintenance/work-orders/route.ts', 'utf8');
+
+  assert.match(create, /X-Motil-Admin-Interaction-Ms/);
+  assert.match(route, /maintenance_ot_create_interaction/);
+  assert.match(route, /excludes mechanical execution and waiting/);
+  assert.match(api, /maintenanceCreateTimingValues/);
+  assert.match(api, /medianCreateSeconds/);
+  assert.match(page, /maintenanceManualSamples >= 3/);
+  assert.match(page, /maintenanceAssistedSamples >= 10/);
+  assert.match(page, /Reducción observada del tiempo de apertura y asignación/);
+  assert.match(page, /Puede ser negativa si MOTIL demora más/);
 });
