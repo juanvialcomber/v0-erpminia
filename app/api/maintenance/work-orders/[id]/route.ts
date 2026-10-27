@@ -188,14 +188,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = (await request.json()) as WorkOrderPatchPayload;
     const { data: currentOrderState, error: currentOrderStateError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('status')
+      .select('status,work_type,priority')
       .eq('id', id)
       .eq('organization_id', context.organizationId)
       .single();
     if (currentOrderStateError) throw currentOrderStateError;
     const currentStatus = String(currentOrderState?.status || '').toLowerCase();
+    const currentWorkType = String(currentOrderState?.work_type || '').toLowerCase();
     if (['completed', 'closed', 'cancelled', 'canceled'].includes(currentStatus)) {
       return NextResponse.json({ error: 'La OT ya está cerrada o anulada y no se puede modificar.' }, { status: 409 });
+    }
+    if (currentWorkType === 'emergency') {
+      if (body.work_type !== undefined && String(body.work_type || '').toLowerCase() !== 'emergency') {
+        return NextResponse.json({ error: 'Una OTe no puede convertirse en una OT normal.' }, { status: 409 });
+      }
+      if (body.priority !== undefined && String(body.priority || '').toLowerCase() !== 'critical') {
+        return NextResponse.json({ error: 'Una OTe conserva prioridad crítica.' }, { status: 409 });
+      }
     }
     if (currentStatus === 'in_progress' && hasModuleWrite) {
       const structuralFields = ['work_type', 'priority', 'scheduled_date', 'assigned_person_id', 'cost_center_id']
