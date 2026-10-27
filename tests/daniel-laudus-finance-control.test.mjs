@@ -209,3 +209,37 @@ test('Daniel coverage level is explicit about four finance domains and partial a
   assert.match(card, /'Activos'/);
   assert.match(card, /Activos: .*enlazados/s);
 });
+
+
+test('Daniel L4 decisions remain open until a human outcome is recorded', () => {
+  const outcomeRoute = fs.readFileSync('app/api/value/finance-priority-outcome/route.ts','utf8');
+  assert.match(outcomeRoute, /finance_priority_outcome/);
+  assert.match(outcomeRoute, /resolved/);
+  assert.match(outcomeRoute, /partially_resolved/);
+  assert.match(outcomeRoute, /no_change/);
+  assert.match(outcomeRoute, /escalated/);
+  assert.match(outcomeRoute, /Sólo una prioridad tomada puede registrar outcome/);
+  assert.match(card, /Decisiones tomadas pendientes de resultado/);
+  assert.match(card, /Resuelta/);
+  assert.match(card, /Parcial/);
+  assert.match(card, /Sin cambio/);
+  assert.match(card, /Escalada/);
+});
+
+test('Daniel reaches L5 only with an observed closed outcome, not with a positive claim', () => {
+  const outcomeRoute = fs.readFileSync('app/api/value/finance-priority-outcome/route.ts','utf8');
+  assert.match(card, /closedOutcomeCount > 0 \? 'L5'/);
+  assert.match(outcomeRoute, /decision_to_outcome_seconds/);
+  assert.match(outcomeRoute, /not savings, avoided cost or causal attribution/);
+  assert.match(card, /no implica que el resultado haya sido positivo/);
+  assert.match(card, /no se declaró ahorro/);
+});
+
+test('finance outcome closes only an existing accepted decision and prevents duplicates', () => {
+  const outcomeRoute = fs.readFileSync('app/api/value/finance-priority-outcome/route.ts','utf8');
+  assert.match(outcomeRoute, /finance_priority_decision/);
+  assert.match(outcomeRoute, /decisionResult\.data\.new_values\?\.decision/);
+  assert.match(outcomeRoute, /Esta prioridad ya tiene un resultado registrado/);
+  assert.match(outcomeRoute, /canonicalMutationExecuted: false/);
+  assert.match(outcomeRoute, /laudusMutationExecuted: false/);
+});
