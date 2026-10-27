@@ -125,3 +125,17 @@ test('maintenance value cockpit publishes evidence coverage with explicit numera
   assert.match(page, /Cobertura no significa ahorro ni mejora causal/);
   assert.match(page, /Gate de valor/);
 });
+
+
+test('maintenance administrative baseline is isolated from mechanical execution and admin-only value evidence', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const route = fs.readFileSync('app/api/value/maintenance-baseline/route.ts', 'utf8');
+
+  assert.match(route, /maintenance_admin_manual_baseline/);
+  assert.match(route, /manual OT administration measured outside MOTIL assistance; excludes mechanical execution time/);
+  assert.match(route, /const managementRoles = new Set\(\['superadmin', 'admin'\]\)/);
+  assert.match(route, /seconds_per_case/);
+  assert.match(page, /Tiempo administrativo por OT fuera de MOTIL/);
+  assert.match(page, /No incluye reparación mecánica/);
+  assert.match(page, /Gate inicial: ≥3 muestras comparables/);
+});
