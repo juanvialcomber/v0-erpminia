@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const route = await readFile(new URL('../app/api/maintenance/work-orders/route.ts', import.meta.url), 'utf8');
 
 test('OT numbering derives from the latest yearly sequence instead of row count', () => {
-  assert.match(route, /const prefix = `OT-\$\{year\}-`/);
+  assert.match(route, /const prefix = isEmergencyWork \? `OTE-\$\{year\}-` : `OT-\$\{year\}-`/);
   assert.match(route, /like\('work_order_number', `\$\{prefix\}%`\)/);
   assert.match(route, /order\('work_order_number', \{ ascending: false \}\)/);
   assert.doesNotMatch(route, /count:\s*'exact'/);
