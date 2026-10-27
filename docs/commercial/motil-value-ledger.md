@@ -223,3 +223,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Gate para avanzar a E3/V5: medir minutos administrativos por OT antes de MOTIL versus con MOTIL sobre cohortes comparables.
 - Regla de Numerin: toda cobertura publica numerador y denominador; ausencia de horómetro se mantiene como 0 observado, no se reemplaza por una inferencia.
 - Diseño: el cockpit existente `/dashboard/valor` se amplía; no se crea un segundo dashboard ni una segunda fuente maestra.
+
+
+## 2026-10-27 — Mantención: baseline administrativo manual instrumentado
+
+- Se añadió un baseline explícito para cronometrar administración manual de OT fuera de MOTIL.
+- Alcance: abrir, asignar, documentar, actualizar y cerrar administrativamente una OT por el método manual.
+- Exclusión obligatoria: no incluye reparación mecánica ni tiempo técnico de ejecución.
+- Persistencia: `audit_log`, acción `maintenance_admin_manual_baseline`.
+- Evidencia por muestra: duración total, número de OT y segundos administrativos por OT.
+- Gate inicial: mínimo 3 muestras comparables antes de usar la mediana como baseline operativo.
+- Seguridad: visible y registrable sólo desde el cockpit interno admin/superadmin; no altera OT ni datos canónicos.
+- Próximo paso: instrumentar una métrica equivalente del tiempo administrativo dentro de MOTIL para comparar baseline manual vs flujo asistido sin mezclar tiempo de reparación.
