@@ -363,7 +363,7 @@ test('Asset 360 review summary counts only pending decisions as actionable',()=>
   assert.match(candidates,/readyDualFinance/);
   assert.match(candidates,/readyPurchaseEvidence/);
   assert.match(candidates,/seguro\+depreciación/);
-  assert.match(candidates,/PPU\+Compras/);
+  assert.match(candidates,/PPU exacta \+ centro de costo en Compras/);
 });
 
 
