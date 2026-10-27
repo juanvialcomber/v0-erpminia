@@ -127,6 +127,35 @@ async function loadReviewMap(context: Awaited<ReturnType<typeof getOrganizationC
   return new Map(((data || []) as SupervisorReviewRow[]).map((review) => [review.work_order_id, review]));
 }
 
+
+async function recordAdminInteractionTiming(
+  context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
+  request: NextRequest,
+  workOrderId: string,
+) {
+  const raw = request.headers.get('x-motil-admin-interaction-ms');
+  if (!raw) return;
+  const durationMs = Number(raw);
+  if (!Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) return;
+
+  const { error } = await context.supabase.from('audit_log').insert({
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    action: 'maintenance_ot_create_interaction',
+    resource_type: 'maintenance_work_order',
+    resource_identifier: workOrderId,
+    new_values: {
+      duration_ms: Math.round(durationMs),
+      seconds: Math.round(durationMs / 1000),
+      metric_version: 'maintenance-admin-assisted-v1',
+      semantics: 'active user interaction from first input on OT creation form to successful creation; excludes mechanical execution and waiting',
+    },
+    user_agent: request.headers.get('user-agent'),
+    status: 'completed',
+  });
+  if (error) console.error('[maintenance/work-orders:admin-interaction]', error);
+}
+
 async function resolveExecutionPersonId(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }) {
   const { data: profile, error: profileError } = await context.supabase
     .from('profiles')
@@ -427,6 +456,9 @@ export async function POST(request: NextRequest) {
 
       await recordRequestedMaterials(context, assignedLinkedOrder as WorkOrderRow, requestedMaterials);
       await recordStructuredMaterials(context, assignedLinkedOrder.id, materials);
+      if (!review.linked_work_order_id) {
+        await recordAdminInteractionTiming(context, request, assignedLinkedOrder.id);
+      }
 
       return NextResponse.json({
         data: mapWorkOrder(assignedLinkedOrder as WorkOrderRow, asset),
