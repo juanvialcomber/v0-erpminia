@@ -105,14 +105,6 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
   const canCreateWorkOrder = Boolean(viewerContext?.canCreateWorkOrder);
   const canCreateEmergencyWorkOrder = Boolean(viewerContext?.canCreateEmergencyWorkOrder);
 
-  /* legacy inline fetcher removed */
-  /*
-    const response = await fetch(url, { credentials: 'include' });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error || 'request failed');
-    return payload;
-  */
-
   const workOrders = Array.isArray(data?.workOrders) ? (data.workOrders as WorkOrderItem[]) : [];
   const operationalWorkOrders = workOrders.filter((order) => order.record_scope !== 'historical');
   const historicalWorkOrders = workOrders.filter((order) => order.record_scope === 'historical');
