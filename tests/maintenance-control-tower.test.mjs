@@ -277,3 +277,13 @@ test('wallboard excludes conflicted inventory from usable stock coverage', () =>
   assert.match(page, /Productos por revisar/);
   assert.match(page, /Productos con stock disponible/);
 });
+
+
+test('regressive or unknown-unit email meters do not drive derived preventive calculations', () => {
+  assert.match(api, /review_reason/);
+  assert.match(api, /meter_sequence_decrease/);
+  assert.match(api, /emailMeterSequenceSafe/);
+  assert.match(api, /emailMeterUnitSafe/);
+  assert.match(api, /emailMeterTrusted/);
+  assert.match(api, /const emailMeterUsable = emailMeterTrusted/);
+});
