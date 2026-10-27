@@ -202,3 +202,24 @@ Estos umbrales habilitan escala inicial, no E4.
 - Evidencia automática disponible por ciclo: decisiones preparadas, críticas P1/P2, programadas dentro de 7 días, bloqueos reales por materiales, planes MOTIL pendientes de revisión y señales retenidas por evidencia antigua.
 - Gate E3: medir tiempo de preparación/revisión semanal antes y después de uso real, tasa de aceptación/corrección de las propuestas y outcomes de ejecución (cumplimiento, faltantes, ciclo y reincidencia).
 - Valor comercial futuro: demostrar capacidad de planificación recuperada y menor dependencia de reconstrucción manual, sin convertir cantidad de alertas o casos priorizados en ahorro.
+
+
+## 2026-10-27 — Mantención: cobertura de evidencia y gate LECTER
+
+- Universo operacional observado en `maintenance_work_orders`: 21 OT creadas con identidad operativa.
+- Responsable asignado: 21/21 (100%).
+- Equipo asociado: 21/21 (100%).
+- Cronómetro utilizado: 12/21 (57%).
+- Causa raíz registrada: 10/21 (48%).
+- Acción preventiva registrada: 9/21 (43%).
+- Horómetro registrado en OT: 0/21 (0%).
+- OT cerradas: 9/21.
+- OTe reales observadas al momento de la medición: 0; el flujo acaba de entrar a producción y se medirá como cohorte separada.
+- Tiempo medio cronometrado cuando existe registro: 115,4 minutos. Es tiempo observado de ejecución, no ahorro.
+- Tiempo medio creación → cierre entre las 9 OT cerradas: 72,48 horas. Incluye espera/proceso y no se interpreta como duración mecánica.
+- Clasificación LECTER actual: L4 / E2 / V4.
+- Atribución económica: NO MEDIBLE AÚN.
+- Pricing readiness: MARKET_ANCHORED.
+- Gate para avanzar a E3/V5: medir minutos administrativos por OT antes de MOTIL versus con MOTIL sobre cohortes comparables.
+- Regla de Numerin: toda cobertura publica numerador y denominador; ausencia de horómetro se mantiene como 0 observado, no se reemplaza por una inferencia.
+- Diseño: el cockpit existente `/dashboard/valor` se amplía; no se crea un segundo dashboard ni una segunda fuente maestra.
