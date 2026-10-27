@@ -126,6 +126,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const searchParams = useSearchParams();
   const initialAssetId = searchParams.get('assetId') || '';
   const reviewId = searchParams.get('reviewId') || '';
+  const emergencyMode = searchParams.get('mode') === 'emergency' || searchParams.get('workType') === 'emergency';
   const [assignedPersonId, setAssignedPersonId] = useState('');
   const [canonicalAssetId, setCanonicalAssetId] = useState(initialAssetId);
   const [assetQuery, setAssetQuery] = useState('');
@@ -134,9 +135,9 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [materialQuery, setMaterialQuery] = useState('');
   const [materialQuantity, setMaterialQuantity] = useState('1');
   const [plannedMaterials, setPlannedMaterials] = useState<PlannedMaterial[]>([]);
-  const [workType, setWorkType] = useState(searchParams.get('workType') || 'corrective');
-  const [generalWork, setGeneralWork] = useState(searchParams.get('workType') === 'general');
-  const [priority, setPriority] = useState(searchParams.get('priority') || 'medium');
+  const [workType, setWorkType] = useState(emergencyMode ? 'emergency' : (searchParams.get('workType') || 'corrective'));
+  const [generalWork, setGeneralWork] = useState(!emergencyMode && searchParams.get('workType') === 'general');
+  const [priority, setPriority] = useState(emergencyMode ? 'critical' : (searchParams.get('priority') || 'medium'));
   const [scheduledDate, setScheduledDate] = useState(searchParams.get('scheduledDate') || chileTodayDateKey());
   const [plannedHours, setPlannedHours] = useState(searchParams.get('plannedDurationHours') || '');
   const [meterReading, setMeterReading] = useState('');
@@ -154,6 +155,9 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const { data, error, isLoading, mutate } = useSWR('/api/maintenance/equipment', fetcher, { revalidateOnFocus: false });
   const { data: viewerContext } = useSWR('/api/maintenance/viewer-context', fetcher, { revalidateOnFocus: false });
   const workshopSite = (viewerContext?.workshopSite || null) as string | null;
+  const emergencySelfAssignOnly = Boolean(viewerContext?.emergencySelfAssignOnly);
+  const viewerPersonId = String(viewerContext?.personId || '');
+  const viewerPersonName = String(viewerContext?.personName || '');
   const { data: assigneeData, error: assigneeError, isLoading: assigneesLoading } = useSWR('/api/maintenance/assignees', fetcher, { revalidateOnFocus: false });
   const normalizedMaterialQuery = materialQuery.trim();
   const { data: materialData, isLoading: materialsLoading } = useSWR(
@@ -191,6 +195,11 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   }, [selectedAsset, assetQuery]);
 
   useEffect(() => {
+    if (!emergencyMode || !emergencySelfAssignOnly || !viewerPersonId) return;
+    setAssignedPersonId(viewerPersonId);
+  }, [emergencyMode, emergencySelfAssignOnly, viewerPersonId]);
+
+  useEffect(() => {
     if (!review) return;
     if (!canonicalAssetId && review.canonical_asset_id) setCanonicalAssetId(review.canonical_asset_id);
     if (!title.trim()) {
@@ -206,7 +215,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   }, [review, canonicalAssetId, title, description, t]);
 
   const validate = () => {
-    if (!assignedPersonId) return 'Selecciona primero al responsable de la OT';
+    if (!assignedPersonId) return emergencyMode ? 'No se pudo vincular tu perfil operativo a la OTe' : 'Selecciona primero al responsable de la OT';
+    if (emergencyMode && !canonicalAssetId) return 'Selecciona el equipo afectado por la emergencia';
     if (!generalWork && !canonicalAssetId) return t.validation.assetRequired;
     if (review && review.canonical_asset_id !== canonicalAssetId) return t.validation.reviewAssetMismatch;
     if (!title.trim()) return t.validation.titleRequired;
@@ -257,8 +267,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
         canonicalProductId: item.productId,
         quantityRequired: item.quantityRequired,
       })),
-      workType: generalWork ? 'general' : workType,
-      priority,
+      workType: emergencyMode ? 'emergency' : (generalWork ? 'general' : workType),
+      priority: emergencyMode ? 'critical' : priority,
       scheduledDate,
       plannedDurationHours: plannedHours ? Number(plannedHours) : 0,
       meterReading: meterReading ? Number(meterReading) : null,
@@ -281,7 +291,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || t.createError);
       clearRequestId();
-      toast.success(reviewId ? t.toastLinked : t.toastCreated);
+      toast.success(emergencyMode ? 'OTe registrada' : (reviewId ? t.toastLinked : t.toastCreated));
       router.push(`/dashboard/mantenimiento/ordenes-trabajo/${payload.data.id}`);
     } catch (submitError) {
       toast.error(submitError instanceof Error ? submitError.message : t.createError);
@@ -295,10 +305,12 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
     <div className="mx-auto max-w-3xl space-y-5">
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderEyebrow>{t.eyebrow}</PageHeaderEyebrow>
-          <PageHeaderTitle>{t.title}</PageHeaderTitle>
+          <PageHeaderEyebrow>{emergencyMode ? 'Mantenimiento · Emergencia' : t.eyebrow}</PageHeaderEyebrow>
+          <PageHeaderTitle>{emergencyMode ? 'Registrar OTe' : t.title}</PageHeaderTitle>
           <PageHeaderDescription>
-            {workshopSite ? `Mina ${workshopSite}. ` : ''}Elige primero al responsable, luego busca el equipo y define el trabajo. Los insumos son opcionales.
+            {workshopSite ? `Mina ${workshopSite}. ` : ''}{emergencyMode
+              ? 'Registra una intervención de emergencia ya ocurrida o que debe ejecutarse de inmediato. Quedará trazada como OTe.'
+              : 'Elige primero al responsable, luego busca el equipo y define el trabajo. Los insumos son opcionales.'}
           </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
@@ -333,12 +345,17 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       <Card className="shadow-none">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">1. Responsable</CardTitle>
-          <CardDescription>Primero define quién será responsable de la OT.</CardDescription>
+          <CardDescription>{emergencyMode && emergencySelfAssignOnly ? 'La OTe queda asignada automáticamente a quien la registra.' : 'Primero define quién será responsable de la OT.'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="assignee">Responsable de la OT</Label>
-            <Select value={assignedPersonId} onValueChange={setAssignedPersonId} disabled={assigneesLoading || Boolean(assigneeError)}>
+            <Label htmlFor="assignee">{emergencyMode ? 'Responsable de la OTe' : 'Responsable de la OT'}</Label>
+            {emergencyMode && emergencySelfAssignOnly ? (
+              <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <p className="font-medium">{viewerPersonName || 'Tu usuario operativo'}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Autoasignada por tratarse de una OTe creada desde un perfil de ejecución.</p>
+              </div>
+            ) : <Select value={assignedPersonId} onValueChange={setAssignedPersonId} disabled={assigneesLoading || Boolean(assigneeError)}>
               <SelectTrigger id="assignee">
                 <SelectValue placeholder={assigneesLoading ? 'Cargando responsables...' : 'Seleccionar responsable'} />
               </SelectTrigger>
@@ -349,8 +366,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            {assigneeError ? <p className="text-xs text-destructive">{assigneeError.message}</p> : null}
+            </Select>}
+            {assigneeError && !(emergencyMode && emergencySelfAssignOnly) ? <p className="text-xs text-destructive">{assigneeError.message}</p> : null}
           </div>
         </CardContent>
       </Card>
@@ -358,10 +375,10 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       <Card className="shadow-none">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">2. Qué hay que hacer</CardTitle>
-          <CardDescription>Puede ser un trabajo sobre un equipo o una tarea general del taller.</CardDescription>
+          <CardDescription>{emergencyMode ? 'Una OTe siempre debe quedar asociada al equipo afectado.' : 'Puede ser un trabajo sobre un equipo o una tarea general del taller.'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          {!reviewId ? <div className="grid grid-cols-2 gap-2">
+          {!reviewId && !emergencyMode ? <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant={!generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(false); if (workType === 'general') setWorkType('corrective'); }}>En equipo</Button>
             <Button type="button" variant={generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(true); setCanonicalAssetId(''); setAssetQuery(''); setWorkType('general'); }}>Trabajo general del taller</Button>
           </div> : null}
@@ -413,19 +430,20 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label>{t.fields.workType}</Label>
-              <Select value={workType} onValueChange={setWorkType}>
+              <Select value={workType} onValueChange={setWorkType} disabled={emergencyMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="corrective">{t.workTypes.corrective}</SelectItem>
                   <SelectItem value="preventive">{t.workTypes.preventive}</SelectItem>
                   <SelectItem value="inspection">{t.workTypes.inspection}</SelectItem>
                   <SelectItem value="predictive">{t.workTypes.predictive}</SelectItem>
+                  {emergencyMode ? <SelectItem value="emergency">Emergencia</SelectItem> : null}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>{t.fields.priority}</Label>
-              <Select value={priority} onValueChange={setPriority}>
+              <Select value={priority} onValueChange={setPriority} disabled={emergencyMode}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="low">{t.priorities.low}</SelectItem>
@@ -496,7 +514,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       <Card className="shadow-none">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">3. Cuándo</CardTitle>
-          <CardDescription>La OT puede crearse sin duración ni horómetro. Los insumos de bodega son opcionales.</CardDescription>
+          <CardDescription>{emergencyMode ? 'La OTe se registra con prioridad crítica. Fecha de intervención requerida.' : 'La OT puede crearse sin duración ni horómetro. Los insumos de bodega son opcionales.'}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
@@ -531,12 +549,12 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       </details>
 
       <div className="sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur">
-        <p className="hidden text-sm text-muted-foreground sm:block">El responsable, equipo e insumos quedan ligados a la OT desde el inicio.</p>
+        <p className="hidden text-sm text-muted-foreground sm:block">{emergencyMode ? 'La OTe quedará ligada al equipo, al ejecutor y a toda la evidencia de cierre.' : 'El responsable, equipo e insumos quedan ligados a la OT desde el inicio.'}</p>
         <div className="ml-auto flex gap-2">
           <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">{t.cancel}</Link></Button>
           <Button onClick={submit} disabled={submitting || isLoading || assigneesLoading || Boolean(error) || Boolean(assigneeError) || reviewLoading || Boolean(reviewError) || Boolean(review?.linked_work_order_id)}>
             {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            {submitting ? t.creating : reviewId ? t.createAndResolve : t.create}
+            {submitting ? t.creating : emergencyMode ? 'Registrar OTe' : reviewId ? t.createAndResolve : t.create}
           </Button>
         </div>
       </div>
