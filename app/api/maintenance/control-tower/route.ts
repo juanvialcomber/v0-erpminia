@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
         .from('motil_email_source_manifest')
         .select('email_sent_at,email_sender,email_subject,filename,ingest_state,domain')
         .eq('organization_id', context.organizationId)
-        .eq('domain', 'maintenance')
+        .in('domain', ['maintenance', 'maintenance_equipment'])
         .ilike('email_sender', '%@lapatagua.cl%')
         .order('email_sent_at', { ascending: false, nullsFirst: false })
         .limit(1)
