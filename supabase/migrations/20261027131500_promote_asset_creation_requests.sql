@@ -115,7 +115,7 @@ begin
           resolution_note=coalesce(resolution_note,'')||
             case when coalesce(resolution_note,'')='' then '' else E'\n' end||
             'Ficha 360 canónica vinculada al activo '||v_existing.asset_code||'.',
-          resolved_at=coalesce(resolved_at,now()),updated_at=now()
+          updated_at=now()
       where id=v_row.reconciliation_review_id and status='accepted';
 
       v_results := v_results||jsonb_build_array(jsonb_build_object(
@@ -217,7 +217,7 @@ begin
         resolution_note=coalesce(resolution_note,'')||
           case when coalesce(resolution_note,'')='' then '' else E'\n' end||
           'Ficha 360 canónica creada como '||v_asset_code||'.',
-        resolved_at=now(),updated_at=now()
+        updated_at=now()
     where id=v_row.reconciliation_review_id and status='accepted';
 
     v_applied := v_applied+1;
