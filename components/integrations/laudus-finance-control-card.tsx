@@ -71,11 +71,16 @@ type FinanceControl = {
   };
   costCenters?: {
     total?: number;
-    resolvedExact?: number;
+    matched?: number;
+    ignored?: number;
+    pending?: number;
+    candidate?: number;
+    conflict?: number;
     unresolved?: number;
     discontinued?: number;
     latestSync?: string | null;
     reconciliationRequired?: boolean;
+    semantics?: string;
   };
   accounting?: {
     entries?: number;
@@ -94,6 +99,8 @@ type FinanceControl = {
   };
   freshness?: {
     latestOperationalSync?: string | null;
+    operationalSyncAgeDays?: number | null;
+    expectedCadence?: string;
   };
 };
 
@@ -191,6 +198,10 @@ export function LaudusFinanceControlCard() {
   const dueByMonth = data?.accountsPayable?.dueByMonth || [];
   const topSuppliers = data?.accountsPayable?.topSuppliers || [];
   const costCenterUnresolved = Number(data?.costCenters?.unresolved || 0);
+  const costCenterMatched = Number(data?.costCenters?.matched || 0);
+  const costCenterIgnored = Number(data?.costCenters?.ignored || 0);
+  const operationalSyncAgeDays = data?.freshness?.operationalSyncAgeDays;
+  const freshnessIsStale = operationalSyncAgeDays !== null && operationalSyncAgeDays !== undefined && operationalSyncAgeDays > 0;
   const accountingCurrent = Boolean(data?.accounting?.currentEnoughForExecutiveUse);
   const fixedAssetLinked = Number(data?.fixedAssets?.linkedToMotil || 0);
   const fixedAssetTotal = Number(data?.fixedAssets?.total || 0);
@@ -202,6 +213,16 @@ export function LaudusFinanceControlCard() {
   const topSupplierSharePct = Number(data?.accountsPayable?.topSupplierSharePct || 0);
 
   const priorities = [
+    freshnessIsStale
+      ? {
+          key: 'freshness',
+          rank: 130,
+          title: 'Revisar actualización de Laudus',
+          evidence: `Última sincronización operativa: ${shortDate(data?.freshness?.latestOperationalSync)} · ${number(operationalSyncAgeDays)} día(s) de antigüedad`,
+          action: 'Revisar fuente',
+          href: '/dashboard/finanzas/fuentes',
+        }
+      : null,
     overduePayableAmount > 0
       ? {
           key: 'overdue',
@@ -275,9 +296,12 @@ export function LaudusFinanceControlCard() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
             <p className="text-xs font-medium">Laudus · fuente financiera</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {isLoading ? 'Actualizando…' : freshnessText(data?.freshness?.latestOperationalSync)}
-          </p>
+          <div className="flex items-center gap-2">
+            {!isLoading && freshnessIsStale ? <Badge variant="destructive">Dato atrasado</Badge> : null}
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? 'Actualizando…' : freshnessText(data?.freshness?.latestOperationalSync)}
+            </p>
+          </div>
         </div>
         <section className="grid gap-px overflow-hidden rounded-lg border bg-border lg:grid-cols-[1.4fr_1fr]" aria-label="Resumen financiero ejecutivo">
           <div className="bg-card p-5 md:p-6">
@@ -351,6 +375,7 @@ export function LaudusFinanceControlCard() {
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Centros por conciliar</p>
             <p className="mt-1 text-lg font-semibold">{number(costCenterUnresolved)}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{number(costCenterMatched)} conciliados · {number(costCenterIgnored)} cerrados/ignorados</p>
           </div>
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Activos enlazados</p>
@@ -406,10 +431,14 @@ export function LaudusFinanceControlCard() {
                 <div className="flex items-center justify-between gap-3 px-3 py-3">
                   <div>
                     <p className="text-sm font-medium">Centros por conciliar</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{number(costCenterUnresolved)} centros sin cruce exacto MOTIL</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {costCenterUnresolved > 0
+                        ? `${number(costCenterUnresolved)} centros todavía requieren revisión`
+                        : `Sin pendientes · ${number(costCenterMatched)} conciliados y ${number(costCenterIgnored)} cerrados/ignorados`}
+                    </p>
                   </div>
                   <Button asChild size="sm" variant="outline">
-                    <Link href="/dashboard/finanzas/centros">Conciliar</Link>
+                    <Link href="/dashboard/finanzas/centros">{costCenterUnresolved > 0 ? 'Conciliar' : 'Ver centros'}</Link>
                   </Button>
                 </div>
               </div>
