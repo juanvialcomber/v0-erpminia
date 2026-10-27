@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -52,6 +52,14 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,material_requirement_count,material_shortage_count,procurement_request_count,procurement_order_count,parts_installed,procurement_order_amount,parts_cost')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_ot_create_interaction')
+        .eq('resource_type', 'maintenance_work_order')
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
     if (current.error) throw current.error;
@@ -61,6 +69,7 @@ export async function GET(request: NextRequest) {
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
+    if (maintenanceAdminTiming.error) throw maintenanceAdminTiming.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -101,6 +110,23 @@ export async function GET(request: NextRequest) {
       }
     }
     const timingValues = Array.from(latestTimingByInvoice.values()).sort((a, b) => a - b);
+    const maintenanceCreateTimingByOrder = new Map<string, number>();
+    for (const row of maintenanceAdminTiming.data || []) {
+      const key = String(row.resource_identifier || '');
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (key && Number.isFinite(durationMs) && durationMs >= 1000 && durationMs <= 30 * 60 * 1000 && !maintenanceCreateTimingByOrder.has(key)) {
+        maintenanceCreateTimingByOrder.set(key, durationMs);
+      }
+    }
+    const maintenanceCreateTimingValues = Array.from(maintenanceCreateTimingByOrder.values()).sort((a, b) => a - b);
+    const maintenanceCreateMidpoint = Math.floor(maintenanceCreateTimingValues.length / 2);
+    const maintenanceCreateMedianMs =
+      maintenanceCreateTimingValues.length === 0
+        ? null
+        : maintenanceCreateTimingValues.length % 2 === 0
+          ? Math.round((maintenanceCreateTimingValues[maintenanceCreateMidpoint - 1] + maintenanceCreateTimingValues[maintenanceCreateMidpoint]) / 2)
+          : maintenanceCreateTimingValues[maintenanceCreateMidpoint];
+
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
       timingValues.length === 0
@@ -295,6 +321,11 @@ export async function GET(request: NextRequest) {
         withPartsInstalled,
         procurementCommitment,
         tracedPartsCost,
+      },
+      adminInteraction: {
+        creationSamples: maintenanceCreateTimingValues.length,
+        medianCreateSeconds: maintenanceCreateMedianMs === null ? null : Math.round(maintenanceCreateMedianMs / 1000),
+        semantics: 'active interaction from first input on OT creation form to successful creation; excludes mechanical execution and waiting',
       },
       valueGate: {
         attribution: 'NO_MEDIBLE_AUN',
