@@ -36,7 +36,7 @@ test('control tower applies freshness and excludes stale planning recommendation
 
 test('control tower includes email and whatsapp freshness plus unresolved email evidence', () => {
   assert.match(api, /motil_email_source_manifest/);
-  assert.match(api, /eq\('domain', 'maintenance'\)/);
+  assert.match(api, /in\('domain', \['maintenance', 'maintenance_equipment'\]\)/);
   assert.match(api, /motil_whatsapp_message_registry_v1/);
   assert.match(api, /pendingEmailMatches/);
   assert.match(page, /Entradas por revisar/);
