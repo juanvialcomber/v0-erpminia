@@ -294,7 +294,7 @@ test('finance candidates keep single-source exact identities below dual-source r
   assert.match(api,/identity_verified_single_source/);
   assert.match(api,/PPU, serie o chasis exacto verificado/);
   assert.match(candidates,/Identidad exacta · 1 fuente/);
-  assert.match(candidates,/falta segunda fuente o validación operacional/);
+  assert.match(candidates,/falta segunda fuente operacional/);
 });
 
 
