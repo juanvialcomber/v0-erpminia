@@ -95,12 +95,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tiempo de decisión fuera de rango.' }, { status: 400 });
   }
 
+  const decisionIdentifier = `${priorityKey}-${new Date().toISOString()}`;
+
   const result = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
     user_id: context.userId,
     action: 'finance_priority_decision',
     resource_type: 'finance_priority',
-    resource_identifier: `${priorityKey}-${new Date().toISOString()}`,
+    resource_identifier: decisionIdentifier,
     new_values: {
       priority_key: priorityKey,
       decision,
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
     ok: true,
     priorityKey,
     decision,
+    decisionIdentifier,
     decisionLatencyMs: Math.round(decisionLatencyMs),
     canonicalMutationExecuted: false,
     laudusMutationExecuted: false,
