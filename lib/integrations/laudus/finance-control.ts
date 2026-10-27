@@ -120,7 +120,11 @@ export async function loadLaudusFinanceControl(
     pendingDepositPayments,
     creditNotes,
     costCenters,
-    resolvedCostCenters,
+    matchedCostCenters,
+    ignoredCostCenters,
+    pendingCostCenters,
+    candidateCostCenters,
+    conflictCostCenters,
     discontinuedCostCenters,
     accountingEntries,
     fixedAssets,
@@ -147,7 +151,11 @@ export async function loadLaudusFinanceControl(
     count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).or('deposited.is.false,deposited.is.null')),
     count(db.schema('integration').from('laudus_credit_notes').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact')),
+    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'matched')),
+    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'ignored')),
+    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'pending')),
+    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'candidate')),
+    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'conflict')),
     count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('discontinued', true)),
     count(db.schema('integration').from('laudus_accounting_entries').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
@@ -364,6 +372,11 @@ export async function loadLaudusFinanceControl(
     ? freshCandidates.sort((a, b) => Date.parse(b) - Date.parse(a))[0]
     : null;
 
+  const latestOperationalSyncKey = latestOperationalSync ? sourceDateKey(latestOperationalSync) : null;
+  const operationalSyncAgeDays = latestOperationalSyncKey
+    ? Math.max(0, todayEpochDay - dateKeyToEpochDay(latestOperationalSyncKey))
+    : null;
+
   const latestAccountingEntryDate = latestAccounting.data?.entry_date
     ? String(latestAccounting.data.entry_date)
     : null;
@@ -438,11 +451,16 @@ export async function loadLaudusFinanceControl(
     },
     costCenters: {
       total: costCenters,
-      resolvedExact: resolvedCostCenters,
-      unresolved: Math.max(0, costCenters - resolvedCostCenters),
+      matched: matchedCostCenters,
+      ignored: ignoredCostCenters,
+      pending: pendingCostCenters,
+      candidate: candidateCostCenters,
+      conflict: conflictCostCenters,
+      unresolved: pendingCostCenters + candidateCostCenters + conflictCostCenters,
       discontinued: discontinuedCostCenters,
       latestSync: latestCostCentersSync,
-      reconciliationRequired: costCenters > resolvedCostCenters,
+      reconciliationRequired: pendingCostCenters + candidateCostCenters + conflictCostCenters > 0,
+      semantics: 'matched and ignored are terminal reconciliation states; only pending, candidate and conflict remain actionable',
     },
     accounting: {
       entries: accountingEntries,
@@ -461,6 +479,8 @@ export async function loadLaudusFinanceControl(
     },
     freshness: {
       latestOperationalSync,
+      operationalSyncAgeDays,
+      expectedCadence: 'daily',
       latestPaymentsSync,
       latestPayablesSync,
       latestInvoicesSync,
