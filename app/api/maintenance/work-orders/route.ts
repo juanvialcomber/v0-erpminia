@@ -288,12 +288,13 @@ export async function POST(request: NextRequest) {
     const canonicalAssetId = body.canonicalAssetId || body.canonical_asset_id || null;
     const workType = body.workType || body.work_type || 'corrective';
     const isGeneralWork = workType === 'general';
+    const isEmergencyWork = workType === 'emergency';
     const reviewId = body.reviewId || body.review_id || null;
-    const assignedPersonId = body.assignedPersonId || body.assigned_person_id || null;
+    let assignedPersonId = body.assignedPersonId || body.assigned_person_id || null;
     const requestedMaterials = body.requestedMaterials || body.requested_materials || null;
     const materials = body.materials || [];
     const creationRequestId = request.headers.get('idempotency-key')?.trim() || null;
-    if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
+    if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: isEmergencyWork ? 'Una OTe debe quedar asociada a un equipo' : 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
     if (reviewId && !canonicalAssetId) return NextResponse.json({ error: 'Una revisión de equipo debe conservar su equipo asociado' }, { status: 400 });
     if (!body.title?.trim()) return NextResponse.json({ error: 'Describe brevemente el trabajo a realizar' }, { status: 400 });
     if (!context.authUserId) {
@@ -308,11 +309,18 @@ export async function POST(request: NextRequest) {
     if (workshopScope.isWorkshopHead && !workshopScope.personId) {
       return NextResponse.json({ error: 'Tu cargo debe estar vinculado a una persona activa para crear OT.' }, { status: 403 });
     }
-    if (!creationCapability.canCreate) {
+    const canCreateRequestedType = isEmergencyWork
+      ? creationCapability.canCreateEmergency
+      : creationCapability.canCreate;
+    if (!canCreateRequestedType) {
       return NextResponse.json(
-        { error: 'Tu cargo no tiene autorización para crear órdenes de trabajo de mantenimiento.' },
+        { error: isEmergencyWork ? 'Tu cargo no tiene autorización para crear OTe.' : 'Tu cargo no tiene autorización para crear órdenes de trabajo de mantenimiento.' },
         { status: 403 }
       );
+    }
+
+    if (isEmergencyWork && creationCapability.emergencySelfAssignOnly) {
+      assignedPersonId = creationCapability.personId;
     }
 
     if (!assignedPersonId) {
@@ -465,7 +473,7 @@ export async function POST(request: NextRequest) {
     const assignedPersonName = assignedPerson.full_name;
 
     const year = new Date().getFullYear();
-    const prefix = `OT-${year}-`;
+    const prefix = isEmergencyWork ? `OTE-${year}-` : `OT-${year}-`;
     const plannedHours = Number(body.plannedDurationHours ?? body.planned_duration_hours ?? 0);
     const meterReading = body.meterReading ?? body.meter_reading ?? null;
 
@@ -499,7 +507,7 @@ export async function POST(request: NextRequest) {
           description: body.description?.trim() || null,
           work_type: workType,
           status: 'open',
-          priority: body.priority || 'medium',
+          priority: isEmergencyWork ? 'critical' : (body.priority || 'medium'),
           scheduled_date: body.scheduledDate || body.scheduled_date || null,
           planned_duration_hours: Number.isFinite(plannedHours) ? plannedHours : 0,
           assigned_to_name: assignedPersonName,

@@ -13,7 +13,7 @@ const migration = await readFile(
 test('maintenance UI and new numbering use OT, never WO', () => {
   assert.match(display, /replace\(\/\^WO-\/i, 'OT-'\)/);
   assert.match(display, /replace\(\/\\bWO-\/gi, 'OT-'\)/);
-  assert.match(route, /const prefix = `OT-\$\{year\}-`/);
+  assert.match(route, /const prefix = isEmergencyWork \? `OTE-\$\{year\}-` : `OT-\$\{year\}-`/);
   assert.doesNotMatch(dictionaries, /\bWO\b/);
   assert.doesNotMatch(dictionaries, /\bWOs\b/);
 });

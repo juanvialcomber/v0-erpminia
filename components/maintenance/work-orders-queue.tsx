@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { AlertCircle, ChevronRight, Inbox, Plus, Search } from 'lucide-react';
+import { AlertCircle, ChevronRight, Inbox, Plus, Search, Siren } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +61,7 @@ function getWorkTypeLabel(workType: string | null | undefined, t: WorkOrdersT) {
   if (value === 'corrective') return t.workType.corrective;
   if (value === 'preventive') return t.workType.preventive;
   if (value === 'predictive') return t.workType.predictive;
+  if (value === 'emergency') return 'Emergencia';
   return workType || t.workType.none;
 }
 
@@ -92,12 +93,17 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'approval' | 'completed' | 'historical'>('active');
 
-  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/work-orders', async (url: string) => {
+  const fetcher = async (url: string) => {
     const response = await fetch(url, { credentials: 'include' });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || 'request failed');
     return payload;
-  });
+  };
+
+  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/work-orders', fetcher);
+  const { data: viewerContext } = useSWR('/api/maintenance/viewer-context', fetcher, { revalidateOnFocus: false });
+  const canCreateWorkOrder = Boolean(viewerContext?.canCreateWorkOrder);
+  const canCreateEmergencyWorkOrder = Boolean(viewerContext?.canCreateEmergencyWorkOrder);
 
   const workOrders = Array.isArray(data?.workOrders) ? (data.workOrders as WorkOrderItem[]) : [];
   const operationalWorkOrders = workOrders.filter((order) => order.record_scope !== 'historical');
@@ -163,7 +169,8 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
         <div className="flex flex-wrap gap-2">
           {missingAssetOnly ? <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">{t.viewAll}</Link></Button> : null}
 
-          <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo/create"><Plus className="mr-2 h-4 w-4" />{t.newOrder}</Link></Button>
+          {canCreateEmergencyWorkOrder ? <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo/create?mode=emergency"><Siren className="mr-2 h-4 w-4" />OTe emergencia</Link></Button> : null}
+          {canCreateWorkOrder ? <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo/create"><Plus className="mr-2 h-4 w-4" />{t.newOrder}</Link></Button> : null}
         </div>
       </section>
 

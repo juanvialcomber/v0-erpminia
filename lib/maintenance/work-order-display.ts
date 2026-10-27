@@ -3,7 +3,7 @@ import type { Locale } from '@/lib/i18n/dictionaries';
 export function formatWorkOrderNumber(value: string | null | undefined, _locale: Locale = 'es') {
   const number = String(value || '').trim();
   if (!number) return 'OT';
-  return number.replace(/^WO-/i, 'OT-');
+  return number.replace(/^OTE-/i, 'OTe-').replace(/^WO-/i, 'OT-');
 }
 
 export function formatWorkOrderText(value: string | null | undefined, _locale: Locale = 'es') {

@@ -72,6 +72,7 @@ function typeLabel(type: string | null | undefined, t: WorkOrderDetailT) {
     predictive: t.workType.predictive,
     predictivo: t.workType.predictive,
     inspection: t.workType.inspection,
+    emergency: 'Emergencia',
     general: 'Trabajo general',
   };
   return labels[type || ''] || type || t.workType.none;
@@ -312,7 +313,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <div className="space-y-2"><Label htmlFor="edit-title">Trabajo</Label><Input id="edit-title" name="title" defaultValue={workOrder.title || ''} required /></div>
           <div className="space-y-2"><Label htmlFor="edit-description">Descripción</Label><Textarea id="edit-description" name="description" defaultValue={workOrder.description || ''} rows={3} /></div>
           {workOrder.status !== 'in_progress' ? <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2"><Label htmlFor="edit-work-type">Tipo</Label><select id="edit-work-type" name="work_type" defaultValue={workOrder.work_type || 'corrective'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="corrective">Correctivo</option><option value="preventive">Preventivo</option><option value="inspection">Inspección</option>{workOrder.work_type === 'general' ? <option value="general">Trabajo general</option> : null}</select></div>
+            <div className="space-y-2"><Label htmlFor="edit-work-type">Tipo</Label><select id="edit-work-type" name="work_type" defaultValue={workOrder.work_type || 'corrective'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="corrective">Correctivo</option><option value="preventive">Preventivo</option><option value="inspection">Inspección</option>{workOrder.work_type === 'emergency' ? <option value="emergency">Emergencia</option> : null}{workOrder.work_type === 'general' ? <option value="general">Trabajo general</option> : null}</select></div>
             <div className="space-y-2"><Label htmlFor="edit-priority">Prioridad</Label><select id="edit-priority" name="priority" defaultValue={workOrder.priority || 'medium'} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></div>
             <div className="space-y-2"><Label htmlFor="edit-date">Fecha</Label><Input id="edit-date" name="scheduled_date" type="date" defaultValue={workOrder.scheduled_date?.slice(0,10) || ''} /></div>
           </div> : null}
