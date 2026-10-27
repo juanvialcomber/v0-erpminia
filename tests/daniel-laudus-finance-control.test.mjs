@@ -172,3 +172,40 @@ test('Daniel sees stale Laudus evidence before acting on financial priorities', 
   assert.match(card, /Última sincronización operativa/);
   assert.match(card, /href: '\/dashboard\/finanzas\/fuentes'/);
 });
+
+
+test('Daniel LEC instrumentation records explicit human priority decisions without mutating Laudus', () => {
+  const priorityRoute = fs.readFileSync('app/api/value/finance-priority-decision/route.ts','utf8');
+  assert.match(priorityRoute, /finance_priority_decision/);
+  assert.match(priorityRoute, /finance_priority/);
+  assert.match(priorityRoute, /accepted/);
+  assert.match(priorityRoute, /deferred/);
+  assert.match(priorityRoute, /rejected/);
+  assert.match(priorityRoute, /decision_latency_ms/);
+  assert.match(priorityRoute, /canonicalMutationExecuted: false/);
+  assert.match(priorityRoute, /laudusMutationExecuted: false/);
+  assert.match(card, /Tomar/);
+  assert.match(card, /Postergar/);
+  assert.match(card, /No aplica/);
+});
+
+test('Daniel cockpit exposes persisted LEC evidence and conservative E3 gate', () => {
+  const baselineRoute = fs.readFileSync('app/api/value/finance-baseline/route.ts','utf8');
+  const priorityRoute = fs.readFileSync('app/api/value/finance-priority-decision/route.ts','utf8');
+  assert.match(priorityRoute, /medianDecisionSeconds/);
+  assert.match(priorityRoute, /timedDecisions/);
+  assert.match(card, /Medición LEC de Daniel/);
+  assert.match(card, /baselineSampleCount >= 3 && timedDecisionCount >= 20 \? 'E3'/);
+  assert.match(card, /No se monetiza hasta E4/);
+  assert.match(card, /Iniciar baseline manual/);
+  assert.match(baselineRoute, /manual Laudus review timed outside MOTIL assistance/);
+});
+
+test('Daniel coverage level is explicit about four finance domains and partial assets', () => {
+  assert.match(card, /coveredDomains/);
+  assert.match(card, /'CxP'/);
+  assert.match(card, /'Pagos'/);
+  assert.match(card, /'Centros'/);
+  assert.match(card, /'Activos'/);
+  assert.match(card, /Activos: .*enlazados/s);
+});
