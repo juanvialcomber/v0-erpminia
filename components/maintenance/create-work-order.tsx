@@ -552,7 +552,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
         <p className="hidden text-sm text-muted-foreground sm:block">{emergencyMode ? 'La OTe quedará ligada al equipo, al ejecutor y a toda la evidencia de cierre.' : 'El responsable, equipo e insumos quedan ligados a la OT desde el inicio.'}</p>
         <div className="ml-auto flex gap-2">
           <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">{t.cancel}</Link></Button>
-          <Button onClick={submit} disabled={submitting || isLoading || assigneesLoading || Boolean(error) || Boolean(assigneeError) || reviewLoading || Boolean(reviewError) || Boolean(review?.linked_work_order_id)}>
+          <Button onClick={submit} disabled={submitting || isLoading || (!emergencySelfAssignOnly && assigneesLoading) || Boolean(error) || (!emergencySelfAssignOnly && Boolean(assigneeError)) || reviewLoading || Boolean(reviewError) || Boolean(review?.linked_work_order_id)}>
             {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             {submitting ? t.creating : emergencyMode ? 'Registrar OTe' : reviewId ? t.createAndResolve : t.create}
           </Button>
