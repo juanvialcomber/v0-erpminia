@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,8 @@ export default function EstadoSistemaPage() {
         </div>
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4" /> Comprobar</Button>
       </section>
+
+      <SectionHandover section="data_health" />
 
       {error ? (
         <Card className="border-destructive/30 shadow-none"><CardContent className="p-8 text-center"><XCircle className="mx-auto h-7 w-7 text-destructive" /><p className="mt-3 font-medium">No se pudo completar la comprobación</p><Button className="mt-4" variant="outline" onClick={() => void mutate()}>Reintentar</Button></CardContent></Card>

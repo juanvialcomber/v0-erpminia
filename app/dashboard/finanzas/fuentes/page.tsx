@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -54,6 +55,8 @@ export default function FinanceSourcesPage() {
           Origen certificado del costo reconocido y de las compras comprometidas. MOTIL mantiene separada la tabla canónica de los archivos documentales nuevos.
         </p>
       </header>
+
+      <SectionHandover section="finance" />
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
