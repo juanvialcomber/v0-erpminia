@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
     const [workOrdersResult, preventiveResult, complianceResult, requestsResult, ordersResult, internalInspectionsResult, externalInspectionsResult, payablesResult, credentialsResult, legalCasesResult, approvalCandidatesResult] = await Promise.all([
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,work_order_number,title,description,status,priority,scheduled_date,completion_date,closed_at,assigned_to_name,assigned_person_id,cost_center_id,canonical_asset_id,created_by')
+        .select('id,work_order_number,title,description,status,priority,work_type,scheduled_date,completion_date,closed_at,assigned_to_name,assigned_person_id,cost_center_id,canonical_asset_id,created_by')
         .eq('organization_id', context.organizationId)
         .not('scheduled_date', 'is', null)
         .gte('scheduled_date', startDate)
@@ -368,12 +368,13 @@ export async function GET(request: NextRequest) {
     for (const row of workOrdersResult.data || []) {
       if (!row.scheduled_date || !includeForScope(row.status, scope)) continue;
       const historical = isHistoricalStatus(row.status);
-      const priority = normalizePriority(row.priority);
+      const isEmergency = String(row.work_type || '').toLowerCase() === 'emergency';
+      const priority = isEmergency ? 'critical' : normalizePriority(row.priority);
       items.push(buildItem({
         id: `work-order:${row.id}`,
         source: 'maintenance',
         source_label: 'Mantenimiento',
-        kind: 'Orden de trabajo',
+        kind: isEmergency ? 'OTe · Emergencia' : 'Orden de trabajo',
         date: row.scheduled_date,
         title: row.title,
         subtitle: normalizeText(row.description),
@@ -395,12 +396,12 @@ export async function GET(request: NextRequest) {
         action_label: row.created_by && row.created_by === context.userId
           ? !row.assigned_person_id ? 'Asignar responsable'
             : !row.cost_center_id ? 'Completar centro de costo'
-              : 'Supervisar OT'
+              : isEmergency ? 'Supervisar OTe' : 'Supervisar OT'
           : null,
         action_note: row.created_by && row.created_by === context.userId
           ? !row.assigned_person_id ? 'Esta OT todavía no tiene responsable.'
             : !row.cost_center_id ? 'Falta centro de costo antes de dejarla lista para ejecutar.'
-              : 'OT programada por ti.'
+              : isEmergency ? 'OTe de emergencia registrada por ti.' : 'OT programada por ti.'
           : null,
       }, today));
     }
