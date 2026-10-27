@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         .limit(5000),
       context.supabase
         .from('motil_email_equipment_meter_stage')
-        .select('id,candidate_asset_id,report_date,mine_name,meter_unit,meter_value,next_maintenance_meter,reported_mp_status,reported_equipment_status,reported_issue,reported_work,parts_requested,evidence_status,review_status,source_manifest_id,updated_at')
+        .select('id,candidate_asset_id,report_date,mine_name,meter_unit,meter_value,next_maintenance_meter,reported_mp_status,reported_equipment_status,reported_issue,reported_work,parts_requested,evidence_status,review_status,review_reason,source_manifest_id,updated_at')
         .eq('organization_id', context.organizationId)
         .not('candidate_asset_id', 'is', null)
         .order('report_date', { ascending: false, nullsFirst: false })
@@ -316,8 +316,12 @@ export async function GET(request: NextRequest) {
       const emailCurrent = Boolean(emailAt) && (!operationalCutoff || sameOrAfter(emailAt, operationalCutoff));
       const whatsappCurrent = whatsappAt ? (!operationalCutoff || sameOrAfter(whatsappAt.slice(0, 10), operationalCutoff)) : false;
       const emailMeter = emailCurrent ? numberValue(email?.meter_value) : null;
+      const emailMeterReviewReason = textValue(email?.review_reason);
+      const emailMeterSequenceSafe = !/meter_sequence_decrease/i.test(emailMeterReviewReason || '');
+      const emailMeterUnitSafe = !/^(unknown|desconocido)$/i.test(String(email?.meter_unit || '').trim());
+      const emailMeterTrusted = emailMeterSequenceSafe && emailMeterUnitSafe;
       const planMeter = planningCurrent ? numberValue(plan?.current_reading) : null;
-      const emailMeterUsable = emailMeter != null && (!plan?.meter_unit || !email?.meter_unit || String(plan.meter_unit).toLowerCase() === String(email.meter_unit).toLowerCase());
+      const emailMeterUsable = emailMeterTrusted && emailMeter != null && (!plan?.meter_unit || !email?.meter_unit || String(plan.meter_unit).toLowerCase() === String(email.meter_unit).toLowerCase());
       const effectiveMeter = emailMeterUsable && (!planningAt || sameOrAfter(emailAt, planningAt.slice(0, 10))) ? emailMeter : planMeter;
       const nextDueMeter = (emailCurrent ? numberValue(email?.next_maintenance_meter) : null) ?? (planningCurrent ? numberValue(plan?.next_due_meter) : null);
       const effectiveRemaining = effectiveMeter != null && nextDueMeter != null
@@ -393,6 +397,8 @@ export async function GET(request: NextRequest) {
         emailWork: textValue(email?.reported_work),
         emailPartsRequested: textValue(email?.parts_requested),
         emailReviewStatus: textValue(email?.review_status),
+        emailReviewReason: emailMeterReviewReason,
+        emailMeterTrusted,
 
         whatsappOccurredAt: whatsappAt,
         whatsappGroup: textValue(whatsapp?.whatsapp_group),
