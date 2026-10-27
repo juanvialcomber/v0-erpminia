@@ -105,3 +105,23 @@ test('maintenance shortage handoff measures only a real human-confirmed procurem
   assert.match(page, /Shortage → solicitud operativa/);
   assert.match(page, /la creación de la solicitud sigue requiriendo acción humana/);
 });
+
+
+test('maintenance value cockpit publishes evidence coverage with explicit numerator semantics and no ROI claim', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /assignmentCoverage/);
+  assert.match(api, /assetCoverage/);
+  assert.match(api, /rootCauseCoverage/);
+  assert.match(api, /preventiveActionCoverage/);
+  assert.match(api, /meterCoverage/);
+  assert.match(api, /attribution: 'NO_MEDIBLE_AUN'/);
+  assert.match(api, /pricingReadiness: 'MARKET_ANCHORED'/);
+  assert.match(api, /Minutos administrativos por OT antes de MOTIL versus con MOTIL/);
+  assert.match(api, /\.not\('created_by', 'is', null\)/);
+  assert.match(page, /Cobertura · calidad de evidencia/);
+  assert.match(page, /Numerador y universo real/);
+  assert.match(page, /Cobertura no significa ahorro ni mejora causal/);
+  assert.match(page, /Gate de valor/);
+});
