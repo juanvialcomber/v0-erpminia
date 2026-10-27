@@ -1,0 +1,140 @@
+-- Prevent Laudus financial-master reconciliation from reopening terminal/review states.
+-- Portero invariant: discontinued cost centers remain ignored; candidate/ignored fixed assets remain closed to automation.
+
+create or replace function public.motil_reconcile_laudus_financial_masters(p_organization_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path to 'public', 'integration', 'canonical', 'pg_temp'
+as $function$
+declare
+  v_cc_matched integer := 0;
+  v_cc_pending integer := 0;
+  v_cc_ignored integer := 0;
+  v_asset_matched integer := 0;
+  v_asset_pending integer := 0;
+  v_asset_candidate integer := 0;
+  v_asset_ignored integer := 0;
+begin
+  update integration.laudus_cost_centers l
+  set operational_code = nullif(
+    substring(coalesce(l.name,'') from '^([0-9]+(?:-[0-9]+)*)[[:space:]]+'),
+    ''
+  )
+  where l.organization_id = p_organization_id;
+
+  update integration.laudus_cost_centers l
+  set canonical_cost_center_id = c.id,
+      reconciliation_status = 'matched'
+  from canonical.cost_centers c
+  where l.organization_id = p_organization_id
+    and c.organization_id = p_organization_id
+    and l.operational_code is not null
+    and lower(trim(c.cost_center_code)) = lower(trim(l.operational_code));
+
+  update integration.laudus_cost_centers l
+  set canonical_cost_center_id = null,
+      reconciliation_status = case
+        when l.discontinued then 'ignored'
+        else 'pending'
+      end
+  where l.organization_id = p_organization_id
+    and not exists (
+      select 1
+      from canonical.cost_centers c
+      where c.organization_id = p_organization_id
+        and l.operational_code is not null
+        and lower(trim(c.cost_center_code)) = lower(trim(l.operational_code))
+    );
+
+  update integration.reconciliation_items ri
+  set canonical_schema = 'canonical',
+      canonical_table = 'cost_centers',
+      canonical_id = l.canonical_cost_center_id::text,
+      resolution_status = case l.reconciliation_status
+        when 'matched' then 'matched'
+        when 'ignored' then 'ignored'
+        when 'candidate' then 'new_candidate'
+        when 'conflict' then 'conflict'
+        else 'pending'
+      end,
+      resolution_method = case when l.reconciliation_status='matched' then 'deterministic_rule' else null end,
+      confidence = case when l.reconciliation_status='matched' then 1 else null end,
+      conflict_reasons = '{}'::text[]
+  from integration.laudus_cost_centers l
+  where ri.organization_id = p_organization_id
+    and ri.entity_type = 'cost_center'
+    and ri.external_id = l.external_id
+    and l.organization_id = p_organization_id;
+
+  update integration.laudus_fixed_assets l
+  set supplier_name = nullif(l.source_payload->>'supplier','')
+  where l.organization_id = p_organization_id;
+
+  update integration.laudus_fixed_assets l
+  set canonical_asset_id = c.id,
+      reconciliation_status = 'matched'
+  from canonical.assets c
+  where l.organization_id = p_organization_id
+    and c.organization_id = p_organization_id
+    and l.serial_number is not null
+    and trim(l.serial_number) <> ''
+    and c.serial_number is not null
+    and lower(trim(c.serial_number)) = lower(trim(l.serial_number))
+    and (
+      select count(*)
+      from canonical.assets c2
+      where c2.organization_id = p_organization_id
+        and c2.serial_number is not null
+        and lower(trim(c2.serial_number)) = lower(trim(l.serial_number))
+    ) = 1;
+
+  update integration.reconciliation_items ri
+  set canonical_schema = 'canonical',
+      canonical_table = 'assets',
+      canonical_id = l.canonical_asset_id::text,
+      resolution_status = case l.reconciliation_status
+        when 'matched' then 'matched'
+        when 'ignored' then 'ignored'
+        when 'candidate' then 'new_candidate'
+        when 'conflict' then 'conflict'
+        else 'pending'
+      end,
+      resolution_method = case when l.reconciliation_status='matched' then 'deterministic_rule' else null end,
+      confidence = case when l.reconciliation_status='matched' then 1 else null end
+  from integration.laudus_fixed_assets l
+  where ri.organization_id = p_organization_id
+    and ri.entity_type = 'fixed_asset'
+    and ri.external_id = l.external_id
+    and l.organization_id = p_organization_id;
+
+  select
+    count(*) filter (where reconciliation_status='matched'),
+    count(*) filter (where reconciliation_status='pending'),
+    count(*) filter (where reconciliation_status='ignored')
+  into v_cc_matched, v_cc_pending, v_cc_ignored
+  from integration.laudus_cost_centers
+  where organization_id = p_organization_id;
+
+  select
+    count(*) filter (where reconciliation_status='matched'),
+    count(*) filter (where reconciliation_status='pending'),
+    count(*) filter (where reconciliation_status='candidate'),
+    count(*) filter (where reconciliation_status='ignored')
+  into v_asset_matched, v_asset_pending, v_asset_candidate, v_asset_ignored
+  from integration.laudus_fixed_assets
+  where organization_id = p_organization_id;
+
+  return jsonb_build_object(
+    'cost_centers_matched', v_cc_matched,
+    'cost_centers_pending', v_cc_pending,
+    'cost_centers_ignored', v_cc_ignored,
+    'fixed_assets_matched', v_asset_matched,
+    'fixed_assets_pending', v_asset_pending,
+    'fixed_assets_candidate', v_asset_candidate,
+    'fixed_assets_ignored', v_asset_ignored,
+    'canonical_mutated', false,
+    'laudus_mutated', false
+  );
+end;
+$function$;
