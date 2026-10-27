@@ -149,6 +149,15 @@ export default function ValueScorecardPage() {
   const baselineStartedAt = useRef<number | null>(null);
   const [baselineRunning, setBaselineRunning] = useState(false);
   const [baselineNotice, setBaselineNotice] = useState<string | null>(null);
+  const maintenanceBaseline = useSWR<BaselineResponse>('/api/value/maintenance-baseline', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline de Mantención.');
+    return payload;
+  });
+  const maintenanceBaselineStartedAt = useRef<number | null>(null);
+  const [maintenanceBaselineRunning, setMaintenanceBaselineRunning] = useState(false);
+  const [maintenanceBaselineNotice, setMaintenanceBaselineNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -219,6 +228,31 @@ export default function ValueScorecardPage() {
       await baseline.mutate();
     } catch (cause) {
       setBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline.');
+    }
+  };
+
+  const saveMaintenanceBaseline = async () => {
+    if (!maintenanceBaselineStartedAt.current) return;
+    const durationMs = Date.now() - maintenanceBaselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántas OT administraste manualmente?', '3');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setMaintenanceBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline de Mantención.');
+      setMaintenanceBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s administrativos por OT.`);
+      maintenanceBaselineStartedAt.current = null;
+      setMaintenanceBaselineRunning(false);
+      await maintenanceBaseline.mutate();
+    } catch (cause) {
+      setMaintenanceBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de Mantención.');
     }
   };
 
@@ -376,6 +410,55 @@ export default function ValueScorecardPage() {
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
         </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Baseline administrativo de Mantención">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Baseline E3 · Mantención</p>
+            <h2 className="mt-1 text-lg font-semibold">Tiempo administrativo por OT fuera de MOTIL</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cronometra sólo abrir, asignar, documentar, actualizar y cerrar administrativamente una OT por el método manual. No incluye reparación mecánica.
+            </p>
+          </div>
+          {!maintenanceBaselineRunning ? (
+            <button
+              type="button"
+              onClick={() => {
+                maintenanceBaselineStartedAt.current = Date.now();
+                setMaintenanceBaselineRunning(true);
+                setMaintenanceBaselineNotice('Medición activa. Realiza el flujo administrativo manual sin usar MOTIL y vuelve al terminar.');
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Iniciar baseline Mantención
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void saveMaintenanceBaseline()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Finalizar medición
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Muestras manuales</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceBaseline.data?.sampleCount || 0)}</p>
+          </div>
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana administrativa por OT</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceBaseline.data?.medianSecondsPerCase == null ? '—' : `${number(maintenanceBaseline.data.medianSecondsPerCase)} s`}
+            </p>
+          </div>
+        </div>
+        {maintenanceBaselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{maintenanceBaselineNotice}</p> : null}
+        <p className="mt-3 text-xs text-muted-foreground">
+          Gate inicial: ≥3 muestras comparables. El baseline se mantiene separado del tiempo cronometrado de ejecución hasta contar con una métrica administrativa MOTIL equivalente.
+        </p>
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">
