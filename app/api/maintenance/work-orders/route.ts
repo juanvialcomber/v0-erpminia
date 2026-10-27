@@ -583,6 +583,9 @@ export async function POST(request: NextRequest) {
 
     await recordRequestedMaterials(context, createdOrder, requestedMaterials);
     await recordStructuredMaterials(context, createdOrder.id, materials);
+    if (!idempotentReplay) {
+      await recordAdminInteractionTiming(context, request, createdOrder.id);
+    }
     return NextResponse.json(
       {
         data: mapWorkOrder(createdOrder, asset),
