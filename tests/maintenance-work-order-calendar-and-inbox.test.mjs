@@ -96,3 +96,18 @@ test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas
 function queueWithAllFilter() {
   return read('components/maintenance/work-orders-queue.tsx');
 }
+
+
+test('OTe preserves emergency identity and critical priority in the operational calendar', () => {
+  const api = read('app/api/calendar/operational/route.ts');
+  const calendar = read('components/operational-calendar/comfortable-operational-calendar.tsx');
+
+  assert.match(api, /priority,work_type,scheduled_date/);
+  assert.match(api, /String\(row\.work_type \|\| ''\)\.toLowerCase\(\) === 'emergency'/);
+  assert.match(api, /const priority = isEmergency \? 'critical' : normalizePriority\(row\.priority\)/);
+  assert.match(api, /kind: isEmergency \? 'OTe · Emergencia' : 'Orden de trabajo'/);
+  assert.match(api, /isEmergency \? 'Supervisar OTe' : 'Supervisar OT'/);
+  assert.match(calendar, /replace\(\/\^OTE-\(\\d\{4\}\)-\(\\d\+\)\$\/i, 'OTe \$2'\)/);
+  assert.match(calendar, /\$\{item\.kind\} · \$\{item\.status_label\}/);
+  assert.match(calendar, /\$\{item\.kind\} · \$\{item\.reference\}/);
+});
