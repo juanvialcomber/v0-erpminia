@@ -9,6 +9,7 @@ const viewer = await readFile(new URL('../app/api/maintenance/viewer-context/rou
 const createUi = await readFile(new URL('../components/maintenance/create-work-order.tsx', import.meta.url), 'utf8');
 const queueUi = await readFile(new URL('../components/maintenance/work-orders-queue.tsx', import.meta.url), 'utf8');
 const display = await readFile(new URL('../lib/maintenance/work-order-display.ts', import.meta.url), 'utf8');
+const timeline = await readFile(new URL('../components/shared/entity-timeline.tsx', import.meta.url), 'utf8');
 
 test('mechanics may create emergency OTe without gaining normal OT creation', () => {
   assert.match(access, /isEmergencyWorkOrderCreatorCargo/);
@@ -61,4 +62,10 @@ test('OTe detection evidence is append-once and not silently rewritten', () => {
   assert.match(createRoute, /if \(existing\) return/);
   assert.match(createRoute, /source_record_id: workOrder\.id/);
   assert.doesNotMatch(createRoute, /from\('work_order_events'\)\.update\(/);
+});
+
+
+test('OTe detection is visible with time in the canonical entity timeline', () => {
+  assert.match(timeline, /emergency_detected: 'Emergencia detectada'/);
+  assert.match(timeline, /timeStyle: 'short'/);
 });
