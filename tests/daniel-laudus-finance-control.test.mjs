@@ -148,3 +148,27 @@ test('secondary analytics stay collapsed so decisions remain visually dominant',
   assert.match(card, /Aging, vencimientos y concentración por proveedor/);
   assert.match(card, /group-open:hidden/);
 });
+
+
+test('Daniel cost-center queue respects current reconciliation terminal states', () => {
+  assert.match(loader, /reconciliation_status', 'matched'/);
+  assert.match(loader, /reconciliation_status', 'ignored'/);
+  assert.match(loader, /reconciliation_status', 'pending'/);
+  assert.match(loader, /reconciliation_status', 'candidate'/);
+  assert.match(loader, /reconciliation_status', 'conflict'/);
+  assert.match(loader, /unresolved: pendingCostCenters \+ candidateCostCenters \+ conflictCostCenters/);
+  assert.match(loader, /matched and ignored are terminal reconciliation states/);
+  assert.doesNotMatch(loader, /reconciliation_status', 'resolved_exact'/);
+  assert.match(card, /conciliados ·/);
+  assert.match(card, /cerrados\/ignorados/);
+  assert.match(card, /Sin pendientes/);
+});
+
+test('Daniel sees stale Laudus evidence before acting on financial priorities', () => {
+  assert.match(loader, /operationalSyncAgeDays/);
+  assert.match(loader, /expectedCadence: 'daily'/);
+  assert.match(card, /Dato atrasado/);
+  assert.match(card, /Revisar actualización de Laudus/);
+  assert.match(card, /Última sincronización operativa/);
+  assert.match(card, /href: '\/dashboard\/finanzas\/fuentes'/);
+});
