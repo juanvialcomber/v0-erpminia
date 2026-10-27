@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -60,6 +60,11 @@ export async function GET(request: NextRequest) {
         .eq('resource_type', 'maintenance_work_order')
         .order('created_at', { ascending: false })
         .limit(500),
+      context.supabase
+        .from('work_order_supervisor_reviews')
+        .select('work_order_id,status,reviewed_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     if (current.error) throw current.error;
@@ -70,6 +75,7 @@ export async function GET(request: NextRequest) {
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
     if (maintenanceAdminTiming.error) throw maintenanceAdminTiming.error;
+    if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -183,17 +189,73 @@ export async function GET(request: NextRequest) {
       procurementCommitment > 0 ? 'Finanzas' : null,
     ].filter(Boolean);
 
-    const eventTimes = new Map<string, { created?: string; start?: string; close?: string }>();
+    const eventTimes = new Map<string, { detected?: string; created?: string; start?: string; close?: string }>();
     for (const row of maintenanceEventRows) {
       const key = String(row.work_order_id || '');
       if (!key) continue;
       const current = eventTimes.get(key) || {};
       const at = String(row.event_at || '');
+      if (row.event_type === 'emergency_detected' && (!current.detected || at < current.detected)) current.detected = at;
       if (row.event_type === 'work_order_created' && (!current.created || at < current.created)) current.created = at;
       if (row.event_type === 'timer_play' && (!current.start || at < current.start)) current.start = at;
       if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
       eventTimes.set(key, current);
     }
+    const approvedReviewByOrder = new Map<string, string>();
+    for (const row of maintenanceSupervisorReviews.data || []) {
+      const key = String(row.work_order_id || '');
+      const reviewedAt = String(row.reviewed_at || '');
+      if (key && row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
+    }
+
+    const emergencyCycleRows = emergencyRows.map((row: any) => {
+      const times = eventTimes.get(String(row.id)) || {};
+      const detectedMs = times.detected ? Date.parse(times.detected) : NaN;
+      const registeredMs = Date.parse(String(row.created_at || ''));
+      const startMs = times.start ? Date.parse(times.start) : NaN;
+      const closeMs = row.closed_at ? Date.parse(String(row.closed_at)) : times.close ? Date.parse(times.close) : NaN;
+      const approvedAt = approvedReviewByOrder.get(String(row.id));
+      const approvedMs = approvedAt ? Date.parse(approvedAt) : NaN;
+      return {
+        detectedToRegisteredSeconds: Number.isFinite(detectedMs) && Number.isFinite(registeredMs) && registeredMs >= detectedMs
+          ? Math.round((registeredMs - detectedMs) / 1000)
+          : null,
+        registeredToStartSeconds: Number.isFinite(registeredMs) && Number.isFinite(startMs) && startMs >= registeredMs
+          ? Math.round((startMs - registeredMs) / 1000)
+          : null,
+        startToCloseSeconds: Number.isFinite(startMs) && Number.isFinite(closeMs) && closeMs >= startMs
+          ? Math.round((closeMs - startMs) / 1000)
+          : null,
+        closeToApprovalSeconds: Number.isFinite(closeMs) && Number.isFinite(approvedMs) && approvedMs >= closeMs
+          ? Math.round((approvedMs - closeMs) / 1000)
+          : null,
+        endToEndSeconds: Number.isFinite(detectedMs) && Number.isFinite(approvedMs) && approvedMs >= detectedMs
+          ? Math.round((approvedMs - detectedMs) / 1000)
+          : null,
+      };
+    });
+
+    const median = (values: Array<number | null>) => {
+      const clean = values.filter((value): value is number => value !== null).sort((a, b) => a - b);
+      if (clean.length === 0) return { samples: 0, medianSeconds: null as number | null };
+      const middle = Math.floor(clean.length / 2);
+      return {
+        samples: clean.length,
+        medianSeconds: clean.length % 2 === 0
+          ? Math.round((clean[middle - 1] + clean[middle]) / 2)
+          : clean[middle],
+      };
+    };
+
+    const emergencyCycle = {
+      detectedToRegistered: median(emergencyCycleRows.map((row) => row.detectedToRegisteredSeconds)),
+      registeredToStart: median(emergencyCycleRows.map((row) => row.registeredToStartSeconds)),
+      startToClose: median(emergencyCycleRows.map((row) => row.startToCloseSeconds)),
+      closeToApproval: median(emergencyCycleRows.map((row) => row.closeToApprovalSeconds)),
+      endToEnd: median(emergencyCycleRows.map((row) => row.endToEndSeconds)),
+      semantics: 'OTe event chain from operator-reported detection to human supervisor approval; missing timestamps remain unmeasured',
+    };
+
     const executionCycles = Array.from(eventTimes.values())
       .map((row) => {
         const startMs = row.start ? Date.parse(row.start) : NaN;
@@ -286,6 +348,7 @@ export async function GET(request: NextRequest) {
       preventiveActionCoverageCount: preventiveActionRows.length,
       meterCoverageCount: meterRows.length,
       emergencyWorkOrders: emergencyRows.length,
+      emergencyCycle,
       observedExecutionSeconds: timerSecondsObserved,
       observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
       workOrdersWithEvents: workOrdersWithEvents.size,
