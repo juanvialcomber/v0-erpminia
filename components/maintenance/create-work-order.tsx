@@ -144,6 +144,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [meterUnit, setMeterUnit] = useState('hours');
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const adminInteractionStartedAtRef = useRef<number | null>(null);
 
   const fetcher = async (url: string) => {
     const response = await fetch(url, { credentials: 'include' });
@@ -279,11 +280,15 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
     submittingRef.current = true;
     setSubmitting(true);
     try {
+      const adminInteractionMs = adminInteractionStartedAtRef.current
+        ? Date.now() - adminInteractionStartedAtRef.current
+        : null;
       const response = await fetch('/api/maintenance/work-orders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': creationRequestId,
+          ...(adminInteractionMs != null ? { 'X-Motil-Admin-Interaction-Ms': String(adminInteractionMs) } : {}),
         },
         credentials: 'include',
         body: JSON.stringify(requestPayload),
@@ -302,7 +307,15 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div
+      className="mx-auto max-w-3xl space-y-5"
+      onPointerDown={() => {
+        if (adminInteractionStartedAtRef.current == null) adminInteractionStartedAtRef.current = Date.now();
+      }}
+      onKeyDown={() => {
+        if (adminInteractionStartedAtRef.current == null) adminInteractionStartedAtRef.current = Date.now();
+      }}
+    >
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderEyebrow>{emergencyMode ? 'Mantenimiento · Emergencia' : t.eyebrow}</PageHeaderEyebrow>
