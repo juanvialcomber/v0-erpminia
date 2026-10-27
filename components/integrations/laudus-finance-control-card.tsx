@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 import useSWR from 'swr';
 import { ArrowRight, BadgeCheck } from 'lucide-react';
 import {
@@ -15,6 +16,22 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+
+type PriorityDecisionSummary = {
+  total?: number;
+  accepted?: number;
+  deferred?: number;
+  rejected?: number;
+  timedDecisions?: number;
+  medianDecisionSeconds?: number | null;
+  latestAt?: string | null;
+};
+
+type FinanceBaselineSummary = {
+  sampleCount?: number;
+  medianSecondsPerCase?: number | null;
+  latestAt?: string | null;
+};
 
 type FinanceControl = {
   readOnly?: boolean;
@@ -71,11 +88,16 @@ type FinanceControl = {
   };
   costCenters?: {
     total?: number;
-    resolvedExact?: number;
+    matched?: number;
+    ignored?: number;
+    pending?: number;
+    candidate?: number;
+    conflict?: number;
     unresolved?: number;
     discontinued?: number;
     latestSync?: string | null;
     reconciliationRequired?: boolean;
+    semantics?: string;
   };
   accounting?: {
     entries?: number;
@@ -94,6 +116,8 @@ type FinanceControl = {
   };
   freshness?: {
     latestOperationalSync?: string | null;
+    operationalSyncAgeDays?: number | null;
+    expectedCadence?: string;
   };
 };
 
@@ -163,10 +187,36 @@ function freshnessText(value?: string | null) {
 }
 
 export function LaudusFinanceControlCard() {
+  const cockpitOpenedAt = useRef(Date.now());
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [decisionByPriority, setDecisionByPriority] = useState<Record<string, string>>({});
+  const baselineStartedAt = useRef<number | null>(null);
+  const [baselineRunning, setBaselineRunning] = useState(false);
+  const [baselineNotice, setBaselineNotice] = useState<string | null>(null);
   const { data, error, isLoading } = useSWR<FinanceControl>(
     '/api/integrations/laudus/finance-control',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
+  );
+  const decisionEvidence = useSWR<PriorityDecisionSummary>(
+    '/api/value/finance-priority-decision',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la evidencia de decisiones.');
+      return payload;
+    },
+    { revalidateOnFocus: false },
+  );
+  const baselineEvidence = useSWR<FinanceBaselineSummary>(
+    '/api/value/finance-baseline',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline financiero.');
+      return payload;
+    },
+    { revalidateOnFocus: false },
   );
 
   if (error) {
@@ -191,6 +241,10 @@ export function LaudusFinanceControlCard() {
   const dueByMonth = data?.accountsPayable?.dueByMonth || [];
   const topSuppliers = data?.accountsPayable?.topSuppliers || [];
   const costCenterUnresolved = Number(data?.costCenters?.unresolved || 0);
+  const costCenterMatched = Number(data?.costCenters?.matched || 0);
+  const costCenterIgnored = Number(data?.costCenters?.ignored || 0);
+  const operationalSyncAgeDays = data?.freshness?.operationalSyncAgeDays;
+  const freshnessIsStale = operationalSyncAgeDays !== null && operationalSyncAgeDays !== undefined && operationalSyncAgeDays > 0;
   const accountingCurrent = Boolean(data?.accounting?.currentEnoughForExecutiveUse);
   const fixedAssetLinked = Number(data?.fixedAssets?.linkedToMotil || 0);
   const fixedAssetTotal = Number(data?.fixedAssets?.total || 0);
@@ -200,8 +254,93 @@ export function LaudusFinanceControlCard() {
     : 0;
   const topSupplier = topSuppliers[0];
   const topSupplierSharePct = Number(data?.accountsPayable?.topSupplierSharePct || 0);
+  const fixedAssetCoveragePct = fixedAssetTotal > 0 ? Math.round((fixedAssetLinked / fixedAssetTotal) * 1000) / 10 : null;
+  const coveredDomains = [
+    data?.accountsPayable?.latestSync ? 'CxP' : null,
+    data?.payments?.latestSync ? 'Pagos' : null,
+    data?.costCenters?.total && costCenterUnresolved === 0 ? 'Centros' : null,
+    fixedAssetCoveragePct != null && fixedAssetCoveragePct >= 80 ? 'Activos' : null,
+  ].filter(Boolean);
+  const coverageLevel = coveredDomains.length >= 4 && fixedAssetCoveragePct != null && fixedAssetCoveragePct >= 95
+    ? 'C5'
+    : coveredDomains.length >= 4
+      ? 'C4'
+      : coveredDomains.length >= 3
+        ? 'C3'
+        : coveredDomains.length >= 2
+          ? 'C2'
+          : 'C1';
+  const persistedDecisionCount = Number(decisionEvidence.data?.total || 0);
+  const timedDecisionCount = Number(decisionEvidence.data?.timedDecisions || 0);
+  const baselineSampleCount = Number(baselineEvidence.data?.sampleCount || 0);
+  const evidenceLevel = baselineSampleCount >= 3 && timedDecisionCount >= 20 ? 'E3' : persistedDecisionCount > 0 ? 'E2' : 'E1';
+  const workflowLevel = persistedDecisionCount > 0 ? 'L4' : 'L3';
+
+  const recordPriorityDecision = async (priorityKey: string, decision: 'accepted' | 'deferred' | 'rejected') => {
+    let reason = '';
+    if (decision === 'rejected') {
+      reason = window.prompt('¿Por qué esta prioridad no aplica?', '')?.trim() || '';
+      if (!reason) return;
+    }
+    setDecisionNotice(null);
+    try {
+      const response = await fetch('/api/value/finance-priority-decision', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priorityKey,
+          decision,
+          reason,
+          decisionLatencyMs: Math.max(0, Date.now() - cockpitOpenedAt.current),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
+      setDecisionByPriority((current) => ({ ...current, [priorityKey]: decision }));
+      await decisionEvidence.mutate();
+      setDecisionNotice('Decisión registrada. No se modificó Laudus ni el dato canónico.');
+    } catch (decisionError) {
+      setDecisionNotice(decisionError instanceof Error ? decisionError.message : 'No fue posible registrar la decisión.');
+    }
+  };
+
+  const saveBaseline = async () => {
+    if (!baselineStartedAt.current) return;
+    const durationMs = Date.now() - baselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántos casos comparables revisaste manualmente?', '5');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/finance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible guardar el baseline.');
+      baselineStartedAt.current = null;
+      setBaselineRunning(false);
+      await baselineEvidence.mutate();
+      setBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por caso.`);
+    } catch (baselineError) {
+      setBaselineNotice(baselineError instanceof Error ? baselineError.message : 'No fue posible guardar el baseline.');
+    }
+  };
 
   const priorities = [
+    freshnessIsStale
+      ? {
+          key: 'freshness',
+          rank: 130,
+          title: 'Revisar actualización de Laudus',
+          evidence: `Última sincronización operativa: ${shortDate(data?.freshness?.latestOperationalSync)} · ${number(operationalSyncAgeDays)} día(s) de antigüedad`,
+          action: 'Revisar fuente',
+          href: '/dashboard/finanzas/fuentes',
+        }
+      : null,
     overduePayableAmount > 0
       ? {
           key: 'overdue',
@@ -275,9 +414,12 @@ export function LaudusFinanceControlCard() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
             <p className="text-xs font-medium">Laudus · fuente financiera</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {isLoading ? 'Actualizando…' : freshnessText(data?.freshness?.latestOperationalSync)}
-          </p>
+          <div className="flex items-center gap-2">
+            {!isLoading && freshnessIsStale ? <Badge variant="destructive">Dato atrasado</Badge> : null}
+            <p className="text-xs text-muted-foreground">
+              {isLoading ? 'Actualizando…' : freshnessText(data?.freshness?.latestOperationalSync)}
+            </p>
+          </div>
         </div>
         <section className="grid gap-px overflow-hidden rounded-lg border bg-border lg:grid-cols-[1.4fr_1fr]" aria-label="Resumen financiero ejecutivo">
           <div className="bg-card p-5 md:p-6">
@@ -329,9 +471,26 @@ export function LaudusFinanceControlCard() {
                     <p className="truncate text-sm font-medium">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{item.evidence}</p>
                   </div>
-                  <Button asChild size="sm" variant={index === 0 ? 'default' : 'ghost'}>
-                    <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {decisionByPriority[item.key] ? (
+                      <Badge variant="outline">Registrada</Badge>
+                    ) : (
+                      <>
+                        <Button type="button" size="sm" variant={index === 0 ? 'default' : 'outline'} onClick={() => void recordPriorityDecision(item.key, 'accepted')}>
+                          Tomar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => void recordPriorityDecision(item.key, 'deferred')}>
+                          Postergar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => void recordPriorityDecision(item.key, 'rejected')}>
+                          No aplica
+                        </Button>
+                      </>
+                    )}
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={item.href}>{item.action}<ArrowRight className="ml-2 h-4 w-4"/></Link>
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -343,6 +502,76 @@ export function LaudusFinanceControlCard() {
           </div>
         )}
 
+        {decisionNotice ? <p className="text-xs text-muted-foreground">{decisionNotice}</p> : null}
+
+        <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3" aria-label="LEC Finanzas">
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Level</p>
+            <p className="mt-1 text-lg font-semibold">{workflowLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {workflowLevel === 'L4' ? `${number(persistedDecisionCount)} decisiones humanas registradas.` : 'MOTIL prioriza; falta registrar una decisión humana.'}
+            </p>
+          </div>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Evidence</p>
+            <p className="mt-1 text-lg font-semibold">{evidenceLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {evidenceLevel === 'E3'
+                ? `Baseline comparable + ${number(timedDecisionCount)} decisiones cronometradas.`
+                : evidenceLevel === 'E2'
+                  ? `Decisión humana registrada; ${number(baselineSampleCount)}/3 baselines y ${number(timedDecisionCount)}/20 tiempos para E3.`
+                  : 'Fuentes y prioridades registradas; aún sin decisión humana.'}
+            </p>
+          </div>
+          <div className="bg-card px-4 py-3">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Coverage</p>
+            <p className="mt-1 text-lg font-semibold">{coverageLevel}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {coveredDomains.length}/4 dominios materiales cubiertos. Activos: {fixedAssetCoveragePct == null ? 'N/D' : `${number(fixedAssetCoveragePct)}%`} enlazados.
+            </p>
+          </div>
+        </section>
+
+        <details className="group rounded-lg border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Medición LEC de Daniel</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Baseline manual: {number(baselineSampleCount)}/3 · decisiones cronometradas: {number(timedDecisionCount)}/20
+              </p>
+            </div>
+            <span className="text-xs text-muted-foreground group-open:hidden">Medir</span>
+            <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+          </summary>
+          <div className="border-t p-4">
+            <p className="text-xs text-muted-foreground">
+              Cronometra una revisión manual comparable sin asistencia de MOTIL. No incluye espera, ejecución posterior ni trabajo contable no relacionado.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {!baselineRunning ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  baselineStartedAt.current = Date.now();
+                  setBaselineRunning(true);
+                  setBaselineNotice('Medición activa. Realiza casos comparables por el método manual y vuelve al terminar.');
+                }}>
+                  Iniciar baseline manual
+                </Button>
+              ) : (
+                <Button type="button" size="sm" onClick={() => void saveBaseline()}>
+                  Finalizar medición
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground">
+                Mediana actual: {baselineEvidence.data?.medianSecondsPerCase == null ? '—' : `${number(baselineEvidence.data.medianSecondsPerCase)} s/caso`}
+              </span>
+            </div>
+            {baselineNotice ? <p className="mt-2 text-xs text-muted-foreground">{baselineNotice}</p> : null}
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              E3 sólo se habilita con ≥3 muestras manuales y ≥20 decisiones asistidas cronometradas. No se monetiza hasta E4.
+            </p>
+          </div>
+        </details>
+
         <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4" aria-label="Cobertura financiera">
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Pagos por revisar</p>
@@ -351,6 +580,7 @@ export function LaudusFinanceControlCard() {
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Centros por conciliar</p>
             <p className="mt-1 text-lg font-semibold">{number(costCenterUnresolved)}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{number(costCenterMatched)} conciliados · {number(costCenterIgnored)} cerrados/ignorados</p>
           </div>
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Activos enlazados</p>
@@ -406,10 +636,14 @@ export function LaudusFinanceControlCard() {
                 <div className="flex items-center justify-between gap-3 px-3 py-3">
                   <div>
                     <p className="text-sm font-medium">Centros por conciliar</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{number(costCenterUnresolved)} centros sin cruce exacto MOTIL</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {costCenterUnresolved > 0
+                        ? `${number(costCenterUnresolved)} centros todavía requieren revisión`
+                        : `Sin pendientes · ${number(costCenterMatched)} conciliados y ${number(costCenterIgnored)} cerrados/ignorados`}
+                    </p>
                   </div>
                   <Button asChild size="sm" variant="outline">
-                    <Link href="/dashboard/finanzas/centros">Conciliar</Link>
+                    <Link href="/dashboard/finanzas/centros">{costCenterUnresolved > 0 ? 'Conciliar' : 'Ver centros'}</Link>
                   </Button>
                 </div>
               </div>
