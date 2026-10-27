@@ -239,7 +239,7 @@ export default function ValueScorecardPage() {
   const saveMaintenanceBaseline = async () => {
     if (!maintenanceBaselineStartedAt.current) return;
     const durationMs = Date.now() - maintenanceBaselineStartedAt.current;
-    const rawCases = window.prompt('¿Cuántas OT administraste manualmente?', '3');
+    const rawCases = window.prompt('¿Cuántas OT abriste y asignaste manualmente?', '3');
     if (!rawCases) return;
     const caseCount = Number(rawCases);
     setMaintenanceBaselineNotice(null);
@@ -252,7 +252,7 @@ export default function ValueScorecardPage() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline de Mantención.');
-      setMaintenanceBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s administrativos por OT.`);
+      setMaintenanceBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por apertura manual de OT.`);
       maintenanceBaselineStartedAt.current = null;
       setMaintenanceBaselineRunning(false);
       await maintenanceBaseline.mutate();
@@ -421,9 +421,9 @@ export default function ValueScorecardPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Baseline E3 · Mantención</p>
-            <h2 className="mt-1 text-lg font-semibold">Tiempo administrativo por OT fuera de MOTIL</h2>
+            <h2 className="mt-1 text-lg font-semibold">Baseline manual de apertura de OT</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cronometra sólo abrir, asignar, documentar, actualizar y cerrar administrativamente una OT por el método manual. No incluye reparación mecánica.
+              Cronometra sólo abrir una OT, registrar sus datos iniciales y asignar responsable por el método manual. No incluye reparación, espera, actualizaciones posteriores ni cierre.
             </p>
           </div>
           {!maintenanceBaselineRunning ? (
@@ -432,7 +432,7 @@ export default function ValueScorecardPage() {
               onClick={() => {
                 maintenanceBaselineStartedAt.current = Date.now();
                 setMaintenanceBaselineRunning(true);
-                setMaintenanceBaselineNotice('Medición activa. Realiza el flujo administrativo manual sin usar MOTIL y vuelve al terminar.');
+                setMaintenanceBaselineNotice('Medición activa. Abre y asigna las OT manualmente sin usar MOTIL y vuelve al terminar.');
               }}
               className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
             >
@@ -454,7 +454,7 @@ export default function ValueScorecardPage() {
             <p className="mt-1 text-xl font-semibold">{number(maintenanceBaseline.data?.sampleCount || 0)}</p>
           </div>
           <div className="rounded-md bg-muted/40 px-4 py-3">
-            <p className="text-xs text-muted-foreground">Mediana administrativa por OT</p>
+            <p className="text-xs text-muted-foreground">Mediana manual por apertura</p>
             <p className="mt-1 text-xl font-semibold">
               {maintenanceBaseline.data?.medianSecondsPerCase == null ? '—' : `${number(maintenanceBaseline.data.medianSecondsPerCase)} s`}
             </p>
@@ -475,7 +475,7 @@ export default function ValueScorecardPage() {
             <p className="text-xs text-muted-foreground">Comparación manual vs MOTIL</p>
             <p className="mt-1 text-xl font-semibold">HOLD</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              La creación asistida mide sólo apertura inicial; el baseline manual debe usar exactamente ese mismo alcance antes de calcular reducción.
+              El baseline manual y la creación asistida usan el mismo alcance: apertura, datos iniciales y asignación. La comparación se habilita sólo con muestra suficiente.
             </p>
           </div>
         </div>
