@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const migration = fs.readFileSync('supabase/migrations/20260827191500_add_treasury_aging_alerts_and_tenant_safe_rpc_v1.sql','utf8');
 const executiveRoute = fs.readFileSync('app/api/finance/executive/route.ts','utf8');
 const financePage = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+const payablesPage = fs.readFileSync('app/dashboard/finanzas/pagos/page.tsx','utf8');
 
 test('treasury alerts cover missing due date, due soon, overdue and unreconciled payments',()=>{
   assert.match(migration,/treasury_missing_due_date/);
@@ -31,7 +32,8 @@ test('finance executive preserves treasury and aging data while the cockpit stay
   assert.match(executiveRoute,/procurement_treasury_summary_v1/);
   assert.match(executiveRoute,/procurement_accounts_payable_aging_summary_v1/);
   assert.match(executiveRoute,/treasuryAging/);
-  assert.match(financePage,/currencyMoney/);
-  assert.match(financePage,/CxP aprobadas en MOTIL/);
+  assert.match(payablesPage,/const money = \(value: unknown, currency = ['\"]CLP['\"]\)/);
+  assert.match(payablesPage,/CxP MOTIL pendientes/);
+  assert.match(financePage,/LaudusFinanceControlCard/);
   assert.doesNotMatch(financePage,/Aging por proveedor/);
 });

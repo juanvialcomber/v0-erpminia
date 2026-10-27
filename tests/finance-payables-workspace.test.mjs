@@ -37,6 +37,17 @@ test('finance payables API is finance-authorized and tenant scoped',()=>{
 
 test('finance navigation exposes the payments workspace with honest empty states',()=>{
   assert.match(layout,/\/dashboard\/finanzas\/pagos/);
-  assert.match(page,/No hay facturas aprobadas para pago/);
+  assert.match(page,/No hay cuentas por pagar aprobadas en MOTIL/);
+  assert.match(page,/Esto no significa que Laudus no tenga exposición abierta/);
+  assert.match(page,/CxP MOTIL pendientes/);
   assert.match(page,/No hay pagos registrados/);
+});
+
+
+test('payables workspace reduces overdue review by supplier concentration',()=>{
+  assert.match(page,/Concentración vencida/);
+  assert.match(page,/Proveedores que explican la mayor exposición/);
+  assert.match(page,/Top 5 concentra/);
+  assert.match(page,/Prioriza revisión por proveedor antes de recorrer factura por factura/);
+  assert.match(page,/No implica prioridad automática de pago ni evaluación de riesgo del proveedor/);
 });

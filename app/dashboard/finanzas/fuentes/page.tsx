@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +18,31 @@ type Source = {
   provenanceKind: 'canonical_table';
 };
 
+type WorkbookSource = {
+  id: string;
+  filename: string;
+  canonical: boolean;
+  canonicalAuthority: string | null;
+  canonicalDomain: string | null;
+  sourceKind: string;
+  cutoffDate: string | null;
+  senderDeclaredNotFinal: boolean;
+  sourceRows: number;
+  reviewStatus: string;
+  stage: null | {
+    rows: number;
+    matched: number;
+    unresolved: number;
+    anomalyRows: number;
+    importedAt: string | null;
+  };
+  updatedAt: string | null;
+};
+
 type Response = {
   data: Source[];
+  workbooks: WorkbookSource[];
+  canImportWorkbooks: boolean;
   summary: {
     sources: number;
     auditEvents: number;
@@ -40,24 +64,45 @@ function date(value: string | null) {
 }
 
 export default function FinanceSourcesPage() {
-  const { data, error, isLoading } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
+  const { data, error, isLoading, mutate } = useSWR<Response>('/api/finance/sources', fetcher, { revalidateOnFocus: false });
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [processingError, setProcessingError] = useState<string | null>(null);
 
-  if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Leyendo la trazabilidad canónica certificada." />;
-  if (error || !data) return <StatePanel tone="error" title="Fuentes financieras no disponibles" description="No se reemplaza provenance faltante por una lista vacía." />;
+  async function processWorkbook(id: string) {
+    setProcessingId(id);
+    setProcessingError(null);
+    try {
+      const response = await fetch(`/api/finance/workbook-imports/${id}/stage`, {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo procesar la fuente');
+      await mutate();
+    } catch (processError) {
+      setProcessingError(processError instanceof Error ? processError.message : 'No se pudo procesar la fuente');
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  if (isLoading) return <StatePanel tone="loading" title="Cargando fuentes financieras" description="Revisando el origen y la cobertura de las cifras financieras." />;
+  if (error || !data) return <StatePanel tone="error" title="No fue posible cargar las fuentes" description="Las cifras no se reemplazan por valores vacíos cuando falta información de origen." />;
 
   return (
     <div className="space-y-5">
       <header className="border-b border-border/70 pb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Provenance</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fuentes</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fuentes y calidad</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Origen certificado del costo reconocido y de las compras comprometidas. MOTIL mantiene separada la tabla canónica de los archivos documentales nuevos.
+          Muestra de dónde provienen las cifras, qué período cubren y si existe respaldo documental asociado.
         </p>
       </header>
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
-          ['Eventos auditables', data.summary.auditEvents],
+          ['Registros trazables', data.summary.auditEvents],
           ['Costo reconocido', data.summary.recognizedEvents],
           ['Compra comprometida', data.summary.committedEvents],
           ['Documentos Finanzas', data.summary.documentCoreRecords],
@@ -71,12 +116,68 @@ export default function FinanceSourcesPage() {
 
       {data.summary.documentCoreRecords === 0 ? (
         <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-4">
-          <p className="text-sm font-medium">La trazabilidad histórica está certificada por tablas canónicas, no por archivos preservados en el Document Core.</p>
+          <p className="text-sm font-medium">Los registros históricos tienen trazabilidad financiera, pero no cuentan con archivos originales asociados.</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Los archivos que se suban desde ahora a Finanzas quedarán en el núcleo documental sin alterar los eventos históricos certificados.
+            Los documentos que se incorporen desde ahora quedarán vinculados como respaldo sin modificar el historial existente.
           </p>
         </div>
       ) : null}
+
+      <section className="overflow-hidden rounded-lg border">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">Archivos recibidos</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Evidencia original conservada. Procesar no publica ni reemplaza activos canónicos.</p>
+        </div>
+        {processingError ? (
+          <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{processingError}</div>
+        ) : null}
+        <div className="divide-y">
+          {data.workbooks.length ? data.workbooks.map((workbook) => (
+            <article key={workbook.id} className="p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">{workbook.filename}</h3>
+                    <Badge variant={workbook.canonical ? 'default' : 'outline'}>
+                      {workbook.canonical ? `Canónico · ${workbook.canonicalAuthority || 'Finanzas'}` : workbook.senderDeclaredNotFinal ? 'Preliminar' : 'Fuente recibida'}
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Corte: {date(workbook.cutoffDate)} · {workbook.sourceRows.toLocaleString('es-CL')} filas de origen
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {workbook.stage
+                      ? workbook.canonical
+                        ? `Canónico: ${workbook.stage.rows.toLocaleString('es-CL')} registros · Identidad vinculada: ${workbook.stage.matched.toLocaleString('es-CL')} · Identidad pendiente: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
+                        : `Procesadas: ${workbook.stage.rows.toLocaleString('es-CL')} · Identidad resuelta: ${workbook.stage.matched.toLocaleString('es-CL')} · Por revisar: ${workbook.stage.unresolved.toLocaleString('es-CL')}`
+                      : 'Pendiente de procesamiento estructurado'}
+                  </p>
+                  {workbook.stage?.anomalyRows ? (
+                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                      {workbook.stage.anomalyRows.toLocaleString('es-CL')} observación{workbook.stage.anomalyRows === 1 ? '' : 'es'} para revisión de Daniel. La fuente permanece canónica.
+                    </p>
+                  ) : null}
+                </div>
+                {data.canImportWorkbooks ? (
+                  <button
+                    type="button"
+                    onClick={() => processWorkbook(workbook.id)}
+                    disabled={processingId !== null}
+                    className="inline-flex h-9 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {processingId === workbook.id ? 'Procesando…' : workbook.stage ? 'Reprocesar' : 'Procesar'}
+                  </button>
+                ) : (
+                  <Badge variant="secondary">{workbook.reviewStatus === 'needs_review' ? 'Revisión pendiente' : workbook.reviewStatus}</Badge>
+                )}
+              </div>
+            </article>
+          )) : (
+            <div className="p-4 text-sm text-muted-foreground">No hay archivos financieros registrados.</div>
+          )}
+        </div>
+      </section>
 
       <section className="divide-y overflow-hidden rounded-lg border">
         {data.data.map((source) => (
@@ -86,11 +187,11 @@ export default function FinanceSourcesPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Database className="h-4 w-4 text-muted-foreground" />
                   <h2 className="text-sm font-semibold">{source.label}</h2>
-                  <Badge variant="secondary">Tabla canónica</Badge>
+                  <Badge variant="secondary">Fuente registrada</Badge>
                   <Badge variant="outline">{source.meaning}</Badge>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  {source.sourceTable} · {source.records.toLocaleString('es-CL')} eventos · {source.currency}
+                  {source.records.toLocaleString('es-CL')} registros · {source.currency}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Cobertura: {date(source.firstEventAt)} → {date(source.lastEventAt)}
@@ -98,7 +199,7 @@ export default function FinanceSourcesPage() {
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                <span>No se presenta como archivo Excel original</span>
+                <span>No incluye archivo original</span>
               </div>
             </div>
           </article>

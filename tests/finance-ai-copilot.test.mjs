@@ -30,20 +30,16 @@ test('finance AI keeps contractual forecast separate from statistical prediction
   assert.match(assistant,/Forecast contractual basado en CxP y fechas de vencimiento/);
   assert.match(assistant,/No es predicción estadística/);
   assert.match(assistant,/No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado/);
-  assert.match(finance,/Predicción estadística/);
-  assert.match(finance,/En calibración/);
 });
 
-test('Daniel gets one-tap executive questions with provenance and conversational continuity',()=>{
-  assert.match(finance,/Qué revisar/);
-  assert.match(finance,/Qué viene/);
-  assert.match(finance,/Fuera de patrón/);
-  assert.match(finance,/Evidencia: \{aiSources\.join/);
-  assert.match(finance,/conversationId: aiConversationId/);
-  assert.match(finance,/Pregunta sobre caja, proveedores o vencimientos/);
-  assert.match(finance,/setAiConversationId/);
-  assert.match(finance,/\/api\/finance\/assistant/);
+test('finance assistant remains available without duplicating a second copilot inside the summary',()=>{
   assert.match(financeRoute,/MODULE_KEYS\.FIN_FINANZAS/);
+  assert.match(financeRoute,/operational-domain-assistant|assistant/i);
+  assert.doesNotMatch(finance,/Pregunta sobre caja, proveedores o vencimientos/);
+  assert.doesNotMatch(finance,/Qué revisar/);
+  assert.doesNotMatch(finance,/Qué viene/);
+  assert.doesNotMatch(finance,/Fuera de patrón/);
+  assert.match(finance,/LaudusFinanceControlCard/);
   assert.doesNotMatch(proxy,/path === '\/api\/intelligence\/executive-assistant'/);
 });
 

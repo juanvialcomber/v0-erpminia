@@ -18,7 +18,15 @@ export async function GET(request: NextRequest) {
     console.error('[finance/payables]', payablesError || paymentsError);
     return NextResponse.json({ payables: [], payments: [], canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
   }
-  return NextResponse.json({ payables: payables || [], payments: payments || [], canEdit: access.canWrite });
+  const isUatValue = (value: unknown) => typeof value === 'string' && /^UAT-/i.test(value.trim());
+  const visiblePayables = (payables || []).filter((row) =>
+    !isUatValue(row.invoice_number) && !isUatValue(row.supplier_name),
+  );
+  const visiblePayments = (payments || []).filter((row) =>
+    !isUatValue(row.payment_reference) && !isUatValue(row.reconciliation_reference),
+  );
+
+  return NextResponse.json({ payables: visiblePayables, payments: visiblePayments, canEdit: access.canWrite });
 }
 
 export async function POST(request: NextRequest) {

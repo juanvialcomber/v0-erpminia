@@ -462,6 +462,89 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       materialMeterDecreases: materialMeterDecreaseCount,
     });
 
+    const [{ data: insuranceEvidence, error: insuranceEvidenceError }, depreciationEvidenceResult] = await Promise.all([
+      context.supabase
+        .from('motil_finance_asset_stage')
+        .select('import_id,insured_uf,identity_status,identity_basis,source_sheet,source_row')
+        .eq('organization_id', context.organizationId)
+        .eq('canonical_asset_id', id)
+        .not('insured_uf', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      context.supabase
+        .from('motil_finance_asset_stage')
+        .select('import_id,net_book_value,updated_asset,total_accum_depr,depreciation_current,remaining_life_months,cost_center_raw,source_sheet,source_row,source_payload')
+        .eq('organization_id', context.organizationId)
+        .eq('canonical_asset_id', id)
+        .not('net_book_value', 'is', null)
+        .order('source_row', { ascending: true })
+        .limit(10),
+    ]);
+
+    if (insuranceEvidenceError) console.warn('[asset-360] insurance finance evidence unavailable', { assetId: id, error: insuranceEvidenceError });
+    if (depreciationEvidenceResult.error) console.warn('[asset-360] depreciation finance evidence unavailable', { assetId: id, error: depreciationEvidenceResult.error });
+
+    const depreciationRows = depreciationEvidenceResult.data || [];
+    const depreciationEvidence = depreciationRows.length === 1 ? depreciationRows[0] : null;
+    const depreciationConflictCount = depreciationRows.length > 1 ? depreciationRows.length : 0;
+
+    const financeImportIds = Array.from(new Set([
+      insuranceEvidence?.import_id,
+      ...depreciationRows.map((row: any) => row.import_id),
+    ].filter(Boolean)));
+    const financeImportsResult = financeImportIds.length
+      ? await context.supabase
+          .from('motil_finance_workbook_imports')
+          .select('id,filename,source_cutoff_date,review_status,metadata')
+          .eq('organization_id', context.organizationId)
+          .in('id', financeImportIds)
+      : { data: [], error: null };
+    if (financeImportsResult.error) console.warn('[asset-360] finance workbook authority unavailable', { assetId: id, error: financeImportsResult.error });
+
+    const financeImportsById = new Map((financeImportsResult.data || []).map((row: any) => [row.id, row]));
+    const insuranceImport = insuranceEvidence?.import_id ? financeImportsById.get(insuranceEvidence.import_id) : null;
+    const depreciationImport = depreciationEvidence?.import_id ? financeImportsById.get(depreciationEvidence.import_id) : null;
+    const insuranceMetadata = insuranceImport?.metadata && typeof insuranceImport.metadata === 'object'
+      ? insuranceImport.metadata as Record<string, unknown>
+      : {};
+    const depreciationMetadata = depreciationImport?.metadata && typeof depreciationImport.metadata === 'object'
+      ? depreciationImport.metadata as Record<string, unknown>
+      : {};
+
+    const financeProfile = {
+      insurance: insuranceEvidence ? {
+        insured_uf: insuranceEvidence.insured_uf,
+        identity_status: insuranceEvidence.identity_status,
+        identity_basis: insuranceEvidence.identity_basis,
+        source_sheet: insuranceEvidence.source_sheet,
+        source_row: insuranceEvidence.source_row,
+        source_file: insuranceImport?.filename || null,
+        source_cutoff_date: insuranceImport?.source_cutoff_date || null,
+        canonical: insuranceMetadata.canonical === true,
+        authority: typeof insuranceMetadata.canonical_authority === 'string' ? insuranceMetadata.canonical_authority : null,
+      } : null,
+      depreciation: depreciationEvidence ? {
+        net_book_value: depreciationEvidence.net_book_value,
+        updated_asset: depreciationEvidence.updated_asset,
+        total_accum_depr: depreciationEvidence.total_accum_depr,
+        depreciation_current: depreciationEvidence.depreciation_current,
+        remaining_life_months: depreciationEvidence.remaining_life_months,
+        cost_center_raw: depreciationEvidence.cost_center_raw,
+        source_sheet: depreciationEvidence.source_sheet,
+        source_row: depreciationEvidence.source_row,
+        source_file: depreciationImport?.filename || null,
+        source_cutoff_date: depreciationImport?.source_cutoff_date || null,
+        canonical: depreciationMetadata.canonical === true,
+        authority: typeof depreciationMetadata.canonical_authority === 'string' ? depreciationMetadata.canonical_authority : null,
+        review_flags: Array.isArray((depreciationEvidence.source_payload as Record<string, unknown> | null)?.review_flags)
+          ? (depreciationEvidence.source_payload as Record<string, unknown>).review_flags
+          : [],
+      } : null,
+      depreciation_identity_pending: Boolean(insuranceEvidence && depreciationRows.length === 0),
+      depreciation_conflict_count: depreciationConflictCount,
+    };
+
     const summary = {
       activeWorkOrders: (ordersResult.data || []).length,
       criticalOpen: (ordersResult.data || []).filter((row: any) => String(row.priority || '').toLowerCase() === 'critical').length,
@@ -504,6 +587,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       drillingMaintenanceReview: drillingReviewResult.data || [],
       maintenancePriority: maintenancePriorityResult.data || null,
       financeReconciliation: financeReconciliationResult.data || null,
+      financeProfile,
       runtimeCostIntelligence: resolvedRuntimeCostIntelligence,
       meterHistory: planningMeterHistory,
       drillOperationalEvidence: drillEvidenceResult.data || null,

@@ -10,7 +10,7 @@ test('treasury exposes one explicit next action',()=>{
   assert.match(page,/Definir vencimiento/);
   assert.match(page,/Registrar pago vencido/);
   assert.match(page,/Conciliar pago/);
-  assert.match(page,/Sin acción pendiente/);
+  assert.match(page,/Sin CxP MOTIL pendientes/);
 });
 
 test('treasury replaces browser prompts with traceable dialogs',()=>{

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const migration = fs.readFileSync('supabase/migrations/20260827192000_add_procurement_cash_forecast_v1.sql','utf8');
 const route = fs.readFileSync('app/api/finance/executive/route.ts','utf8');
 const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+const payments = fs.readFileSync('app/dashboard/finanzas/pagos/page.tsx','utf8');
 
 test('cash forecast uses only real payable due dates and keeps undated obligations explicit',()=>{
   assert.match(migration,/due_date is null then 'no_due_date'/i);
@@ -28,10 +29,11 @@ test('finance executive API exposes forecast tenant scoped through organization 
   assert.match(route,/cashForecast: cashForecast\.data \|\| \[\]/);
 });
 
-test('finance cockpit keeps short-term treasury visible without expanding the full forecast',()=>{
-  assert.match(page,/CxP aprobadas en MOTIL/);
-  assert.match(page,/Vence ≤ 7 días/);
-  assert.match(page,/Este universo es distinto de la exposición histórica observada en Laudus/);
+test('payments keeps short-term treasury actionable without expanding the full forecast on summary',()=>{
+  assert.match(payments,/days_to_due/);
+  assert.match(payments,/Vencidas/);
+  assert.match(payments,/Sin vencimiento/);
+  assert.match(page,/LaudusFinanceControlCard/);
   assert.doesNotMatch(page,/Próx\. 30 días/);
   assert.doesNotMatch(page,/Próx\. 60 días/);
   assert.doesNotMatch(page,/Próx\. 90 días/);

@@ -11,9 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const q = searchParams.get('q')?.trim();
-    const intelligence = context.supabase.schema('intelligence');
-
-    let query = intelligence
+    let query = context.supabase
       .from('canonical_clp_cost_ledger')
       .select('*')
       .eq('organization_id', context.organizationId)
@@ -25,14 +23,16 @@ export async function GET(request: NextRequest) {
 
     const [eventsResult, overviewResult] = await Promise.all([
       query,
-      intelligence.from('canonical_finance_overview').select('*').eq('organization_id', context.organizationId).maybeSingle(),
+      context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', context.organizationId).maybeSingle(),
     ]);
 
     if (eventsResult.error) throw eventsResult.error;
-    if (overviewResult.error) throw overviewResult.error;
+    if (overviewResult.error) {
+      console.warn('[finance/event-ledger] overview unavailable', overviewResult.error.message);
+    }
 
     return NextResponse.json({
-      overview: overviewResult.data || null,
+      overview: overviewResult.error ? null : overviewResult.data || null,
       events: eventsResult.data || [],
       capped: (eventsResult.data || []).length === 250,
       certification: {

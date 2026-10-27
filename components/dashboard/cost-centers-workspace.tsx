@@ -22,6 +22,8 @@ type Group = {
   rootCode: string;
   rootName: string;
   items: CostCenterRecord[];
+  activityEvents: number;
+  committedClp: number;
 };
 
 type AdminResult = {
@@ -29,6 +31,13 @@ type AdminResult = {
   title: string;
   description: string;
 };
+
+function compactClp(value: number) {
+  return new Intl.NumberFormat('es-CL', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+}
 
 function normalize(value: string) {
   return value
@@ -41,6 +50,8 @@ function normalize(value: string) {
 export function CostCentersWorkspace() {
   const { costCenters, loading, error, reload } = useCostCenters();
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'all'>('active');
+  const [orderMode, setOrderMode] = useState<'impact' | 'structure'>('impact');
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [adminOpen, setAdminOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,12 +65,15 @@ export function CostCentersWorkspace() {
   );
 
   const filtered = useMemo(() => {
+    const byStatus = statusFilter === 'active'
+      ? visible.filter((center) => isActiveCostCenterStatus(center.status))
+      : visible;
     const term = normalize(query);
-    if (!term) return visible;
-    return visible.filter((center) =>
+    if (!term) return byStatus;
+    return byStatus.filter((center) =>
       normalize(`${center.code} ${center.name} ${center.description || ''}`).includes(term),
     );
-  }, [query, visible]);
+  }, [query, statusFilter, visible]);
 
   const groups = useMemo<Group[]>(() => {
     const result = new Map<string, Group>();
@@ -68,22 +82,31 @@ export function CostCentersWorkspace() {
       const current = result.get(rootCode);
       if (current) {
         current.items.push(center);
+        current.activityEvents += Number(center.activityEvents || 0);
+        current.committedClp += Number(center.committedClp || 0);
       } else {
         result.set(rootCode, {
           rootCode,
           rootName: center.code === rootCode ? center.name : rootCode,
           items: [center],
+          activityEvents: Number(center.activityEvents || 0),
+          committedClp: Number(center.committedClp || 0),
         });
       }
     }
-    return Array.from(result.values()).sort(
-      (left, right) => getCostCenterPriority(left.rootCode) - getCostCenterPriority(right.rootCode),
-    );
-  }, [filtered]);
+    return Array.from(result.values()).sort((left, right) => {
+      if (orderMode === 'impact') {
+        if (right.committedClp !== left.committedClp) return right.committedClp - left.committedClp;
+        if (right.activityEvents !== left.activityEvents) return right.activityEvents - left.activityEvents;
+      }
+      return getCostCenterPriority(left.rootCode) - getCostCenterPriority(right.rootCode);
+    });
+  }, [filtered, orderMode]);
 
   const activeCount = visible.filter((center) => isActiveCostCenterStatus(center.status)).length;
   const rootCount = new Set(visible.map((center) => getCostCenterRootCode(center.code))).size;
   const leafCount = visible.filter((center) => !isRootCostCenter(center.code)).length;
+  const topGroups = groups.filter((group) => group.activityEvents > 0 || group.committedClp > 0).slice(0, 4);
 
   const toggle = (rootCode: string) => {
     setExpanded((current) => ({ ...current, [rootCode]: !current[rootCode] }));
@@ -172,7 +195,7 @@ export function CostCentersWorkspace() {
   };
 
   if (loading) {
-    return <StatePanel tone="loading" title="Cargando centros de costos" description="Consultando la estructura canónica vigente." />;
+    return <StatePanel tone="loading" title="Cargando centros de costos" description="Consultando la estructura vigente." />;
   }
 
   if (error) {
@@ -187,17 +210,22 @@ export function CostCentersWorkspace() {
   }
 
   if (visible.length === 0) {
-    return <StatePanel tone="neutral" title="Sin centros de costos visibles" description="No hay una estructura operacional disponible para esta organización." />;
+    return (
+      <StatePanel
+        tone="neutral"
+        title="Sin centros de costos visibles"
+        description="No hay una estructura operacional disponible para esta organización."
+      />
+    );
   }
 
   return (
     <div className="space-y-5">
-      <section aria-label="Resumen de centros de costos" className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Resumen de centros de costos" className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3">
         {[
           ['Centros vigentes', activeCount],
           ['Grupos principales', rootCount],
           ['Subcentros', leafCount],
-          ['Resultados visibles', filtered.length],
         ].map(([label, value]) => (
           <div key={String(label)} className="bg-card px-4 py-3">
             <p className="text-xs text-muted-foreground">{label}</p>
@@ -206,19 +234,86 @@ export function CostCentersWorkspace() {
         ))}
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full max-w-xl">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por código, nombre o descripción"
-            className="pl-9"
-          />
+      {topGroups.length > 0 ? (
+        <section className="space-y-3" aria-label="Familias con mayor actividad">
+          <div>
+            <p className="text-sm font-semibold">Familias con mayor actividad observada</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ordenado por movimientos y compromiso CLP registrado. No representa costo reconocido ni presupuesto ejecutado.
+            </p>
+          </div>
+          <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 xl:grid-cols-4">
+            {topGroups.map((group) => (
+              <button
+                key={group.rootCode}
+                type="button"
+                onClick={() => setExpanded((current) => ({ ...current, [group.rootCode]: true }))}
+                className="bg-card px-4 py-3 text-left transition-colors hover:bg-muted/30"
+              >
+                <p className="truncate text-sm font-medium">{repairCostCenterText(group.rootName)}</p>
+                <p className="mt-2 text-lg font-semibold tabular-nums">{'$'}{compactClp(group.committedClp)}</p>
+                <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                  {group.activityEvents.toLocaleString('es-CL')} movimientos
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar código, nombre o descripción"
+              className="pl-9"
+            />
+          </div>
+
+          <div className="inline-flex w-fit rounded-md border bg-card p-1" aria-label="Orden">
+            <button
+              type="button"
+              onClick={() => setOrderMode('impact')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${orderMode === 'impact' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Impacto
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderMode('structure')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${orderMode === 'structure' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Estructura
+            </button>
+          </div>
+
+          <div className="inline-flex w-fit rounded-md border bg-card p-1" aria-label="Filtro de estado">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('active')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === 'active' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Vigentes
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${statusFilter === 'all' ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={reload}>
-          <RefreshCw className="mr-2 h-4 w-4" />Actualizar vista
-        </Button>
+
+        <div className="flex items-center gap-3">
+          <span className="text-xs tabular-nums text-muted-foreground">{filtered.length} visibles</span>
+          <Button variant="outline" size="sm" onClick={reload}>
+            <RefreshCw className="mr-2 h-4 w-4" />Actualizar
+          </Button>
+        </div>
       </div>
 
       {groups.length === 0 ? (
@@ -230,6 +325,7 @@ export function CostCentersWorkspace() {
             const items = sortCostCenters(group.items);
             const root = items.find((item) => item.code === group.rootCode);
             const children = items.filter((item) => item.code !== group.rootCode);
+            const activeChildren = children.filter((item) => isActiveCostCenterStatus(item.status)).length;
             const rootLabel = root
               ? formatCostCenterLabel(root)
               : `${group.rootCode} - ${repairCostCenterText(group.rootName)}`;
@@ -239,24 +335,48 @@ export function CostCentersWorkspace() {
                 <button
                   type="button"
                   onClick={() => toggle(group.rootCode)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/30"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
                   aria-expanded={open}
                 >
-                  {open ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                  {open
+                    ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{rootLabel}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">{children.length} subcentros</span>
+                  <div className="flex shrink-0 items-center gap-3">
+                    {group.activityEvents > 0 || group.committedClp > 0 ? (
+                      <span className="hidden text-right text-xs tabular-nums text-muted-foreground sm:block">
+                        <span className="font-medium text-foreground">{'$'}{compactClp(group.committedClp)}</span>
+                        <span className="ml-2">{group.activityEvents.toLocaleString('es-CL')} mov.</span>
+                      </span>
+                    ) : null}
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {statusFilter === 'active' ? `${activeChildren} vigentes` : `${activeChildren}/${children.length} vigentes`}
+                    </span>
+                  </div>
                 </button>
+
                 {open ? (
                   <div className="border-t bg-muted/10">
                     {children.length === 0 ? (
                       <p className="px-11 py-3 text-sm text-muted-foreground">Sin subcentros.</p>
                     ) : children.map((center) => (
-                      <div key={center.id} className="grid gap-1 border-b px-11 py-2.5 last:border-b-0 md:grid-cols-[170px_minmax(0,1fr)] md:gap-4">
+                      <div
+                        key={center.id}
+                        className="grid gap-1 border-b px-11 py-2.5 last:border-b-0 md:grid-cols-[140px_minmax(0,1fr)_160px] md:items-center md:gap-4"
+                      >
                         <span className="text-xs font-medium tabular-nums text-muted-foreground">{center.code}</span>
                         <div className="min-w-0">
                           <p className="truncate text-sm">{repairCostCenterText(center.name)}</p>
-                          {center.description ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{repairCostCenterText(center.description)}</p> : null}
+                          {center.description ? (
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{repairCostCenterText(center.description)}</p>
+                          ) : null}
                         </div>
+                        {Number(center.activityEvents || 0) > 0 || Number(center.committedClp || 0) > 0 ? (
+                          <div className="text-left text-xs tabular-nums text-muted-foreground md:text-right">
+                            <p className="font-medium text-foreground">{'$'}{compactClp(Number(center.committedClp || 0))}</p>
+                            <p>{Number(center.activityEvents || 0).toLocaleString('es-CL')} mov.</p>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -313,7 +433,12 @@ export function CostCentersWorkspace() {
             </div>
 
             {adminResult ? (
-              <StatePanel tone={adminResult.tone} title={adminResult.title} description={adminResult.description} className="min-h-0" />
+              <StatePanel
+                tone={adminResult.tone}
+                title={adminResult.title}
+                description={adminResult.description}
+                className="min-h-0"
+              />
             ) : null}
           </div>
         ) : null}

@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const client = fs.readFileSync('lib/integrations/laudus/client.ts','utf8');
 const lib = fs.readFileSync('lib/integrations/laudus/native-invoice-trace.ts','utf8');
 const route = fs.readFileSync('app/api/integrations/laudus/native-invoice-trace/route.ts','utf8');
-const page = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
+const page = fs.readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx','utf8');
 
 test('Laudus client exposes bounded read-only GET without arbitrary hosts',()=>{
   assert.match(client,/getLaudusReadOnly/);
@@ -43,7 +43,7 @@ test('native trace API is Finance scoped and cached briefly',()=>{
   assert.match(route,/private, max-age=300/);
 });
 
-test('finance presents native Laudus evidence without overclaiming PO confirmation',()=>{
+test('finance traceability presents native Laudus evidence without overclaiming PO confirmation',()=>{
   assert.match(page,/Evidencia de factura/);
   assert.match(page,/Con líneas/);
   assert.match(page,/Con traza Laudus/);

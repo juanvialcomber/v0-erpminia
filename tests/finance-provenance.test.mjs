@@ -23,9 +23,9 @@ test('finance provenance preserves recognized and committed source semantics', a
 
 test('finance source UI does not invent original files', async () => {
   const source = await readFile(pageUrl, 'utf8');
-  assert.match(source, /No se presenta como archivo Excel original/);
-  assert.match(source, /tablas canónicas/);
-  assert.match(source, /Documentos Finanzas/);
+  assert.match(source, /No incluye archivo original/);
+  assert.match(source, /registros históricos tienen trazabilidad financiera/);
+  assert.match(source, /Fuentes y calidad/);
 });
 
 test('finance navigation exposes provenance', async () => {

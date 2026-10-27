@@ -18,6 +18,7 @@ const fetcher = async (url: string) => {
 
 const money = (value: unknown) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
 const number = (value: unknown) => new Intl.NumberFormat('es-CL').format(Number(value || 0));
+const informationStatus = (value: unknown) => value === 'valid' ? 'Verificada' : value === 'warning' ? 'Revisar' : 'No informado';
 
 type PurchaseOrder = { id: string; order_number: string; order_date?: string | null; total_amount?: number | null; operational_status?: string | null; status?: string | null };
 type ProductSummary = { product_code: string; description?: string | null; quantity: number; spend: number };
@@ -41,7 +42,7 @@ export default function SupplierProfilePage() {
       <section className="border-b border-border/70 pb-6">
         <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3"><Link href="/dashboard/finanzas/proveedores"><ArrowLeft className="mr-2 h-4 w-4" />Proveedores</Link></Button>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div><p className="text-sm font-medium text-muted-foreground">Proveedor canónico</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{supplier.trade_name || supplier.legal_name}</h1><p className="mt-2 text-sm text-muted-foreground">{supplier.tax_id || 'Sin RUT'} · {supplier.region || 'Sin región'} · {supplier.country || 'Chile'}</p></div>
+          <div><p className="text-sm font-medium text-muted-foreground">Ficha de proveedor</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{supplier.trade_name || supplier.legal_name}</h1><p className="mt-2 text-sm text-muted-foreground">{supplier.tax_id || 'Sin RUT'} · {supplier.region || 'Sin región'} · {supplier.country || 'Chile'}</p></div>
           <Badge variant={supplier.is_active ? 'secondary' : 'outline'}>{supplier.is_active ? 'Activo' : 'Inactivo'}</Badge>
         </div>
       </section>
@@ -56,18 +57,18 @@ export default function SupplierProfilePage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-        <Card className="shadow-none"><CardHeader><CardTitle>Identidad y condiciones</CardTitle><CardDescription>Una sola ficha administrativa.</CardDescription></CardHeader><CardContent className="grid gap-4 text-sm sm:grid-cols-2">
-          <Field label="Razón social" value={supplier.legal_name} /><Field label="Nombre de fantasía" value={supplier.trade_name} /><Field label="Giro" value={supplier.business_activity} /><Field label="Condición de pago" value={supplier.payment_terms} /><Field label="Email" value={supplier.email} /><Field label="Teléfono" value={supplier.phone} /><Field label="Dirección" value={[supplier.address, supplier.commune].filter(Boolean).join(', ')} /><Field label="Calidad de datos" value={supplier.validation_status} />
+        <Card className="shadow-none"><CardHeader><CardTitle>Identidad y condiciones</CardTitle><CardDescription>Datos administrativos y condiciones registradas.</CardDescription></CardHeader><CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+          <Field label="Razón social" value={supplier.legal_name} /><Field label="Nombre de fantasía" value={supplier.trade_name} /><Field label="Giro" value={supplier.business_activity} /><Field label="Condición de pago" value={supplier.payment_terms} /><Field label="Email" value={supplier.email} /><Field label="Teléfono" value={supplier.phone} /><Field label="Dirección" value={[supplier.address, supplier.commune].filter(Boolean).join(', ')} /><Field label="Calidad de datos" value={informationStatus(supplier.validation_status)} />
         </CardContent></Card>
 
-        <Card className="shadow-none"><CardHeader><CardTitle>Productos principales</CardTitle><CardDescription>Concentración según líneas canónicas de compra.</CardDescription></CardHeader><CardContent className="space-y-3">
+        <Card className="shadow-none"><CardHeader><CardTitle>Productos principales</CardTitle><CardDescription>Concentración según las compras registradas.</CardDescription></CardHeader><CardContent className="space-y-3">
           {!products.length ? <p className="text-sm text-muted-foreground">No hay productos históricos enlazados.</p> : products.map((product) => <div key={`${product.product_code}-${product.description}`} className="grid gap-2 border-b pb-3 last:border-0 sm:grid-cols-[1fr_120px_160px] sm:items-center"><div><p className="font-medium">{product.product_code}</p><p className="text-xs text-muted-foreground">{product.description || 'Sin descripción'}</p></div><p className="text-sm">{number(product.quantity)} unidades</p><p className="text-sm font-medium">{money(product.spend)}</p></div>)}
         </CardContent></Card>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="shadow-none"><CardHeader><CardTitle>Órdenes recientes</CardTitle></CardHeader><CardContent className="space-y-3">
-          {!orders.length ? <p className="text-sm text-muted-foreground">No hay órdenes canónicas enlazadas.</p> : orders.slice(0, 20).map((order) => <div key={order.id} className="flex items-center justify-between gap-4 border-b pb-3 last:border-0"><div><p className="font-medium">{order.order_number}</p><p className="text-xs text-muted-foreground">{order.order_date || 'Sin fecha'} · {order.operational_status || order.status || 'sin estado'}</p></div><p className="text-sm font-medium">{money(order.total_amount)}</p></div>)}
+          {!orders.length ? <p className="text-sm text-muted-foreground">No hay órdenes de compra vinculadas.</p> : orders.slice(0, 20).map((order) => <div key={order.id} className="flex items-center justify-between gap-4 border-b pb-3 last:border-0"><div><p className="font-medium">{order.order_number}</p><p className="text-xs text-muted-foreground">{order.order_date || 'Sin fecha'} · {order.operational_status || order.status || 'sin estado'}</p></div><p className="text-sm font-medium">{money(order.total_amount)}</p></div>)}
         </CardContent></Card>
 
         <Card className="shadow-none"><CardHeader><CardTitle>Cotizaciones</CardTitle></CardHeader><CardContent className="space-y-3">

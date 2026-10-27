@@ -42,11 +42,11 @@ export function CertifiedFinancialSummary({ entity, id }: { entity: Entity; id: 
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Cargando cifras certificadas...</p>;
+    return <p className="text-sm text-muted-foreground">Cargando cifras con respaldo...</p>;
   }
 
   if (error) {
-    return <p className="text-sm text-destructive">No fue posible cargar las cifras certificadas.</p>;
+    return <p className="text-sm text-destructive">No fue posible cargar las cifras con respaldo.</p>;
   }
 
   const summary = data?.data || {};
@@ -54,15 +54,15 @@ export function CertifiedFinancialSummary({ entity, id }: { entity: Entity; id: 
   const metrics = [
     { label: 'Costo reconocido', value: money(summary.recognized_clp) },
     { label: 'Compromisos', value: money(summary.committed_clp) },
-    { label: 'Eventos certificados', value: number(eventCount) },
+    { label: 'Eventos registrados', value: number(eventCount) },
   ];
 
   return (
     <section className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-semibold">Resumen financiero certificado</h2>
-          <p className="text-sm text-muted-foreground">Origen canónico · CLP · reconocido y comprometido separados.</p>
+          <h2 className="font-semibold">Resumen financiero trazable</h2>
+          <p className="text-sm text-muted-foreground">Fuente registrada · CLP · reconocido y comprometido separados.</p>
         </div>
         <Link href="/dashboard/finanzas/trazabilidad" className="text-sm font-medium hover:underline">
           Ver origen

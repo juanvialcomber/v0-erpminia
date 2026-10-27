@@ -183,6 +183,36 @@ type Asset360Response = {
   drillEconomicsChange?: Asset360DrillEconomicsChange;
   maintenancePriority?: Asset360MaintenancePriority;
   financeReconciliation?: Asset360FinanceReconciliation;
+  financeProfile?: {
+    insurance?: {
+      insured_uf?: number | string | null;
+      identity_status?: string | null;
+      identity_basis?: string | null;
+      source_sheet?: string | null;
+      source_row?: number | null;
+      source_file?: string | null;
+      source_cutoff_date?: string | null;
+      canonical?: boolean;
+      authority?: string | null;
+    } | null;
+    depreciation?: {
+      net_book_value?: number | string | null;
+      updated_asset?: number | string | null;
+      total_accum_depr?: number | string | null;
+      depreciation_current?: number | string | null;
+      remaining_life_months?: number | string | null;
+      cost_center_raw?: string | null;
+      source_sheet?: string | null;
+      source_row?: number | null;
+      source_file?: string | null;
+      source_cutoff_date?: string | null;
+      canonical?: boolean;
+      authority?: string | null;
+      review_flags?: unknown[];
+    } | null;
+    depreciation_identity_pending?: boolean;
+    depreciation_conflict_count?: number;
+  };
   identityHistory?: Asset360IdentityHistoryRow[];
   operatingSpine?: {
     last_work_order_at?: string | null;
@@ -519,6 +549,7 @@ export function Asset360Overview({
         economicHistory={economicHistory}
         operationalState={operationalState}
         lastCostEventAt={operatingSpine?.last_cost_event_at}
+        financeProfile={data.financeProfile}
       />
 
       <Asset360PurchaseSection

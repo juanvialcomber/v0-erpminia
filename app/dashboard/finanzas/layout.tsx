@@ -25,6 +25,7 @@ const primaryItems: FinanceItem[] = [
   { href: '/dashboard/finanzas', label: 'Resumen' },
   { href: '/dashboard/finanzas/pagos', label: 'Pagos', requiresEdit: true },
   { href: '/dashboard/finanzas/proveedores', label: 'Proveedores' },
+  { href: '/dashboard/finanzas/activos', label: 'Activos' },
   { href: '/dashboard/finanzas/trazabilidad', label: 'Trazabilidad' },
 ];
 

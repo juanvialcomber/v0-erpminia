@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DocumentUpload } from '@/components/documents/document-upload';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DocumentList, Document } from '@/components/documents/document-list';
 import { DocumentReviewModal, type DocumentReviewDocument } from '@/components/documents/document-review-modal';
-import { FileText, CheckCircle2, AlertCircle, ArrowRight, Clock } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface DocumentStats {
@@ -127,29 +126,18 @@ export default function DocumentosFinanzasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Documentos Finanzas</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas</p>\n          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Documentos</h1>
           <p className="mt-2 text-muted-foreground">
-            Gestión de políticas, procedimientos e instructivos financieros
+            Políticas, procedimientos e instructivos financieros con revisión y respaldo.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas/importar">Excel finanzas</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/finanzas">
-              <ArrowRight className="mr-2 h-4 w-4" />
-              Volver a finanzas
-            </Link>
-          </Button>
-        </div>
+        <Button asChild>
+          <Link href="/dashboard/finanzas/documentos/importar">Importar documentos</Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-sm font-medium">
               <span>Total</span>
@@ -162,11 +150,11 @@ export default function DocumentosFinanzasPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-sm font-medium">
               <span>Vigentes</span>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-secondary" />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -175,24 +163,24 @@ export default function DocumentosFinanzasPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-sm font-medium">
                <span>En revisión</span>
-              <Clock className="h-4 w-4 text-yellow-500" />
+              <Clock className="h-4 w-4 text-primary" />
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-yellow-500">{stats.en_revision}</p>
-            <p className="text-xs text-muted-foreground">esperando aprobacion</p>
+            <p className="text-xs text-muted-foreground">esperando aprobación</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between text-sm font-medium">
               <span>Rechazados</span>
-              <AlertCircle className="h-4 w-4 text-red-500" />
+              <AlertCircle className="h-4 w-4 text-destructive" />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -207,7 +195,6 @@ export default function DocumentosFinanzasPage() {
           <TabsTrigger value="all" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Todos</TabsTrigger>
           <TabsTrigger value="vigentes" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Vigentes</TabsTrigger>
           <TabsTrigger value="revision" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">En revisión</TabsTrigger>
-          <TabsTrigger value="upload" className="font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Subir Documentos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -232,25 +219,6 @@ export default function DocumentosFinanzasPage() {
           />
         </TabsContent>
 
-        <TabsContent value="upload" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Subir Nuevo Documento</CardTitle>
-              <CardDescription>Sube politicas, procedimientos e instructivos financieros</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" asChild>
-                  <Link href="/dashboard/finanzas/documentos/importar">Abrir importador dedicado</Link>
-                </Button>
-                <Button size="sm" variant="ghost" asChild>
-                  <Link href="/dashboard/finanzas/importar">Ir al importador tabular</Link>
-                </Button>
-              </div>
-              <DocumentUpload module="finanzas" category="documentos" onUploadSuccess={loadDocuments} />
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       <DocumentReviewModal

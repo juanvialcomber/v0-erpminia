@@ -58,17 +58,52 @@ export async function GET(request: NextRequest) {
     };
   }));
 
-  const { count: financeDocuments, error: documentsError } = await context.supabase
-    .from('module_documents')
-    .select('id', { count: 'exact', head: true })
-    .eq('organization_id', context.organizationId)
-    .eq('module', 'finanzas')
-    .is('deleted_at', null);
+  const [{ count: financeDocuments, error: documentsError }, { data: workbookImports, error: workbookError }] = await Promise.all([
+    context.supabase
+      .from('module_documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', context.organizationId)
+      .eq('module', 'finanzas')
+      .is('deleted_at', null),
+    context.supabase
+      .from('motil_finance_workbook_imports')
+      .select('id,filename,source_kind,source_cutoff_date,sender_declared_not_final,structured_row_count,review_status,metadata,updated_at')
+      .eq('organization_id', context.organizationId)
+      .order('created_at', { ascending: false }),
+  ]);
 
   if (documentsError) return NextResponse.json({ error: documentsError.message }, { status: 500 });
+  if (workbookError) return NextResponse.json({ error: workbookError.message }, { status: 500 });
+
+  const financeWorkbooks = (workbookImports || []).map((workbook) => {
+    const metadata = (workbook.metadata || {}) as Record<string, unknown>;
+    const stage = (metadata.stage || null) as Record<string, unknown> | null;
+    return {
+      id: workbook.id,
+      filename: workbook.filename,
+      canonical: metadata.canonical === true,
+      canonicalAuthority: typeof metadata.canonical_authority === 'string' ? metadata.canonical_authority : null,
+      canonicalDomain: typeof metadata.canonical_domain === 'string' ? metadata.canonical_domain : null,
+      sourceKind: workbook.source_kind,
+      cutoffDate: workbook.source_cutoff_date,
+      senderDeclaredNotFinal: workbook.sender_declared_not_final,
+      sourceRows: workbook.structured_row_count,
+      reviewStatus: workbook.review_status,
+      stage: stage ? {
+        rows: Number(stage.rows || 0),
+        matched: Number(stage.matched || 0),
+        unresolved: Number(stage.unresolved || 0),
+        anomalyRows: Number(stage.anomaly_rows || 0),
+        importedAt: typeof stage.imported_at === 'string' ? stage.imported_at : null,
+      } : null,
+      updatedAt: workbook.updated_at,
+    };
+  });
 
   return NextResponse.json({
     data: sources,
+    workbooks: financeWorkbooks,
+    canImportWorkbooks: ['superadmin', 'admin'].includes(String(context.role || '').trim().toLowerCase()),
     summary: {
       sources: sources.length,
       auditEvents: sources.reduce((sum, source) => sum + source.records, 0),
@@ -79,6 +114,7 @@ export async function GET(request: NextRequest) {
     policy: {
       canonical_table: 'Tabla canónica certificada que conserva la fila o evento fuente. No se presenta como archivo Excel original.',
       document_core: 'Archivos nuevos de Finanzas viven en module_documents y no sustituyen la trazabilidad canónica histórica.',
+      canonical_workbook: 'Los archivos enviados por la autoridad financiera definida se consideran fuente canónica. Las observaciones se muestran para revisión y no invalidan la fuente.',
     },
   });
 }

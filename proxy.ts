@@ -128,6 +128,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
 
   const financeIntegrationRoutes = new Set([
+    '/api/integrations/laudus/finance-control',
     '/api/integrations/laudus/invoice-po-control',
     '/api/integrations/laudus/native-invoice-trace',
     '/api/integrations/laudus/bank-reconciliation',

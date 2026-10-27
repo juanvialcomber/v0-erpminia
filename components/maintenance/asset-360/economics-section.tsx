@@ -2,7 +2,7 @@
 // Extraída de asset-360-overview.tsx; consume las primitivas y helpers
 // compartidos del mismo directorio.
 
-import { CalendarDays, ChevronDown, Coins } from 'lucide-react';
+import { CalendarDays, ChevronDown, Coins, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { date, money, number } from './format';
 import { IdentityItem } from './primitives';
@@ -20,10 +20,34 @@ export function Asset360EconomicsSection({
   economicHistory,
   operationalState,
   lastCostEventAt,
+  financeProfile,
 }: {
   economicHistory: Asset360EconomicHistoryRow[];
   operationalState: Asset360OperationalState | undefined;
   lastCostEventAt: string | null | undefined;
+  financeProfile?: {
+    insurance?: {
+      insured_uf?: number | string | null;
+      source_file?: string | null;
+      source_cutoff_date?: string | null;
+      canonical?: boolean;
+      authority?: string | null;
+    } | null;
+    depreciation?: {
+      net_book_value?: number | string | null;
+      updated_asset?: number | string | null;
+      total_accum_depr?: number | string | null;
+      depreciation_current?: number | string | null;
+      remaining_life_months?: number | string | null;
+      source_file?: string | null;
+      source_cutoff_date?: string | null;
+      canonical?: boolean;
+      authority?: string | null;
+      review_flags?: unknown[];
+    } | null;
+    depreciation_identity_pending?: boolean;
+    depreciation_conflict_count?: number;
+  };
 }) {
   const economicLifetime = economicHistory.reduce(
     (sum, row) => sum + Number(row.historical_total_cost || 0),
@@ -57,6 +81,13 @@ export function Asset360EconomicsSection({
   const economic12mValue = operationalState?.recognized_cost_clp_12m != null
     ? Number(operationalState.recognized_cost_clp_12m)
     : null;
+  const bookValue = financeProfile?.depreciation?.net_book_value != null
+    ? Number(financeProfile.depreciation.net_book_value)
+    : null;
+  const maintenanceToBookPct =
+    economicLifetimeValue != null && bookValue != null && Number.isFinite(bookValue) && bookValue > 0
+      ? (economicLifetimeValue / bookValue) * 100
+      : null;
 
   return (
     <Card className="border-border/80 shadow-none">
@@ -73,6 +104,72 @@ export function Asset360EconomicsSection({
             <p className="text-xs text-muted-foreground">Corte {date(economicLastCostDate)}</p>
           ) : null}
         </div>
+
+        {financeProfile?.insurance || financeProfile?.depreciation ? (
+          <div className="border-b border-border py-5">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <p className="text-sm font-medium">Economía canónica del activo</p>
+              {financeProfile.insurance?.canonical || financeProfile.depreciation?.canonical ? (
+                <span className="rounded-full border px-2 py-0.5 text-[11px] font-medium">
+                  Canónico · {financeProfile.insurance?.authority || financeProfile.depreciation?.authority || 'Finanzas'}
+                </span>
+              ) : null}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <IdentityItem
+                icon={ShieldCheck}
+                label="Valor asegurado"
+                value={financeProfile.insurance?.insured_uf != null
+                  ? `${number(financeProfile.insurance.insured_uf, 2)} UF`
+                  : 'Sin base'}
+                meta={financeProfile.insurance?.source_cutoff_date
+                  ? `Fuente ${date(financeProfile.insurance.source_cutoff_date)}`
+                  : financeProfile.insurance?.source_file || null}
+              />
+              <IdentityItem
+                icon={Coins}
+                label="Valor libro"
+                value={financeProfile.depreciation?.net_book_value != null
+                  ? money(financeProfile.depreciation.net_book_value)
+                  : 'Pendiente de vincular'}
+                meta={financeProfile.depreciation?.source_cutoff_date
+                  ? `Fuente ${date(financeProfile.depreciation.source_cutoff_date)}`
+                  : Number(financeProfile.depreciation_conflict_count || 0) > 1
+                    ? `${financeProfile.depreciation_conflict_count} registros canónicos vinculados; Daniel debe resolver cuál aplica`
+                    : financeProfile.depreciation_identity_pending
+                      ? 'La depreciación canónica aún no está conciliada con este activo'
+                      : null}
+              />
+              <IdentityItem
+                icon={CalendarDays}
+                label="Depreciación del período"
+                value={financeProfile.depreciation?.depreciation_current != null
+                  ? money(financeProfile.depreciation.depreciation_current)
+                  : Number(financeProfile.depreciation_conflict_count || 0) > 1
+                    ? 'Revisión requerida'
+                    : 'Sin vínculo'}
+                meta={Number(financeProfile.depreciation_conflict_count || 0) > 1
+                  ? 'No se selecciona una fila automáticamente'
+                  : financeProfile.depreciation?.review_flags?.length
+                    ? `${financeProfile.depreciation.review_flags.length} observación(es) para Finanzas`
+                    : 'La fuente permanece canónica'}
+              />
+            </div>
+            {maintenanceToBookPct != null ? (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="text-xs text-muted-foreground">Mantenimiento reconocido / valor libro</p>
+                <p className="mt-1 text-sm font-medium tabular-nums">{number(maintenanceToBookPct, 1)}%</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Relación descriptiva entre gasto histórico reconocido en MOTIL y valor libro canónico. No representa TCO ni recomienda reemplazo.
+                </p>
+              </div>
+            ) : null}
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              Seguro, valor libro y depreciación son conceptos distintos. MOTIL los mantiene separados hasta contar con una conciliación exacta por activo.
+            </p>
+          </div>
+        ) : null}
 
         {economicLifetimeValue != null || economicHistory.length > 0 ? (
           <div>
