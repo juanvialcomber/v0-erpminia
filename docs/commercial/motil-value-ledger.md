@@ -249,3 +249,21 @@ Estos umbrales habilitan escala inicial, no E4.
 - Valores negativos se conservan; si MOTIL tarda más, debe mostrarse.
 - No se monetiza esta reducción hasta contar con costo/hora cargado válido, período comparable y suficiente atribución.
 - Investigación de diseño: arXiv:2609.07984 respalda event logs orientados a acción gobernada; arXiv:2509.08482 refuerza que las características del log afectan la evaluación y no deben confundirse con causalidad.
+
+
+## 2026-10-27 — OTe: cadena de evidencia desde detección a aprobación
+
+- La OTe exige hora de detección informada explícitamente por el operador.
+- MOTIL no infiere la detección a partir de la hora de creación.
+- Persistencia: `work_order_events.event_type = emergency_detected`, con `event_at` igual a la hora informada y actor trazable.
+- Validación: no acepta detección futura y limita retroactividad a 30 días.
+- Tramos medidos por cohorte OTe:
+  1. detección -> registro;
+  2. registro -> primer `timer_play`;
+  3. primer inicio -> cierre;
+  4. cierre -> aprobación humana;
+  5. detección -> aprobación.
+- La aprobación proviene de `work_order_supervisor_reviews.status = approved` y `reviewed_at`.
+- Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
+- No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
+- Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
