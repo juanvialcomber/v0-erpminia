@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
         .limit(500),
       context.supabase
         .from('maintenance_work_orders')
-        .select('id,canonical_asset_id,status,total_timer_seconds,actual_duration_hours,closed_at,created_at')
+        .select('id,canonical_asset_id,asset_id,status,work_type,assigned_person_id,total_timer_seconds,actual_duration_hours,root_cause,preventive_actions,meter_reading,closed_at,created_at,created_by')
         .eq('organization_id', context.organizationId)
+        .not('created_by', 'is', null)
         .limit(5000),
       context.supabase
         .from('work_order_events')
@@ -123,6 +124,15 @@ export async function GET(request: NextRequest) {
       0,
     );
     const closedRows = maintenanceRows.filter((row: any) => Boolean(row.closed_at));
+    const assignedRows = maintenanceRows.filter((row: any) => Boolean(row.assigned_person_id));
+    const assetLinkedRows = maintenanceRows.filter((row: any) => Boolean(row.canonical_asset_id || row.asset_id));
+    const rootCauseRows = maintenanceRows.filter((row: any) => Boolean(String(row.root_cause || '').trim()));
+    const preventiveActionRows = maintenanceRows.filter((row: any) => Boolean(String(row.preventive_actions || '').trim()));
+    const meterRows = maintenanceRows.filter((row: any) => row.meter_reading !== null && row.meter_reading !== undefined);
+    const emergencyRows = maintenanceRows.filter((row: any) => row.work_type === 'emergency');
+    const coveragePct = (count: number) => maintenanceRows.length > 0
+      ? Math.round((count / maintenanceRows.length) * 100)
+      : null;
     const workOrdersWithEvents = new Set(
       maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
     );
@@ -238,10 +248,18 @@ export async function GET(request: NextRequest) {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
       timerInstrumentedWorkOrders: timerRows.length,
-      timerCoverage:
-        maintenanceRows.length > 0
-          ? Math.round((timerRows.length / maintenanceRows.length) * 100)
-          : null,
+      timerCoverage: coveragePct(timerRows.length),
+      assignmentCoverage: coveragePct(assignedRows.length),
+      assetCoverage: coveragePct(assetLinkedRows.length),
+      rootCauseCoverage: coveragePct(rootCauseRows.length),
+      preventiveActionCoverage: coveragePct(preventiveActionRows.length),
+      meterCoverage: coveragePct(meterRows.length),
+      assignmentCoverageCount: assignedRows.length,
+      assetCoverageCount: assetLinkedRows.length,
+      rootCauseCoverageCount: rootCauseRows.length,
+      preventiveActionCoverageCount: preventiveActionRows.length,
+      meterCoverageCount: meterRows.length,
+      emergencyWorkOrders: emergencyRows.length,
       observedExecutionSeconds: timerSecondsObserved,
       observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
       workOrdersWithEvents: workOrdersWithEvents.size,
@@ -277,6 +295,12 @@ export async function GET(request: NextRequest) {
         withPartsInstalled,
         procurementCommitment,
         tracedPartsCost,
+      },
+      valueGate: {
+        attribution: 'NO_MEDIBLE_AUN',
+        pricingReadiness: 'MARKET_ANCHORED',
+        nextMeasurement: 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.',
+        semantics: 'coverage and workflow evidence are observed; savings, avoided downtime and ROI require a comparable baseline and attributable outcome',
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
     };
