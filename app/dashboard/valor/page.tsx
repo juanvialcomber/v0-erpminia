@@ -76,6 +76,14 @@ type ApiResponse = {
     preventiveActionCoverageCount?: number;
     meterCoverageCount?: number;
     emergencyWorkOrders?: number;
+    emergencyCycle?: {
+      detectedToRegistered?: { samples?: number; medianSeconds?: number | null };
+      registeredToStart?: { samples?: number; medianSeconds?: number | null };
+      startToClose?: { samples?: number; medianSeconds?: number | null };
+      closeToApproval?: { samples?: number; medianSeconds?: number | null };
+      endToEnd?: { samples?: number; medianSeconds?: number | null };
+      semantics?: string;
+    };
     observedExecutionSeconds?: number;
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
@@ -140,6 +148,13 @@ const money = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value)
     ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value)
     : '—';
+
+const duration = (seconds: number | null | undefined) => {
+  if (seconds == null || !Number.isFinite(seconds)) return '—';
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 1 }).format(seconds / 60)} min`;
+  return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(seconds / 3600)} h`;
+};
 
 export default function ValueScorecardPage() {
   const { data, error, isLoading } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
@@ -427,6 +442,35 @@ export default function ValueScorecardPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
+        </div>
+      </section>
+
+      <section aria-label="Cohorte OTe de emergencia" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">OTe · cohorte de emergencia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Detección → aprobación</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sólo tiempos respaldados por eventos reales. Un tramo sin timestamp queda sin medir.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ['Detección → registro', maintenanceValue.emergencyCycle?.detectedToRegistered],
+            ['Registro → inicio', maintenanceValue.emergencyCycle?.registeredToStart],
+            ['Inicio → cierre', maintenanceValue.emergencyCycle?.startToClose],
+            ['Cierre → aprobación', maintenanceValue.emergencyCycle?.closeToApproval],
+            ['Detección → aprobación', maintenanceValue.emergencyCycle?.endToEnd],
+          ].map(([label, metric]) => {
+            const row = metric as { samples?: number; medianSeconds?: number | null } | undefined;
+            return <div key={String(label)} className="bg-card px-5 py-5">
+              <p className="text-xs text-muted-foreground">{String(label)}</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(row?.medianSeconds)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{number(row?.samples || 0)} OTe medibles.</p>
+            </div>;
+          })}
+        </div>
+        <div className="border-t px-5 py-4 text-xs text-muted-foreground">
+          OTe observadas: {number(maintenanceValue.emergencyWorkOrders || 0)}. La hora de detección es informada por el operador; MOTIL no la infiere desde la creación.
         </div>
       </section>
 
