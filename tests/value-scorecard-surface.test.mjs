@@ -157,3 +157,23 @@ test('maintenance assisted creation timing is comparable only after matched-scop
   assert.match(page, /Reducción observada del tiempo de apertura y asignación/);
   assert.match(page, /Puede ser negativa si MOTIL demora más/);
 });
+
+
+test('OTe value cohort measures only observed event-chain intervals through human approval', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /emergency_detected/);
+  assert.match(api, /work_order_supervisor_reviews/);
+  assert.match(api, /status === 'approved'/);
+  assert.match(api, /detectedToRegistered/);
+  assert.match(api, /registeredToStart/);
+  assert.match(api, /startToClose/);
+  assert.match(api, /closeToApproval/);
+  assert.match(api, /endToEnd/);
+  assert.match(api, /missing timestamps remain unmeasured/);
+  assert.match(page, /OTe · cohorte de emergencia/);
+  assert.match(page, /Detección → aprobación/);
+  assert.match(page, /Un tramo sin timestamp queda sin medir/);
+  assert.match(page, /MOTIL no la infiere desde la creación/);
+});
