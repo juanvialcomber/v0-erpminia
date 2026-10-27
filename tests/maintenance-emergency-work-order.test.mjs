@@ -43,3 +43,14 @@ test('OT inbox exposes emergency creation separately from planned OT creation', 
   assert.match(createUi, /Registrar OTe/);
   assert.match(createUi, /workType: emergencyMode \? 'emergency'/);
 });
+
+
+test('OTe requires explicit operator-reported detection time and persists it as evidence', () => {
+  assert.match(createUi, /Fecha y hora de detección/);
+  assert.match(createUi, /detectedAt: emergencyMode/);
+  assert.match(createUi, /MOTIL no inferirá esta hora desde la creación de la OTe/);
+  assert.match(createRoute, /Indica cuándo se detectó la emergencia/);
+  assert.match(createRoute, /event_type: 'emergency_detected'/);
+  assert.match(createRoute, /operator-reported emergency detection time; not inferred from OT creation/);
+  assert.match(createRoute, /La detección de la OTe no puede estar en el futuro/);
+});
