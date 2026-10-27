@@ -235,3 +235,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Gate inicial: mínimo 3 muestras comparables antes de usar la mediana como baseline operativo.
 - Seguridad: visible y registrable sólo desde el cockpit interno admin/superadmin; no altera OT ni datos canónicos.
 - Próximo paso: instrumentar una métrica equivalente del tiempo administrativo dentro de MOTIL para comparar baseline manual vs flujo asistido sin mezclar tiempo de reparación.
+
+
+## 2026-10-27 — Mantención: timing asistido comparable
+
+- Se instrumentó la creación de OT desde la primera interacción activa en el formulario hasta la creación exitosa.
+- Persistencia: `audit_log`, acción `maintenance_ot_create_interaction`, una muestra por OT creada sin replay idempotente.
+- Límite de calidad: se aceptan duraciones de 1 segundo a 30 minutos; fuera de ese rango no se promueven como muestra.
+- Semántica: mide interacción activa de apertura, captura inicial y asignación; excluye reparación mecánica y espera.
+- El baseline manual fue alineado al mismo alcance: apertura de OT, datos iniciales y asignación fuera de MOTIL.
+- Gate de comparación: ≥3 muestras manuales y ≥10 aperturas MOTIL instrumentadas.
+- Fórmula: `(mediana_manual - mediana_motil) / mediana_manual`.
+- Valores negativos se conservan; si MOTIL tarda más, debe mostrarse.
+- No se monetiza esta reducción hasta contar con costo/hora cargado válido, período comparable y suficiente atribución.
+- Investigación de diseño: arXiv:2609.07984 respalda event logs orientados a acción gobernada; arXiv:2509.08482 refuerza que las características del log afectan la evaluación y no deben confundirse con causalidad.
