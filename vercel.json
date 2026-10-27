@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/whatsapp-vision",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/laudus-financial-masters-daily",
+      "schedule": "20 4 * * *"
     }
   ]
 }
