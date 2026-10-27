@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
     const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
     const workshopScope = await resolveWorkshopHeadScope(context);
     const canCreateWorkOrder = creationCapability.canCreate;
+    const canCreateEmergencyWorkOrder = creationCapability.canCreateEmergency;
 
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
     let hasAssignedOperationalWork = false;
@@ -68,6 +69,10 @@ export async function GET(request: NextRequest) {
       cargoName,
       canEdit: accessLevel === 'ED' || hasAssignedOperationalWork,
       canCreateWorkOrder,
+      canCreateEmergencyWorkOrder,
+      emergencySelfAssignOnly: creationCapability.emergencySelfAssignOnly,
+      personId: creationCapability.personId,
+      personName: creationCapability.personName,
       hasAssignedOperationalWork,
       workshopSite: workshopScope.isWorkshopHead ? workshopScope.site : null,
     });
