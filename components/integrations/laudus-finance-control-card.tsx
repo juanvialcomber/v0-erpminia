@@ -27,6 +27,19 @@ type PriorityDecisionSummary = {
   latestAt?: string | null;
 };
 
+type PriorityOutcomeSummary = {
+  accepted?: number;
+  openAccepted?: Array<{ decisionIdentifier: string; priorityKey: string; decisionAt?: string | null }>;
+  outcomes?: {
+    total?: number;
+    resolved?: number;
+    partiallyResolved?: number;
+    noChange?: number;
+    escalated?: number;
+    medianDecisionToOutcomeSeconds?: number | null;
+  };
+};
+
 type FinanceBaselineSummary = {
   sampleCount?: number;
   medianSecondsPerCase?: number | null;
@@ -208,6 +221,16 @@ export function LaudusFinanceControlCard() {
     },
     { revalidateOnFocus: false },
   );
+  const outcomeEvidence = useSWR<PriorityOutcomeSummary>(
+    '/api/value/finance-priority-outcome',
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar los resultados financieros.');
+      return payload;
+    },
+    { revalidateOnFocus: false },
+  );
   const baselineEvidence = useSWR<FinanceBaselineSummary>(
     '/api/value/finance-baseline',
     async (url: string) => {
@@ -273,8 +296,9 @@ export function LaudusFinanceControlCard() {
   const persistedDecisionCount = Number(decisionEvidence.data?.total || 0);
   const timedDecisionCount = Number(decisionEvidence.data?.timedDecisions || 0);
   const baselineSampleCount = Number(baselineEvidence.data?.sampleCount || 0);
+  const closedOutcomeCount = Number(outcomeEvidence.data?.outcomes?.total || 0);
   const evidenceLevel = baselineSampleCount >= 3 && timedDecisionCount >= 20 ? 'E3' : persistedDecisionCount > 0 ? 'E2' : 'E1';
-  const workflowLevel = persistedDecisionCount > 0 ? 'L4' : 'L3';
+  const workflowLevel = closedOutcomeCount > 0 ? 'L5' : persistedDecisionCount > 0 ? 'L4' : 'L3';
 
   const recordPriorityDecision = async (priorityKey: string, decision: 'accepted' | 'deferred' | 'rejected') => {
     let reason = '';
@@ -298,10 +322,34 @@ export function LaudusFinanceControlCard() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
       setDecisionByPriority((current) => ({ ...current, [priorityKey]: decision }));
-      await decisionEvidence.mutate();
+      await Promise.all([decisionEvidence.mutate(), outcomeEvidence.mutate()]);
       setDecisionNotice('Decisión registrada. No se modificó Laudus ni el dato canónico.');
     } catch (decisionError) {
       setDecisionNotice(decisionError instanceof Error ? decisionError.message : 'No fue posible registrar la decisión.');
+    }
+  };
+
+  const recordOutcome = async (
+    decisionIdentifier: string,
+    outcome: 'resolved' | 'partially_resolved' | 'no_change' | 'escalated',
+  ) => {
+    const needsNote = outcome === 'no_change' || outcome === 'escalated';
+    const note = needsNote ? window.prompt('¿Qué ocurrió?', '')?.trim() || '' : '';
+    if (needsNote && !note) return;
+    setDecisionNotice(null);
+    try {
+      const response = await fetch('/api/value/finance-priority-outcome', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisionIdentifier, outcome, note }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar el resultado.');
+      await outcomeEvidence.mutate();
+      setDecisionNotice('Resultado registrado. Se midió el ciclo decisión → outcome; no se declaró ahorro.');
+    } catch (outcomeError) {
+      setDecisionNotice(outcomeError instanceof Error ? outcomeError.message : 'No fue posible registrar el resultado.');
     }
   };
 
@@ -509,7 +557,11 @@ export function LaudusFinanceControlCard() {
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Level</p>
             <p className="mt-1 text-lg font-semibold">{workflowLevel}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {workflowLevel === 'L4' ? `${number(persistedDecisionCount)} decisiones humanas registradas.` : 'MOTIL prioriza; falta registrar una decisión humana.'}
+              {workflowLevel === 'L5'
+                ? `${number(closedOutcomeCount)} resultados cerrados y observados.`
+                : workflowLevel === 'L4'
+                  ? `${number(persistedDecisionCount)} decisiones humanas registradas.`
+                  : 'MOTIL prioriza; falta registrar una decisión humana.'}
             </p>
           </div>
           <div className="bg-card px-4 py-3">
@@ -531,6 +583,33 @@ export function LaudusFinanceControlCard() {
             </p>
           </div>
         </section>
+
+        {(outcomeEvidence.data?.openAccepted || []).length > 0 ? (
+          <section className="rounded-lg border bg-card" aria-label="Outcomes financieros abiertos">
+            <div className="border-b px-4 py-3">
+              <p className="text-sm font-medium">Decisiones tomadas pendientes de resultado</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Cerrar un resultado habilita evidencia L5; no implica que el resultado haya sido positivo.
+              </p>
+            </div>
+            <div className="divide-y">
+              {(outcomeEvidence.data?.openAccepted || []).map((item) => (
+                <div key={item.decisionIdentifier} className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{item.priorityKey}</p>
+                    <p className="text-xs text-muted-foreground">Tomada {shortDate(item.decisionAt)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button type="button" size="sm" variant="outline" onClick={() => void recordOutcome(item.decisionIdentifier, 'resolved')}>Resuelta</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void recordOutcome(item.decisionIdentifier, 'partially_resolved')}>Parcial</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void recordOutcome(item.decisionIdentifier, 'no_change')}>Sin cambio</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void recordOutcome(item.decisionIdentifier, 'escalated')}>Escalada</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <details className="group rounded-lg border bg-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
