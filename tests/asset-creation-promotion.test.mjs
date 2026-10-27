@@ -31,5 +31,6 @@ test('promotion function is backend only', () => {
   assert.match(sql, /security definer/i);
   assert.ok(sql.includes('revoke all on function public.motil_promote_asset_creation_requests(uuid,uuid,integer)'));
   assert.ok(sql.includes('from public,anon,authenticated;'));
-  assert.match(sql, /grant execute .* to service_role/i);
+  assert.ok(sql.includes('grant execute on function public.motil_promote_asset_creation_requests(uuid,uuid,integer)'));
+  assert.ok(sql.includes('to service_role;'));
 });
