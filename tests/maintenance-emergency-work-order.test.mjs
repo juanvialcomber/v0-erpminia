@@ -54,3 +54,11 @@ test('OTe requires explicit operator-reported detection time and persists it as 
   assert.match(createRoute, /operator-reported emergency detection time; not inferred from OT creation/);
   assert.match(createRoute, /La detección de la OTe no puede estar en el futuro/);
 });
+
+
+test('OTe detection evidence is append-once and not silently rewritten', () => {
+  assert.match(createRoute, /eq\('event_type', 'emergency_detected'\)/);
+  assert.match(createRoute, /if \(existing\) return/);
+  assert.match(createRoute, /source_record_id: workOrder\.id/);
+  assert.doesNotMatch(createRoute, /from\('work_order_events'\)\.update\(/);
+});
