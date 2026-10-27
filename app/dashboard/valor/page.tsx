@@ -108,6 +108,11 @@ type ApiResponse = {
       procurementCommitment?: number;
       tracedPartsCost?: number;
     };
+    adminInteraction?: {
+      creationSamples?: number;
+      medianCreateSeconds?: number | null;
+      semantics?: string;
+    };
     valueGate?: {
       attribution?: string;
       pricingReadiness?: string;
@@ -456,8 +461,26 @@ export default function ValueScorecardPage() {
           </div>
         </div>
         {maintenanceBaselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{maintenanceBaselineNotice}</p> : null}
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Creación asistida en MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceValue.adminInteraction?.medianCreateSeconds == null ? '—' : `${number(maintenanceValue.adminInteraction.medianCreateSeconds)} s`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mediana sobre {number(maintenanceValue.adminInteraction?.creationSamples || 0)} OT con interacción instrumentada.
+            </p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Comparación manual vs MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">HOLD</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              La creación asistida mide sólo apertura inicial; el baseline manual debe usar exactamente ese mismo alcance antes de calcular reducción.
+            </p>
+          </div>
+        </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Gate inicial: ≥3 muestras comparables. El baseline se mantiene separado del tiempo cronometrado de ejecución hasta contar con una métrica administrativa MOTIL equivalente.
+          Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
         </p>
       </section>
 
