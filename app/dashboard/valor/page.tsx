@@ -53,6 +53,12 @@ type ApiResponse = {
     calibrationGate?: string;
     reviewedAmountClp?: number;
     acceptedAmountClp?: number;
+    valueGate?: {
+      attribution?: string;
+      pricingReadiness?: string;
+      nextMeasurement?: string;
+      semantics?: string;
+    };
     semantics?: string;
   } | null;
   financeReviewTiming?: {
@@ -65,6 +71,17 @@ type ApiResponse = {
     closedWorkOrders?: number;
     timerInstrumentedWorkOrders?: number;
     timerCoverage?: number | null;
+    assignmentCoverage?: number | null;
+    assetCoverage?: number | null;
+    rootCauseCoverage?: number | null;
+    preventiveActionCoverage?: number | null;
+    meterCoverage?: number | null;
+    assignmentCoverageCount?: number;
+    assetCoverageCount?: number;
+    rootCauseCoverageCount?: number;
+    preventiveActionCoverageCount?: number;
+    meterCoverageCount?: number;
+    emergencyWorkOrders?: number;
     observedExecutionSeconds?: number;
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
@@ -326,6 +343,38 @@ export default function ValueScorecardPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Base para medir MTTR, reincidencia y outcomes E3.</p>
           </div>
+        </div>
+      </section>
+
+      <section aria-label="Cobertura de evidencia de Mantención" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Cobertura · calidad de evidencia</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Qué parte del trabajo ya podemos medir</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Numerador y universo real. Cobertura no significa ahorro ni mejora causal.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ['Responsable', maintenanceValue.assignmentCoverage, maintenanceValue.assignmentCoverageCount],
+            ['Equipo', maintenanceValue.assetCoverage, maintenanceValue.assetCoverageCount],
+            ['Causa raíz', maintenanceValue.rootCauseCoverage, maintenanceValue.rootCauseCoverageCount],
+            ['Acción preventiva', maintenanceValue.preventiveActionCoverage, maintenanceValue.preventiveActionCoverageCount],
+            ['Horómetro', maintenanceValue.meterCoverage, maintenanceValue.meterCoverageCount],
+          ].map(([label, pctValue, countValue]) => <div key={String(label)} className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">{String(label)}</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{pctValue == null ? '—' : `${number(pctValue)}%`}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(countValue || 0)} de {number(maintenanceValue.workOrders || 0)} OT observadas.</p>
+          </div>)}
+        </div>
+        <div className="border-t px-5 py-4 text-sm">
+          <p className="font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {maintenanceValue.valueGate?.nextMeasurement || 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
+          </p>
         </div>
       </section>
 
