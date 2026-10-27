@@ -29,6 +29,6 @@ test('promotion preserves evidence and closes review state', () => {
 
 test('promotion function is backend only', () => {
   assert.match(sql, /security definer/i);
-  assert.match(sql, /revoke all on function[\\s\\S]*from public,anon,authenticated/i);
+  assert.ok(sql.includes('revoke all on function public.motil_promote_asset_creation_requests(uuid,uuid,integer)'));\n  assert.ok(sql.includes('from public,anon,authenticated;'));
   assert.match(sql, /grant execute .* to service_role/i);
 });
