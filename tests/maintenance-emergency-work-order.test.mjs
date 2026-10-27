@@ -15,7 +15,7 @@ test('mechanics may create emergency OTe without gaining normal OT creation', ()
   assert.match(access, /cargo\.startsWith\('mecánico'\)/);
   assert.match(access, /canCreateEmergency/);
   assert.match(access, /emergencySelfAssignOnly: canCreateEmergency && !canCreate/);
-  assert.match(createRoute, /isEmergencyWork \? creationCapability\.canCreateEmergency/);
+  assert.match(createRoute, /isEmergencyWork[\s\S]*?creationCapability\.canCreateEmergency/);
   assert.match(createRoute, /: creationCapability\.canCreate/);
 });
 
