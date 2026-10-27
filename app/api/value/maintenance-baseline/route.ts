@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     sampleCount: samples.length,
     medianSecondsPerCase: medianSeconds,
     latestAt: samples[0]?.createdAt || null,
-    semantics: 'manual OT administration measured outside MOTIL assistance; excludes mechanical execution time',
+    semantics: 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure',
   });
 }
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     caseCount > 20
   ) {
     return NextResponse.json(
-      { error: 'La medición debe durar entre 10 segundos y 90 minutos, con 1 a 20 OT administrativas.' },
+      { error: 'La medición debe durar entre 10 segundos y 90 minutos, con 1 a 20 aperturas de OT.' },
       { status: 400 },
     );
   }
@@ -99,8 +99,8 @@ export async function POST(request: NextRequest) {
       duration_ms: Math.round(durationMs),
       case_count: caseCount,
       seconds_per_case: Math.round(durationMs / caseCount / 1000),
-      metric_version: 'maintenance-admin-baseline-v1',
-      semantics: 'manual OT administration measured outside MOTIL assistance; excludes mechanical execution time',
+      metric_version: 'maintenance-create-baseline-v1',
+      semantics: 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure',
     },
     user_agent: request.headers.get('user-agent'),
     status: 'completed',
