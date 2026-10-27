@@ -53,12 +53,6 @@ type ApiResponse = {
     calibrationGate?: string;
     reviewedAmountClp?: number;
     acceptedAmountClp?: number;
-    valueGate?: {
-      attribution?: string;
-      pricingReadiness?: string;
-      nextMeasurement?: string;
-      semantics?: string;
-    };
     semantics?: string;
   } | null;
   financeReviewTiming?: {
@@ -113,6 +107,12 @@ type ApiResponse = {
       withPartsInstalled?: number;
       procurementCommitment?: number;
       tracedPartsCost?: number;
+    };
+    valueGate?: {
+      attribution?: string;
+      pricingReadiness?: string;
+      nextMeasurement?: string;
+      semantics?: string;
     };
     semantics?: string;
   } | null;
