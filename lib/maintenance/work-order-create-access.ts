@@ -18,6 +18,17 @@ export function isMaintenanceWorkOrderCreatorCargo(cargoName?: string | null) {
   );
 }
 
+export function isEmergencyWorkOrderCreatorCargo(cargoName?: string | null) {
+  const cargo = normalizeCargo(cargoName);
+
+  return (
+    isMaintenanceWorkOrderCreatorCargo(cargoName) ||
+    cargo.startsWith('mecánico') ||
+    cargo === 'soldador' ||
+    cargo === 'encargado de camionetas y camiones'
+  );
+}
+
 export async function getMaintenanceWorkOrderCreationCapability(
   context: OrganizationSuccessContext,
 ) {
@@ -57,8 +68,13 @@ export async function getMaintenanceWorkOrderCreationCapability(
     MODULE_KEYS.MANT_OPERACIONES,
   );
 
+  const canCreate = Boolean(person?.id) && accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName);
+  const canCreateEmergency = Boolean(person?.id) && isEmergencyWorkOrderCreatorCargo(cargoName);
+
   return {
-    canCreate: Boolean(person?.id) && accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName),
+    canCreate,
+    canCreateEmergency,
+    emergencySelfAssignOnly: canCreateEmergency && !canCreate,
     accessLevel,
     cargoName,
     personId: person?.id || null,
