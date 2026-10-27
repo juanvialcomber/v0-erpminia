@@ -207,6 +207,19 @@ export default function ValueScorecardPage() {
   const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
   const maintenanceValue = data?.maintenanceValue || {};
   const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
+  const maintenanceManualSamples = maintenanceBaseline.data?.sampleCount || 0;
+  const maintenanceManualMedian = maintenanceBaseline.data?.medianSecondsPerCase ?? null;
+  const maintenanceAssistedSamples = maintenanceValue.adminInteraction?.creationSamples || 0;
+  const maintenanceAssistedMedian = maintenanceValue.adminInteraction?.medianCreateSeconds ?? null;
+  const maintenanceCreateComparisonReady =
+    maintenanceManualSamples >= 3 &&
+    maintenanceAssistedSamples >= 10 &&
+    maintenanceManualMedian != null &&
+    maintenanceAssistedMedian != null &&
+    maintenanceManualMedian > 0;
+  const maintenanceCreateReductionPct = maintenanceCreateComparisonReady
+    ? Math.round(((maintenanceManualMedian - maintenanceAssistedMedian) / maintenanceManualMedian) * 100)
+    : null;
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
@@ -473,9 +486,13 @@ export default function ValueScorecardPage() {
           </div>
           <div className="rounded-md border px-4 py-3">
             <p className="text-xs text-muted-foreground">Comparación manual vs MOTIL</p>
-            <p className="mt-1 text-xl font-semibold">HOLD</p>
+            <p className="mt-1 text-xl font-semibold">
+              {maintenanceCreateReductionPct == null ? 'HOLD' : `${number(maintenanceCreateReductionPct)}%`}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              El baseline manual y la creación asistida usan el mismo alcance: apertura, datos iniciales y asignación. La comparación se habilita sólo con muestra suficiente.
+              {maintenanceCreateReductionPct == null
+                ? `Requiere ≥3 muestras manuales y ≥10 aperturas MOTIL instrumentadas. Actual: ${maintenanceManualSamples}/3 y ${maintenanceAssistedSamples}/10.`
+                : 'Reducción observada del tiempo de apertura y asignación. Puede ser negativa si MOTIL demora más.'}
             </p>
           </div>
         </div>
