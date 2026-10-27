@@ -112,6 +112,12 @@ function getOrCreateRequestId(payload: unknown) {
   }
 }
 
+function localDateTimeNow() {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
 function clearRequestId() {
   try {
     sessionStorage.removeItem(CREATE_OT_IDEMPOTENCY_STORAGE_KEY);
@@ -142,6 +148,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [plannedHours, setPlannedHours] = useState(searchParams.get('plannedDurationHours') || '');
   const [meterReading, setMeterReading] = useState('');
   const [meterUnit, setMeterUnit] = useState('hours');
+  const [detectedAt, setDetectedAt] = useState(emergencyMode ? localDateTimeNow() : '');
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const adminInteractionStartedAtRef = useRef<number | null>(null);
@@ -218,6 +225,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const validate = () => {
     if (!assignedPersonId) return emergencyMode ? 'No se pudo vincular tu perfil operativo a la OTe' : 'Selecciona primero al responsable de la OT';
     if (emergencyMode && !canonicalAssetId) return 'Selecciona el equipo afectado por la emergencia';
+    if (emergencyMode && !detectedAt) return 'Indica cuándo se detectó la emergencia';
+    if (emergencyMode && !Number.isFinite(new Date(detectedAt).getTime())) return 'La hora de detección no es válida';
     if (!generalWork && !canonicalAssetId) return t.validation.assetRequired;
     if (review && review.canonical_asset_id !== canonicalAssetId) return t.validation.reviewAssetMismatch;
     if (!title.trim()) return t.validation.titleRequired;
@@ -274,6 +283,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       plannedDurationHours: plannedHours ? Number(plannedHours) : 0,
       meterReading: meterReading ? Number(meterReading) : null,
       meterUnit: meterReading ? meterUnit : null,
+      detectedAt: emergencyMode && detectedAt ? new Date(detectedAt).toISOString() : null,
     };
     const creationRequestId = getOrCreateRequestId(requestPayload);
 
@@ -352,6 +362,26 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
               {review.machine_observations ? <div className="sm:col-span-2"><p className="text-xs text-muted-foreground">{t.reviewCard.observation}</p><p className="font-medium">{review.machine_observations}</p></div> : null}
             </CardContent>
           ) : null}
+        </Card>
+      ) : null}
+
+      {emergencyMode ? (
+        <Card className="shadow-none">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Detección de la emergencia</CardTitle>
+            <CardDescription>Registra cuándo se detectó el problema. MOTIL no inferirá esta hora desde la creación de la OTe.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="detected-at">Fecha y hora de detección</Label>
+            <Input
+              id="detected-at"
+              type="datetime-local"
+              value={detectedAt}
+              onChange={(event) => setDetectedAt(event.target.value)}
+              max={localDateTimeNow()}
+            />
+            <p className="text-xs text-muted-foreground">Se usará para medir detección → registro → inicio → cierre → aprobación.</p>
+          </CardContent>
         </Card>
       ) : null}
 
