@@ -117,6 +117,33 @@ export async function GET(request: NextRequest) {
 
   if (unresolvedError) return NextResponse.json({ error: unresolvedError.message }, { status: 500 });
 
+  const { data: depreciationRows, error: depreciationError } = await context.supabase
+    .from('motil_finance_asset_stage')
+    .select('canonical_asset_id,depreciation_current,total_accum_depr,net_book_value,remaining_life_months,identity_status')
+    .eq('organization_id', context.organizationId)
+    .eq('import_id', source.id);
+
+  if (depreciationError) return NextResponse.json({ error: depreciationError.message }, { status: 500 });
+
+  const depreciationCoverage = (depreciationRows || []).reduce((acc, row: any) => {
+    acc.rows += 1;
+    if (row.depreciation_current !== null) acc.withCurrentDepreciation += 1;
+    if (row.total_accum_depr !== null) acc.withAccumulatedDepreciation += 1;
+    if (row.net_book_value !== null) acc.withBookValue += 1;
+    if (row.remaining_life_months !== null) acc.withRemainingLife += 1;
+    if (row.canonical_asset_id) acc.linkedCanonical += 1;
+    if (String(row.identity_status || '') === 'review_required') acc.reviewRequired += 1;
+    return acc;
+  }, {
+    rows: 0,
+    withCurrentDepreciation: 0,
+    withAccumulatedDepreciation: 0,
+    withBookValue: 0,
+    withRemainingLife: 0,
+    linkedCanonical: 0,
+    reviewRequired: 0,
+  });
+
   const metadata = source.metadata && typeof source.metadata === 'object'
     ? source.metadata as Record<string, unknown>
     : {};
@@ -185,6 +212,7 @@ export async function GET(request: NextRequest) {
       materialReviewFloorClp: Number(stage.material_operational_review_floor_clp || 0),
       unexplainedOperationalRows: Number(stage.unexplained_operational_rows || 0),
       unexplainedOperationalBookValueClp: Number(stage.unexplained_operational_book_value_clp || 0),
+      depreciationCoverage,
     },
     unresolved: {
       byReason,
