@@ -152,6 +152,19 @@ type ApiResponse = {
       };
       e3Ready?: boolean;
       v5Ready?: boolean;
+      v6Ready?: boolean;
+      semantics?: string;
+    };
+    economicValue?: {
+      planningHourlyCostClp?: number | null;
+      executionHourlyCostClp?: number | null;
+      createdLast30?: number;
+      closedLast30?: number;
+      openSavedSecondsPerCase?: number;
+      closeSavedSecondsPerCase?: number;
+      openMonthlyValueClp?: number;
+      closeMonthlyValueClp?: number;
+      attributedMonthlyValueClp?: number | null;
       semantics?: string;
     };
     valueGate?: {
@@ -220,6 +233,13 @@ export default function ValueScorecardPage() {
   const maintenanceCloseBaselineStartedAt = useRef<number | null>(null);
   const [maintenanceCloseBaselineRunning, setMaintenanceCloseBaselineRunning] = useState(false);
   const [maintenanceCloseBaselineNotice, setMaintenanceCloseBaselineNotice] = useState<string | null>(null);
+  const hourlyCosts = useSWR('/api/value/maintenance-hourly-cost', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar los costos hora.');
+    return payload;
+  });
+  const [hourlyCostNotice, setHourlyCostNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -366,6 +386,30 @@ export default function ValueScorecardPage() {
       await maintenanceCloseBaseline.mutate();
     } catch (cause) {
       setMaintenanceCloseBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de cierre.');
+    }
+  };
+
+  const saveHourlyCost = async (role: 'planning' | 'execution') => {
+    const label = role === 'planning' ? 'planificación/apertura' : 'ejecución/cierre';
+    const raw = window.prompt(`Costo hora cargado CLP para ${label}`);
+    if (!raw) return;
+    const source = window.prompt('Fuente o responsable que valida esta cifra (ej. Daniel Villarroel / Finanzas)');
+    if (!source) return;
+    setHourlyCostNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-hourly-cost', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, hourlyCostClp: Number(raw), source }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el costo hora.');
+      setHourlyCostNotice(`Costo hora validado guardado para ${label}: ${money(payload.hourlyCostClp)}.`);
+      await hourlyCosts.mutate();
+      await mutate();
+    } catch (cause) {
+      setHourlyCostNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el costo hora.');
     }
   };
 
@@ -531,6 +575,10 @@ export default function ValueScorecardPage() {
               <p className="text-xs text-muted-foreground">Gate V5</p>
               <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v5Ready ? 'PASS · outcome favorable' : 'HOLD · sin mejora demostrada'}</p>
             </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2 sm:col-span-2">
+              <p className="text-xs text-muted-foreground">Gate V6</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v6Ready ? 'PASS · valor económico atribuible' : 'HOLD · falta costo validado o outcome positivo'}</p>
+            </div>
           </div>
           <p className="mt-2 font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -540,6 +588,42 @@ export default function ValueScorecardPage() {
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
         </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Costo hora validado para V6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate V6 · monetización</p>
+            <h2 className="mt-1 text-lg font-semibold">Costo hora cargado validado</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sólo promedios por proceso/rol. No requiere ni expone sueldos individuales.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            ['planning', 'Planificación / apertura', maintenanceValue.economicValue?.planningHourlyCostClp],
+            ['execution', 'Ejecución / cierre', maintenanceValue.economicValue?.executionHourlyCostClp],
+          ].map(([role, label, value]) => (
+            <div key={String(role)} className="rounded-md border px-4 py-3">
+              <p className="text-xs text-muted-foreground">{String(label)}</p>
+              <p className="mt-1 text-xl font-semibold">{value == null ? 'Pendiente' : money(Number(value)) + '/h'}</p>
+              <button type="button" onClick={() => void saveHourlyCost(role as 'planning' | 'execution')} className="mt-3 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">
+                {value == null ? 'Registrar costo validado' : 'Actualizar costo'}
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-md bg-muted/40 px-4 py-3">
+          <p className="text-xs text-muted-foreground">Valor administrativo atribuible / mes</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {maintenanceValue.economicValue?.attributedMonthlyValueClp == null ? 'HOLD' : money(maintenanceValue.economicValue.attributedMonthlyValueClp)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Usa volumen real de los últimos 30 días y sólo reducciones de tiempo positivas con cohorte comparable. No representa ROI total de Mantención.
+          </p>
+        </div>
+        {hourlyCostNotice ? <p className="mt-3 text-xs text-muted-foreground">{hourlyCostNotice}</p> : null}
       </section>
 
       <section aria-label="Cohorte OTe de emergencia" className="overflow-hidden rounded-xl border bg-card">
