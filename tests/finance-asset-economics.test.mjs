@@ -487,3 +487,15 @@ test('Daniel fixed asset panel shows Laudus freshness from the fixed-asset sync 
   assert.match(page,/Última sincronización:/);
   assert.match(page,/fixedAssets\?\.latestSync/);
 });
+
+
+test('depreciation reconciliation counts are live, not frozen import metadata',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/linkedCanonicalAssetIds/);
+  assert.match(review,/linkedRows = depreciationCoverage\.linkedCanonical/);
+  assert.match(review,/linkedAssets = depreciationCoverage\.linkedCanonicalAssets/);
+  assert.doesNotMatch(review,/const linkedRows = Number\(stage\.identity_linked_rows/);
+  assert.match(page,/Filas conciliadas/);
+  assert.match(page,/activos únicos con identidad verificada/);
+});
