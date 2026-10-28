@@ -612,3 +612,9 @@ test('facility review workspace keeps multi-unit families separate from 1:1 inst
   assert.match(cockpit,/\/dashboard\/finanzas\/activos\/instalaciones/);
   assert.match(cockpit,/Revisar instalaciones/);
 });
+
+
+test('candidate review API reuses finance asset candidate reviews after reclassification',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/finance_asset_candidate:/);
+});
