@@ -27,6 +27,7 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-history',
   '/api/cron/whatsapp-media',
   '/api/cron/whatsapp-vision',
+  '/api/cron/laudus-financial-masters-daily',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
@@ -139,6 +140,12 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (financeIntegrationRoutes.has(path)) {
     return path === '/api/integrations/laudus/finance-review-feedback' ? true : readOnly;
   }
+
+  const financeValueRoutes = new Set([
+    '/api/value/finance-baseline',
+    '/api/value/finance-priority-decision',
+  ]);
+  if (financeValueRoutes.has(path)) return true;
 
   const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
   if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
