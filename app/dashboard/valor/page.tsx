@@ -133,6 +133,27 @@ type ApiResponse = {
       medianCloseSeconds?: number | null;
       semantics?: string;
     };
+    impactGate?: {
+      open?: {
+        manualSamples?: number;
+        assistedSamples?: number;
+        manualMedianSeconds?: number | null;
+        assistedMedianSeconds?: number | null;
+        comparisonReady?: boolean;
+        reductionPct?: number | null;
+      };
+      close?: {
+        manualSamples?: number;
+        assistedSamples?: number;
+        manualMedianSeconds?: number | null;
+        assistedMedianSeconds?: number | null;
+        comparisonReady?: boolean;
+        reductionPct?: number | null;
+      };
+      e3Ready?: boolean;
+      v5Ready?: boolean;
+      semantics?: string;
+    };
     valueGate?: {
       attribution?: string;
       pricingReadiness?: string;
@@ -501,6 +522,16 @@ export default function ValueScorecardPage() {
             Cobertura completa: {number(maintenanceValue.lec?.coverageNumerator || 0)} de {number(maintenanceValue.lec?.coverageDenominator || 0)} OT cerradas
             {maintenanceValue.lec?.coveragePct == null ? '' : ` · ${number(maintenanceValue.lec.coveragePct)}%`}.
           </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate E3</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.e3Ready ? 'PASS · comparación válida' : 'HOLD · falta cohorte comparable'}</p>
+            </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate V5</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v5Ready ? 'PASS · outcome favorable' : 'HOLD · sin mejora demostrada'}</p>
+            </div>
+          </div>
           <p className="mt-2 font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {maintenanceValue.valueGate?.nextMeasurement || 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.'}
