@@ -104,6 +104,16 @@ type ApiResponse = {
     };
     evidenceLevel?: string;
     workflowLevel?: number;
+    lec?: {
+      level?: string;
+      evidence?: string;
+      coverage?: string | null;
+      valueLevel?: string;
+      coverageNumerator?: number;
+      coverageDenominator?: number;
+      coveragePct?: number | null;
+      coverageSemantics?: string;
+    };
     connectedDomains?: string[];
     connectedDomainCount?: number;
     supplyChain?: {
@@ -119,6 +129,8 @@ type ApiResponse = {
     adminInteraction?: {
       creationSamples?: number;
       medianCreateSeconds?: number | null;
+      closeSamples?: number;
+      medianCloseSeconds?: number | null;
       semantics?: string;
     };
     valueGate?: {
@@ -178,6 +190,15 @@ export default function ValueScorecardPage() {
   const maintenanceBaselineStartedAt = useRef<number | null>(null);
   const [maintenanceBaselineRunning, setMaintenanceBaselineRunning] = useState(false);
   const [maintenanceBaselineNotice, setMaintenanceBaselineNotice] = useState<string | null>(null);
+  const maintenanceCloseBaseline = useSWR<BaselineResponse>('/api/value/maintenance-baseline?phase=close', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline de cierre.');
+    return payload;
+  });
+  const maintenanceCloseBaselineStartedAt = useRef<number | null>(null);
+  const [maintenanceCloseBaselineRunning, setMaintenanceCloseBaselineRunning] = useState(false);
+  const [maintenanceCloseBaselineNotice, setMaintenanceCloseBaselineNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -235,6 +256,19 @@ export default function ValueScorecardPage() {
   const maintenanceCreateReductionPct = maintenanceCreateComparisonReady
     ? Math.round(((maintenanceManualMedian - maintenanceAssistedMedian) / maintenanceManualMedian) * 100)
     : null;
+  const maintenanceCloseManualSamples = maintenanceCloseBaseline.data?.sampleCount || 0;
+  const maintenanceCloseManualMedian = maintenanceCloseBaseline.data?.medianSecondsPerCase ?? null;
+  const maintenanceCloseAssistedSamples = maintenanceValue.adminInteraction?.closeSamples || 0;
+  const maintenanceCloseAssistedMedian = maintenanceValue.adminInteraction?.medianCloseSeconds ?? null;
+  const maintenanceCloseComparisonReady =
+    maintenanceCloseManualSamples >= 3 &&
+    maintenanceCloseAssistedSamples >= 10 &&
+    maintenanceCloseManualMedian != null &&
+    maintenanceCloseAssistedMedian != null &&
+    maintenanceCloseManualMedian > 0;
+  const maintenanceCloseReductionPct = maintenanceCloseComparisonReady
+    ? Math.round(((maintenanceCloseManualMedian - maintenanceCloseAssistedMedian) / maintenanceCloseManualMedian) * 100)
+    : null;
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
@@ -286,6 +320,31 @@ export default function ValueScorecardPage() {
       await maintenanceBaseline.mutate();
     } catch (cause) {
       setMaintenanceBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de Mantención.');
+    }
+  };
+
+  const saveMaintenanceCloseBaseline = async () => {
+    if (!maintenanceCloseBaselineStartedAt.current) return;
+    const durationMs = Date.now() - maintenanceCloseBaselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántas OT cerraste administrativamente por el método manual?', '3');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setMaintenanceCloseBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount, phase: 'close' }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline de cierre.');
+      setMaintenanceCloseBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por cierre administrativo manual.`);
+      maintenanceCloseBaselineStartedAt.current = null;
+      setMaintenanceCloseBaselineRunning(false);
+      await maintenanceCloseBaseline.mutate();
+    } catch (cause) {
+      setMaintenanceCloseBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de cierre.');
     }
   };
 
@@ -435,7 +494,14 @@ export default function ValueScorecardPage() {
           </div>)}
         </div>
         <div className="border-t px-5 py-4 text-sm">
-          <p className="font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
+          <p className="font-medium">
+            LEC Mantención: {maintenanceValue.lec?.level || 'L1'} / {maintenanceValue.lec?.evidence || 'E0'} / {maintenanceValue.lec?.coverage || '—'} · {maintenanceValue.lec?.valueLevel || 'V0'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cobertura completa: {number(maintenanceValue.lec?.coverageNumerator || 0)} de {number(maintenanceValue.lec?.coverageDenominator || 0)} OT cerradas
+            {maintenanceValue.lec?.coveragePct == null ? '' : ` · ${number(maintenanceValue.lec.coveragePct)}%`}.
+          </p>
+          <p className="mt-2 font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {maintenanceValue.valueGate?.nextMeasurement || 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.'}
           </p>
@@ -543,6 +609,64 @@ export default function ValueScorecardPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
         </p>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Baseline administrativo de cierre de Mantención">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate E3 · cierre administrativo</p>
+            <h2 className="mt-1 text-lg font-semibold">Baseline manual de cierre de OT</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cronometra sólo documentación final y confirmación de cierre por el método manual. Excluye reparación mecánica y tiempos de espera.
+            </p>
+          </div>
+          {!maintenanceCloseBaselineRunning ? (
+            <button
+              type="button"
+              onClick={() => {
+                maintenanceCloseBaselineStartedAt.current = Date.now();
+                setMaintenanceCloseBaselineRunning(true);
+                setMaintenanceCloseBaselineNotice('Medición activa. Documenta y cierra las OT manualmente sin usar MOTIL y vuelve al terminar.');
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Iniciar baseline cierre
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void saveMaintenanceCloseBaseline()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Finalizar medición
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Muestras manuales</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceCloseManualSamples)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana manual</p>
+            <p className="mt-1 text-xl font-semibold">{duration(maintenanceCloseManualMedian)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">{duration(maintenanceCloseAssistedMedian)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(maintenanceCloseAssistedSamples)} cierres instrumentados.</p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-md border px-4 py-3">
+          <p className="text-xs text-muted-foreground">Reducción observada del tiempo de cierre</p>
+          <p className="mt-1 text-xl font-semibold">{maintenanceCloseReductionPct == null ? 'HOLD' : `${number(maintenanceCloseReductionPct)}%`}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {maintenanceCloseReductionPct == null
+              ? `Requiere ≥3 muestras manuales y ≥10 cierres MOTIL instrumentados. Actual: ${maintenanceCloseManualSamples}/3 y ${maintenanceCloseAssistedSamples}/10.`
+              : 'Comparación de igual alcance administrativo. Puede ser negativa si MOTIL demora más.'}
+          </p>
+        </div>
+        {maintenanceCloseBaselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{maintenanceCloseBaselineNotice}</p> : null}
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">
