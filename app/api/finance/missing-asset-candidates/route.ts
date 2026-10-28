@@ -175,6 +175,9 @@ export async function GET(request: NextRequest) {
     let internalMasterSearchSources: string[] = [];
     let candidateConfidence: string | null = null;
     let candidateScope: string | null = null;
+    let duplicateRisk = false;
+    let duplicateRiskBasis: string | null = null;
+    let duplicateRiskAssetCode: string | null = null;
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -214,6 +217,9 @@ export async function GET(request: NextRequest) {
       reviewBasis = reviewBasis || text(payload.candidate_review_basis);
       candidateConfidence = candidateConfidence || text(payload.asset_candidate_confidence);
       candidateScope = candidateScope || text(payload.asset_candidate_scope);
+      if (payload.candidate_duplicate_risk === true) duplicateRisk = true;
+      duplicateRiskBasis = duplicateRiskBasis || text(payload.candidate_duplicate_risk_basis);
+      duplicateRiskAssetCode = duplicateRiskAssetCode || text(payload.candidate_duplicate_risk_asset_code);
       const payloadSourceCount = numeric(payload.candidate_review_source_count);
       if (payloadSourceCount != null) reviewSourceCount = Math.max(reviewSourceCount ?? payloadSourceCount, payloadSourceCount);
       purchaseCostCenterEvidence = purchaseCostCenterEvidence || text(payload.purchase_cost_center_evidence);
@@ -292,6 +298,11 @@ export async function GET(request: NextRequest) {
       reviewBasis,
       candidateConfidence,
       candidateScope,
+      duplicateRisk: {
+        active: duplicateRisk,
+        basis: duplicateRiskBasis,
+        assetCode: duplicateRiskAssetCode,
+      },
       reviewSourceCount,
       operationalEvidence: {
         purchaseCostCenter: purchaseCostCenterEvidence,
@@ -313,7 +324,7 @@ export async function GET(request: NextRequest) {
       } : null,
       sourceCount: sourceKinds.size,
       evidenceCount: evidence.length,
-      priority: readyForReview ? 5 : identityVerifiedSingleSource ? 4 : dualSource ? 3 : modelOnlyNeedsOperationalIdentity ? 2 : sourceCodeNeedsOperationalValidation ? 1 : (plate || serial || chassis ? 2 : 0),
+      priority: duplicateRisk ? -1 : readyForReview ? 5 : identityVerifiedSingleSource ? 4 : dualSource ? 3 : modelOnlyNeedsOperationalIdentity ? 2 : sourceCodeNeedsOperationalValidation ? 1 : (plate || serial || chassis ? 2 : 0),
       evidence,
     };
   }).sort((a, b) =>
@@ -346,6 +357,7 @@ export async function GET(request: NextRequest) {
       pendingReview: candidates.filter((row) => row.readyForReview && (!row.review || row.review.status === 'open')).length,
       acceptedForCreation: candidates.filter((row) => row.review?.status === 'accepted').length,
       ignoredCandidates: candidates.filter((row) => row.review?.status === 'ignored').length,
+      duplicateRiskCandidates: candidates.filter((row) => row.duplicateRisk.active).length,
       openIdentityConflicts: identityConflicts.length,
       identityVerifiedSingleSource: candidates.filter((row) => row.identityVerifiedSingleSource).length,
       exactSingleVerifiedAbsentInternalMasters: candidates.filter((row) => row.identityVerifiedSingleSource && row.internalMasterVerification.verified && row.internalMasterVerification.result === 'no_exact_counterpart').length,
