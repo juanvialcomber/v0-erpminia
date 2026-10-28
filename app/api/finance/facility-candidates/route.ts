@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
 
   if (rowsError) return NextResponse.json({ error: rowsError.message }, { status: 500 });
 
-  const facilityRows = (rows || []).filter((row: any) => Boolean(text(row.source_payload?.facility_candidate_group)));
+  const facilityRows = (rows || []).filter((row: any) => {
+    const group = text(row.source_payload?.facility_candidate_group);
+    const scope = text(row.source_payload?.facility_candidate_scope);
+    return Boolean(group) && ['single_facility', 'multi_unit_family'].includes(String(scope));
+  });
   const grouped = new Map<string, any[]>();
 
   for (const row of facilityRows) {
