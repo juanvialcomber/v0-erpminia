@@ -116,9 +116,9 @@ test('maintenance value cockpit publishes evidence coverage with explicit numera
   assert.match(api, /rootCauseCoverage/);
   assert.match(api, /preventiveActionCoverage/);
   assert.match(api, /meterCoverage/);
-  assert.match(api, /attribution: 'NO_MEDIBLE_AUN'/);
-  assert.match(api, /pricingReadiness: 'MARKET_ANCHORED'/);
-  assert.match(api, /Minutos administrativos por OT antes de MOTIL versus con MOTIL/);
+  assert.match(api, /hasObservedComparison \? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN'/);
+  assert.match(api, /hasPositiveOperationalImpact \? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED'/);
+  assert.match(api, /Completar cohortes manuales y asistidas comparables de apertura\/cierre/);
   assert.match(api, /\.not\('created_by', 'is', null\)/);
   assert.match(page, /Cobertura · calidad de evidencia/);
   assert.match(page, /Numerador y universo real/);
@@ -176,4 +176,109 @@ test('OTe value cohort measures only observed event-chain intervals through huma
   assert.match(page, /Detección → aprobación/);
   assert.match(page, /Un tramo sin timestamp queda sin medir/);
   assert.match(page, /MOTIL no la infiere desde la creación/);
+});
+
+
+test('maintenance close timing is measured separately from mechanical execution', () => {
+  const closeFlow = fs.readFileSync('components/maintenance/progressive-work-order-close-queue.tsx', 'utf8');
+  const closeRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/close/route.ts', 'utf8');
+  const scorecard = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(closeFlow, /X-Motil-Close-Interaction-Ms/);
+  assert.match(closeRoute, /maintenance_ot_close_interaction/);
+  assert.match(closeRoute, /excludes mechanical execution and waiting outside the flow/);
+  assert.match(scorecard, /maintenanceCloseTimingValues/);
+  assert.match(scorecard, /medianCloseSeconds/);
+  assert.match(page, /Baseline manual de cierre de OT/);
+  assert.match(page, /Reducción observada del tiempo de cierre/);
+  assert.match(page, /≥3 muestras manuales y ≥10 cierres MOTIL instrumentados/);
+});
+
+test('maintenance LEC publishes coverage from complete closed-OT evidence only', () => {
+  const scorecard = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(scorecard, /traceCompleteClosedRows/);
+  assert.match(scorecard, /execution_evidence_added/);
+  assert.match(scorecard, /supervisor approval/);
+  assert.match(scorecard, /coverageLevel/);
+  assert.match(scorecard, /coverageNumerator/);
+  assert.match(scorecard, /coverageDenominator/);
+  assert.match(scorecard, /valueLevel/);
+  assert.match(page, /LEC Mantención/);
+  assert.match(page, /Cobertura completa/);
+});
+
+test('maintenance manual baseline supports a separate close phase', () => {
+  const route = fs.readFileSync('app/api/value/maintenance-baseline/route.ts', 'utf8');
+
+  assert.match(route, /phase.*=== 'close'/);
+  assert.match(route, /maintenance_admin_manual_close_baseline/);
+  assert.match(route, /maintenance-close-baseline-v1/);
+  assert.match(route, /manual OT administrative closure measured outside MOTIL assistance/);
+});
+
+
+test('maintenance E3 and V5 gates are automatic and keep evidence separate from outcome direction', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /maintenance_admin_manual_close_baseline/);
+  assert.match(api, /createComparisonReady/);
+  assert.match(api, /closeComparisonReady/);
+  assert.match(api, /hasObservedComparison/);
+  assert.match(api, /hasPositiveOperationalImpact/);
+  assert.match(api, /e3Ready: hasObservedComparison/);
+  assert.match(api, /v5Ready: hasPositiveOperationalImpact/);
+  assert.match(page, /Gate E3/);
+  assert.match(page, /Gate V5/);
+  assert.match(page, /comparación válida/);
+  assert.match(page, /outcome favorable/);
+});
+
+
+test('maintenance V6 requires validated hourly cost and positive observed impact', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const costApi = fs.readFileSync('app/api/value/maintenance-hourly-cost/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(costApi, /maintenance_value_hourly_cost/);
+  assert.match(costApi, /maintenance_value_role_cost/);
+  assert.match(costApi, /hourly_cost_clp/);
+  assert.match(api, /planningHourlyCostClp/);
+  assert.match(api, /executionHourlyCostClp/);
+  assert.match(api, /attributedMonthlyValueClp/);
+  assert.match(api, /v6Ready/);
+  assert.match(api, /VALOR_ECONOMICO_ATRIBUIBLE/);
+  assert.match(api, /not total maintenance ROI/);
+  assert.match(page, /Gate V6/);
+  assert.match(page, /Costo hora cargado validado/);
+  assert.match(page, /No requiere ni expone sueldos individuales/);
+});
+
+
+test('missing V6 inputs remain HOLD/null and are never published as zero economic value', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /attributedMonthlyValueClp: v6Ready \? attributedMonthlyValueClp : null/);
+  assert.match(api, /const v6Ready = attributedMonthlyValueClp > 0/);
+  assert.match(page, /attributedMonthlyValueClp == null \? 'HOLD'/);
+  assert.doesNotMatch(page, /attributedMonthlyValueClp == null \? money\(0\)/);
+});
+
+
+test('maintenance E4 requires three closed positive comparable periods and excludes the current month', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /currentMonthKey/);
+  assert.match(api, /key === currentMonthKey/);
+  assert.match(api, /positiveRecurringPeriods\.length >= 3/);
+  assert.match(api, /closed calendar months only; current partial month excluded/);
+  assert.match(api, /e4Ready/);
+  assert.match(page, /Gate E4/);
+  assert.match(page, /Valor sostenido por período cerrado/);
+  assert.match(page, /3 meses cerrados comparables/);
 });

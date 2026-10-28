@@ -267,3 +267,54 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+
+## 2026-10-28 — Mantención: cierre administrativo comparable + eje C
+
+- Problema previo: MOTIL medía apertura asistida y ejecución de OT, pero faltaba una métrica comparable del trabajo administrativo de cierre. Mezclar ese tiempo con reparación mecánica habría inflado cualquier claim de productividad.
+- Instrumentación asistida: el flujo progresivo de cierre mide interacción activa desde que se abre una OT en cierre hasta `work_order_closed`.
+- Persistencia: `audit_log.action = maintenance_ot_close_interaction`, una muestra por OT cerrada, limitada a 1 segundo–30 minutos.
+- Semántica: incluye documentación final, evidencia y confirmación de cierre dentro del flujo MOTIL; excluye ejecución mecánica y espera fuera del flujo.
+- Baseline manual separado: `maintenance_admin_manual_close_baseline`, visible sólo en el cockpit interno admin/superadmin.
+- Gate de comparación: ≥3 muestras manuales y ≥10 cierres MOTIL instrumentados.
+- Fórmula: `(mediana_manual_cierre - mediana_motil_cierre) / mediana_manual_cierre`.
+- Valores negativos se conservan. La comparación no se monetiza hasta contar con costo/hora cargado válido y período comparable.
+- Eje C de LECTER: se calcula sobre OT cerradas con cadena completa: inicio de cronómetro + foto + causa raíz + acción preventiva + evento de cierre + aprobación humana.
+- C1–C5 usa el porcentaje real de esa cadena completa sobre el universo de OT cerradas: <20% C1; 20–49% C2; 50–74% C3; 75–94% C4; ≥95% C5.
+- Estado de valor: L/E/C/V se deriva de evidencia observada; no se eleva por cantidad de features.
+- Próximo gate E3/V5: completar las muestras de cierre y apertura comparables y demostrar una reducción operacional repetible antes de atribuir valor económico.
+
+
+## 2026-10-28 — Mantención: promoción automática E3 / V5
+
+- E3 se promueve automáticamente cuando existe al menos una comparación administrativa válida (apertura o cierre) con ≥3 muestras manuales y ≥10 muestras MOTIL comparables.
+- E3 mide evidencia de impacto y puede ser favorable o desfavorable; una reducción negativa no se oculta.
+- V5 se promueve sólo cuando al menos una comparación válida demuestra reducción operacional positiva.
+- Pricing readiness pasa a `OUTCOME_ANCHORED` sólo con V5; E3 desfavorable permanece `MARKET_ANCHORED` hasta mejorar el outcome.
+- V6/valor económico sigue bloqueado hasta validar costo/hora cargado, recurrencia y atribución.
+- La promoción es determinística y se recalcula desde `audit_log`; no depende de una etiqueta manual.
+
+
+## 2026-10-28 — Mantención: gate V6 económico atribuible
+
+- Se agregó registro admin-only de costo hora cargado promedio para `planning` y `execution`; no almacena sueldos individuales.
+- Fuente y fecha efectiva son obligatorias y quedan auditadas en `audit_log`.
+- El cálculo económico usa sólo reducción positiva observada de tiempo administrativo con cohorte comparable.
+- Volumen aplicado: OT creadas/cerradas en los últimos 30 días, según corresponda al proceso.
+- Fórmula apertura: `(segundos ahorrados por caso × OT creadas 30d / 3600) × costo hora planificación`.
+- Fórmula cierre: `(segundos ahorrados por caso × OT cerradas 30d / 3600) × costo hora ejecución`.
+- V6 sólo se promueve cuando el valor mensual atribuible es > 0 y los costos hora están validados para el tramo monetizado.
+- Este valor representa capacidad administrativa atribuible, no ROI total de Mantención ni ahorro contable realizado.
+- Próximo gate: observar recurrencia por varios períodos y conciliar con Finanzas antes de usar la cifra en pricing contractual.
+
+
+## 2026-10-28 — Mantención: gate E4 de valor recurrente
+
+- E4 no se promueve por un único mes positivo.
+- Requiere al menos 3 períodos mensuales cerrados, comparables y con valor atribuible positivo.
+- El mes calendario en curso se excluye por ser incompleto.
+- Cada período exige las mismas cohortes mínimas usadas para E3/V5: baseline manual suficiente y ≥10 muestras MOTIL en el tramo medido.
+- El valor mensual se deriva sólo de tiempo administrativo positivo observado, volumen real del período y costo hora validado.
+- Meses sin datos suficientes quedan no comparables; no se convierten en cero.
+- No se crean snapshots sintéticos ni backfill para completar recurrencia.
+- V7 permanece bloqueado hasta demostrar valor estratégico sostenido más allá del ahorro administrativo atribuible.

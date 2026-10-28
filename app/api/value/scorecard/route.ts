@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceCreateTiming, maintenanceCloseTiming, maintenanceManualOpenBaseline, maintenanceManualCloseBaseline, maintenanceHourlyCosts, maintenanceSupervisorReviews] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -61,6 +61,38 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(500),
       context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_ot_close_interaction')
+        .eq('resource_type', 'maintenance_work_order')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      context.supabase
+        .from('audit_log')
+        .select('new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_admin_manual_baseline')
+        .eq('resource_type', 'maintenance_admin_baseline')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
+        .from('audit_log')
+        .select('new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_admin_manual_close_baseline')
+        .eq('resource_type', 'maintenance_admin_baseline')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_value_hourly_cost')
+        .eq('resource_type', 'maintenance_value_role_cost')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
         .from('work_order_supervisor_reviews')
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', context.organizationId)
@@ -74,7 +106,11 @@ export async function GET(request: NextRequest) {
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
-    if (maintenanceAdminTiming.error) throw maintenanceAdminTiming.error;
+    if (maintenanceCreateTiming.error) throw maintenanceCreateTiming.error;
+    if (maintenanceCloseTiming.error) throw maintenanceCloseTiming.error;
+    if (maintenanceManualOpenBaseline.error) throw maintenanceManualOpenBaseline.error;
+    if (maintenanceManualCloseBaseline.error) throw maintenanceManualCloseBaseline.error;
+    if (maintenanceHourlyCosts.error) throw maintenanceHourlyCosts.error;
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
 
     const financeRows = financeReviews.data || [];
@@ -117,7 +153,7 @@ export async function GET(request: NextRequest) {
     }
     const timingValues = Array.from(latestTimingByInvoice.values()).sort((a, b) => a - b);
     const maintenanceCreateTimingByOrder = new Map<string, number>();
-    for (const row of maintenanceAdminTiming.data || []) {
+    for (const row of maintenanceCreateTiming.data || []) {
       const key = String(row.resource_identifier || '');
       const durationMs = Number((row.new_values as any)?.duration_ms);
       if (key && Number.isFinite(durationMs) && durationMs >= 1000 && durationMs <= 30 * 60 * 1000 && !maintenanceCreateTimingByOrder.has(key)) {
@@ -132,6 +168,113 @@ export async function GET(request: NextRequest) {
         : maintenanceCreateTimingValues.length % 2 === 0
           ? Math.round((maintenanceCreateTimingValues[maintenanceCreateMidpoint - 1] + maintenanceCreateTimingValues[maintenanceCreateMidpoint]) / 2)
           : maintenanceCreateTimingValues[maintenanceCreateMidpoint];
+
+    const maintenanceCloseTimingByOrder = new Map<string, number>();
+    for (const row of maintenanceCloseTiming.data || []) {
+      const key = String(row.resource_identifier || '');
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (key && Number.isFinite(durationMs) && durationMs >= 1000 && durationMs <= 30 * 60 * 1000 && !maintenanceCloseTimingByOrder.has(key)) {
+        maintenanceCloseTimingByOrder.set(key, durationMs);
+      }
+    }
+    const maintenanceCloseTimingValues = Array.from(maintenanceCloseTimingByOrder.values()).sort((a, b) => a - b);
+    const maintenanceCloseMidpoint = Math.floor(maintenanceCloseTimingValues.length / 2);
+    const maintenanceCloseMedianMs =
+      maintenanceCloseTimingValues.length === 0
+        ? null
+        : maintenanceCloseTimingValues.length % 2 === 0
+          ? Math.round((maintenanceCloseTimingValues[maintenanceCloseMidpoint - 1] + maintenanceCloseTimingValues[maintenanceCloseMidpoint]) / 2)
+          : maintenanceCloseTimingValues[maintenanceCloseMidpoint];
+
+    const medianFromAudit = (rows: any[]) => {
+      const values = rows
+        .map((row: any) => {
+          const durationMs = Number(row.new_values?.duration_ms);
+          const caseCount = Number(row.new_values?.case_count);
+          return Number.isFinite(durationMs) && durationMs > 0 && Number.isFinite(caseCount) && caseCount > 0
+            ? durationMs / caseCount
+            : null;
+        })
+        .filter((value: number | null): value is number => value !== null)
+        .sort((a: number, b: number) => a - b);
+      if (!values.length) return { samples: 0, medianMs: null as number | null };
+      const middle = Math.floor(values.length / 2);
+      const medianMs = values.length % 2 === 0
+        ? Math.round((values[middle - 1] + values[middle]) / 2)
+        : Math.round(values[middle]);
+      return { samples: values.length, medianMs };
+    };
+    const manualOpen = medianFromAudit(maintenanceManualOpenBaseline.data || []);
+    const manualClose = medianFromAudit(maintenanceManualCloseBaseline.data || []);
+    const createComparisonReady = manualOpen.samples >= 3
+      && maintenanceCreateTimingValues.length >= 10
+      && manualOpen.medianMs !== null
+      && maintenanceCreateMedianMs !== null
+      && manualOpen.medianMs > 0;
+    const closeComparisonReady = manualClose.samples >= 3
+      && maintenanceCloseTimingValues.length >= 10
+      && manualClose.medianMs !== null
+      && maintenanceCloseMedianMs !== null
+      && manualClose.medianMs > 0;
+    const createReductionPct = createComparisonReady
+      ? Math.round(((manualOpen.medianMs! - maintenanceCreateMedianMs!) / manualOpen.medianMs!) * 100)
+      : null;
+    const closeReductionPct = closeComparisonReady
+      ? Math.round(((manualClose.medianMs! - maintenanceCloseMedianMs!) / manualClose.medianMs!) * 100)
+      : null;
+    const observedAdminComparisons = [
+      createComparisonReady ? createReductionPct : null,
+      closeComparisonReady ? closeReductionPct : null,
+    ].filter((value): value is number => value !== null);
+    const hasObservedComparison = observedAdminComparisons.length > 0;
+    const hasPositiveOperationalImpact = observedAdminComparisons.some((value) => value > 0);
+
+    const latestHourlyCostByRole = new Map<string, number>();
+    for (const row of maintenanceHourlyCosts.data || []) {
+      const role = String(row.resource_identifier || '');
+      const hourlyCostClp = Number((row.new_values as any)?.hourly_cost_clp);
+      if ((role === 'planning' || role === 'execution')
+        && Number.isFinite(hourlyCostClp)
+        && hourlyCostClp > 0
+        && !latestHourlyCostByRole.has(role)) {
+        latestHourlyCostByRole.set(role, hourlyCostClp);
+      }
+    }
+    const planningHourlyCostClp = latestHourlyCostByRole.get('planning') || null;
+    const executionHourlyCostClp = latestHourlyCostByRole.get('execution') || null;
+
+    const monthKey = (raw: string | null | undefined) => {
+      const date = new Date(String(raw || ''));
+      if (!Number.isFinite(date.getTime())) return null;
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    };
+    const currentMonthKey = monthKey(new Date().toISOString());
+    const monthlyMedianMs = (values: number[]) => {
+      if (!values.length) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? Math.round((sorted[middle - 1] + sorted[middle]) / 2)
+        : Math.round(sorted[middle]);
+    };
+    const createTimingByMonth = new Map<string, number[]>();
+    for (const row of maintenanceCreateTiming.data || []) {
+      const key = monthKey(row.created_at);
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (!key || key === currentMonthKey || !Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) continue;
+      const values = createTimingByMonth.get(key) || [];
+      values.push(durationMs);
+      createTimingByMonth.set(key, values);
+    }
+    const closeTimingByMonth = new Map<string, number[]>();
+    for (const row of maintenanceCloseTiming.data || []) {
+      const key = monthKey(row.created_at);
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (!key || key === currentMonthKey || !Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) continue;
+      const values = closeTimingByMonth.get(key) || [];
+      values.push(durationMs);
+      closeTimingByMonth.set(key, values);
+    }
 
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
@@ -162,12 +305,94 @@ export async function GET(request: NextRequest) {
     const preventiveActionRows = maintenanceRows.filter((row: any) => Boolean(String(row.preventive_actions || '').trim()));
     const meterRows = maintenanceRows.filter((row: any) => row.meter_reading !== null && row.meter_reading !== undefined);
     const emergencyRows = maintenanceRows.filter((row: any) => row.work_type === 'emergency');
+    const thirtyDaysAgoMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const createdLast30 = maintenanceRows.filter((row: any) => {
+      const at = Date.parse(String(row.created_at || ''));
+      return Number.isFinite(at) && at >= thirtyDaysAgoMs;
+    }).length;
+    const closedLast30 = maintenanceRows.filter((row: any) => {
+      const at = Date.parse(String(row.closed_at || ''));
+      return Number.isFinite(at) && at >= thirtyDaysAgoMs;
+    }).length;
+    const openSavedSecondsPerCase = createComparisonReady && createReductionPct != null && createReductionPct > 0
+      ? Math.max(0, Math.round((manualOpen.medianMs! - maintenanceCreateMedianMs!) / 1000))
+      : 0;
+    const closeSavedSecondsPerCase = closeComparisonReady && closeReductionPct != null && closeReductionPct > 0
+      ? Math.max(0, Math.round((manualClose.medianMs! - maintenanceCloseMedianMs!) / 1000))
+      : 0;
+    const openMonthlyValueClp = planningHourlyCostClp && openSavedSecondsPerCase > 0
+      ? Math.round((openSavedSecondsPerCase * createdLast30 / 3600) * planningHourlyCostClp)
+      : 0;
+    const closeMonthlyValueClp = executionHourlyCostClp && closeSavedSecondsPerCase > 0
+      ? Math.round((closeSavedSecondsPerCase * closedLast30 / 3600) * executionHourlyCostClp)
+      : 0;
+    const attributedMonthlyValueClp = openMonthlyValueClp + closeMonthlyValueClp;
+    const v6Ready = attributedMonthlyValueClp > 0;
+
+    const workOrderVolumesByMonth = new Map<string, { created: number; closed: number }>();
+    for (const row of maintenanceRows) {
+      const createdKey = monthKey(row.created_at);
+      if (createdKey && createdKey !== currentMonthKey) {
+        const volume = workOrderVolumesByMonth.get(createdKey) || { created: 0, closed: 0 };
+        volume.created += 1;
+        workOrderVolumesByMonth.set(createdKey, volume);
+      }
+      const closedKey = monthKey(row.closed_at);
+      if (closedKey && closedKey !== currentMonthKey) {
+        const volume = workOrderVolumesByMonth.get(closedKey) || { created: 0, closed: 0 };
+        volume.closed += 1;
+        workOrderVolumesByMonth.set(closedKey, volume);
+      }
+    }
+    const closedMonthKeys = Array.from(new Set([
+      ...createTimingByMonth.keys(),
+      ...closeTimingByMonth.keys(),
+      ...workOrderVolumesByMonth.keys(),
+    ])).sort();
+    const recurrencePeriods = closedMonthKeys.map((period) => {
+      const createValues = createTimingByMonth.get(period) || [];
+      const closeValues = closeTimingByMonth.get(period) || [];
+      const createMedianMs = monthlyMedianMs(createValues);
+      const closeMedianMs = monthlyMedianMs(closeValues);
+      const createReady = manualOpen.samples >= 3 && createValues.length >= 10 && manualOpen.medianMs !== null && createMedianMs !== null;
+      const closeReady = manualClose.samples >= 3 && closeValues.length >= 10 && manualClose.medianMs !== null && closeMedianMs !== null;
+      const openSavedSeconds = createReady ? Math.max(0, Math.round((manualOpen.medianMs! - createMedianMs!) / 1000)) : 0;
+      const closeSavedSeconds = closeReady ? Math.max(0, Math.round((manualClose.medianMs! - closeMedianMs!) / 1000)) : 0;
+      const volume = workOrderVolumesByMonth.get(period) || { created: 0, closed: 0 };
+      const openValueClp = planningHourlyCostClp && openSavedSeconds > 0
+        ? Math.round((openSavedSeconds * volume.created / 3600) * planningHourlyCostClp)
+        : 0;
+      const closeValueClp = executionHourlyCostClp && closeSavedSeconds > 0
+        ? Math.round((closeSavedSeconds * volume.closed / 3600) * executionHourlyCostClp)
+        : 0;
+      const valueClp = openValueClp + closeValueClp;
+      return {
+        period,
+        createSamples: createValues.length,
+        closeSamples: closeValues.length,
+        createdWorkOrders: volume.created,
+        closedWorkOrders: volume.closed,
+        comparable: createReady || closeReady,
+        valueClp: valueClp > 0 ? valueClp : null,
+        positive: valueClp > 0,
+      };
+    });
+    const positiveRecurringPeriods = recurrencePeriods.filter((row) => row.comparable && row.positive);
+    const e4Ready = positiveRecurringPeriods.length >= 3;
     const coveragePct = (count: number) => maintenanceRows.length > 0
       ? Math.round((count / maintenanceRows.length) * 100)
       : null;
     const workOrdersWithEvents = new Set(
       maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
     );
+    const eventTypesByOrder = new Map<string, Set<string>>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const types = eventTypesByOrder.get(key) || new Set<string>();
+      types.add(String(row.event_type || ''));
+      eventTypesByOrder.set(key, types);
+    }
     const supplyRows = maintenanceSupplyChain.data || [];
     const withMaterials = supplyRows.filter((row: any) => Number(row.material_requirement_count || 0) > 0).length;
     const withShortages = supplyRows.filter((row: any) => Number(row.material_shortage_count || 0) > 0).length;
@@ -207,6 +432,26 @@ export async function GET(request: NextRequest) {
       const reviewedAt = String(row.reviewed_at || '');
       if (key && row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
     }
+
+    const traceCompleteClosedRows = closedRows.filter((row: any) => {
+      const types = eventTypesByOrder.get(String(row.id)) || new Set<string>();
+      return types.has('timer_play')
+        && types.has('execution_evidence_added')
+        && types.has('root_cause_changed')
+        && types.has('preventive_actions_changed')
+        && types.has('work_order_closed')
+        && approvedReviewByOrder.has(String(row.id));
+    });
+    const traceCompleteCoveragePct = closedRows.length > 0
+      ? Math.round((traceCompleteClosedRows.length / closedRows.length) * 100)
+      : null;
+    const coverageLevel = traceCompleteCoveragePct == null
+      ? null
+      : traceCompleteCoveragePct >= 95 ? 'C5'
+        : traceCompleteCoveragePct >= 75 ? 'C4'
+          : traceCompleteCoveragePct >= 50 ? 'C3'
+            : traceCompleteCoveragePct >= 20 ? 'C2'
+              : 'C1';
 
     const emergencyCycleRows = emergencyRows.map((row: any) => {
       const times = eventTimes.get(String(row.id)) || {};
@@ -371,8 +616,18 @@ export async function GET(request: NextRequest) {
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       evidenceLevel:
-        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        e4Ready ? 'E4' : hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      lec: {
+        level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
+        evidence: e4Ready ? 'E4' : hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        coverage: coverageLevel,
+        valueLevel: v6Ready ? 'V6' : hasPositiveOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
+        coverageNumerator: traceCompleteClosedRows.length,
+        coverageDenominator: closedRows.length,
+        coveragePct: traceCompleteCoveragePct,
+        coverageSemantics: 'closed OT with timer start, photo evidence, root cause, preventive action, close event and human supervisor approval',
+      },
       connectedDomains,
       connectedDomainCount: connectedDomains.length,
       supplyChain: {
@@ -388,12 +643,66 @@ export async function GET(request: NextRequest) {
       adminInteraction: {
         creationSamples: maintenanceCreateTimingValues.length,
         medianCreateSeconds: maintenanceCreateMedianMs === null ? null : Math.round(maintenanceCreateMedianMs / 1000),
-        semantics: 'active interaction from first input on OT creation form to successful creation; excludes mechanical execution and waiting',
+        closeSamples: maintenanceCloseTimingValues.length,
+        medianCloseSeconds: maintenanceCloseMedianMs === null ? null : Math.round(maintenanceCloseMedianMs / 1000),
+        semantics: 'active MOTIL administrative interactions only; opening and closure exclude mechanical execution and waiting',
+      },
+      impactGate: {
+        open: {
+          manualSamples: manualOpen.samples,
+          assistedSamples: maintenanceCreateTimingValues.length,
+          manualMedianSeconds: manualOpen.medianMs === null ? null : Math.round(manualOpen.medianMs / 1000),
+          assistedMedianSeconds: maintenanceCreateMedianMs === null ? null : Math.round(maintenanceCreateMedianMs / 1000),
+          comparisonReady: createComparisonReady,
+          reductionPct: createReductionPct,
+        },
+        close: {
+          manualSamples: manualClose.samples,
+          assistedSamples: maintenanceCloseTimingValues.length,
+          manualMedianSeconds: manualClose.medianMs === null ? null : Math.round(manualClose.medianMs / 1000),
+          assistedMedianSeconds: maintenanceCloseMedianMs === null ? null : Math.round(maintenanceCloseMedianMs / 1000),
+          comparisonReady: closeComparisonReady,
+          reductionPct: closeReductionPct,
+        },
+        e3Ready: hasObservedComparison,
+        v5Ready: hasPositiveOperationalImpact,
+        v6Ready,
+        e4Ready,
+        recurrencePositivePeriods: positiveRecurringPeriods.length,
+        recurrenceRequiredPeriods: 3,
+        semantics: 'E3 requires a comparable administrative cohort; V5 requires positive observed time reduction; V6 requires validated loaded hourly cost; E4 requires at least 3 closed monthly periods with comparable positive attributable value.',
+      },
+      recurrence: {
+        periods: recurrencePeriods.slice(-12),
+        positivePeriods: positiveRecurringPeriods.length,
+        requiredPositivePeriods: 3,
+        e4Ready,
+        semantics: 'closed calendar months only; current partial month excluded; no synthetic snapshots or backfill',
+      },
+      economicValue: {
+        planningHourlyCostClp,
+        executionHourlyCostClp,
+        createdLast30,
+        closedLast30,
+        openSavedSecondsPerCase,
+        closeSavedSecondsPerCase,
+        openMonthlyValueClp,
+        closeMonthlyValueClp,
+        attributedMonthlyValueClp: v6Ready ? attributedMonthlyValueClp : null,
+        semantics: 'monthly attributable administrative capacity value based on positive observed time reduction, last-30-day OT volume and validated loaded hourly cost; not total maintenance ROI',
       },
       valueGate: {
-        attribution: 'NO_MEDIBLE_AUN',
-        pricingReadiness: 'MARKET_ANCHORED',
-        nextMeasurement: 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.',
+        attribution: v6Ready ? 'VALOR_ECONOMICO_ATRIBUIBLE' : hasObservedComparison ? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN',
+        pricingReadiness: v6Ready ? 'ECONOMIC_ANCHORED' : hasPositiveOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
+        nextMeasurement: e4Ready
+          ? 'E4 demostrado; mantener recurrencia y conciliar con Finanzas antes de cualquier claim contractual.'
+          : v6Ready
+            ? `Acumular ${Math.max(0, 3 - positiveRecurringPeriods.length)} período(s) mensual(es) positivo(s) comparable(s) para E4.`
+          : hasPositiveOperationalImpact
+            ? 'Registrar costo/hora cargado validado por planificación y ejecución.'
+          : hasObservedComparison
+            ? 'La comparación ya es E3; mejorar el outcome antes de promover V5 o monetizar.'
+            : 'Completar cohortes manuales y asistidas comparables de apertura/cierre.',
         semantics: 'coverage and workflow evidence are observed; savings, avoided downtime and ROI require a comparable baseline and attributable outcome',
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
@@ -419,6 +728,23 @@ export async function GET(request: NextRequest) {
           E2: 'Desempeño medido',
           E3: 'Impacto observado',
           E4: 'Valor recurrente',
+        },
+        coverage: {
+          C1: '<20% de OT cerradas con cadena completa',
+          C2: '20–49% de OT cerradas con cadena completa',
+          C3: '50–74% de OT cerradas con cadena completa',
+          C4: '75–94% de OT cerradas con cadena completa',
+          C5: '≥95% de OT cerradas con cadena completa',
+        },
+        valueLevel: {
+          V0: 'Habilitador técnico',
+          V1: 'Visibilidad',
+          V2: 'Control',
+          V3: 'Priorización',
+          V4: 'Decisión asistida',
+          V5: 'Resultado operacional',
+          V6: 'Resultado económico atribuible',
+          V7: 'Valor estratégico demostrado',
         },
       },
     });

@@ -104,6 +104,16 @@ type ApiResponse = {
     };
     evidenceLevel?: string;
     workflowLevel?: number;
+    lec?: {
+      level?: string;
+      evidence?: string;
+      coverage?: string | null;
+      valueLevel?: string;
+      coverageNumerator?: number;
+      coverageDenominator?: number;
+      coveragePct?: number | null;
+      coverageSemantics?: string;
+    };
     connectedDomains?: string[];
     connectedDomainCount?: number;
     supplyChain?: {
@@ -119,6 +129,61 @@ type ApiResponse = {
     adminInteraction?: {
       creationSamples?: number;
       medianCreateSeconds?: number | null;
+      closeSamples?: number;
+      medianCloseSeconds?: number | null;
+      semantics?: string;
+    };
+    impactGate?: {
+      open?: {
+        manualSamples?: number;
+        assistedSamples?: number;
+        manualMedianSeconds?: number | null;
+        assistedMedianSeconds?: number | null;
+        comparisonReady?: boolean;
+        reductionPct?: number | null;
+      };
+      close?: {
+        manualSamples?: number;
+        assistedSamples?: number;
+        manualMedianSeconds?: number | null;
+        assistedMedianSeconds?: number | null;
+        comparisonReady?: boolean;
+        reductionPct?: number | null;
+      };
+      e3Ready?: boolean;
+      v5Ready?: boolean;
+      v6Ready?: boolean;
+      e4Ready?: boolean;
+      recurrencePositivePeriods?: number;
+      recurrenceRequiredPeriods?: number;
+      semantics?: string;
+    };
+    recurrence?: {
+      periods?: Array<{
+        period?: string;
+        createSamples?: number;
+        closeSamples?: number;
+        createdWorkOrders?: number;
+        closedWorkOrders?: number;
+        comparable?: boolean;
+        valueClp?: number | null;
+        positive?: boolean;
+      }>;
+      positivePeriods?: number;
+      requiredPositivePeriods?: number;
+      e4Ready?: boolean;
+      semantics?: string;
+    };
+    economicValue?: {
+      planningHourlyCostClp?: number | null;
+      executionHourlyCostClp?: number | null;
+      createdLast30?: number;
+      closedLast30?: number;
+      openSavedSecondsPerCase?: number;
+      closeSavedSecondsPerCase?: number;
+      openMonthlyValueClp?: number;
+      closeMonthlyValueClp?: number;
+      attributedMonthlyValueClp?: number | null;
       semantics?: string;
     };
     valueGate?: {
@@ -157,7 +222,7 @@ const duration = (seconds: number | null | undefined) => {
 };
 
 export default function ValueScorecardPage() {
-  const { data, error, isLoading } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
+  const { data, error, isLoading, mutate: mutateScorecard } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
   const baseline = useSWR<BaselineResponse>('/api/value/finance-baseline', async (url: string) => {
@@ -178,6 +243,22 @@ export default function ValueScorecardPage() {
   const maintenanceBaselineStartedAt = useRef<number | null>(null);
   const [maintenanceBaselineRunning, setMaintenanceBaselineRunning] = useState(false);
   const [maintenanceBaselineNotice, setMaintenanceBaselineNotice] = useState<string | null>(null);
+  const maintenanceCloseBaseline = useSWR<BaselineResponse>('/api/value/maintenance-baseline?phase=close', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el baseline de cierre.');
+    return payload;
+  });
+  const maintenanceCloseBaselineStartedAt = useRef<number | null>(null);
+  const [maintenanceCloseBaselineRunning, setMaintenanceCloseBaselineRunning] = useState(false);
+  const [maintenanceCloseBaselineNotice, setMaintenanceCloseBaselineNotice] = useState<string | null>(null);
+  const hourlyCosts = useSWR('/api/value/maintenance-hourly-cost', async (url: string) => {
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudieron cargar los costos hora.');
+    return payload;
+  });
+  const [hourlyCostNotice, setHourlyCostNotice] = useState<string | null>(null);
 
   const score = data?.current || {};
   const decisions = (score.assistedDecision?.matchReviews || 0) + (score.assistedDecision?.supplyDecisions || 0);
@@ -235,6 +316,19 @@ export default function ValueScorecardPage() {
   const maintenanceCreateReductionPct = maintenanceCreateComparisonReady
     ? Math.round(((maintenanceManualMedian - maintenanceAssistedMedian) / maintenanceManualMedian) * 100)
     : null;
+  const maintenanceCloseManualSamples = maintenanceCloseBaseline.data?.sampleCount || 0;
+  const maintenanceCloseManualMedian = maintenanceCloseBaseline.data?.medianSecondsPerCase ?? null;
+  const maintenanceCloseAssistedSamples = maintenanceValue.adminInteraction?.closeSamples || 0;
+  const maintenanceCloseAssistedMedian = maintenanceValue.adminInteraction?.medianCloseSeconds ?? null;
+  const maintenanceCloseComparisonReady =
+    maintenanceCloseManualSamples >= 3 &&
+    maintenanceCloseAssistedSamples >= 10 &&
+    maintenanceCloseManualMedian != null &&
+    maintenanceCloseAssistedMedian != null &&
+    maintenanceCloseManualMedian > 0;
+  const maintenanceCloseReductionPct = maintenanceCloseComparisonReady
+    ? Math.round(((maintenanceCloseManualMedian - maintenanceCloseAssistedMedian) / maintenanceCloseManualMedian) * 100)
+    : null;
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
@@ -286,6 +380,55 @@ export default function ValueScorecardPage() {
       await maintenanceBaseline.mutate();
     } catch (cause) {
       setMaintenanceBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de Mantención.');
+    }
+  };
+
+  const saveMaintenanceCloseBaseline = async () => {
+    if (!maintenanceCloseBaselineStartedAt.current) return;
+    const durationMs = Date.now() - maintenanceCloseBaselineStartedAt.current;
+    const rawCases = window.prompt('¿Cuántas OT cerraste administrativamente por el método manual?', '3');
+    if (!rawCases) return;
+    const caseCount = Number(rawCases);
+    setMaintenanceCloseBaselineNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-baseline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMs, caseCount, phase: 'close' }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el baseline de cierre.');
+      setMaintenanceCloseBaselineNotice(`Baseline guardado: ${number(payload.secondsPerCase)} s por cierre administrativo manual.`);
+      maintenanceCloseBaselineStartedAt.current = null;
+      setMaintenanceCloseBaselineRunning(false);
+      await maintenanceCloseBaseline.mutate();
+    } catch (cause) {
+      setMaintenanceCloseBaselineNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el baseline de cierre.');
+    }
+  };
+
+  const saveHourlyCost = async (role: 'planning' | 'execution') => {
+    const label = role === 'planning' ? 'planificación/apertura' : 'ejecución/cierre';
+    const raw = window.prompt(`Costo hora cargado CLP para ${label}`);
+    if (!raw) return;
+    const source = window.prompt('Fuente o responsable que valida esta cifra (ej. Daniel Villarroel / Finanzas)');
+    if (!source) return;
+    setHourlyCostNotice(null);
+    try {
+      const response = await fetch('/api/value/maintenance-hourly-cost', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, hourlyCostClp: Number(raw), source }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el costo hora.');
+      setHourlyCostNotice(`Costo hora validado guardado para ${label}: ${money(payload.hourlyCostClp)}.`);
+      await hourlyCosts.mutate();
+      await mutateScorecard();
+    } catch (cause) {
+      setHourlyCostNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el costo hora.');
     }
   };
 
@@ -435,7 +578,32 @@ export default function ValueScorecardPage() {
           </div>)}
         </div>
         <div className="border-t px-5 py-4 text-sm">
-          <p className="font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
+          <p className="font-medium">
+            LEC Mantención: {maintenanceValue.lec?.level || 'L1'} / {maintenanceValue.lec?.evidence || 'E0'} / {maintenanceValue.lec?.coverage || '—'} · {maintenanceValue.lec?.valueLevel || 'V0'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Cobertura completa: {number(maintenanceValue.lec?.coverageNumerator || 0)} de {number(maintenanceValue.lec?.coverageDenominator || 0)} OT cerradas
+            {maintenanceValue.lec?.coveragePct == null ? '' : ` · ${number(maintenanceValue.lec.coveragePct)}%`}.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate E3</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.e3Ready ? 'PASS · comparación válida' : 'HOLD · falta cohorte comparable'}</p>
+            </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate V5</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v5Ready ? 'PASS · outcome favorable' : 'HOLD · sin mejora demostrada'}</p>
+            </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate V6</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v6Ready ? 'PASS · valor económico atribuible' : 'HOLD · falta costo validado o outcome positivo'}</p>
+            </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate E4</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.e4Ready ? 'PASS · valor recurrente' : `HOLD · ${number(maintenanceValue.impactGate?.recurrencePositivePeriods || 0)}/${number(maintenanceValue.impactGate?.recurrenceRequiredPeriods || 3)} períodos`}</p>
+            </div>
+          </div>
+          <p className="mt-2 font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {maintenanceValue.valueGate?.nextMeasurement || 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.'}
           </p>
@@ -443,6 +611,63 @@ export default function ValueScorecardPage() {
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
         </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Recurrencia de valor E4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate E4 · recurrencia</p>
+          <h2 className="mt-1 text-lg font-semibold">Valor sostenido por período cerrado</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Requiere 3 meses cerrados comparables con valor atribuible positivo. El mes en curso no cuenta.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Períodos positivos</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceValue.recurrence?.positivePeriods || 0)} / {number(maintenanceValue.recurrence?.requiredPositivePeriods || 3)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3 sm:col-span-2">
+            <p className="text-xs text-muted-foreground">Estado</p>
+            <p className="mt-1 text-xl font-semibold">{maintenanceValue.recurrence?.e4Ready ? 'E4 · valor recurrente' : 'HOLD'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Sin snapshots sintéticos ni backfill. Sólo meses cerrados observados.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Costo hora validado para V6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate V6 · monetización</p>
+            <h2 className="mt-1 text-lg font-semibold">Costo hora cargado validado</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sólo promedios por proceso/rol. No requiere ni expone sueldos individuales.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            ['planning', 'Planificación / apertura', maintenanceValue.economicValue?.planningHourlyCostClp],
+            ['execution', 'Ejecución / cierre', maintenanceValue.economicValue?.executionHourlyCostClp],
+          ].map(([role, label, value]) => (
+            <div key={String(role)} className="rounded-md border px-4 py-3">
+              <p className="text-xs text-muted-foreground">{String(label)}</p>
+              <p className="mt-1 text-xl font-semibold">{value == null ? 'Pendiente' : money(Number(value)) + '/h'}</p>
+              <button type="button" onClick={() => void saveHourlyCost(role as 'planning' | 'execution')} className="mt-3 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted">
+                {value == null ? 'Registrar costo validado' : 'Actualizar costo'}
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-md bg-muted/40 px-4 py-3">
+          <p className="text-xs text-muted-foreground">Valor administrativo atribuible / mes</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {maintenanceValue.economicValue?.attributedMonthlyValueClp == null ? 'HOLD' : money(maintenanceValue.economicValue.attributedMonthlyValueClp)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Usa volumen real de los últimos 30 días y sólo reducciones de tiempo positivas con cohorte comparable. No representa ROI total de Mantención.
+          </p>
+        </div>
+        {hourlyCostNotice ? <p className="mt-3 text-xs text-muted-foreground">{hourlyCostNotice}</p> : null}
       </section>
 
       <section aria-label="Cohorte OTe de emergencia" className="overflow-hidden rounded-xl border bg-card">
@@ -543,6 +768,64 @@ export default function ValueScorecardPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
         </p>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Baseline administrativo de cierre de Mantención">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate E3 · cierre administrativo</p>
+            <h2 className="mt-1 text-lg font-semibold">Baseline manual de cierre de OT</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cronometra sólo documentación final y confirmación de cierre por el método manual. Excluye reparación mecánica y tiempos de espera.
+            </p>
+          </div>
+          {!maintenanceCloseBaselineRunning ? (
+            <button
+              type="button"
+              onClick={() => {
+                maintenanceCloseBaselineStartedAt.current = Date.now();
+                setMaintenanceCloseBaselineRunning(true);
+                setMaintenanceCloseBaselineNotice('Medición activa. Documenta y cierra las OT manualmente sin usar MOTIL y vuelve al terminar.');
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Iniciar baseline cierre
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void saveMaintenanceCloseBaseline()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Finalizar medición
+            </button>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Muestras manuales</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceCloseManualSamples)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana manual</p>
+            <p className="mt-1 text-xl font-semibold">{duration(maintenanceCloseManualMedian)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3">
+            <p className="text-xs text-muted-foreground">Mediana MOTIL</p>
+            <p className="mt-1 text-xl font-semibold">{duration(maintenanceCloseAssistedMedian)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{number(maintenanceCloseAssistedSamples)} cierres instrumentados.</p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-md border px-4 py-3">
+          <p className="text-xs text-muted-foreground">Reducción observada del tiempo de cierre</p>
+          <p className="mt-1 text-xl font-semibold">{maintenanceCloseReductionPct == null ? 'HOLD' : `${number(maintenanceCloseReductionPct)}%`}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {maintenanceCloseReductionPct == null
+              ? `Requiere ≥3 muestras manuales y ≥10 cierres MOTIL instrumentados. Actual: ${maintenanceCloseManualSamples}/3 y ${maintenanceCloseAssistedSamples}/10.`
+              : 'Comparación de igual alcance administrativo. Puede ser negativa si MOTIL demora más.'}
+          </p>
+        </div>
+        {maintenanceCloseBaselineNotice ? <p className="mt-3 text-xs text-muted-foreground">{maintenanceCloseBaselineNotice}</p> : null}
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">

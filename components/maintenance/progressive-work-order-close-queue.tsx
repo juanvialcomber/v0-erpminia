@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
@@ -119,6 +119,11 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const closeInteractionStartedAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    closeInteractionStartedAt.current = current?.work_order_id ? Date.now() : null;
+  }, [current?.work_order_id]);
 
   useEffect(() => {
     setActionError(null);
@@ -131,13 +136,13 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     setMeterReason('');
   }, [current?.work_order_id, current?.next_action, current?.next_plan_step_id]);
 
-  async function request(url: string, body: Record<string, unknown>) {
+  async function request(url: string, body: Record<string, unknown>, extraHeaders: Record<string, string> = {}) {
     setSaving(true);
     setActionError(null);
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...extraHeaders },
         credentials: 'include',
         body: JSON.stringify(body),
       });
@@ -289,11 +294,16 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
 
     if (current.next_action === 'close_work_order') {
       if (evidenceCount < 1) return setActionError('Agrega al menos una foto antes de cerrar.');
+      const closeInteractionMs = closeInteractionStartedAt.current ? Date.now() - closeInteractionStartedAt.current : 0;
+      const closeHeaders: Record<string, string> = {};
+      if (closeInteractionMs >= 1000 && closeInteractionMs <= 30 * 60 * 1000) {
+        closeHeaders['X-Motil-Close-Interaction-Ms'] = String(Math.round(closeInteractionMs));
+      }
       return request(`/api/maintenance/work-orders/${current.work_order_id}/close`, {
         actual_duration_hours: Number(current.actual_duration_hours || 0),
         root_cause: current.root_cause,
         preventive_actions: current.preventive_actions,
-      });
+      }, closeHeaders);
     }
   }
 
