@@ -476,3 +476,14 @@ test('depreciation coverage keeps an explicit zero state when source is absent',
   assert.match(review,/withBookValue: 0/);
   assert.match(review,/linkedCanonical: 0/);
 });
+
+
+test('Daniel fixed asset panel shows Laudus freshness from the fixed-asset sync itself',()=>{
+  const control=fs.readFileSync('lib/integrations/laudus/finance-control.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(control,/laudus_fixed_assets/);
+  assert.match(control,/latestFixedAssetsSync/);
+  assert.match(control,/latestSync: latestFixedAssetsSync/);
+  assert.match(page,/Última sincronización:/);
+  assert.match(page,/fixedAssets\?\.latestSync/);
+});
