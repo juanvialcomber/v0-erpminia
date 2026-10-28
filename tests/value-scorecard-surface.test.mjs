@@ -218,3 +218,21 @@ test('maintenance manual baseline supports a separate close phase', () => {
   assert.match(route, /maintenance-close-baseline-v1/);
   assert.match(route, /manual OT administrative closure measured outside MOTIL assistance/);
 });
+
+
+test('maintenance E3 and V5 gates are automatic and keep evidence separate from outcome direction', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /maintenance_admin_manual_close_baseline/);
+  assert.match(api, /createComparisonReady/);
+  assert.match(api, /closeComparisonReady/);
+  assert.match(api, /hasObservedComparison/);
+  assert.match(api, /hasPositiveOperationalImpact/);
+  assert.match(api, /e3Ready: hasObservedComparison/);
+  assert.match(api, /v5Ready: hasPositiveOperationalImpact/);
+  assert.match(page, /Gate E3/);
+  assert.match(page, /Gate V5/);
+  assert.match(page, /comparación válida/);
+  assert.match(page, /outcome favorable/);
+});
