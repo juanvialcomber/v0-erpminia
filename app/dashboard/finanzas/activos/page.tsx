@@ -58,6 +58,7 @@ type ReviewResponse = {
     singleAssets: number;
     conflictAssets: number;
     unresolvedRows: number;
+    classifiedRows: number;
     structuredCandidateRows: number;
     structuredCandidateGroups: number;
     unstructuredRows: number;
@@ -349,9 +350,10 @@ export default function FinanceAssetsPage(){
           <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
             <ReviewMetric label="Fuente depreciación" value={number(reviewData.summary.sourceRows)} detail="Filas conservadas desde el archivo de Daniel" />
             <ReviewMetric label="Activos enlazados" value={number(reviewData.summary.linkedAssets)} detail={`${number(reviewData.summary.singleAssets)} con valor 1:1`} />
-            <ReviewMetric label="Pendiente operacional" value={number(reviewData.summary.unresolvedRows)} detail="Incluye candidatos ya estructurados y filas aún sin resolver" />
-            <ReviewMetric label="Candidatos estructurados" value={number(reviewData.summary.structuredCandidateRows)} detail={`${number(reviewData.summary.structuredCandidateGroups)} grupos de activo/instalación ya clasificados`} />
-            <ReviewMetric label="Sin estructura" value={number(reviewData.summary.unstructuredRows)} detail="Filas que todavía necesitan clasificación o una llave verificable" />
+            <ReviewMetric label="Pendiente operacional" value={number(reviewData.summary.unresolvedRows)} detail="Filas aún sin vínculo canónico; no equivale a datos crudos" />
+            <ReviewMetric label="Clasificado / en revisión" value={number(reviewData.summary.classifiedRows)} detail="Ya tiene causa, categoría o decisión de conciliación" />
+            <ReviewMetric label="Candidatos Ficha 360" value={number(reviewData.summary.structuredCandidateRows)} detail={`${number(reviewData.summary.structuredCandidateGroups)} grupos de activo/instalación ya estructurados`} />
+            <ReviewMetric label="Sin estructura" value={number(reviewData.summary.unstructuredRows)} detail="Backlog realmente crudo: aún sin clasificación útil" />
             <ReviewMetric label="Cerrado financiero" value={number(reviewData.summary.terminalRows)} detail="Contexto financiero/CAPEX que no requiere Ficha 360 individual" />
             <ReviewMetric label="Sin identificador operacional" value={number(reviewData.unresolved.byReason.missing_identifier||0)} detail="Sin centro, patente, serie o nombre suficiente" />
             <ReviewMetric label="Ficha 360 faltante" value={number(reviewData.unresolved.byReason.missing_canonical_asset_candidate||0)} detail="Identificador específico sin contraparte canónica ni alias operacional" />
