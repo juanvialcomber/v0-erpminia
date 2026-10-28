@@ -547,3 +547,17 @@ test('Daniel finance cockpit separates classified reconciliation debt from raw b
   assert.match(page,/Backlog realmente crudo/);
   assert.match(page,/Candidatos Ficha 360/);
 });
+
+
+test('candidate review queue includes structured serial/family candidates and reuses existing reviews',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/asset_candidate_key/);
+  assert.match(api,/asset_candidate_family_key/);
+  assert.match(api,/exact_source_serial_single/);
+  assert.match(api,/exact_serial_in_description/);
+  assert.match(api,/insurance_asset_candidate:/);
+  assert.match(api,/depreciation_asset_candidate:/);
+  assert.match(api,/insurance_asset_family:/);
+  assert.match(api,/possibleIssueKeys/);
+  assert.match(api,/reviewByCandidateKey/);
+});
