@@ -499,3 +499,17 @@ test('depreciation reconciliation counts are live, not frozen import metadata',(
   assert.match(page,/Filas conciliadas/);
   assert.match(page,/activos únicos con identidad verificada/);
 });
+
+
+test('finance reconciliation separates actionable backlog from finance-only terminal rows',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/reconciliation_terminal_state/);
+  assert.match(review,/finance_only_non_asset/);
+  assert.match(review,/actionableRows/);
+  assert.match(review,/terminalRows/);
+  assert.match(review,/terminalByReason/);
+  assert.match(page,/Pendiente operacional/);
+  assert.match(page,/Cerrado financiero/);
+  assert.match(page,/no requiere Ficha 360/);
+});
