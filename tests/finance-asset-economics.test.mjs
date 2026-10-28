@@ -451,3 +451,28 @@ test('single-source exact candidates preserve verified absence across internal a
   assert.match(stage,/purchase_cost_center_evidence/);
   assert.match(stage,/purchase_description_exact_plate/);
 });
+
+
+test('Daniel assets page separates depreciation source from Laudus fixed assets',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/depreciationCoverage/);
+  assert.match(review,/withCurrentDepreciation/);
+  assert.match(review,/withBookValue/);
+  assert.match(review,/withRemainingLife/);
+  assert.match(review,/linkedCanonical/);
+  assert.match(page,/Depreciación y Laudus/);
+  assert.match(page,/Depreciación del período/);
+  assert.match(page,/Activos fijos Laudus/);
+  assert.match(page,/Laudus ↔ MOTIL/);
+  assert.match(page,/Costo adquisición Laudus/);
+  assert.match(page,/valor libro, depreciación, seguro y costo de adquisición son magnitudes distintas/);
+});
+
+test('depreciation coverage keeps an explicit zero state when source is absent',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/depreciationCoverage:\s*\{\s*rows: 0,/s);
+  assert.match(review,/withCurrentDepreciation: 0/);
+  assert.match(review,/withBookValue: 0/);
+  assert.match(review,/linkedCanonical: 0/);
+});
