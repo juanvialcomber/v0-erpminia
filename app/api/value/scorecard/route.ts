@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceCreateTiming, maintenanceCloseTiming, maintenanceManualOpenBaseline, maintenanceManualCloseBaseline, maintenanceSupervisorReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceCreateTiming, maintenanceCloseTiming, maintenanceManualOpenBaseline, maintenanceManualCloseBaseline, maintenanceHourlyCosts, maintenanceSupervisorReviews] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -85,6 +85,14 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(100),
       context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_value_hourly_cost')
+        .eq('resource_type', 'maintenance_value_role_cost')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
         .from('work_order_supervisor_reviews')
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', context.organizationId)
@@ -102,6 +110,7 @@ export async function GET(request: NextRequest) {
     if (maintenanceCloseTiming.error) throw maintenanceCloseTiming.error;
     if (maintenanceManualOpenBaseline.error) throw maintenanceManualOpenBaseline.error;
     if (maintenanceManualCloseBaseline.error) throw maintenanceManualCloseBaseline.error;
+    if (maintenanceHourlyCosts.error) throw maintenanceHourlyCosts.error;
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
 
     const financeRows = financeReviews.data || [];
@@ -220,6 +229,20 @@ export async function GET(request: NextRequest) {
     const hasObservedComparison = observedAdminComparisons.length > 0;
     const hasPositiveOperationalImpact = observedAdminComparisons.some((value) => value > 0);
 
+    const latestHourlyCostByRole = new Map<string, number>();
+    for (const row of maintenanceHourlyCosts.data || []) {
+      const role = String(row.resource_identifier || '');
+      const hourlyCostClp = Number((row.new_values as any)?.hourly_cost_clp);
+      if ((role === 'planning' || role === 'execution')
+        && Number.isFinite(hourlyCostClp)
+        && hourlyCostClp > 0
+        && !latestHourlyCostByRole.has(role)) {
+        latestHourlyCostByRole.set(role, hourlyCostClp);
+      }
+    }
+    const planningHourlyCostClp = latestHourlyCostByRole.get('planning') || null;
+    const executionHourlyCostClp = latestHourlyCostByRole.get('execution') || null;
+
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
       timingValues.length === 0
@@ -249,6 +272,29 @@ export async function GET(request: NextRequest) {
     const preventiveActionRows = maintenanceRows.filter((row: any) => Boolean(String(row.preventive_actions || '').trim()));
     const meterRows = maintenanceRows.filter((row: any) => row.meter_reading !== null && row.meter_reading !== undefined);
     const emergencyRows = maintenanceRows.filter((row: any) => row.work_type === 'emergency');
+    const thirtyDaysAgoMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const createdLast30 = maintenanceRows.filter((row: any) => {
+      const at = Date.parse(String(row.created_at || ''));
+      return Number.isFinite(at) && at >= thirtyDaysAgoMs;
+    }).length;
+    const closedLast30 = maintenanceRows.filter((row: any) => {
+      const at = Date.parse(String(row.closed_at || ''));
+      return Number.isFinite(at) && at >= thirtyDaysAgoMs;
+    }).length;
+    const openSavedSecondsPerCase = createComparisonReady && createReductionPct != null && createReductionPct > 0
+      ? Math.max(0, Math.round((manualOpen.medianMs! - maintenanceCreateMedianMs!) / 1000))
+      : 0;
+    const closeSavedSecondsPerCase = closeComparisonReady && closeReductionPct != null && closeReductionPct > 0
+      ? Math.max(0, Math.round((manualClose.medianMs! - maintenanceCloseMedianMs!) / 1000))
+      : 0;
+    const openMonthlyValueClp = planningHourlyCostClp && openSavedSecondsPerCase > 0
+      ? Math.round((openSavedSecondsPerCase * createdLast30 / 3600) * planningHourlyCostClp)
+      : 0;
+    const closeMonthlyValueClp = executionHourlyCostClp && closeSavedSecondsPerCase > 0
+      ? Math.round((closeSavedSecondsPerCase * closedLast30 / 3600) * executionHourlyCostClp)
+      : 0;
+    const attributedMonthlyValueClp = openMonthlyValueClp + closeMonthlyValueClp;
+    const v6Ready = attributedMonthlyValueClp > 0;
     const coveragePct = (count: number) => maintenanceRows.length > 0
       ? Math.round((count / maintenanceRows.length) * 100)
       : null;
@@ -492,7 +538,7 @@ export async function GET(request: NextRequest) {
         level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
         evidence: hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
         coverage: coverageLevel,
-        valueLevel: hasPositiveOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
+        valueLevel: v6Ready ? 'V6' : hasPositiveOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
         coverageNumerator: traceCompleteClosedRows.length,
         coverageDenominator: closedRows.length,
         coveragePct: traceCompleteCoveragePct,
@@ -536,13 +582,28 @@ export async function GET(request: NextRequest) {
         },
         e3Ready: hasObservedComparison,
         v5Ready: hasPositiveOperationalImpact,
-        semantics: 'E3/V5 requires a comparable administrative cohort with sufficient samples and a positive observed time reduction; economic value remains unmeasured until loaded labor cost is validated',
+        v6Ready,
+        semantics: 'E3 requires a comparable administrative cohort; V5 requires a positive observed time reduction; V6 additionally requires validated loaded hourly cost and current 30-day OT volume.',
+      },
+      economicValue: {
+        planningHourlyCostClp,
+        executionHourlyCostClp,
+        createdLast30,
+        closedLast30,
+        openSavedSecondsPerCase,
+        closeSavedSecondsPerCase,
+        openMonthlyValueClp,
+        closeMonthlyValueClp,
+        attributedMonthlyValueClp: v6Ready ? attributedMonthlyValueClp : null,
+        semantics: 'monthly attributable administrative capacity value based on positive observed time reduction, last-30-day OT volume and validated loaded hourly cost; not total maintenance ROI',
       },
       valueGate: {
-        attribution: hasObservedComparison ? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN',
-        pricingReadiness: hasPositiveOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
-        nextMeasurement: hasPositiveOperationalImpact
-          ? 'Validar costo/hora cargado y recurrencia del impacto antes de monetizar.'
+        attribution: v6Ready ? 'VALOR_ECONOMICO_ATRIBUIBLE' : hasObservedComparison ? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN',
+        pricingReadiness: v6Ready ? 'ECONOMIC_ANCHORED' : hasPositiveOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
+        nextMeasurement: v6Ready
+          ? 'Validar recurrencia por varios períodos antes de usarlo como ROI contractual.'
+          : hasPositiveOperationalImpact
+            ? 'Registrar costo/hora cargado validado por planificación y ejecución.'
           : hasObservedComparison
             ? 'La comparación ya es E3; mejorar el outcome antes de promover V5 o monetizar.'
             : 'Completar cohortes manuales y asistidas comparables de apertura/cierre.',
