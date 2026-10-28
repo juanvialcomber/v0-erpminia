@@ -267,3 +267,18 @@ test('missing V6 inputs remain HOLD/null and are never published as zero economi
   assert.match(page, /attributedMonthlyValueClp == null \? 'HOLD'/);
   assert.doesNotMatch(page, /attributedMonthlyValueClp == null \? money\(0\)/);
 });
+
+
+test('maintenance E4 requires three closed positive comparable periods and excludes the current month', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /currentMonthKey/);
+  assert.match(api, /key === currentMonthKey/);
+  assert.match(api, /positiveRecurringPeriods\.length >= 3/);
+  assert.match(api, /closed calendar months only; current partial month excluded/);
+  assert.match(api, /e4Ready/);
+  assert.match(page, /Gate E4/);
+  assert.match(page, /Valor sostenido por período cerrado/);
+  assert.match(page, /3 meses cerrados comparables/);
+});
