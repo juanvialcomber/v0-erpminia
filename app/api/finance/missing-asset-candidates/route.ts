@@ -63,21 +63,33 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const { data: rows, error: rowsError } = await context.supabase
+  const { data: rawRows, error: rowsError } = await context.supabase
     .from('motil_finance_asset_stage')
     .select('id,import_id,source_sheet,source_row,description,equipment_type,brand,model,model_year,serial_number,chassis_number,engine_number,license_plate,insured_uf,net_book_value,source_payload')
     .eq('organization_id', context.organizationId)
     .in('import_id', importIds)
-    .is('canonical_asset_id', null)
-    .contains('source_payload', { reconciliation_disposition: 'missing_canonical_asset_candidate' });
+    .is('canonical_asset_id', null);
 
   if (rowsError) return NextResponse.json({ error: rowsError.message }, { status: 500 });
 
+  const rows = (rawRows || []).filter((rawRow: any) => {
+    const payload = rawRow.source_payload && typeof rawRow.source_payload === 'object'
+      ? rawRow.source_payload as Record<string, unknown>
+      : {};
+    return (
+      text(payload.reconciliation_disposition) === 'missing_canonical_asset_candidate' ||
+      Boolean(text(payload.asset_candidate_key)) ||
+      Boolean(text(payload.asset_candidate_family_key))
+    );
+  });
+
   const grouped = new Map<string, StageCandidateRow[]>();
-  for (const rawRow of rows || []) {
+  for (const rawRow of rows) {
     const row = rawRow as StageCandidateRow;
     const payload = row.source_payload || {};
     const key =
+      text(payload.asset_candidate_key) ||
+      text(payload.asset_candidate_family_key) ||
       text(payload.reconciliation_candidate_key) ||
       (text(payload.reconciliation_evidence_token) ? `evidence:${text(payload.reconciliation_evidence_token)}` : null) ||
       `stage:${row.id}`;
@@ -86,20 +98,31 @@ export async function GET(request: NextRequest) {
     grouped.set(key, existing);
   }
 
-  const issueKeys = [...grouped.keys()].map((key) => 'asset_missing_candidate:' + key);
+  const candidateKeys = [...grouped.keys()];
+  const reviewIssueKeys = [...new Set(candidateKeys.flatMap((key) => [
+    'asset_missing_candidate:' + key,
+    'insurance_asset_candidate:' + key,
+    'depreciation_asset_candidate:' + key,
+    'insurance_asset_family:' + key,
+  ]))];
+
   const { data: reviewRows, error: reviewError } = await context.supabase
     .from('data_reconciliation_reviews')
     .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
     .eq('organization_id', context.organizationId)
     .eq('entity_type', 'asset')
-    .eq('issue_type', 'missing_canonical_asset_candidate')
-    .in('issue_key', issueKeys);
+    .in('issue_key', reviewIssueKeys);
 
   if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
 
-  const reviewByIssueKey = new Map(
-    (reviewRows || []).map((row: any) => [row.issue_key, row])
-  );
+  const reviewByCandidateKey = new Map<string, any>();
+  for (const reviewRow of reviewRows || []) {
+    const issueKey = String((reviewRow as any).issue_key || '');
+    const key = candidateKeys.find((candidateKey) => issueKey.endsWith(':' + candidateKey));
+    if (!key) continue;
+    const current = reviewByCandidateKey.get(key);
+    if (!current || current.status === 'open') reviewByCandidateKey.set(key, reviewRow);
+  }
 
   const { data: conflictRows, error: conflictError } = await context.supabase
     .from('data_reconciliation_reviews')
@@ -146,6 +169,8 @@ export async function GET(request: NextRequest) {
     let internalMasterSearchVerified = false;
     let internalMasterSearchResult: string | null = null;
     let internalMasterSearchSources: string[] = [];
+    let candidateConfidence: string | null = null;
+    let candidateScope: string | null = null;
     const evidence: Array<{
       source: 'insurance' | 'depreciation';
       stageId: number;
@@ -183,6 +208,8 @@ export async function GET(request: NextRequest) {
       equipmentType = equipmentType || text(row.equipment_type);
       reviewStatus = reviewStatus || text(payload.candidate_review_status);
       reviewBasis = reviewBasis || text(payload.candidate_review_basis);
+      candidateConfidence = candidateConfidence || text(payload.asset_candidate_confidence);
+      candidateScope = candidateScope || text(payload.asset_candidate_scope);
       const payloadSourceCount = numeric(payload.candidate_review_source_count);
       if (payloadSourceCount != null) reviewSourceCount = Math.max(reviewSourceCount ?? payloadSourceCount, payloadSourceCount);
       purchaseCostCenterEvidence = purchaseCostCenterEvidence || text(payload.purchase_cost_center_evidence);
@@ -210,7 +237,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const review = reviewByIssueKey.get('asset_missing_candidate:' + key) || null;
+    const review = reviewByCandidateKey.get(key) || null;
     const dualSource = sourceKinds.size > 1;
     const normalizedEquipmentType = String(equipmentType || '').toLowerCase();
     const normalizedTitle = String(title || '').toLowerCase();
@@ -221,8 +248,12 @@ export async function GET(request: NextRequest) {
       /camión|camion/.test(typeEvidence) ? 'CAMIONES' :
       null;
     const readyForReview = reviewStatus === 'ready_for_asset_review';
-    const identityVerifiedSingleSource = reviewStatus === 'identity_verified_single_source';
-    const modelOnlyNeedsOperationalIdentity = reviewStatus === 'model_only_needs_operational_identity';
+    const identityVerifiedSingleSource =
+      reviewStatus === 'identity_verified_single_source' ||
+      ['exact_source_serial_single','exact_serial_in_description'].includes(String(candidateConfidence));
+    const modelOnlyNeedsOperationalIdentity =
+      reviewStatus === 'model_only_needs_operational_identity' ||
+      candidateScope === 'single_candidate_without_unit_identifier';
     const sourceCodeNeedsOperationalValidation = reviewStatus === 'source_code_needs_operational_validation';
     return {
       key,
@@ -255,6 +286,8 @@ export async function GET(request: NextRequest) {
       sourceCodeNeedsOperationalValidation,
       reviewStatus,
       reviewBasis,
+      candidateConfidence,
+      candidateScope,
       reviewSourceCount,
       operationalEvidence: {
         purchaseCostCenter: purchaseCostCenterEvidence,
@@ -349,7 +382,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Decisión inválida' }, { status: 400 });
   }
 
-  const issueKey = 'asset_missing_candidate:' + key;
+  const possibleIssueKeys = [
+    'asset_missing_candidate:' + key,
+    'insurance_asset_candidate:' + key,
+    'depreciation_asset_candidate:' + key,
+    'insurance_asset_family:' + key,
+  ];
   const status =
     decision === 'accept' ? 'accepted' :
     decision === 'ignore' ? 'ignored' :
@@ -364,12 +402,14 @@ export async function POST(request: NextRequest) {
 
   const now = new Date().toISOString();
 
-  const { data: existing, error: existingError } = await context.supabase
+  const { data: existingRows, error: existingError } = await context.supabase
     .from('data_reconciliation_reviews')
-    .select('id')
+    .select('id,issue_key')
     .eq('organization_id', context.organizationId)
-    .eq('issue_key', issueKey)
-    .maybeSingle();
+    .in('issue_key', possibleIssueKeys)
+    .limit(1);
+
+  const existing = existingRows?.[0] || null;
 
   if (existingError) return NextResponse.json({ error: existingError.message }, { status: 500 });
 
@@ -395,7 +435,7 @@ export async function POST(request: NextRequest) {
       .from('data_reconciliation_reviews')
       .insert({
         organization_id: context.organizationId,
-        issue_key: issueKey,
+        issue_key: 'asset_missing_candidate:' + key,
         entity_type: 'asset',
         entity_id: null,
         issue_type: 'missing_canonical_asset_candidate',
