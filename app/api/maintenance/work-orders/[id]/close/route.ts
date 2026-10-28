@@ -91,6 +91,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { data: updatedOT, error: reloadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     if (reloadError) throw reloadError;
 
+    const closeInteractionMs = Number(request.headers.get('x-motil-close-interaction-ms'));
+    if (Number.isFinite(closeInteractionMs) && closeInteractionMs >= 1000 && closeInteractionMs <= 30 * 60 * 1000) {
+      const { error: timingError } = await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'maintenance_ot_close_interaction',
+        resource_type: 'maintenance_work_order',
+        resource_identifier: id,
+        new_values: {
+          duration_ms: Math.round(closeInteractionMs),
+          seconds_per_case: Math.round(closeInteractionMs / 1000),
+          metric_version: 'maintenance-close-interaction-v1',
+          semantics: 'active MOTIL administrative close interaction from opening the progressive close flow to successful closure; excludes mechanical execution and waiting outside the flow',
+        },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      if (timingError) console.error('[maintenance/value] close interaction timing error:', timingError);
+    }
+
     if (typedWorkOrder.asset_id) {
       const today = new Date().toISOString().split('T')[0];
       const availabilityPercent = Math.max(0, 100 - (downtime / 24) * 100);
