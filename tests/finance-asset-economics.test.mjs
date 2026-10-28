@@ -591,3 +591,10 @@ test('candidate review surfaces duplicate risk before asset creation',()=>{
   assert.match(page,/Posible duplicado/);
   assert.match(page,/antes de crear una nueva/);
 });
+
+
+test('candidate verification copy reflects the three masters actually checked',()=>{
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(page,/0 contrapartes exactas en 3 maestros internos/);
+  assert.doesNotMatch(page,/canónico, mantenimiento y planificación/);
+});
