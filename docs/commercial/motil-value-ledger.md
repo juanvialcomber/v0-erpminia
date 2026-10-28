@@ -283,3 +283,13 @@ Estos umbrales habilitan escala inicial, no E4.
 - C1–C5 usa el porcentaje real de esa cadena completa sobre el universo de OT cerradas: <20% C1; 20–49% C2; 50–74% C3; 75–94% C4; ≥95% C5.
 - Estado de valor: L/E/C/V se deriva de evidencia observada; no se eleva por cantidad de features.
 - Próximo gate E3/V5: completar las muestras de cierre y apertura comparables y demostrar una reducción operacional repetible antes de atribuir valor económico.
+
+
+## 2026-10-28 — Mantención: promoción automática E3 / V5
+
+- E3 se promueve automáticamente cuando existe al menos una comparación administrativa válida (apertura o cierre) con ≥3 muestras manuales y ≥10 muestras MOTIL comparables.
+- E3 mide evidencia de impacto y puede ser favorable o desfavorable; una reducción negativa no se oculta.
+- V5 se promueve sólo cuando al menos una comparación válida demuestra reducción operacional positiva.
+- Pricing readiness pasa a `OUTCOME_ANCHORED` sólo con V5; E3 desfavorable permanece `MARKET_ANCHORED` hasta mejorar el outcome.
+- V6/valor económico sigue bloqueado hasta validar costo/hora cargado, recurrencia y atribución.
+- La promoción es determinística y se recalcula desde `audit_log`; no depende de una etiqueta manual.
