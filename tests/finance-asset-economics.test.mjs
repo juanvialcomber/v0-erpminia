@@ -580,3 +580,14 @@ test('candidate review API handles an empty candidate set without invalid IN que
   assert.match(api,/if \(reviewIssueKeys\.length > 0\)/);
   assert.match(api,/let reviewRows: any\[\] = \[\]/);
 });
+
+
+test('candidate review surfaces duplicate risk before asset creation',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/candidate_duplicate_risk/);
+  assert.match(api,/duplicateRiskCandidates/);
+  assert.match(api,/priority: duplicateRisk \? -1/);
+  assert.match(page,/Posible duplicado/);
+  assert.match(page,/antes de crear una nueva/);
+});
