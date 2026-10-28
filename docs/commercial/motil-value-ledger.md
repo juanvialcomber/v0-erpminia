@@ -267,3 +267,19 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+
+## 2026-10-28 — Mantención: cierre administrativo comparable + eje C
+
+- Problema previo: MOTIL medía apertura asistida y ejecución de OT, pero faltaba una métrica comparable del trabajo administrativo de cierre. Mezclar ese tiempo con reparación mecánica habría inflado cualquier claim de productividad.
+- Instrumentación asistida: el flujo progresivo de cierre mide interacción activa desde que se abre una OT en cierre hasta `work_order_closed`.
+- Persistencia: `audit_log.action = maintenance_ot_close_interaction`, una muestra por OT cerrada, limitada a 1 segundo–30 minutos.
+- Semántica: incluye documentación final, evidencia y confirmación de cierre dentro del flujo MOTIL; excluye ejecución mecánica y espera fuera del flujo.
+- Baseline manual separado: `maintenance_admin_manual_close_baseline`, visible sólo en el cockpit interno admin/superadmin.
+- Gate de comparación: ≥3 muestras manuales y ≥10 cierres MOTIL instrumentados.
+- Fórmula: `(mediana_manual_cierre - mediana_motil_cierre) / mediana_manual_cierre`.
+- Valores negativos se conservan. La comparación no se monetiza hasta contar con costo/hora cargado válido y período comparable.
+- Eje C de LECTER: se calcula sobre OT cerradas con cadena completa: inicio de cronómetro + foto + causa raíz + acción preventiva + evento de cierre + aprobación humana.
+- C1–C5 usa el porcentaje real de esa cadena completa sobre el universo de OT cerradas: <20% C1; 20–49% C2; 50–74% C3; 75–94% C4; ≥95% C5.
+- Estado de valor: L/E/C/V se deriva de evidencia observada; no se eleva por cantidad de features.
+- Próximo gate E3/V5: completar las muestras de cierre y apertura comparables y demostrar una reducción operacional repetible antes de atribuir valor económico.
