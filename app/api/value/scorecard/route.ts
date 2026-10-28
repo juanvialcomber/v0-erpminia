@@ -194,6 +194,14 @@ export async function GET(request: NextRequest) {
     const workOrdersWithEvents = new Set(
       maintenanceEventRows.map((row: any) => String(row.work_order_id || '')).filter(Boolean),
     );
+    const eventTypesByOrder = new Map<string, Set<string>>();
+    for (const row of maintenanceEventRows) {
+      const key = String(row.work_order_id || '');
+      if (!key) continue;
+      const types = eventTypesByOrder.get(key) || new Set<string>();
+      types.add(String(row.event_type || ''));
+      eventTypesByOrder.set(key, types);
+    }
     const supplyRows = maintenanceSupplyChain.data || [];
     const withMaterials = supplyRows.filter((row: any) => Number(row.material_requirement_count || 0) > 0).length;
     const withShortages = supplyRows.filter((row: any) => Number(row.material_shortage_count || 0) > 0).length;
@@ -233,6 +241,26 @@ export async function GET(request: NextRequest) {
       const reviewedAt = String(row.reviewed_at || '');
       if (key && row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
     }
+
+    const traceCompleteClosedRows = closedRows.filter((row: any) => {
+      const types = eventTypesByOrder.get(String(row.id)) || new Set<string>();
+      return types.has('timer_play')
+        && types.has('execution_evidence_added')
+        && types.has('root_cause_changed')
+        && types.has('preventive_actions_changed')
+        && types.has('work_order_closed')
+        && approvedReviewByOrder.has(String(row.id));
+    });
+    const traceCompleteCoveragePct = closedRows.length > 0
+      ? Math.round((traceCompleteClosedRows.length / closedRows.length) * 100)
+      : null;
+    const coverageLevel = traceCompleteCoveragePct == null
+      ? null
+      : traceCompleteCoveragePct >= 95 ? 'C5'
+        : traceCompleteCoveragePct >= 75 ? 'C4'
+          : traceCompleteCoveragePct >= 50 ? 'C3'
+            : traceCompleteCoveragePct >= 20 ? 'C2'
+              : 'C1';
 
     const emergencyCycleRows = emergencyRows.map((row: any) => {
       const times = eventTimes.get(String(row.id)) || {};
@@ -399,6 +427,16 @@ export async function GET(request: NextRequest) {
       evidenceLevel:
         timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      lec: {
+        level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
+        evidence: timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        coverage: coverageLevel,
+        valueLevel: timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
+        coverageNumerator: traceCompleteClosedRows.length,
+        coverageDenominator: closedRows.length,
+        coveragePct: traceCompleteCoveragePct,
+        coverageSemantics: 'closed OT with timer start, photo evidence, root cause, preventive action, close event and human supervisor approval',
+      },
       connectedDomains,
       connectedDomainCount: connectedDomains.length,
       supplyChain: {
