@@ -16,11 +16,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
   }
 
+  const phase = request.nextUrl.searchParams.get('phase') === 'close' ? 'close' : 'open';
+  const action = phase === 'close' ? 'maintenance_admin_manual_close_baseline' : 'maintenance_admin_manual_baseline';
+  const semantics = phase === 'close'
+    ? 'manual OT administrative closure measured outside MOTIL assistance; includes documentation and close confirmation only, excludes mechanical execution and waiting'
+    : 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure';
+
   const result = await context.supabase
     .from('audit_log')
     .select('new_values,created_at,user_id')
     .eq('organization_id', context.organizationId)
-    .eq('action', 'maintenance_admin_manual_baseline')
+    .eq('action', action)
     .eq('resource_type', 'maintenance_admin_baseline')
     .order('created_at', { ascending: false })
     .limit(100);
@@ -60,7 +66,8 @@ export async function GET(request: NextRequest) {
     sampleCount: samples.length,
     medianSecondsPerCase: medianSeconds,
     latestAt: samples[0]?.createdAt || null,
-    semantics: 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure',
+    phase,
+    semantics,
   });
 }
 
@@ -72,8 +79,13 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
+  const phase = body?.phase === 'close' ? 'close' : 'open';
   const durationMs = Number(body?.durationMs);
   const caseCount = Number(body?.caseCount);
+  const action = phase === 'close' ? 'maintenance_admin_manual_close_baseline' : 'maintenance_admin_manual_baseline';
+  const semantics = phase === 'close'
+    ? 'manual OT administrative closure measured outside MOTIL assistance; includes documentation and close confirmation only, excludes mechanical execution and waiting'
+    : 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure';
 
   if (
     !Number.isFinite(durationMs) ||
@@ -92,15 +104,16 @@ export async function POST(request: NextRequest) {
   const result = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
     user_id: context.userId,
-    action: 'maintenance_admin_manual_baseline',
+    action,
     resource_type: 'maintenance_admin_baseline',
-    resource_identifier: `manual-${new Date().toISOString()}`,
+    resource_identifier: `manual-${phase}-${new Date().toISOString()}`,
     new_values: {
       duration_ms: Math.round(durationMs),
       case_count: caseCount,
       seconds_per_case: Math.round(durationMs / caseCount / 1000),
-      metric_version: 'maintenance-create-baseline-v1',
-      semantics: 'manual OT opening and initial assignment measured outside MOTIL assistance; excludes mechanical execution, waiting, later updates and closure',
+      metric_version: phase === 'close' ? 'maintenance-close-baseline-v1' : 'maintenance-create-baseline-v1',
+      phase,
+      semantics,
     },
     user_agent: request.headers.get('user-agent'),
     status: 'completed',
@@ -113,6 +126,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    phase,
     caseCount,
     durationMs: Math.round(durationMs),
     secondsPerCase: Math.round(durationMs / caseCount / 1000),
