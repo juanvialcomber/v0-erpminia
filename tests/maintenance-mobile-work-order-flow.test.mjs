@@ -30,6 +30,9 @@ test('the terrain flow preserves the start pause resume and evidence-gated close
   assert.match(flow, /Fotos de la OT/);
   assert.match(flow, /Agregar fotos/);
   assert.match(flow, /multiple/);
+  assert.doesNotMatch(flow, /capture="environment"/);
+  assert.match(flow, /fallbackForm = new FormData\(\)/);
+  assert.match(flow, /fallbackForm\.append\('file', file\)/);
   assert.doesNotMatch(flow, /Tag de evidencia/);
   assert.doesNotMatch(flow, /evidenceTag/);
   assert.match(flow, /ordenes-trabajo\/cierre\?workOrderId=/);
