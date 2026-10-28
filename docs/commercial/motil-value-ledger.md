@@ -306,3 +306,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - V6 sólo se promueve cuando el valor mensual atribuible es > 0 y los costos hora están validados para el tramo monetizado.
 - Este valor representa capacidad administrativa atribuible, no ROI total de Mantención ni ahorro contable realizado.
 - Próximo gate: observar recurrencia por varios períodos y conciliar con Finanzas antes de usar la cifra en pricing contractual.
+
+
+## 2026-10-28 — Mantención: gate E4 de valor recurrente
+
+- E4 no se promueve por un único mes positivo.
+- Requiere al menos 3 períodos mensuales cerrados, comparables y con valor atribuible positivo.
+- El mes calendario en curso se excluye por ser incompleto.
+- Cada período exige las mismas cohortes mínimas usadas para E3/V5: baseline manual suficiente y ≥10 muestras MOTIL en el tramo medido.
+- El valor mensual se deriva sólo de tiempo administrativo positivo observado, volumen real del período y costo hora validado.
+- Meses sin datos suficientes quedan no comparables; no se convierten en cero.
+- No se crean snapshots sintéticos ni backfill para completar recurrencia.
+- V7 permanece bloqueado hasta demostrar valor estratégico sostenido más allá del ahorro administrativo atribuible.
