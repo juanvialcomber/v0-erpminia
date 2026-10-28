@@ -13,7 +13,8 @@ type LaudusSyncTable =
   | 'laudus_accounts_payable'
   | 'laudus_purchase_invoices'
   | 'laudus_credit_notes'
-  | 'laudus_cost_centers';
+  | 'laudus_cost_centers'
+  | 'laudus_fixed_assets';
 
 async function latestTimestamp(
   db: SupabaseClient,
@@ -139,6 +140,7 @@ export async function loadLaudusFinanceControl(
     latestInvoicesSync,
     latestCreditNotesSync,
     latestCostCentersSync,
+    latestFixedAssetsSync,
     pendingPaymentRows,
     openPayables,
     overduePayables,
@@ -170,6 +172,7 @@ export async function loadLaudusFinanceControl(
     latestTimestamp(db, 'laudus_purchase_invoices', organizationId),
     latestTimestamp(db, 'laudus_credit_notes', organizationId),
     latestTimestamp(db, 'laudus_cost_centers', organizationId),
+    latestTimestamp(db, 'laudus_fixed_assets', organizationId),
     db
       .schema('integration')
       .from('laudus_purchase_payments')
@@ -476,6 +479,7 @@ export async function loadLaudusFinanceControl(
       withAcquisitionDate: fixedAssetsWithDate,
       withUsefulLife: fixedAssetsWithUsefulLife,
       economicsReady: linkedFixedAssets > 0 && fixedAssetsWithCost > 0,
+      latestSync: latestFixedAssetsSync,
     },
     freshness: {
       latestOperationalSync,
