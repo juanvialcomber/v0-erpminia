@@ -203,7 +203,7 @@ const duration = (seconds: number | null | undefined) => {
 };
 
 export default function ValueScorecardPage() {
-  const { data, error, isLoading } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
+  const { data, error, isLoading, mutate: mutateScorecard } = useSWR<ApiResponse>('/api/value/scorecard', fetcher, {
     refreshInterval: 15 * 60 * 1000,
   });
   const baseline = useSWR<BaselineResponse>('/api/value/finance-baseline', async (url: string) => {
@@ -407,7 +407,7 @@ export default function ValueScorecardPage() {
       if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el costo hora.');
       setHourlyCostNotice(`Costo hora validado guardado para ${label}: ${money(payload.hourlyCostClp)}.`);
       await hourlyCosts.mutate();
-      await mutate();
+      await mutateScorecard();
     } catch (cause) {
       setHourlyCostNotice(cause instanceof Error ? cause.message : 'No se pudo guardar el costo hora.');
     }
