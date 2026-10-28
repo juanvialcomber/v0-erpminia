@@ -205,7 +205,22 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .map(String)
   );
-  const unstructuredRows = actionableRows.length - structuredCandidateRows.length;
+  const unstructuredRows = actionableRows.filter((row) => {
+    const payload = row.source_payload && typeof row.source_payload === 'object'
+      ? row.source_payload as Record<string, unknown>
+      : {};
+    const hasExplicitClassification = Boolean(
+      payload.facility_candidate_group ||
+      payload.asset_candidate_key ||
+      payload.asset_candidate_family_key ||
+      payload.reconciliation_disposition ||
+      payload.candidate_review_status ||
+      payload.canonical_cost_center_type ||
+      (row.cost_center_raw && String(row.cost_center_raw).trim() !== '0')
+    );
+    return !hasExplicitClassification && String(row.identity_status || '').trim().toLowerCase() === 'unresolved';
+  }).length;
+  const classifiedRows = actionableRows.length - unstructuredRows;
 
   const byReason = actionableRows.reduce<Record<string, number>>((acc, row) => {
     acc[row.reason.key] = (acc[row.reason.key] || 0) + 1;
@@ -297,6 +312,7 @@ export async function GET(request: NextRequest) {
       singleAssets,
       conflictAssets,
       unresolvedRows: actionableRows.length,
+      classifiedRows,
       structuredCandidateRows: structuredCandidateRows.length,
       structuredCandidateGroups: structuredCandidateKeys.size,
       unstructuredRows,
