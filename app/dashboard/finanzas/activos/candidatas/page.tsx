@@ -49,6 +49,11 @@ type Candidate = {
   sourceCodeNeedsOperationalValidation: boolean;
   reviewStatus: string | null;
   reviewBasis: string | null;
+  duplicateRisk: {
+    active: boolean;
+    basis: string | null;
+    assetCode: string | null;
+  };
   reviewSourceCount: number | null;
   operationalEvidence: {
     purchaseCostCenter: string | null;
@@ -90,6 +95,7 @@ type Response = {
     pendingReview: number;
     acceptedForCreation: number;
     ignoredCandidates: number;
+    duplicateRiskCandidates: number;
     openIdentityConflicts: number;
     identityVerifiedSingleSource: number;
     exactSingleVerifiedAbsentInternalMasters: number;
@@ -174,6 +180,7 @@ export default function MissingAssetCandidatesPage(){
         <Metric label="Candidatas" value={number(data.summary.candidates)} detail={money(data.summary.candidateBookValueClp)+" de valor libro representado"} />
         <Metric label="Por decidir" value={number(data.summary.pendingReview)} detail={number(data.summary.readyDualFinance)+" seguro+depreciación · "+number(data.summary.readyPurchaseCostCenter)+" centro Compras · "+number(data.summary.readyPurchaseDescription)+" orden Compras"} />
         <Metric label="Identidad exacta · 1 fuente" value={number(data.summary.identityVerifiedSingleSource)} detail={number(data.summary.exactSingleVerifiedAbsentInternalMasters)+" verificadas en 3 maestros internos"} />
+        <Metric label="Posible duplicado" value={number(data.summary.duplicateRiskCandidates)} detail="Requiere confirmar contra una Ficha existente antes de alta" />
         <Metric label="Conflictos" value={number(data.summary.openIdentityConflicts)} detail="Ficha existente vs fuente nueva" />
       </section>
 
@@ -208,12 +215,12 @@ export default function MissingAssetCandidatesPage(){
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium">{candidate.title}</p>
-                    {candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.identityVerifiedSingleSource ? <Badge variant="outline"><ShieldCheck className="mr-1 h-3 w-3"/>Identidad exacta · 1 fuente</Badge> : candidate.modelOnlyNeedsOperationalIdentity ? <Badge variant="outline">Falta identidad operacional</Badge> : candidate.sourceCodeNeedsOperationalValidation ? <Badge variant="outline">Código fuente por validar</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
+                    {candidate.duplicateRisk.active ? <Badge variant="destructive">Posible duplicado</Badge> : candidate.readyForReview ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Lista para revisión</Badge> : candidate.identityVerifiedSingleSource ? <Badge variant="outline"><ShieldCheck className="mr-1 h-3 w-3"/>Identidad exacta · 1 fuente</Badge> : candidate.modelOnlyNeedsOperationalIdentity ? <Badge variant="outline">Falta identidad operacional</Badge> : candidate.sourceCodeNeedsOperationalValidation ? <Badge variant="outline">Código fuente por validar</Badge> : candidate.dualSource ? <Badge variant="secondary"><ShieldCheck className="mr-1 h-3 w-3"/>Doble respaldo</Badge> : <Badge variant="outline">{candidate.evidence[0]?.source==='insurance'?'Seguro':'Depreciación'}</Badge>}
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[candidate.plate?'PPU '+candidate.plate:null,candidate.serial?'Serie '+candidate.serial:null,candidate.chassis?'Chasis '+candidate.chassis:null,candidate.engine?'Motor '+candidate.engine:null,candidate.modelYear?'Año '+candidate.modelYear:null].filter(Boolean).join(' · ')||'Identificador desde evidencia fuente'}
                   </p>
-                  {candidate.readyForReview ? <p className="mt-1 text-xs text-primary">{candidate.reviewBasis==='exact_plate_plus_purchase_cost_center'?'PPU exacta + centro de costo en Compras':candidate.reviewBasis==='exact_plate_plus_purchase_description'?'PPU exacta en orden de compra':'Evidencia exacta en seguro + depreciación'} · sin contraparte canónica exacta</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">{candidate.internalMasterVerification.verified?'Identificador exacto · 0 contrapartes en canónico, mantenimiento y planificación':'Identificador físico exacto verificado'} · falta segunda fuente operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
+                  {candidate.duplicateRisk.active ? <p className="mt-1 text-xs text-destructive">Confirmar contra {candidate.duplicateRisk.assetCode||'la Ficha 360 existente'} antes de crear una nueva.</p> : candidate.readyForReview ? <p className="mt-1 text-xs text-primary">{candidate.reviewBasis==='exact_plate_plus_purchase_cost_center'?'PPU exacta + centro de costo en Compras':candidate.reviewBasis==='exact_plate_plus_purchase_description'?'PPU exacta en orden de compra':'Evidencia exacta en seguro + depreciación'} · sin contraparte canónica exacta</p> : candidate.identityVerifiedSingleSource ? <p className="mt-1 text-xs text-muted-foreground">{candidate.internalMasterVerification.verified?'Identificador exacto · 0 contrapartes en canónico, mantenimiento y planificación':'Identificador físico exacto verificado'} · falta segunda fuente operacional</p> : candidate.modelOnlyNeedsOperationalIdentity ? <p className="mt-1 text-xs text-muted-foreground">Modelo específico presente · falta PPU, serie, chasis o número de unidad</p> : candidate.sourceCodeNeedsOperationalValidation ? <p className="mt-1 text-xs text-muted-foreground">Código estable de la fuente financiera · falta equivalencia operacional</p> : null}
                 </div>
                 <Value label="Valor libro" value={money(candidate.netBookValueClp)} />
                 <Value label="Seguro" value={uf(candidate.insuredUf)} />
