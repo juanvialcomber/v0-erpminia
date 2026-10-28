@@ -180,13 +180,22 @@ export async function GET(request: NextRequest) {
   const classified = (unresolvedRows || []).map((row: any) => ({
     ...row,
     reason: classifyRow(row),
+    terminal: String(row.source_payload?.reconciliation_terminal_state || '') === 'finance_only_non_asset',
   }));
-  const byReason = classified.reduce<Record<string, number>>((acc, row) => {
+  const actionableRows = classified.filter((row) => !row.terminal);
+  const terminalRows = classified.filter((row) => row.terminal);
+
+  const byReason = actionableRows.reduce<Record<string, number>>((acc, row) => {
     acc[row.reason.key] = (acc[row.reason.key] || 0) + 1;
     return acc;
   }, {});
+  const terminalByReason = terminalRows.reduce<Record<string, number>>((acc, row) => {
+    const key = String(row.source_payload?.reconciliation_terminal_reason || row.reason.key || 'finance_only_non_asset');
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
 
-  const reviewRows = classified
+  const reviewRows = actionableRows
     .sort((a, b) =>
       b.reason.rank - a.reason.rank ||
       String(a.source_sheet || '').localeCompare(String(b.source_sheet || '')) ||
@@ -227,7 +236,8 @@ export async function GET(request: NextRequest) {
       linkedAssets,
       singleAssets,
       conflictAssets,
-      unresolvedRows: classified.length,
+      unresolvedRows: actionableRows.length,
+      terminalRows: terminalRows.length,
       materialReviewComplete: Boolean(stage.material_operational_review_complete),
       materialReviewFloorClp: Number(stage.material_operational_review_floor_clp || 0),
       unexplainedOperationalRows: Number(stage.unexplained_operational_rows || 0),
@@ -238,6 +248,10 @@ export async function GET(request: NextRequest) {
       byReason,
       rows: reviewRows,
       limitedTo: 60,
+    },
+    terminal: {
+      rows: terminalRows.length,
+      byReason: terminalByReason,
     },
     semantics: {
       unresolved: 'Fila financiera que aún no tiene contraparte canónica verificable en MOTIL. No implica error en la fuente.',
