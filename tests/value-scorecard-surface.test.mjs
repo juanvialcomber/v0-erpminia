@@ -256,3 +256,14 @@ test('maintenance V6 requires validated hourly cost and positive observed impact
   assert.match(page, /Costo hora cargado validado/);
   assert.match(page, /No requiere ni expone sueldos individuales/);
 });
+
+
+test('missing V6 inputs remain HOLD/null and are never published as zero economic value', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /attributedMonthlyValueClp: v6Ready \? attributedMonthlyValueClp : null/);
+  assert.match(api, /const v6Ready = attributedMonthlyValueClp > 0/);
+  assert.match(page, /attributedMonthlyValueClp == null \? 'HOLD'/);
+  assert.doesNotMatch(page, /attributedMonthlyValueClp == null \? money\(0\)/);
+});
