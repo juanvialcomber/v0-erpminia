@@ -13,9 +13,11 @@ test('finance manager can reach only the Laudus evidence routes used by the cock
   assert.doesNotMatch(proxy,/path\.startsWith\('\/api\/integrations\/laudus\/'\) return true/);
 });
 
-test('read-only Laudus evidence routes remain GET-only while internal value routes stay hidden from finance',()=>{
+test('read-only Laudus evidence routes remain GET-only while Daniel LEC routes are explicitly allowed',()=>{
   assert.match(proxy,/path === '\/api\/integrations\/laudus\/finance-review-feedback' \? true : readOnly/);
-  assert.doesNotMatch(proxy,/path === '\/api\/value\/finance-baseline'/);
+  assert.match(proxy,/financeValueRoutes/);
+  assert.match(proxy,/\/api\/value\/finance-baseline/);
+  assert.match(proxy,/\/api\/value\/finance-priority-decision/);
   assert.doesNotMatch(proxy,/path === '\/api\/value\/scorecard'/);
   assert.doesNotMatch(proxy,/path === '\/dashboard\/valor'/);
 });
