@@ -190,6 +190,9 @@ export default function FinanceAssetsPage(){
           <Link href="/dashboard/finanzas/activos/candidatas" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
             Candidatas Ficha 360
           </Link>
+          <Link href="/dashboard/finanzas/activos/instalaciones" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
+            Revisar instalaciones
+          </Link>
           <Link href="/dashboard/finanzas/activos/registro" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted">
             Registro financiero completo
           </Link>
