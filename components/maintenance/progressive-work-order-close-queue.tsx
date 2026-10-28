@@ -206,7 +206,18 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
           contentType: upload.mimeType || file.type || 'image/jpeg',
           cacheControl: '3600',
         });
-      if (uploadError) throw new Error(uploadError.message || 'No se pudo subir la foto.');
+      if (uploadError) {
+        const fallbackForm = new FormData();
+        fallbackForm.append('file', file);
+        const fallbackResponse = await fetch(`/api/maintenance/work-orders/${current.work_order_id}/evidence`, {
+          method: 'POST',
+          credentials: 'include',
+          body: fallbackForm,
+        });
+        const fallback = await fallbackResponse.json().catch(() => null);
+        if (!fallbackResponse.ok) throw new Error(fallback?.error || uploadError.message || 'No se pudo subir la foto.');
+        continue;
+      }
 
       const completeResponse = await fetch(`/api/maintenance/work-orders/${current.work_order_id}/evidence`, {
         method: 'POST',
@@ -434,7 +445,6 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                     type="file"
                     multiple
                     accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-                    capture="environment"
                     disabled={uploadingEvidence}
                     onChange={(event) => void uploadEvidence(event.target.files)}
                   />
