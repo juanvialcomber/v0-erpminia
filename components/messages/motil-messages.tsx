@@ -424,13 +424,13 @@ export function MotilMessages({ locale }: { locale: Locale }) {
 
   return (
     <section className="mx-auto w-full max-w-6xl space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-widest text-muted-foreground">MOTIL</p>
           <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
           <p className="text-sm text-muted-foreground">{t.subtitle}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           <Button type="button" variant="outline" size="sm"
             onClick={() => setSearchOpen((previous) => !previous)}
             aria-expanded={searchOpen} aria-controls="motil-message-search">
@@ -497,7 +497,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
       ) : isLoading ? (
         <MessagesInboxSkeleton label={t.loading} />
       ) : (
-        <div className="grid h-[min(74vh,760px)] min-h-[430px] overflow-hidden rounded-xl border bg-card md:min-h-[520px] md:grid-cols-[270px_minmax(0,1fr)]">
+        <div className="grid h-[calc(100dvh-16.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[420px] max-h-[760px] overflow-hidden rounded-xl border bg-card md:h-[min(74vh,760px)] md:min-h-[520px] md:grid-cols-[270px_minmax(0,1fr)]">
           <aside className={(mobileConversation ? 'hidden md:flex ' : 'flex ') + 'min-h-0 flex-col border-r'} aria-label={t.back}>
             <div className="border-b p-3">
               <RecipientSearch locale={locale} busy={creating} onSelect={(targetId) => {
@@ -538,7 +538,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
           <div className={(mobileConversation ? 'flex ' : 'hidden md:flex ') + 'min-h-0 min-w-0 flex-col'}>
             {selected ? (
               <>
-                <div className="flex min-h-16 items-center gap-3 border-b px-4 py-3">
+                <div className="flex min-h-14 items-center gap-2 border-b px-2 py-2 sm:min-h-16 sm:gap-3 sm:px-4 sm:py-3">
                   <Button className="md:hidden" size="icon" variant="ghost" aria-label={t.back} onClick={() => setMobileConversation(false)}>
                     <ChevronLeft className="h-5 w-5"/>
                   </Button>
@@ -588,7 +588,7 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                 ) : null}
                 <div className="relative min-h-0 flex-1">
                   <div ref={scrollRef} onScroll={updateScrollPosition}
-                    className="h-full space-y-4 overflow-y-auto bg-muted/10 px-4 py-5" aria-live="polite">
+                    className="h-full space-y-3 overflow-y-auto bg-muted/10 px-3 py-4 overscroll-contain sm:space-y-4 sm:px-4 sm:py-5" aria-live="polite">
                   {history?.hasMore && !oldestReached ? (
                     <div className="text-center">
                       <Button type="button" variant="ghost" size="sm" disabled={loadingOlder} onClick={() => void loadOlder()}>{t.older}</Button>
@@ -645,15 +645,15 @@ export function MotilMessages({ locale }: { locale: Locale }) {
                     </Button>
                   ) : null}
                 </div>
-                <div className="border-t p-3">
+                <div className="border-t bg-card p-2.5 sm:p-3">
                   {status ? <p role="status" className="mb-2 text-xs text-destructive">{status}</p> : null}
                   <div className="flex items-end gap-2">
                     <textarea ref={composerRef} aria-label={t.placeholder} placeholder={t.placeholder} value={draft}
                       maxLength={2000} rows={2} disabled={saving || creating || Boolean(recipientId)}
                       onChange={(event) => { setDraft(event.target.value); if (threadId) draftsByThread.current[threadId] = event.target.value; pendingMessageId.current = null; }}
                       onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }}
-                      className="max-h-40 min-h-14 min-w-0 flex-1 resize-y rounded-lg border bg-background p-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"/>
-                    <Button type="button" className="min-h-12" disabled={!draft.trim() || saving || creating || Boolean(recipientId)} onClick={() => void send()}>
+                      className="max-h-40 min-h-12 min-w-0 flex-1 resize-none rounded-lg border bg-background p-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-14 sm:resize-y sm:text-sm"/>
+                    <Button type="button" className="min-h-12 min-w-12 shrink-0 px-3 sm:px-4" disabled={!draft.trim() || saving || creating || Boolean(recipientId)} onClick={() => void send()}>
                       {saving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
                       <span className="ml-2 hidden sm:inline">{saving ? t.sending : t.send}</span>
                     </Button>
