@@ -243,6 +243,39 @@ export async function GET(request: NextRequest) {
     const planningHourlyCostClp = latestHourlyCostByRole.get('planning') || null;
     const executionHourlyCostClp = latestHourlyCostByRole.get('execution') || null;
 
+    const monthKey = (raw: string | null | undefined) => {
+      const date = new Date(String(raw || ''));
+      if (!Number.isFinite(date.getTime())) return null;
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+    };
+    const currentMonthKey = monthKey(new Date().toISOString());
+    const median = (values: number[]) => {
+      if (!values.length) return null;
+      const sorted = [...values].sort((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? Math.round((sorted[middle - 1] + sorted[middle]) / 2)
+        : Math.round(sorted[middle]);
+    };
+    const createTimingByMonth = new Map<string, number[]>();
+    for (const row of maintenanceCreateTiming.data || []) {
+      const key = monthKey(row.created_at);
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (!key || key === currentMonthKey || !Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) continue;
+      const values = createTimingByMonth.get(key) || [];
+      values.push(durationMs);
+      createTimingByMonth.set(key, values);
+    }
+    const closeTimingByMonth = new Map<string, number[]>();
+    for (const row of maintenanceCloseTiming.data || []) {
+      const key = monthKey(row.created_at);
+      const durationMs = Number((row.new_values as any)?.duration_ms);
+      if (!key || key === currentMonthKey || !Number.isFinite(durationMs) || durationMs < 1000 || durationMs > 30 * 60 * 1000) continue;
+      const values = closeTimingByMonth.get(key) || [];
+      values.push(durationMs);
+      closeTimingByMonth.set(key, values);
+    }
+
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
       timingValues.length === 0
@@ -295,6 +328,57 @@ export async function GET(request: NextRequest) {
       : 0;
     const attributedMonthlyValueClp = openMonthlyValueClp + closeMonthlyValueClp;
     const v6Ready = attributedMonthlyValueClp > 0;
+
+    const workOrderVolumesByMonth = new Map<string, { created: number; closed: number }>();
+    for (const row of maintenanceRows) {
+      const createdKey = monthKey(row.created_at);
+      if (createdKey && createdKey !== currentMonthKey) {
+        const volume = workOrderVolumesByMonth.get(createdKey) || { created: 0, closed: 0 };
+        volume.created += 1;
+        workOrderVolumesByMonth.set(createdKey, volume);
+      }
+      const closedKey = monthKey(row.closed_at);
+      if (closedKey && closedKey !== currentMonthKey) {
+        const volume = workOrderVolumesByMonth.get(closedKey) || { created: 0, closed: 0 };
+        volume.closed += 1;
+        workOrderVolumesByMonth.set(closedKey, volume);
+      }
+    }
+    const closedMonthKeys = Array.from(new Set([
+      ...createTimingByMonth.keys(),
+      ...closeTimingByMonth.keys(),
+      ...workOrderVolumesByMonth.keys(),
+    ])).sort();
+    const recurrencePeriods = closedMonthKeys.map((period) => {
+      const createValues = createTimingByMonth.get(period) || [];
+      const closeValues = closeTimingByMonth.get(period) || [];
+      const createMedianMs = median(createValues);
+      const closeMedianMs = median(closeValues);
+      const createReady = manualOpen.samples >= 3 && createValues.length >= 10 && manualOpen.medianMs !== null && createMedianMs !== null;
+      const closeReady = manualClose.samples >= 3 && closeValues.length >= 10 && manualClose.medianMs !== null && closeMedianMs !== null;
+      const openSavedSeconds = createReady ? Math.max(0, Math.round((manualOpen.medianMs! - createMedianMs!) / 1000)) : 0;
+      const closeSavedSeconds = closeReady ? Math.max(0, Math.round((manualClose.medianMs! - closeMedianMs!) / 1000)) : 0;
+      const volume = workOrderVolumesByMonth.get(period) || { created: 0, closed: 0 };
+      const openValueClp = planningHourlyCostClp && openSavedSeconds > 0
+        ? Math.round((openSavedSeconds * volume.created / 3600) * planningHourlyCostClp)
+        : 0;
+      const closeValueClp = executionHourlyCostClp && closeSavedSeconds > 0
+        ? Math.round((closeSavedSeconds * volume.closed / 3600) * executionHourlyCostClp)
+        : 0;
+      const valueClp = openValueClp + closeValueClp;
+      return {
+        period,
+        createSamples: createValues.length,
+        closeSamples: closeValues.length,
+        createdWorkOrders: volume.created,
+        closedWorkOrders: volume.closed,
+        comparable: createReady || closeReady,
+        valueClp: valueClp > 0 ? valueClp : null,
+        positive: valueClp > 0,
+      };
+    });
+    const positiveRecurringPeriods = recurrencePeriods.filter((row) => row.comparable && row.positive);
+    const e4Ready = positiveRecurringPeriods.length >= 3;
     const coveragePct = (count: number) => maintenanceRows.length > 0
       ? Math.round((count / maintenanceRows.length) * 100)
       : null;
@@ -532,11 +616,11 @@ export async function GET(request: NextRequest) {
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       evidenceLevel:
-        hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        e4Ready ? 'E4' : hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
       lec: {
         level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
-        evidence: hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        evidence: e4Ready ? 'E4' : hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
         coverage: coverageLevel,
         valueLevel: v6Ready ? 'V6' : hasPositiveOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
         coverageNumerator: traceCompleteClosedRows.length,
@@ -583,7 +667,17 @@ export async function GET(request: NextRequest) {
         e3Ready: hasObservedComparison,
         v5Ready: hasPositiveOperationalImpact,
         v6Ready,
-        semantics: 'E3 requires a comparable administrative cohort; V5 requires a positive observed time reduction; V6 additionally requires validated loaded hourly cost and current 30-day OT volume.',
+        e4Ready,
+        recurrencePositivePeriods: positiveRecurringPeriods.length,
+        recurrenceRequiredPeriods: 3,
+        semantics: 'E3 requires a comparable administrative cohort; V5 requires positive observed time reduction; V6 requires validated loaded hourly cost; E4 requires at least 3 closed monthly periods with comparable positive attributable value.',
+      },
+      recurrence: {
+        periods: recurrencePeriods.slice(-12),
+        positivePeriods: positiveRecurringPeriods.length,
+        requiredPositivePeriods: 3,
+        e4Ready,
+        semantics: 'closed calendar months only; current partial month excluded; no synthetic snapshots or backfill',
       },
       economicValue: {
         planningHourlyCostClp,
@@ -600,8 +694,10 @@ export async function GET(request: NextRequest) {
       valueGate: {
         attribution: v6Ready ? 'VALOR_ECONOMICO_ATRIBUIBLE' : hasObservedComparison ? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN',
         pricingReadiness: v6Ready ? 'ECONOMIC_ANCHORED' : hasPositiveOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
-        nextMeasurement: v6Ready
-          ? 'Validar recurrencia por varios períodos antes de usarlo como ROI contractual.'
+        nextMeasurement: e4Ready
+          ? 'E4 demostrado; mantener recurrencia y conciliar con Finanzas antes de cualquier claim contractual.'
+          : v6Ready
+            ? `Acumular ${Math.max(0, 3 - positiveRecurringPeriods.length)} período(s) mensual(es) positivo(s) comparable(s) para E4.`
           : hasPositiveOperationalImpact
             ? 'Registrar costo/hora cargado validado por planificación y ejecución.'
           : hasObservedComparison
