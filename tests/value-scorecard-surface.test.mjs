@@ -177,3 +177,44 @@ test('OTe value cohort measures only observed event-chain intervals through huma
   assert.match(page, /Un tramo sin timestamp queda sin medir/);
   assert.match(page, /MOTIL no la infiere desde la creación/);
 });
+
+
+test('maintenance close timing is measured separately from mechanical execution', () => {
+  const closeFlow = fs.readFileSync('components/maintenance/progressive-work-order-close-queue.tsx', 'utf8');
+  const closeRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/close/route.ts', 'utf8');
+  const scorecard = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(closeFlow, /X-Motil-Close-Interaction-Ms/);
+  assert.match(closeRoute, /maintenance_ot_close_interaction/);
+  assert.match(closeRoute, /excludes mechanical execution and waiting outside the flow/);
+  assert.match(scorecard, /maintenanceCloseTimingValues/);
+  assert.match(scorecard, /medianCloseSeconds/);
+  assert.match(page, /Baseline manual de cierre de OT/);
+  assert.match(page, /Reducción observada del tiempo de cierre/);
+  assert.match(page, /≥3 muestras manuales y ≥10 cierres MOTIL instrumentados/);
+});
+
+test('maintenance LEC publishes coverage from complete closed-OT evidence only', () => {
+  const scorecard = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(scorecard, /traceCompleteClosedRows/);
+  assert.match(scorecard, /execution_evidence_added/);
+  assert.match(scorecard, /supervisor approval/);
+  assert.match(scorecard, /coverageLevel/);
+  assert.match(scorecard, /coverageNumerator/);
+  assert.match(scorecard, /coverageDenominator/);
+  assert.match(scorecard, /valueLevel/);
+  assert.match(page, /LEC Mantención/);
+  assert.match(page, /Cobertura completa/);
+});
+
+test('maintenance manual baseline supports a separate close phase', () => {
+  const route = fs.readFileSync('app/api/value/maintenance-baseline/route.ts', 'utf8');
+
+  assert.match(route, /phase.*=== 'close'/);
+  assert.match(route, /maintenance_admin_manual_close_baseline/);
+  assert.match(route, /maintenance-close-baseline-v1/);
+  assert.match(route, /manual OT administrative closure measured outside MOTIL assistance/);
+});
