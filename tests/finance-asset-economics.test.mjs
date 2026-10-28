@@ -532,7 +532,7 @@ test('Daniel reconciliation uses live staging for depreciation and insurance cou
   assert.match(review,/insuranceLinkedAssetIds/);
   assert.match(review,/insuranceStructuredCandidates/);
   assert.doesNotMatch(review,/identity_linked_rows \|\| 0/);
-  assert.match(page,/Candidatos estructurados/);
+  assert.match(page,/Candidatos Ficha 360/);
   assert.match(page,/Sin estructura/);
 });
 
