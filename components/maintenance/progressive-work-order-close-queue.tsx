@@ -295,9 +295,10 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     if (current.next_action === 'close_work_order') {
       if (evidenceCount < 1) return setActionError('Agrega al menos una foto antes de cerrar.');
       const closeInteractionMs = closeInteractionStartedAt.current ? Date.now() - closeInteractionStartedAt.current : 0;
-      const closeHeaders = closeInteractionMs >= 1000 && closeInteractionMs <= 30 * 60 * 1000
-        ? { 'X-Motil-Close-Interaction-Ms': String(Math.round(closeInteractionMs)) }
-        : {};
+      const closeHeaders: Record<string, string> = {};
+      if (closeInteractionMs >= 1000 && closeInteractionMs <= 30 * 60 * 1000) {
+        closeHeaders['X-Motil-Close-Interaction-Ms'] = String(Math.round(closeInteractionMs));
+      }
       return request(`/api/maintenance/work-orders/${current.work_order_id}/close`, {
         actual_duration_hours: Number(current.actual_duration_hours || 0),
         root_cause: current.root_cause,
