@@ -104,6 +104,7 @@ export async function GET(request: NextRequest) {
     'insurance_asset_candidate:' + key,
     'depreciation_asset_candidate:' + key,
     'insurance_asset_family:' + key,
+    'finance_asset_candidate:' + key,
   ]))];
 
   let reviewRows: any[] = [];
@@ -403,6 +404,7 @@ export async function POST(request: NextRequest) {
     'insurance_asset_candidate:' + key,
     'depreciation_asset_candidate:' + key,
     'insurance_asset_family:' + key,
+    'finance_asset_candidate:' + key,
   ];
   const status =
     decision === 'accept' ? 'accepted' :
