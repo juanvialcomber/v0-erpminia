@@ -513,3 +513,11 @@ test('finance reconciliation separates actionable backlog from finance-only term
   assert.match(page,/Cerrado financiero/);
   assert.match(page,/no requiere Ficha 360/);
 });
+
+
+test('finance reconciliation treats CAPEX context as terminal, not actionable backlog',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/finance_only_non_asset/);
+  assert.match(review,/finance_only_capex_context/);
+  assert.match(review,/\.includes\(String\(row\.source_payload\?\.reconciliation_terminal_state/);
+});
