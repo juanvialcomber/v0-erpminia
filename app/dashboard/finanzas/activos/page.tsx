@@ -61,6 +61,10 @@ type ReviewResponse = {
     classifiedRows: number;
     structuredCandidateRows: number;
     structuredCandidateGroups: number;
+    facilityCandidateRows: number;
+    facilityCandidateGroups: number;
+    assetCandidateRows: number;
+    assetCandidateGroups: number;
     unstructuredRows: number;
     terminalRows: number;
     materialReviewComplete: boolean;
@@ -352,7 +356,8 @@ export default function FinanceAssetsPage(){
             <ReviewMetric label="Activos enlazados" value={number(reviewData.summary.linkedAssets)} detail={`${number(reviewData.summary.singleAssets)} con valor 1:1`} />
             <ReviewMetric label="Pendiente operacional" value={number(reviewData.summary.unresolvedRows)} detail="Filas aún sin vínculo canónico; no equivale a datos crudos" />
             <ReviewMetric label="Clasificado / en revisión" value={number(reviewData.summary.classifiedRows)} detail="Ya tiene causa, categoría o decisión de conciliación" />
-            <ReviewMetric label="Candidatos Ficha 360" value={number(reviewData.summary.structuredCandidateRows)} detail={`${number(reviewData.summary.structuredCandidateGroups)} grupos de activo/instalación ya estructurados`} />
+            <ReviewMetric label="Equipos por revisar" value={number(reviewData.summary.assetCandidateRows)} detail={`${number(reviewData.summary.assetCandidateGroups)} grupos o unidades con evidencia suficiente para revisión`} />
+            <ReviewMetric label="Instalaciones por revisar" value={number(reviewData.summary.facilityCandidateRows)} detail={`${number(reviewData.summary.facilityCandidateGroups)} instalaciones o familias de infraestructura`} />
             <ReviewMetric label="Sin estructura" value={number(reviewData.summary.unstructuredRows)} detail="Backlog realmente crudo: aún sin clasificación útil" />
             <ReviewMetric label="Cerrado financiero" value={number(reviewData.summary.terminalRows)} detail="Contexto financiero/CAPEX que no requiere Ficha 360 individual" />
             <ReviewMetric label="Sin identificador operacional" value={number(reviewData.unresolved.byReason.missing_identifier||0)} detail="Sin centro, patente, serie o nombre suficiente" />
