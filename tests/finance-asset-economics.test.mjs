@@ -561,3 +561,15 @@ test('candidate review queue includes structured serial/family candidates and re
   assert.match(api,/possibleIssueKeys/);
   assert.match(api,/reviewByCandidateKey/);
 });
+
+
+test('Daniel cockpit separates equipment candidates from facility candidates',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/facilityCandidateRows/);
+  assert.match(review,/facilityCandidateGroups/);
+  assert.match(review,/assetCandidateRows/);
+  assert.match(review,/assetCandidateGroups/);
+  assert.match(page,/Equipos por revisar/);
+  assert.match(page,/Instalaciones por revisar/);
+});
