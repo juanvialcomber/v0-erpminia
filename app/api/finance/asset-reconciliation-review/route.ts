@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
   if (depreciationError) return NextResponse.json({ error: depreciationError.message }, { status: 500 });
 
   const linkedCanonicalAssetIds = new Set<string>();
+  const linkedRowsByAsset = new Map<string, number>();
   const depreciationCoverage = (depreciationRows || []).reduce((acc, row: any) => {
     acc.rows += 1;
     if (row.depreciation_current !== null) acc.withCurrentDepreciation += 1;
@@ -148,7 +149,9 @@ export async function GET(request: NextRequest) {
     if (row.remaining_life_months !== null) acc.withRemainingLife += 1;
     if (row.canonical_asset_id) {
       acc.linkedCanonical += 1;
-      linkedCanonicalAssetIds.add(String(row.canonical_asset_id));
+      const assetId = String(row.canonical_asset_id);
+      linkedCanonicalAssetIds.add(assetId);
+      linkedRowsByAsset.set(assetId, (linkedRowsByAsset.get(assetId) || 0) + 1);
     }
     if (String(row.identity_status || '') === 'review_required') acc.reviewRequired += 1;
     return acc;
@@ -171,11 +174,11 @@ export async function GET(request: NextRequest) {
     ? metadata.stage as Record<string, unknown>
     : {};
 
-  const sourceRows = Number(stage.rows || 0);
+  const sourceRows = depreciationCoverage.rows;
   const linkedRows = depreciationCoverage.linkedCanonical;
   const linkedAssets = depreciationCoverage.linkedCanonicalAssets;
-  const singleAssets = Number(stage.identity_single_assets || 0);
-  const conflictAssets = Number(stage.identity_conflict_assets || 0);
+  const singleAssets = Array.from(linkedRowsByAsset.values()).filter((count) => count === 1).length;
+  const conflictAssets = Array.from(linkedRowsByAsset.values()).filter((count) => count > 1).length;
 
   const classified = (unresolvedRows || []).map((row: any) => ({
     ...row,
@@ -222,23 +225,61 @@ export async function GET(request: NextRequest) {
     )
     .slice(0, 60);
 
-  const insuranceMetadata = insuranceSource?.metadata && typeof insuranceSource.metadata === 'object'
-    ? insuranceSource.metadata as Record<string, unknown>
-    : {};
-  const insuranceStage = insuranceMetadata.stage && typeof insuranceMetadata.stage === 'object'
-    ? insuranceMetadata.stage as Record<string, unknown>
-    : {};
-  const insuranceSummary = insuranceSource ? {
-    filename: insuranceSource.filename,
-    sourceRows: Number(insuranceStage.rows || 0),
-    linkedRows: Number(insuranceStage.identity_linked_rows || 0),
-    linkedAssets: Number(insuranceStage.identity_linked_assets || 0),
-    unresolvedRows: Number(insuranceStage.identity_unresolved_rows || 0),
-    unclassifiedRows: Number(insuranceStage.unclassified_rows || 0),
-    missingCandidates: Number(insuranceStage.missing_canonical_candidate_rows || 0),
-    ambiguousRows: Number(insuranceStage.ambiguous_existing_family_rows || 0),
-    discrepancies: Number(insuranceStage.identity_source_discrepancy_rows || 0),
-  } : null;
+  let insuranceSummary = null;
+  if (insuranceSource) {
+    const { data: insuranceRows, error: insuranceRowsError } = await context.supabase
+      .from('motil_finance_asset_stage')
+      .select('canonical_asset_id,identity_status,source_payload')
+      .eq('organization_id', context.organizationId)
+      .eq('import_id', insuranceSource.id);
+
+    if (insuranceRowsError) {
+      return NextResponse.json({ error: insuranceRowsError.message }, { status: 500 });
+    }
+
+    const insuranceLinkedAssetIds = new Set<string>();
+    let insuranceLinkedRows = 0;
+    let insuranceStructuredCandidates = 0;
+    let insuranceUnitCandidates = 0;
+    let insuranceFamilyCandidates = 0;
+    let insuranceDiscrepancies = 0;
+
+    for (const row of insuranceRows || []) {
+      if (row.canonical_asset_id) {
+        insuranceLinkedRows += 1;
+        insuranceLinkedAssetIds.add(String(row.canonical_asset_id));
+        continue;
+      }
+
+      const payload = row.source_payload && typeof row.source_payload === 'object'
+        ? row.source_payload as Record<string, unknown>
+        : {};
+      if (payload.asset_candidate_key) {
+        insuranceStructuredCandidates += 1;
+        insuranceUnitCandidates += 1;
+      } else if (payload.asset_candidate_family_key) {
+        insuranceStructuredCandidates += 1;
+        insuranceFamilyCandidates += 1;
+      }
+      if (String(row.identity_status || '') === 'conflict') insuranceDiscrepancies += 1;
+    }
+
+    const insuranceSourceRows = (insuranceRows || []).length;
+    const insuranceUnresolvedRows = insuranceSourceRows - insuranceLinkedRows;
+    const insuranceUnclassifiedRows = Math.max(0, insuranceUnresolvedRows - insuranceStructuredCandidates);
+
+    insuranceSummary = {
+      filename: insuranceSource.filename,
+      sourceRows: insuranceSourceRows,
+      linkedRows: insuranceLinkedRows,
+      linkedAssets: insuranceLinkedAssetIds.size,
+      unresolvedRows: insuranceUnresolvedRows,
+      unclassifiedRows: insuranceUnclassifiedRows,
+      missingCandidates: insuranceUnitCandidates,
+      ambiguousRows: insuranceFamilyCandidates,
+      discrepancies: insuranceDiscrepancies,
+    };
+  }
 
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
