@@ -106,17 +106,21 @@ export async function GET(request: NextRequest) {
     'insurance_asset_family:' + key,
   ]))];
 
-  const { data: reviewRows, error: reviewError } = await context.supabase
-    .from('data_reconciliation_reviews')
-    .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
-    .eq('organization_id', context.organizationId)
-    .eq('entity_type', 'asset')
-    .in('issue_key', reviewIssueKeys);
+  let reviewRows: any[] = [];
+  if (reviewIssueKeys.length > 0) {
+    const { data, error: reviewError } = await context.supabase
+      .from('data_reconciliation_reviews')
+      .select('id,issue_key,status,resolution_note,reviewed_by,reviewed_at')
+      .eq('organization_id', context.organizationId)
+      .eq('entity_type', 'asset')
+      .in('issue_key', reviewIssueKeys);
 
-  if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
+    if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
+    reviewRows = data || [];
+  }
 
   const reviewByCandidateKey = new Map<string, any>();
-  for (const reviewRow of reviewRows || []) {
+  for (const reviewRow of reviewRows) {
     const issueKey = String((reviewRow as any).issue_key || '');
     const key = candidateKeys.find((candidateKey) => issueKey.endsWith(':' + candidateKey));
     if (!key) continue;
