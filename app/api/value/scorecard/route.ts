@@ -217,7 +217,8 @@ export async function GET(request: NextRequest) {
       createComparisonReady ? createReductionPct : null,
       closeComparisonReady ? closeReductionPct : null,
     ].filter((value): value is number => value !== null);
-    const hasObservedOperationalImpact = observedAdminComparisons.some((value) => value > 0);
+    const hasObservedComparison = observedAdminComparisons.length > 0;
+    const hasPositiveOperationalImpact = observedAdminComparisons.some((value) => value > 0);
 
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
@@ -485,13 +486,13 @@ export async function GET(request: NextRequest) {
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       evidenceLevel:
-        hasObservedOperationalImpact ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
       lec: {
         level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
-        evidence: hasObservedOperationalImpact ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        evidence: hasObservedComparison ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
         coverage: coverageLevel,
-        valueLevel: hasObservedOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
+        valueLevel: hasPositiveOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
         coverageNumerator: traceCompleteClosedRows.length,
         coverageDenominator: closedRows.length,
         coveragePct: traceCompleteCoveragePct,
@@ -533,15 +534,18 @@ export async function GET(request: NextRequest) {
           comparisonReady: closeComparisonReady,
           reductionPct: closeReductionPct,
         },
-        e3Ready: hasObservedOperationalImpact,
+        e3Ready: hasObservedComparison,
+        v5Ready: hasPositiveOperationalImpact,
         semantics: 'E3/V5 requires a comparable administrative cohort with sufficient samples and a positive observed time reduction; economic value remains unmeasured until loaded labor cost is validated',
       },
       valueGate: {
-        attribution: hasObservedOperationalImpact ? 'IMPACTO_OPERACIONAL_OBSERVADO' : 'NO_MEDIBLE_AUN',
-        pricingReadiness: hasObservedOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
-        nextMeasurement: hasObservedOperationalImpact
+        attribution: hasObservedComparison ? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN',
+        pricingReadiness: hasPositiveOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
+        nextMeasurement: hasPositiveOperationalImpact
           ? 'Validar costo/hora cargado y recurrencia del impacto antes de monetizar.'
-          : 'Completar cohortes manuales y asistidas comparables de apertura/cierre.',
+          : hasObservedComparison
+            ? 'La comparación ya es E3; mejorar el outcome antes de promover V5 o monetizar.'
+            : 'Completar cohortes manuales y asistidas comparables de apertura/cierre.',
         semantics: 'coverage and workflow evidence are observed; savings, avoided downtime and ROI require a comparable baseline and attributable outcome',
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
