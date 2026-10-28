@@ -535,3 +535,15 @@ test('Daniel reconciliation uses live staging for depreciation and insurance cou
   assert.match(page,/Candidatos estructurados/);
   assert.match(page,/Sin estructura/);
 });
+
+
+test('Daniel finance cockpit separates classified reconciliation debt from raw backlog',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/classifiedRows/);
+  assert.match(review,/hasExplicitClassification/);
+  assert.match(review,/candidate_review_status/);
+  assert.match(page,/Clasificado \/ en revisión/);
+  assert.match(page,/Backlog realmente crudo/);
+  assert.match(page,/Candidatos Ficha 360/);
+});
