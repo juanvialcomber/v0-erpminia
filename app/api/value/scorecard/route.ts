@@ -486,6 +486,23 @@ export async function GET(request: NextRequest) {
           E3: 'Impacto observado',
           E4: 'Valor recurrente',
         },
+        coverage: {
+          C1: '<20% de OT cerradas con cadena completa',
+          C2: '20–49% de OT cerradas con cadena completa',
+          C3: '50–74% de OT cerradas con cadena completa',
+          C4: '75–94% de OT cerradas con cadena completa',
+          C5: '≥95% de OT cerradas con cadena completa',
+        },
+        valueLevel: {
+          V0: 'Habilitador técnico',
+          V1: 'Visibilidad',
+          V2: 'Control',
+          V3: 'Priorización',
+          V4: 'Decisión asistida',
+          V5: 'Resultado operacional',
+          V6: 'Resultado económico atribuible',
+          V7: 'Valor estratégico demostrado',
+        },
       },
     });
   } catch (error) {
