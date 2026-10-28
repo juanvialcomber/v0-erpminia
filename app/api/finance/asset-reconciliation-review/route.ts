@@ -187,6 +187,10 @@ export async function GET(request: NextRequest) {
   }));
   const actionableRows = classified.filter((row) => !row.terminal);
   const terminalRows = classified.filter((row) => row.terminal);
+  const facilityCandidateRows = actionableRows.filter((row) => Boolean(row.source_payload?.facility_candidate_group));
+  const assetCandidateRows = actionableRows.filter((row) =>
+    Boolean(row.source_payload?.asset_candidate_key || row.source_payload?.asset_candidate_family_key)
+  );
   const structuredCandidateRows = actionableRows.filter((row) =>
     Boolean(
       row.source_payload?.facility_candidate_group ||
@@ -205,6 +209,15 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .map(String)
   );
+  const facilityCandidateGroups = new Set(
+    facilityCandidateRows.map((row) => String(row.source_payload?.facility_candidate_group || '')).filter(Boolean)
+  ).size;
+  const assetCandidateGroups = new Set(
+    assetCandidateRows
+      .map((row) => String(row.source_payload?.asset_candidate_key || row.source_payload?.asset_candidate_family_key || ''))
+      .filter(Boolean)
+  ).size;
+
   const unstructuredRows = actionableRows.filter((row) => {
     const payload = row.source_payload && typeof row.source_payload === 'object'
       ? row.source_payload as Record<string, unknown>
@@ -315,6 +328,10 @@ export async function GET(request: NextRequest) {
       classifiedRows,
       structuredCandidateRows: structuredCandidateRows.length,
       structuredCandidateGroups: structuredCandidateKeys.size,
+      facilityCandidateRows: facilityCandidateRows.length,
+      facilityCandidateGroups,
+      assetCandidateRows: assetCandidateRows.length,
+      assetCandidateGroups,
       unstructuredRows,
       terminalRows: terminalRows.length,
       materialReviewComplete: Boolean(stage.material_operational_review_complete),
