@@ -445,7 +445,7 @@ test('single-source exact candidates preserve verified absence across internal a
   assert.match(api,/internalMasterVerification/);
   assert.match(api,/exactSingleVerifiedAbsentInternalMasters/);
   assert.match(api,/no_exact_counterpart/);
-  assert.match(candidates,/0 contrapartes en canónico, mantenimiento y planificación/);
+  assert.match(candidates,/0 contrapartes exactas en 3 maestros internos/);
   assert.match(candidates,/verificadas en 3 maestros internos/);
   assert.match(stage,/candidate_internal_master_search_verified/);
   assert.match(stage,/purchase_cost_center_evidence/);
