@@ -184,6 +184,25 @@ export async function GET(request: NextRequest) {
   }));
   const actionableRows = classified.filter((row) => !row.terminal);
   const terminalRows = classified.filter((row) => row.terminal);
+  const structuredCandidateRows = actionableRows.filter((row) =>
+    Boolean(
+      row.source_payload?.facility_candidate_group ||
+      row.source_payload?.asset_candidate_key ||
+      row.source_payload?.asset_candidate_family_key
+    )
+  );
+  const structuredCandidateKeys = new Set(
+    structuredCandidateRows
+      .map((row) =>
+        row.source_payload?.facility_candidate_group ||
+        row.source_payload?.asset_candidate_key ||
+        row.source_payload?.asset_candidate_family_key ||
+        null
+      )
+      .filter(Boolean)
+      .map(String)
+  );
+  const unstructuredRows = actionableRows.length - structuredCandidateRows.length;
 
   const byReason = actionableRows.reduce<Record<string, number>>((acc, row) => {
     acc[row.reason.key] = (acc[row.reason.key] || 0) + 1;
@@ -237,6 +256,9 @@ export async function GET(request: NextRequest) {
       singleAssets,
       conflictAssets,
       unresolvedRows: actionableRows.length,
+      structuredCandidateRows: structuredCandidateRows.length,
+      structuredCandidateGroups: structuredCandidateKeys.size,
+      unstructuredRows,
       terminalRows: terminalRows.length,
       materialReviewComplete: Boolean(stage.material_operational_review_complete),
       materialReviewFloorClp: Number(stage.material_operational_review_floor_clp || 0),
