@@ -249,7 +249,7 @@ export async function GET(request: NextRequest) {
       return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
     };
     const currentMonthKey = monthKey(new Date().toISOString());
-    const median = (values: number[]) => {
+    const monthlyMedianMs = (values: number[]) => {
       if (!values.length) return null;
       const sorted = [...values].sort((a, b) => a - b);
       const middle = Math.floor(sorted.length / 2);
@@ -352,8 +352,8 @@ export async function GET(request: NextRequest) {
     const recurrencePeriods = closedMonthKeys.map((period) => {
       const createValues = createTimingByMonth.get(period) || [];
       const closeValues = closeTimingByMonth.get(period) || [];
-      const createMedianMs = median(createValues);
-      const closeMedianMs = median(closeValues);
+      const createMedianMs = monthlyMedianMs(createValues);
+      const closeMedianMs = monthlyMedianMs(closeValues);
       const createReady = manualOpen.samples >= 3 && createValues.length >= 10 && manualOpen.medianMs !== null && createMedianMs !== null;
       const closeReady = manualClose.samples >= 3 && closeValues.length >= 10 && manualClose.medianMs !== null && closeMedianMs !== null;
       const openSavedSeconds = createReady ? Math.max(0, Math.round((manualOpen.medianMs! - createMedianMs!) / 1000)) : 0;
