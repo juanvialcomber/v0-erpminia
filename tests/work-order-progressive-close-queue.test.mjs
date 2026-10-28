@@ -57,3 +57,11 @@ test('scheduled maintenance hands completion to the safe progressive closure flo
   assert.match(schedule, /cierre\?workOrderId=/);
   assert.doesNotMatch(schedule, /status:\s*'completed'/);
 });
+
+
+test('requested closure flow is strictly scoped to one work order', () => {
+  assert.match(api, /request\.nextUrl\.searchParams\.get\('workOrderId'\)/);
+  assert.match(api, /readinessQuery = readinessQuery\.eq\('work_order_id', requestedWorkOrderId\)/);
+  assert.match(component, /work-order-close-queue\?workOrderId=/);
+  assert.doesNotMatch(component, /sort\(\(a, b\) => a\.work_order_id === selectedWorkOrderId/);
+});

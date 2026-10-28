@@ -138,11 +138,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const requestedWorkOrderId = String(request.nextUrl.searchParams.get('workOrderId') || '').trim();
+
     let readinessQuery = context.supabase
       .from('work_order_close_readiness_v2')
       .select('*')
       .eq('organization_id', context.organizationId);
     if (allowedWorkOrderIds) readinessQuery = readinessQuery.in('work_order_id', allowedWorkOrderIds);
+    if (requestedWorkOrderId) readinessQuery = readinessQuery.eq('work_order_id', requestedWorkOrderId);
 
     const { data, error } = await readinessQuery;
     if (error) throw error;
@@ -180,7 +183,14 @@ export async function GET(request: NextRequest) {
       missingRuntimeEvidence: queue.filter((row) => row.missing_runtime_evidence).length,
     };
 
-    return NextResponse.json({ queue, summary, canEdit: accessLevel === 'ED' || canEditAssigned, source: 'work_order_close_readiness_v2', workshopSite: workshopScope.isWorkshopHead ? workshopScope.site : null });
+    return NextResponse.json({
+      queue,
+      summary,
+      canEdit: accessLevel === 'ED' || canEditAssigned,
+      source: 'work_order_close_readiness_v2',
+      requestedWorkOrderId: requestedWorkOrderId || null,
+      workshopSite: workshopScope.isWorkshopHead ? workshopScope.site : null,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la cola de cierre de OT';
     return NextResponse.json({ queue: [], error: message }, { status: 500 });

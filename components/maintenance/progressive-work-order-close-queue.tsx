@@ -88,19 +88,17 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const numberLocale = locale === 'en' ? 'en-US' : 'es-CL';
   const searchParams = useSearchParams();
   const selectedWorkOrderId = searchParams.get('workOrderId');
+  const closeQueueUrl = selectedWorkOrderId
+    ? `/api/maintenance/work-order-close-queue?workOrderId=${encodeURIComponent(selectedWorkOrderId)}`
+    : '/api/maintenance/work-order-close-queue';
   const { data, error, isLoading, mutate } = useSWR<QueueResponse>(
-    '/api/maintenance/work-order-close-queue',
+    closeQueueUrl,
     fetcher,
     { revalidateOnFocus: false },
   );
 
   const rawQueue = Array.isArray(data?.queue) ? data.queue : [];
-  const queue = useMemo(
-    () => selectedWorkOrderId
-      ? [...rawQueue].sort((a, b) => a.work_order_id === selectedWorkOrderId ? -1 : b.work_order_id === selectedWorkOrderId ? 1 : 0)
-      : rawQueue,
-    [rawQueue, selectedWorkOrderId],
-  );
+  const queue = useMemo(() => rawQueue, [rawQueue]);
   const current = queue[0] || null;
 
   const { data: evidenceData, mutate: mutateEvidence } = useSWR<EvidenceResponse>(
