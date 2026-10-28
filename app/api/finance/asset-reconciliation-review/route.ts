@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
           withBookValue: 0,
           withRemainingLife: 0,
           linkedCanonical: 0,
+          linkedCanonicalAssets: 0,
           reviewRequired: 0,
         },
       },
@@ -138,13 +139,17 @@ export async function GET(request: NextRequest) {
 
   if (depreciationError) return NextResponse.json({ error: depreciationError.message }, { status: 500 });
 
+  const linkedCanonicalAssetIds = new Set<string>();
   const depreciationCoverage = (depreciationRows || []).reduce((acc, row: any) => {
     acc.rows += 1;
     if (row.depreciation_current !== null) acc.withCurrentDepreciation += 1;
     if (row.total_accum_depr !== null) acc.withAccumulatedDepreciation += 1;
     if (row.net_book_value !== null) acc.withBookValue += 1;
     if (row.remaining_life_months !== null) acc.withRemainingLife += 1;
-    if (row.canonical_asset_id) acc.linkedCanonical += 1;
+    if (row.canonical_asset_id) {
+      acc.linkedCanonical += 1;
+      linkedCanonicalAssetIds.add(String(row.canonical_asset_id));
+    }
     if (String(row.identity_status || '') === 'review_required') acc.reviewRequired += 1;
     return acc;
   }, {
@@ -154,8 +159,10 @@ export async function GET(request: NextRequest) {
     withBookValue: 0,
     withRemainingLife: 0,
     linkedCanonical: 0,
+    linkedCanonicalAssets: 0,
     reviewRequired: 0,
   });
+  depreciationCoverage.linkedCanonicalAssets = linkedCanonicalAssetIds.size;
 
   const metadata = source.metadata && typeof source.metadata === 'object'
     ? source.metadata as Record<string, unknown>
@@ -165,8 +172,8 @@ export async function GET(request: NextRequest) {
     : {};
 
   const sourceRows = Number(stage.rows || 0);
-  const linkedRows = Number(stage.identity_linked_rows || 0);
-  const linkedAssets = Number(stage.identity_linked_assets || 0);
+  const linkedRows = depreciationCoverage.linkedCanonical;
+  const linkedAssets = depreciationCoverage.linkedCanonicalAssets;
   const singleAssets = Number(stage.identity_single_assets || 0);
   const conflictAssets = Number(stage.identity_conflict_assets || 0);
 
