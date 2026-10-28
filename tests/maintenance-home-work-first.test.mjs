@@ -11,7 +11,7 @@ test('maintenance renders role action queue ahead of optional summaries', () => 
 });
 test('execution remains terrain-first and role-controlled', () => {
   assert.match(home, /mode === 'execution'/);
-  assert.match(home, /<MobileTerrainPanel \/>/);
+  assert.match(home, /<MobileTerrainPanel\b[^>]*\/>/);
   assert.match(home, /viewer\?\.canCreateWorkOrder/);
   assert.match(home, /actions\.map/);
   assert.match(home, /Ver detalle/);

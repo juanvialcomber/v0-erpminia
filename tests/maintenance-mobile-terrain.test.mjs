@@ -8,7 +8,7 @@ const myWork = await readFile(new URL('../app/api/maintenance/my-work/route.ts',
 
 test('execution users receive the dedicated assigned-work surface on every viewport', () => {
   assert.match(dashboard, /if \(mode === 'execution'\) \{/);
-  assert.match(dashboard, /<MobileTerrainPanel \/>/);
+  assert.match(dashboard, /<MobileTerrainPanel\b[^>]*\/>/);
   assert.match(dashboard, /max-w-xl/);
   assert.doesNotMatch(dashboard, /md:hidden"><MobileTerrainPanel/);
   assert.doesNotMatch(dashboard, /mode==='execution' \? 'hidden md:block' : undefined/);
