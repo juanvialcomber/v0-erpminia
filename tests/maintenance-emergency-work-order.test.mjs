@@ -8,6 +8,8 @@ const detailRoute = await readFile(new URL('../app/api/maintenance/work-orders/[
 const viewer = await readFile(new URL('../app/api/maintenance/viewer-context/route.ts', import.meta.url), 'utf8');
 const createUi = await readFile(new URL('../components/maintenance/create-work-order.tsx', import.meta.url), 'utf8');
 const queueUi = await readFile(new URL('../components/maintenance/work-orders-queue.tsx', import.meta.url), 'utf8');
+const terrainUi = await readFile(new URL('../components/maintenance/mobile-terrain-panel.tsx', import.meta.url), 'utf8');
+const homeUi = await readFile(new URL('../components/dashboard/maintenance-home.tsx', import.meta.url), 'utf8');
 const display = await readFile(new URL('../lib/maintenance/work-order-display.ts', import.meta.url), 'utf8');
 const timeline = await readFile(new URL('../components/shared/entity-timeline.tsx', import.meta.url), 'utf8');
 
@@ -43,6 +45,16 @@ test('OT inbox exposes emergency creation separately from planned OT creation', 
   assert.match(queueUi, /OTe emergencia/);
   assert.match(createUi, /Registrar OTe/);
   assert.match(createUi, /workType: emergencyMode \? 'emergency'/);
+});
+
+test('execution home exposes OTe creation using the canonical viewer capability, even without assigned work', () => {
+  assert.match(homeUi, /<MobileTerrainPanel canCreateEmergencyWorkOrder=\{viewer\?\.canCreateEmergencyWorkOrder === true\}/);
+  assert.match(terrainUi, /canCreateEmergencyWorkOrder = false/);
+  const creation = terrainUi.indexOf('{canCreateEmergencyWorkOrder ? (');
+  assert.ok(creation > 0);
+  assert.ok(creation < terrainUi.indexOf('{isLoading ?'));
+  assert.match(terrainUi.slice(creation, terrainUi.indexOf(') : null}', creation)), /create\?mode=emergency/);
+  assert.match(terrainUi, /Crear OTe de emergencia/);
 });
 
 

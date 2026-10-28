@@ -20,7 +20,7 @@ type Response = {
   actions?: ActionItem[];
 };
 type ViewerMode = 'leadership' | 'planning' | 'execution' | 'oversight' | 'general';
-type ViewerContext = { mode?: ViewerMode; cargoName?: string | null; canEdit?: boolean; canCreateWorkOrder?: boolean };
+type ViewerContext = { mode?: ViewerMode; cargoName?: string | null; canEdit?: boolean; canCreateWorkOrder?: boolean; canCreateEmergencyWorkOrder?: boolean };
 type Metric = readonly [string, string | number, string, string];
 
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -76,7 +76,7 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
   }
 
   if (mode === 'execution') {
-    return <div className="mx-auto w-full max-w-xl"><MobileTerrainPanel /></div>;
+    return <div className="mx-auto w-full max-w-xl"><MobileTerrainPanel canCreateEmergencyWorkOrder={viewer?.canCreateEmergencyWorkOrder === true} /></div>;
   }
 
   const summary = data?.summary;

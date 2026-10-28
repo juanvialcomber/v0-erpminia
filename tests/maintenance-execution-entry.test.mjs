@@ -23,7 +23,7 @@ test('execution routing reuses the canonical maintenance viewer-mode resolver', 
 
 test('execution maintenance home is the assigned-work surface at every viewport', () => {
   assert.match(maintenanceHome, /if \(mode === 'execution'\) \{/);
-  assert.match(maintenanceHome, /<MobileTerrainPanel \/>/);
+  assert.match(maintenanceHome, /<MobileTerrainPanel\b[^>]*\/>/);
   assert.match(maintenanceHome, /max-w-xl/);
   assert.doesNotMatch(maintenanceHome, /mode==='execution' \? 'hidden md:block'/);
   assert.doesNotMatch(maintenanceHome, /md:hidden"><MobileTerrainPanel/);

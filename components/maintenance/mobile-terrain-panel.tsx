@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowRight, ClipboardList, Gauge, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ClipboardList, Gauge, RefreshCw, Siren } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -41,7 +41,7 @@ function dateContext(action: TerrainAction) {
   return 'En ' + action.daysUntil + ' días';
 }
 
-export function MobileTerrainPanel() {
+export function MobileTerrainPanel({ canCreateEmergencyWorkOrder = false }: { canCreateEmergencyWorkOrder?: boolean }) {
   const { data, error, isLoading, mutate, isValidating } = useSWR<TerrainResponse>(
     '/api/maintenance/my-work',
     fetcher,
@@ -84,6 +84,12 @@ export function MobileTerrainPanel() {
           <RefreshCw className={'h-4 w-4 ' + (isValidating ? 'animate-spin' : '')} />
         </Button>
       </header>
+
+      {canCreateEmergencyWorkOrder ? (
+        <Button asChild className="min-h-10 w-full">
+          <Link href="/dashboard/mantenimiento/ordenes-trabajo/create?mode=emergency"><Siren className="mr-2 h-4 w-4" />Crear OTe de emergencia</Link>
+        </Button>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3 border-b pb-4">
         <p className="text-sm text-muted-foreground">{actions.length} OT activas asignadas</p>

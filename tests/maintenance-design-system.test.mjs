@@ -12,7 +12,7 @@ test('maintenance workspaces simplify progressively down the role chain', () => 
   assert.match(page, /oversight: \[/);
   assert.match(page, /general: \[/);
   assert.match(page, /if \(mode === 'execution'\) \{/);
-  assert.match(page, /<MobileTerrainPanel \/>/);
+  assert.match(page, /<MobileTerrainPanel\b[^>]*\/>/);
   assert.match(page, /mode === 'planning'\s*\? maintenanceFlow\.slice\(0, 3\)/s);
   assert.match(dict, /Planificar → Preparar → Ejecutar/);
 });
