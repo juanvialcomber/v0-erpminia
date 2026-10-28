@@ -272,8 +272,8 @@ export function SeniorAssistantWidget() {
         <section
           aria-label={displayTitle}
           className={specialist
-            ? 'fixed bottom-24 right-4 z-50 flex h-[min(700px,calc(100vh-7rem))] w-[min(460px,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl md:right-6'
-            : 'fixed bottom-24 right-4 z-50 w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-border bg-card shadow-xl md:right-6'}
+            ? 'fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-50 flex h-[min(72dvh,700px)] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl md:inset-x-auto md:bottom-24 md:right-6 md:w-[min(460px,calc(100vw-2rem))]'
+            : 'fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-50 overflow-hidden rounded-lg border border-border bg-card shadow-xl md:inset-x-auto md:bottom-24 md:right-6 md:w-[min(23rem,calc(100vw-2rem))]'}
         >
           <div className="flex items-center gap-3 border-b border-border bg-muted/40 px-4 py-3.5">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-background">
@@ -326,12 +326,12 @@ export function SeniorAssistantWidget() {
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="fixed bottom-5 right-4 z-50 flex size-16 items-center justify-center rounded-full border border-primary/50 bg-card shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:right-6"
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-3 z-50 flex size-14 items-center justify-center rounded-full border border-primary/50 bg-card shadow-lg transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:bottom-5 md:right-6 md:size-16 md:hover:-translate-y-0.5"
         aria-label={open ? `Cerrar ${context.title}` : `Abrir ${context.title}`}
         aria-expanded={open}
         title={context.title}
       >
-        <SeniorAssistantMark className="size-14" />
+        <SeniorAssistantMark className="size-12 md:size-14" />
         <span className="sr-only">{context.title}</span>
       </button>
     </>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { DailyManagementContextNav } from '@/components/layout/daily-management-context-nav';
 import { DocumentationContextNav } from '@/components/layout/documentation-context-nav';
 import { OperationalAttentionContextNav } from '@/components/layout/operational-attention-context-nav';
@@ -63,7 +64,7 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
         <DocumentationContextNav dictionary={dictionary} />
         <OperationalAttentionContextNav dictionary={dictionary} />
         <DashboardPeriodProvider>
-          <main className="flex-1 overflow-x-hidden bg-muted/20 px-4 py-5 md:px-6 md:py-6 xl:px-8 xl:py-7">
+          <main className="flex-1 overflow-x-hidden bg-muted/20 px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-4 md:px-6 md:py-6 xl:px-8 xl:py-7">
             <div className="motil-page space-y-6">
               <DataSourceAttentionBanner />
               {children}
@@ -73,6 +74,7 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
         </DashboardPeriodProvider>
       </div>
 
+      <MobileBottomNav dictionary={dictionary} />
       <SeniorAssistantWidget />
     </div>
   );

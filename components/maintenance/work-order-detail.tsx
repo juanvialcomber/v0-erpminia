@@ -255,7 +255,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
             requestAnimationFrame(() => document.getElementById('edit-work-order')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
           }}><Pencil className="mr-2 h-4 w-4" />Editar</Button> : null}
           {isCompleted ? (
-            <div className="min-w-44 rounded-lg border px-5 py-3 text-right">
+            <div className="w-full rounded-lg border px-4 py-3 text-left sm:w-auto sm:min-w-44 sm:px-5 sm:text-right">
               <p className="text-xs text-muted-foreground">Tiempo ejecutado</p>
               <p className="text-3xl font-semibold tracking-tight tabular-nums">{durationLabel(workOrder.actual_duration_hours)}</p>
             </div>
@@ -292,7 +292,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       </Card>
 
       ) : null}
-      {saveMessage && (saveState === 'saved' || saveState === 'error') ? <div role="status" aria-live="polite" className={`fixed right-4 top-20 z-50 max-w-sm rounded-lg border px-5 py-4 text-sm font-semibold shadow-xl ${saveState === 'saved' ? 'border-emerald-500/50 bg-background text-foreground' : 'border-destructive/50 bg-background text-destructive'}`}>{saveState === 'saved' ? '✓ Cambios guardados correctamente' : saveMessage}<button type="button" onClick={() => { setSaveMessage(''); setSaveState('idle'); }} aria-label="Cerrar aviso" className="ml-4 text-muted-foreground">×</button></div> : null}
+      {saveMessage && (saveState === 'saved' || saveState === 'error') ? <div role="status" aria-live="polite" className={`fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4.5rem)] z-50 rounded-lg border px-4 py-3 text-sm font-semibold shadow-xl sm:inset-x-auto sm:right-4 sm:top-20 sm:max-w-sm sm:px-5 sm:py-4 ${saveState === 'saved' ? 'border-emerald-500/50 bg-background text-foreground' : 'border-destructive/50 bg-background text-destructive'}`}>{saveState === 'saved' ? '✓ Cambios guardados correctamente' : saveMessage}<button type="button" onClick={() => { setSaveMessage(''); setSaveState('idle'); }} aria-label="Cerrar aviso" className="ml-4 text-muted-foreground">×</button></div> : null}
       {canEdit ? <details id="edit-work-order" open={editOpen} onToggle={(event) => setEditOpen(event.currentTarget.open)} className="scroll-mt-24 rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Editar OT</summary>
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
