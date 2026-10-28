@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceCreateTiming, maintenanceCloseTiming, maintenanceSupervisorReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceCreateTiming, maintenanceCloseTiming, maintenanceManualOpenBaseline, maintenanceManualCloseBaseline, maintenanceSupervisorReviews] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -69,6 +69,22 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(500),
       context.supabase
+        .from('audit_log')
+        .select('new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_admin_manual_baseline')
+        .eq('resource_type', 'maintenance_admin_baseline')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
+        .from('audit_log')
+        .select('new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'maintenance_admin_manual_close_baseline')
+        .eq('resource_type', 'maintenance_admin_baseline')
+        .order('created_at', { ascending: false })
+        .limit(100),
+      context.supabase
         .from('work_order_supervisor_reviews')
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', context.organizationId)
@@ -84,6 +100,8 @@ export async function GET(request: NextRequest) {
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
     if (maintenanceCreateTiming.error) throw maintenanceCreateTiming.error;
     if (maintenanceCloseTiming.error) throw maintenanceCloseTiming.error;
+    if (maintenanceManualOpenBaseline.error) throw maintenanceManualOpenBaseline.error;
+    if (maintenanceManualCloseBaseline.error) throw maintenanceManualCloseBaseline.error;
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
 
     const financeRows = financeReviews.data || [];
@@ -158,6 +176,48 @@ export async function GET(request: NextRequest) {
         : maintenanceCloseTimingValues.length % 2 === 0
           ? Math.round((maintenanceCloseTimingValues[maintenanceCloseMidpoint - 1] + maintenanceCloseTimingValues[maintenanceCloseMidpoint]) / 2)
           : maintenanceCloseTimingValues[maintenanceCloseMidpoint];
+
+    const medianFromAudit = (rows: any[]) => {
+      const values = rows
+        .map((row: any) => {
+          const durationMs = Number(row.new_values?.duration_ms);
+          const caseCount = Number(row.new_values?.case_count);
+          return Number.isFinite(durationMs) && durationMs > 0 && Number.isFinite(caseCount) && caseCount > 0
+            ? durationMs / caseCount
+            : null;
+        })
+        .filter((value: number | null): value is number => value !== null)
+        .sort((a: number, b: number) => a - b);
+      if (!values.length) return { samples: 0, medianMs: null as number | null };
+      const middle = Math.floor(values.length / 2);
+      const medianMs = values.length % 2 === 0
+        ? Math.round((values[middle - 1] + values[middle]) / 2)
+        : Math.round(values[middle]);
+      return { samples: values.length, medianMs };
+    };
+    const manualOpen = medianFromAudit(maintenanceManualOpenBaseline.data || []);
+    const manualClose = medianFromAudit(maintenanceManualCloseBaseline.data || []);
+    const createComparisonReady = manualOpen.samples >= 3
+      && maintenanceCreateTimingValues.length >= 10
+      && manualOpen.medianMs !== null
+      && maintenanceCreateMedianMs !== null
+      && manualOpen.medianMs > 0;
+    const closeComparisonReady = manualClose.samples >= 3
+      && maintenanceCloseTimingValues.length >= 10
+      && manualClose.medianMs !== null
+      && maintenanceCloseMedianMs !== null
+      && manualClose.medianMs > 0;
+    const createReductionPct = createComparisonReady
+      ? Math.round(((manualOpen.medianMs! - maintenanceCreateMedianMs!) / manualOpen.medianMs!) * 100)
+      : null;
+    const closeReductionPct = closeComparisonReady
+      ? Math.round(((manualClose.medianMs! - maintenanceCloseMedianMs!) / manualClose.medianMs!) * 100)
+      : null;
+    const observedAdminComparisons = [
+      createComparisonReady ? createReductionPct : null,
+      closeComparisonReady ? closeReductionPct : null,
+    ].filter((value): value is number => value !== null);
+    const hasObservedOperationalImpact = observedAdminComparisons.some((value) => value > 0);
 
     const midpoint = Math.floor(timingValues.length / 2);
     const medianMs =
@@ -425,13 +485,13 @@ export async function GET(request: NextRequest) {
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       evidenceLevel:
-        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        hasObservedOperationalImpact ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
       lec: {
         level: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 'L4' : maintenanceRows.length > 0 ? 'L2' : 'L1',
-        evidence: timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
+        evidence: hasObservedOperationalImpact ? 'E3' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
         coverage: coverageLevel,
-        valueLevel: timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
+        valueLevel: hasObservedOperationalImpact ? 'V5' : timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'V4' : maintenanceRows.length > 0 ? 'V2' : 'V0',
         coverageNumerator: traceCompleteClosedRows.length,
         coverageDenominator: closedRows.length,
         coveragePct: traceCompleteCoveragePct,
@@ -456,10 +516,32 @@ export async function GET(request: NextRequest) {
         medianCloseSeconds: maintenanceCloseMedianMs === null ? null : Math.round(maintenanceCloseMedianMs / 1000),
         semantics: 'active MOTIL administrative interactions only; opening and closure exclude mechanical execution and waiting',
       },
+      impactGate: {
+        open: {
+          manualSamples: manualOpen.samples,
+          assistedSamples: maintenanceCreateTimingValues.length,
+          manualMedianSeconds: manualOpen.medianMs === null ? null : Math.round(manualOpen.medianMs / 1000),
+          assistedMedianSeconds: maintenanceCreateMedianMs === null ? null : Math.round(maintenanceCreateMedianMs / 1000),
+          comparisonReady: createComparisonReady,
+          reductionPct: createReductionPct,
+        },
+        close: {
+          manualSamples: manualClose.samples,
+          assistedSamples: maintenanceCloseTimingValues.length,
+          manualMedianSeconds: manualClose.medianMs === null ? null : Math.round(manualClose.medianMs / 1000),
+          assistedMedianSeconds: maintenanceCloseMedianMs === null ? null : Math.round(maintenanceCloseMedianMs / 1000),
+          comparisonReady: closeComparisonReady,
+          reductionPct: closeReductionPct,
+        },
+        e3Ready: hasObservedOperationalImpact,
+        semantics: 'E3/V5 requires a comparable administrative cohort with sufficient samples and a positive observed time reduction; economic value remains unmeasured until loaded labor cost is validated',
+      },
       valueGate: {
-        attribution: 'NO_MEDIBLE_AUN',
-        pricingReadiness: 'MARKET_ANCHORED',
-        nextMeasurement: 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.',
+        attribution: hasObservedOperationalImpact ? 'IMPACTO_OPERACIONAL_OBSERVADO' : 'NO_MEDIBLE_AUN',
+        pricingReadiness: hasObservedOperationalImpact ? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED',
+        nextMeasurement: hasObservedOperationalImpact
+          ? 'Validar costo/hora cargado y recurrencia del impacto antes de monetizar.'
+          : 'Completar cohortes manuales y asistidas comparables de apertura/cierre.',
         semantics: 'coverage and workflow evidence are observed; savings, avoided downtime and ROI require a comparable baseline and attributable outcome',
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
