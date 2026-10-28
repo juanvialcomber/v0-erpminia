@@ -69,6 +69,7 @@ type ReviewResponse = {
       withBookValue: number;
       withRemainingLife: number;
       linkedCanonical: number;
+      linkedCanonicalAssets: number;
       reviewRequired: number;
     };
   };
@@ -222,9 +223,9 @@ export default function FinanceAssetsPage(){
             detail="Registros con valor libro conservado desde la fuente contable"
           />
           <ReviewMetric
-            label="Ligadas a Ficha 360"
+            label="Filas conciliadas"
             value={number(reviewData.summary.depreciationCoverage.linkedCanonical)}
-            detail="Identidades verificadas; no se fuerza el resto por similitud"
+            detail={`${number(reviewData.summary.depreciationCoverage.linkedCanonicalAssets)} activos únicos con identidad verificada`}
           />
           <ReviewMetric
             label="Vida útil remanente"
