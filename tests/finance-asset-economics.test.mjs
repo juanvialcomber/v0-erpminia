@@ -573,3 +573,10 @@ test('Daniel cockpit separates equipment candidates from facility candidates',()
   assert.match(page,/Equipos por revisar/);
   assert.match(page,/Instalaciones por revisar/);
 });
+
+
+test('candidate review API handles an empty candidate set without invalid IN query',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/if \(reviewIssueKeys\.length > 0\)/);
+  assert.match(api,/let reviewRows: any\[\] = \[\]/);
+});
