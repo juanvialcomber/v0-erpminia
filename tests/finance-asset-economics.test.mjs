@@ -521,3 +521,17 @@ test('finance reconciliation treats CAPEX context as terminal, not actionable ba
   assert.match(review,/finance_only_capex_context/);
   assert.match(review,/\.includes\(String\(row\.source_payload\?\.reconciliation_terminal_state/);
 });
+
+
+test('Daniel reconciliation uses live staging for depreciation and insurance counts',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/linkedRowsByAsset/);
+  assert.match(review,/const sourceRows = depreciationCoverage\.rows/);
+  assert.match(review,/insuranceRows/);
+  assert.match(review,/insuranceLinkedAssetIds/);
+  assert.match(review,/insuranceStructuredCandidates/);
+  assert.doesNotMatch(review,/identity_linked_rows \|\| 0/);
+  assert.match(page,/Candidatos estructurados/);
+  assert.match(page,/Sin estructura/);
+});
