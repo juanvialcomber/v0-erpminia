@@ -87,6 +87,7 @@ type LaudusAssetControl = {
     withAcquisitionDate?: number;
     withUsefulLife?: number;
     economicsReady?: boolean;
+    latestSync?: string | null;
   };
   freshness?: {
     latestOperationalSync?: string | null;
@@ -141,6 +142,12 @@ const reviewFetcher=async(url:string):Promise<ReviewResponse>=>{
 const money=(value:number|null)=>value==null?'Sin base':new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(value);
 const uf=(value:number|null)=>value==null?'Sin base':`${new Intl.NumberFormat('es-CL',{maximumFractionDigits:2}).format(value)} UF`;
 const number=(value:number,digits=0)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:digits}).format(value);
+const shortDate=(value?:string|null)=>{
+  if(!value) return 'Sin sincronización';
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime())) return 'Fecha por revisar';
+  return new Intl.DateTimeFormat('es-CL',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Santiago'}).format(date);
+};
 
 function tone(key:string){
   if(key==='maintenance_attention') return 'destructive' as const;
@@ -235,7 +242,7 @@ export default function FinanceAssetsPage(){
           </div>
         ) : (
           <>
-            <ReviewMetric label="Activos fijos Laudus" value={number(Number(laudusData?.fixedAssets?.total||0))} detail="Maestro sincronizado; Laudus conserva autoridad financiera" />
+            <ReviewMetric label="Activos fijos Laudus" value={number(Number(laudusData?.fixedAssets?.total||0))} detail={`Última sincronización: ${shortDate(laudusData?.fixedAssets?.latestSync)}`} />
             <ReviewMetric label="Laudus ↔ MOTIL" value={number(Number(laudusData?.fixedAssets?.linkedToMotil||0))} detail="Activos fijos con identidad MOTIL ya vinculada" />
             <ReviewMetric label="Fecha + vida útil" value={number(Math.min(Number(laudusData?.fixedAssets?.withAcquisitionDate||0),Number(laudusData?.fixedAssets?.withUsefulLife||0)))} detail="Cobertura disponible en el maestro Laudus sincronizado" />
             <ReviewMetric label="Costo adquisición Laudus" value={number(Number(laudusData?.fixedAssets?.withAcquisitionCost||0))} detail="El listado sincronizado aún no expone costo; detalle se consulta de forma acotada" />
