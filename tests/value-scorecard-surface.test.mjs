@@ -236,3 +236,23 @@ test('maintenance E3 and V5 gates are automatic and keep evidence separate from 
   assert.match(page, /comparación válida/);
   assert.match(page, /outcome favorable/);
 });
+
+
+test('maintenance V6 requires validated hourly cost and positive observed impact', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const costApi = fs.readFileSync('app/api/value/maintenance-hourly-cost/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(costApi, /maintenance_value_hourly_cost/);
+  assert.match(costApi, /maintenance_value_role_cost/);
+  assert.match(costApi, /hourly_cost_clp/);
+  assert.match(api, /planningHourlyCostClp/);
+  assert.match(api, /executionHourlyCostClp/);
+  assert.match(api, /attributedMonthlyValueClp/);
+  assert.match(api, /v6Ready/);
+  assert.match(api, /VALOR_ECONOMICO_ATRIBUIBLE/);
+  assert.match(api, /not total maintenance ROI/);
+  assert.match(page, /Gate V6/);
+  assert.match(page, /Costo hora cargado validado/);
+  assert.match(page, /No requiere ni expone sueldos individuales/);
+});
