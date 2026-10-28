@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
   const classified = (unresolvedRows || []).map((row: any) => ({
     ...row,
     reason: classifyRow(row),
-    terminal: String(row.source_payload?.reconciliation_terminal_state || '') === 'finance_only_non_asset',
+    terminal: ['finance_only_non_asset','finance_only_capex_context'].includes(String(row.source_payload?.reconciliation_terminal_state || '')),
   }));
   const actionableRows = classified.filter((row) => !row.terminal);
   const terminalRows = classified.filter((row) => row.terminal);
