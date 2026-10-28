@@ -293,3 +293,16 @@ Estos umbrales habilitan escala inicial, no E4.
 - Pricing readiness pasa a `OUTCOME_ANCHORED` sólo con V5; E3 desfavorable permanece `MARKET_ANCHORED` hasta mejorar el outcome.
 - V6/valor económico sigue bloqueado hasta validar costo/hora cargado, recurrencia y atribución.
 - La promoción es determinística y se recalcula desde `audit_log`; no depende de una etiqueta manual.
+
+
+## 2026-10-28 — Mantención: gate V6 económico atribuible
+
+- Se agregó registro admin-only de costo hora cargado promedio para `planning` y `execution`; no almacena sueldos individuales.
+- Fuente y fecha efectiva son obligatorias y quedan auditadas en `audit_log`.
+- El cálculo económico usa sólo reducción positiva observada de tiempo administrativo con cohorte comparable.
+- Volumen aplicado: OT creadas/cerradas en los últimos 30 días, según corresponda al proceso.
+- Fórmula apertura: `(segundos ahorrados por caso × OT creadas 30d / 3600) × costo hora planificación`.
+- Fórmula cierre: `(segundos ahorrados por caso × OT cerradas 30d / 3600) × costo hora ejecución`.
+- V6 sólo se promueve cuando el valor mensual atribuible es > 0 y los costos hora están validados para el tramo monetizado.
+- Este valor representa capacidad administrativa atribuible, no ROI total de Mantención ni ahorro contable realizado.
+- Próximo gate: observar recurrencia por varios períodos y conciliar con Finanzas antes de usar la cifra en pricing contractual.
