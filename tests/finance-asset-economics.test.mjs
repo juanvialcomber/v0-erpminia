@@ -618,3 +618,10 @@ test('candidate review API reuses finance asset candidate reviews after reclassi
   const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
   assert.match(api,/finance_asset_candidate:/);
 });
+
+
+test('facility review API excludes non-facility scopes even when a group key is present',()=>{
+  const api=fs.readFileSync('app/api/finance/facility-candidates/route.ts','utf8');
+  assert.match(api,/\['single_facility', 'multi_unit_family'\]\.includes/);
+  assert.match(api,/facility_candidate_scope/);
+});
