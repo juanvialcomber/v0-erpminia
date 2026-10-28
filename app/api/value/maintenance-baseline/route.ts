@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
     caseCount > 20
   ) {
     return NextResponse.json(
-      { error: 'La medición debe durar entre 10 segundos y 90 minutos, con 1 a 20 aperturas de OT.' },
+      { error: phase === 'close'
+          ? 'La medición debe durar entre 10 segundos y 90 minutos, con 1 a 20 cierres administrativos de OT.'
+          : 'La medición debe durar entre 10 segundos y 90 minutos, con 1 a 20 aperturas de OT.' },
       { status: 400 },
     );
   }
