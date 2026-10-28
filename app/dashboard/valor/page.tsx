@@ -153,6 +153,25 @@ type ApiResponse = {
       e3Ready?: boolean;
       v5Ready?: boolean;
       v6Ready?: boolean;
+      e4Ready?: boolean;
+      recurrencePositivePeriods?: number;
+      recurrenceRequiredPeriods?: number;
+      semantics?: string;
+    };
+    recurrence?: {
+      periods?: Array<{
+        period?: string;
+        createSamples?: number;
+        closeSamples?: number;
+        createdWorkOrders?: number;
+        closedWorkOrders?: number;
+        comparable?: boolean;
+        valueClp?: number | null;
+        positive?: boolean;
+      }>;
+      positivePeriods?: number;
+      requiredPositivePeriods?: number;
+      e4Ready?: boolean;
       semantics?: string;
     };
     economicValue?: {
@@ -575,9 +594,13 @@ export default function ValueScorecardPage() {
               <p className="text-xs text-muted-foreground">Gate V5</p>
               <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v5Ready ? 'PASS · outcome favorable' : 'HOLD · sin mejora demostrada'}</p>
             </div>
-            <div className="rounded-md bg-muted/40 px-3 py-2 sm:col-span-2">
+            <div className="rounded-md bg-muted/40 px-3 py-2">
               <p className="text-xs text-muted-foreground">Gate V6</p>
               <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.v6Ready ? 'PASS · valor económico atribuible' : 'HOLD · falta costo validado o outcome positivo'}</p>
+            </div>
+            <div className="rounded-md bg-muted/40 px-3 py-2">
+              <p className="text-xs text-muted-foreground">Gate E4</p>
+              <p className="mt-0.5 font-semibold">{maintenanceValue.impactGate?.e4Ready ? 'PASS · valor recurrente' : `HOLD · ${number(maintenanceValue.impactGate?.recurrencePositivePeriods || 0)}/${number(maintenanceValue.impactGate?.recurrenceRequiredPeriods || 3)} períodos`}</p>
             </div>
           </div>
           <p className="mt-2 font-medium">Gate de valor: {maintenanceValue.valueGate?.attribution || 'NO_MEDIBLE_AUN'}</p>
@@ -587,6 +610,27 @@ export default function ValueScorecardPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-card px-5 py-4" aria-label="Recurrencia de valor E4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gate E4 · recurrencia</p>
+          <h2 className="mt-1 text-lg font-semibold">Valor sostenido por período cerrado</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Requiere 3 meses cerrados comparables con valor atribuible positivo. El mes en curso no cuenta.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-muted/40 px-4 py-3">
+            <p className="text-xs text-muted-foreground">Períodos positivos</p>
+            <p className="mt-1 text-xl font-semibold">{number(maintenanceValue.recurrence?.positivePeriods || 0)} / {number(maintenanceValue.recurrence?.requiredPositivePeriods || 3)}</p>
+          </div>
+          <div className="rounded-md border px-4 py-3 sm:col-span-2">
+            <p className="text-xs text-muted-foreground">Estado</p>
+            <p className="mt-1 text-xl font-semibold">{maintenanceValue.recurrence?.e4Ready ? 'E4 · valor recurrente' : 'HOLD'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Sin snapshots sintéticos ni backfill. Sólo meses cerrados observados.</p>
+          </div>
         </div>
       </section>
 
