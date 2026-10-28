@@ -9,6 +9,8 @@ const assistant = await readFile(new URL('../components/intelligence/senior-assi
 const bottomNav = await readFile(new URL('../components/layout/mobile-bottom-nav.tsx', import.meta.url), 'utf8');
 const layout = await readFile(new URL('../app/layout.tsx', import.meta.url), 'utf8');
 const systemCss = await readFile(new URL('../app/motil-system.css', import.meta.url), 'utf8');
+const messages = await readFile(new URL('../components/messages/motil-messages.tsx', import.meta.url), 'utf8');
+const calendar = await readFile(new URL('../components/calendar/operational-calendar.tsx', import.meta.url), 'utf8');
 
 test('mobile shell exposes role-aware bottom navigation and safe content spacing', () => {
   assert.match(shell, /MobileBottomNav/);
@@ -42,4 +44,20 @@ test('PWA viewport and shared controls are mobile hardened', () => {
   assert.match(systemCss, /min-height: 2\.75rem/);
   assert.match(systemCss, /overscroll-behavior-x: contain/);
   assert.match(systemCss, /-webkit-overflow-scrolling: touch/);
+});
+
+
+test('messages use mobile viewport height and one-handed composer controls', () => {
+  assert.match(messages, /100dvh/);
+  assert.match(messages, /safe-area-inset-bottom/);
+  assert.match(messages, /sm:resize-y/);
+  assert.match(messages, /text-base/);
+  assert.match(messages, /min-w-12/);
+});
+
+test('operational calendar stays compact and horizontally safe on mobile', () => {
+  assert.match(calendar, /grid-cols-2/);
+  assert.match(calendar, /overflow-x-auto/);
+  assert.match(calendar, /scrollbar-width:none/);
+  assert.match(calendar, /shrink-0/);
 });
