@@ -58,6 +58,9 @@ type ReviewResponse = {
     singleAssets: number;
     conflictAssets: number;
     unresolvedRows: number;
+    structuredCandidateRows: number;
+    structuredCandidateGroups: number;
+    unstructuredRows: number;
     terminalRows: number;
     materialReviewComplete: boolean;
     materialReviewFloorClp: number;
@@ -346,8 +349,10 @@ export default function FinanceAssetsPage(){
           <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
             <ReviewMetric label="Fuente depreciación" value={number(reviewData.summary.sourceRows)} detail="Filas conservadas desde el archivo de Daniel" />
             <ReviewMetric label="Activos enlazados" value={number(reviewData.summary.linkedAssets)} detail={`${number(reviewData.summary.singleAssets)} con valor 1:1`} />
-            <ReviewMetric label="Pendiente operacional" value={number(reviewData.summary.unresolvedRows)} detail="Filas que aún requieren identidad o decisión verificable" />
-            <ReviewMetric label="Cerrado financiero" value={number(reviewData.summary.terminalRows)} detail="Área, administración, componente o agregado: no requiere Ficha 360" />
+            <ReviewMetric label="Pendiente operacional" value={number(reviewData.summary.unresolvedRows)} detail="Incluye candidatos ya estructurados y filas aún sin resolver" />
+            <ReviewMetric label="Candidatos estructurados" value={number(reviewData.summary.structuredCandidateRows)} detail={`${number(reviewData.summary.structuredCandidateGroups)} grupos de activo/instalación ya clasificados`} />
+            <ReviewMetric label="Sin estructura" value={number(reviewData.summary.unstructuredRows)} detail="Filas que todavía necesitan clasificación o una llave verificable" />
+            <ReviewMetric label="Cerrado financiero" value={number(reviewData.summary.terminalRows)} detail="Contexto financiero/CAPEX que no requiere Ficha 360 individual" />
             <ReviewMetric label="Sin identificador operacional" value={number(reviewData.unresolved.byReason.missing_identifier||0)} detail="Sin centro, patente, serie o nombre suficiente" />
             <ReviewMetric label="Ficha 360 faltante" value={number(reviewData.unresolved.byReason.missing_canonical_asset_candidate||0)} detail="Identificador específico sin contraparte canónica ni alias operacional" />
             <ReviewMetric label="Unidad ambigua" value={number(reviewData.unresolved.byReason.ambiguous_existing_asset_family||0)} detail="La familia existe; falta patente, serie o número de unidad" />
