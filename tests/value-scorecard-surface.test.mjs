@@ -116,9 +116,9 @@ test('maintenance value cockpit publishes evidence coverage with explicit numera
   assert.match(api, /rootCauseCoverage/);
   assert.match(api, /preventiveActionCoverage/);
   assert.match(api, /meterCoverage/);
-  assert.match(api, /attribution: 'NO_MEDIBLE_AUN'/);
-  assert.match(api, /pricingReadiness: 'MARKET_ANCHORED'/);
-  assert.match(api, /Minutos administrativos por OT antes de MOTIL versus con MOTIL/);
+  assert.match(api, /hasObservedComparison \? 'IMPACTO_OPERACIONAL_MEDIDO' : 'NO_MEDIBLE_AUN'/);
+  assert.match(api, /hasPositiveOperationalImpact \? 'OUTCOME_ANCHORED' : 'MARKET_ANCHORED'/);
+  assert.match(api, /Completar cohortes manuales y asistidas comparables de apertura\/cierre/);
   assert.match(api, /\.not\('created_by', 'is', null\)/);
   assert.match(page, /Cobertura · calidad de evidencia/);
   assert.match(page, /Numerador y universo real/);
