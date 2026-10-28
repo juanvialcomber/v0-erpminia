@@ -62,11 +62,35 @@ type ReviewResponse = {
     materialReviewFloorClp: number;
     unexplainedOperationalRows: number;
     unexplainedOperationalBookValueClp: number;
+    depreciationCoverage: {
+      rows: number;
+      withCurrentDepreciation: number;
+      withAccumulatedDepreciation: number;
+      withBookValue: number;
+      withRemainingLife: number;
+      linkedCanonical: number;
+      reviewRequired: number;
+    };
   };
   unresolved: {
     byReason: Record<string,number>;
     rows: ReviewRow[];
     limitedTo: number;
+  };
+};
+
+type LaudusAssetControl = {
+  fixedAssets?: {
+    total?: number;
+    linkedToMotil?: number;
+    withAcquisitionCost?: number;
+    withAcquisitionDate?: number;
+    withUsefulLife?: number;
+    economicsReady?: boolean;
+  };
+  freshness?: {
+    latestOperationalSync?: string | null;
+    operationalSyncAgeDays?: number | null;
   };
 };
 
@@ -100,6 +124,13 @@ const fetcher=async(url:string):Promise<Response>=>{
   return payload;
 };
 
+const laudusFetcher=async(url:string):Promise<LaudusAssetControl>=>{
+  const response=await fetch(url,{credentials:'include',cache:'no-store'});
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok) throw new Error(payload?.error||'No se pudo cargar activos fijos Laudus');
+  return payload;
+};
+
 const reviewFetcher=async(url:string):Promise<ReviewResponse>=>{
   const response=await fetch(url,{credentials:'include',cache:'no-store'});
   const payload=await response.json().catch(()=>null);
@@ -120,6 +151,7 @@ function tone(key:string){
 export default function FinanceAssetsPage(){
   const {data,error,isLoading}=useSWR<Response>('/api/finance/asset-economics',fetcher,{revalidateOnFocus:false});
   const {data:reviewData,error:reviewError}=useSWR<ReviewResponse>('/api/finance/asset-reconciliation-review',reviewFetcher,{revalidateOnFocus:false});
+  const {data:laudusData,error:laudusError}=useSWR<LaudusAssetControl>('/api/integrations/laudus/finance-control',laudusFetcher,{revalidateOnFocus:false,refreshInterval:15*60*1000});
 
   if(isLoading) return <StatePanel tone="loading" title="Preparando economía de activos" description="Conectando seguro, mantenimiento y uso observado." />;
   if(error) return <StatePanel tone="error" title="No se pudo preparar economía de activos" description={error.message} />;
@@ -150,6 +182,70 @@ export default function FinanceAssetsPage(){
       <Metric icon={Wrench} label="Con historia de mantenimiento" value={number(data.summary.withMaintenanceEvidence)} detail="OT o costo reconocido enlazado" />
       <Metric icon={Gauge} label="Con medidor" value={number(data.summary.withRuntimeEvidence)} detail={`${data.summary.withUsableRuntime} con secuencia utilizable para tasas`} />
       <Metric icon={CircleDollarSign} label="Valor libro conciliado" value={number(data.summary.withBookValue)} detail={data.summary.depreciationConflicts > 0 ? `${data.summary.depreciationConflicts} activo(s) con doble registro para Daniel` : 'Depreciación canónica vinculada 1:1'} />
+    </section>
+
+    <section className="rounded-lg border bg-card" aria-label="Estado de depreciación y activos fijos">
+      <div className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Depreciación y Laudus</p>
+          <h2 className="mt-1 font-semibold">Qué está realmente disponible</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            La depreciación contable de Daniel y el maestro de activos fijos Laudus se muestran por separado hasta que la identidad del activo esté conciliada.
+          </p>
+        </div>
+        <Link href="/dashboard/finanzas/activos/registro" className="inline-flex items-center gap-2 text-xs font-medium text-primary">
+          Abrir registro completo <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
+
+      {reviewError ? (
+        <StatePanel tone="error" title="No se pudo cargar la depreciación" description={reviewError.message} className="border-0" />
+      ) : !reviewData ? (
+        <StatePanel tone="loading" title="Preparando depreciación" className="border-0" />
+      ) : (
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <ReviewMetric
+            label="Depreciación del período"
+            value={`${number(reviewData.summary.depreciationCoverage.withCurrentDepreciation)}/${number(reviewData.summary.depreciationCoverage.rows)}`}
+            detail="Filas de la fuente de Daniel con depreciación corriente disponible"
+          />
+          <ReviewMetric
+            label="Valor libro"
+            value={`${number(reviewData.summary.depreciationCoverage.withBookValue)}/${number(reviewData.summary.depreciationCoverage.rows)}`}
+            detail="Registros con valor libro conservado desde la fuente contable"
+          />
+          <ReviewMetric
+            label="Ligadas a Ficha 360"
+            value={number(reviewData.summary.depreciationCoverage.linkedCanonical)}
+            detail="Identidades verificadas; no se fuerza el resto por similitud"
+          />
+          <ReviewMetric
+            label="Vida útil remanente"
+            value={number(reviewData.summary.depreciationCoverage.withRemainingLife)}
+            detail="Registros con meses remanentes disponibles para análisis"
+          />
+        </div>
+      )}
+
+      <div className="grid gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-4">
+        {laudusError ? (
+          <div className="bg-card p-4 sm:col-span-2 xl:col-span-4">
+            <p className="text-sm font-medium">Activos fijos Laudus no disponibles</p>
+            <p className="mt-1 text-xs text-muted-foreground">{laudusError.message}</p>
+          </div>
+        ) : (
+          <>
+            <ReviewMetric label="Activos fijos Laudus" value={number(Number(laudusData?.fixedAssets?.total||0))} detail="Maestro sincronizado; Laudus conserva autoridad financiera" />
+            <ReviewMetric label="Laudus ↔ MOTIL" value={number(Number(laudusData?.fixedAssets?.linkedToMotil||0))} detail="Activos fijos con identidad MOTIL ya vinculada" />
+            <ReviewMetric label="Fecha + vida útil" value={number(Math.min(Number(laudusData?.fixedAssets?.withAcquisitionDate||0),Number(laudusData?.fixedAssets?.withUsefulLife||0)))} detail="Cobertura disponible en el maestro Laudus sincronizado" />
+            <ReviewMetric label="Costo adquisición Laudus" value={number(Number(laudusData?.fixedAssets?.withAcquisitionCost||0))} detail="El listado sincronizado aún no expone costo; detalle se consulta de forma acotada" />
+          </>
+        )}
+      </div>
+
+      <div className="border-t px-4 py-3 text-xs leading-5 text-muted-foreground">
+        <strong className="font-medium text-foreground">Regla:</strong> valor libro, depreciación, seguro y costo de adquisición son magnitudes distintas. MOTIL no completa una con otra ni calcula reemplazo hasta tener identidad 1:1 y evidencia financiera suficiente.
+      </div>
     </section>
 
     <section className="rounded-lg border bg-card">
