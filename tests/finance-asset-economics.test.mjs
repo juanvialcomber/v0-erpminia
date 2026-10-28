@@ -598,3 +598,17 @@ test('candidate verification copy reflects the three masters actually checked',(
   assert.match(page,/0 contrapartes exactas en 3 maestros internos/);
   assert.doesNotMatch(page,/canónico, mantenimiento y planificación/);
 });
+
+
+test('facility review workspace keeps multi-unit families separate from 1:1 installations',()=>{
+  const api=fs.readFileSync('app/api/finance/facility-candidates/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/instalaciones/page.tsx','utf8');
+  const cockpit=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(api,/multi_unit_family/);
+  assert.match(api,/Esta vista es de revisión\. No crea, fusiona ni modifica Fichas 360/);
+  assert.match(page,/Requiere desagregar/);
+  assert.match(page,/No crear Ficha 360 hasta separar unidades con evidencia/);
+  assert.match(page,/Instalación 1:1/);
+  assert.match(cockpit,/\/dashboard\/finanzas\/activos\/instalaciones/);
+  assert.match(cockpit,/Revisar instalaciones/);
+});
