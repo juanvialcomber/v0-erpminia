@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type PriorityDecisionSummary = {
   total?: number;
@@ -223,6 +224,7 @@ export function LaudusFinanceControlCard() {
     return (
       <Card className="shadow-none">
         <CardContent className="p-5">
+          <LaudusSourceMark state="offline" className="mb-3" />
           <p className="text-sm font-medium">Control Laudus no disponible</p>
           <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
         </CardContent>
@@ -410,10 +412,7 @@ export function LaudusFinanceControlCard() {
     <Card className="overflow-hidden border-border/80 bg-card shadow-none">
       <CardContent className="space-y-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />
-            <p className="text-xs font-medium">Laudus · fuente financiera</p>
-          </div>
+          <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} />
           <div className="flex items-center gap-2">
             {!isLoading && freshnessIsStale ? <Badge variant="destructive">Dato atrasado</Badge> : null}
             <p className="text-xs text-muted-foreground">
