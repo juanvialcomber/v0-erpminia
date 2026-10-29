@@ -20,6 +20,14 @@ test('financial master sync uses bounded 100-row pages and existing ingest RPCs'
   assert.match(helper, /motil_reconcile_laudus_financial_masters/);
 });
 
+test('financial master sync requests only fields observed in successful Laudus payloads', () => {
+  assert.match(helper, /'costCenterId','code','name','fullPath','parentId','discontinued'/);
+  assert.match(helper, /'depreciateFromMonthOfAcquisition','taxDeductionPercentage'/);
+  assert.doesNotMatch(helper, /'modifiedAt'/);
+  assert.doesNotMatch(helper, /'acquisitionCost'/);
+  assert.doesNotMatch(helper, /'supplierId'/);
+});
+
 test('financial master sync remains read only toward Laudus and canonical', () => {
   assert.match(helper, /laudusMutated: false/);
   assert.match(helper, /canonicalMutated: false/);
