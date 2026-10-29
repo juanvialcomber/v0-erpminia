@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
           fetchAll((from, to) => context.supabase
             .schema('integration')
             .from('laudus_product_stock')
-            .select('product_external_id,warehouse_external_id,stock,source_date_to,synced_at')
+            .select('product_external_id,warehouse_external_id,lot,stock,source_date_to,synced_at')
             .eq('organization_id', context.organizationId)
             .in('product_external_id', productCandidateIds)
             .range(from, to)),
@@ -159,22 +159,35 @@ export async function GET(request: NextRequest) {
           const productId = text(row.product_external_id);
           const warehouseId = text(row.warehouse_external_id);
           if (!productId || !warehouseId) continue;
-          const key = `${productId}:${warehouseId}`;
+          const key = `${productId}:${warehouseId}:${text(row.lot)}`;
           const current = latestPositions.get(key);
           const currentAt = Date.parse(text(current?.source_date_to || current?.synced_at)) || 0;
           const nextAt = Date.parse(text(row.source_date_to || row.synced_at)) || 0;
           if (!current || nextAt >= currentAt) latestPositions.set(key, row);
         }
 
+        const warehouseTotals = new Map<string, { productId: string; warehouseCode: string; stock: number }>();
         for (const row of latestPositions.values()) {
           const productId = text(row.product_external_id);
-          const positions = productPositionMap.get(productId) || [];
-          positions.push({
-            warehouseCode: text(row.warehouse_external_id),
-            warehouseName: warehouseNames.get(text(row.warehouse_external_id)) || '',
-            stock: Number(row.stock || 0),
+          const warehouseCode = text(row.warehouse_external_id);
+          if (!productId || !warehouseCode) continue;
+          const key = `${productId}:${warehouseCode}`;
+          const current = warehouseTotals.get(key);
+          warehouseTotals.set(key, {
+            productId,
+            warehouseCode,
+            stock: Number(current?.stock || 0) + Number(row.stock || 0),
           });
-          productPositionMap.set(productId, positions);
+        }
+
+        for (const row of warehouseTotals.values()) {
+          const positions = productPositionMap.get(row.productId) || [];
+          positions.push({
+            warehouseCode: row.warehouseCode,
+            warehouseName: warehouseNames.get(row.warehouseCode) || '',
+            stock: row.stock,
+          });
+          productPositionMap.set(row.productId, positions);
         }
 
         for (const positions of productPositionMap.values()) {
