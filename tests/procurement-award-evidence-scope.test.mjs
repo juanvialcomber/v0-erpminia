@@ -39,7 +39,7 @@ test('supplier performance excludes procurement UAT at the intake boundary', () 
   assert.match(migration, /7150f4ec-19b5-412c-b505-d11c8ed55a06/);
   assert.match(migration, /with eligible_orders as/);
   assert.match(migration, /req\.evidence_scope='operational'/);
-  assert.match(migration, /join eligible_orders o[\s\S]*procurement_supplier_invoices/);
-  assert.match(migration, /join eligible_orders o[\s\S]*procurement_supplier_returns/);
+  assert.match(migration, /from public\.procurement_supplier_invoices i[\s\S]*join eligible_orders o/);
+  assert.match(migration, /from public\.procurement_supplier_returns r[\s\S]*join eligible_orders o/);
   assert.match(migration, /v2_equal_available_dimensions_operational_only/);
 });
