@@ -1,5 +1,5 @@
 import { listLaudus } from '@/lib/integrations/laudus/client';
-import { LAUDUS_SYNC_POLICIES } from '@/lib/integrations/laudus/sync-policy';
+import { LAUDUS_SYNC_POLICIES, markLaudusSyncFailure, markLaudusSyncRunning, markLaudusSyncSuccess } from '@/lib/integrations/laudus/sync-policy';
 
 const COST_CENTER_PATH = '/purchases/costcenters/list';
 const FIXED_ASSET_PATH = '/purchases/fixedAssets/list';
@@ -57,7 +57,9 @@ export async function syncLaudusFinancialMasters(
   organizationId: string,
   supabase: any,
 ) {
-  const [costCenters, fixedAssets] = await Promise.all([
+  await markLaudusSyncRunning(supabase, organizationId, 'financial_masters');
+  try {
+    const [costCenters, fixedAssets] = await Promise.all([
     fetchAll(COST_CENTER_PATH, COST_CENTER_FIELDS, 'cost_center'),
     fetchAll(FIXED_ASSET_PATH, FIXED_ASSET_FIELDS, 'fixed_asset'),
   ]);
@@ -78,15 +80,28 @@ export async function syncLaudusFinancialMasters(
   );
   if (reconciliationError) throw new Error('Laudus financial master reconciliation failed');
 
-  return {
+    const apiListCalls = costCenters.calls + fixedAssets.calls;
+    await markLaudusSyncSuccess(supabase, organizationId, 'financial_masters', {
+      processed: costCenters.rows.length + fixedAssets.rows.length,
+      changed: 0,
+      conflicts: 0,
+      apiCalls: apiListCalls,
+      metadata: { costCentersRead: costCenters.rows.length, fixedAssetsRead: fixedAssets.rows.length },
+    });
+
+    return {
     status: 'completed' as const,
     organizationId,
-    apiListCalls: costCenters.calls + fixedAssets.calls,
+    apiListCalls,
     costCentersRead: costCenters.rows.length,
     fixedAssetsRead: fixedAssets.rows.length,
     ingest,
     reconciliation,
     laudusMutated: false,
     canonicalMutated: false,
-  };
+    };
+  } catch (error) {
+    await markLaudusSyncFailure(supabase, organizationId, 'financial_masters', error);
+    throw error;
+  }
 }
