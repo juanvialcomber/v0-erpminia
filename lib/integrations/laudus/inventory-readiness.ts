@@ -28,6 +28,7 @@ type BodegaAuthorityRow = {
 };
 
 type LaudusNegativePositionRow = {
+  product_external_id: string | null;
   sku: string | null;
   description: string | null;
   unit_of_measure: string | null;
@@ -122,7 +123,7 @@ export async function loadLaudusInventoryReadiness(
       .maybeSingle(),
     db
       .from('laudus_negative_stock_positions_service_v1')
-      .select('sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
+      .select('product_external_id,sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
       .eq('organization_id', organizationId)
       .order('warehouse_stock', { ascending: true }),
     db
@@ -142,6 +143,7 @@ export async function loadLaudusInventoryReadiness(
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
   const negativePositions = ((negativePositionsResult.data || []) as LaudusNegativePositionRow[]).map((row) => ({
+    productId: String(row.product_external_id || ''),
     sku: String(row.sku || ''),
     description: String(row.description || row.sku || ''),
     unit: String(row.unit_of_measure || ''),

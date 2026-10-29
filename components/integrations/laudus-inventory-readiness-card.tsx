@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
-import { AlertTriangle, Boxes, GitCompareArrows, History, ShieldCheck, Warehouse } from 'lucide-react';
+import { AlertTriangle, Boxes, GitCompareArrows, History, RefreshCw, ShieldCheck, Warehouse } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Payload = {
@@ -38,6 +40,7 @@ type Payload = {
     negativeProducts: number;
     negativeWarehouses: number;
     negativePositions: Array<{
+      productId: string;
       sku: string;
       description: string;
       unit: string;
@@ -99,6 +102,42 @@ export function LaudusInventoryReadinessCard() {
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
+
+  const [kardexLoading, setKardexLoading] = useState<string | null>(null);
+  const [kardexMessage, setKardexMessage] = useState<Record<string, string>>({});
+
+  async function loadKardex(productId: string, sku: string) {
+    if (!productId || kardexLoading) return;
+    setKardexLoading(productId);
+    setKardexMessage((current) => ({ ...current, [sku]: 'Consultando Kardex…' }));
+    try {
+      const response = await fetch('/api/integrations/laudus/kardex-sync', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = response.status === 403
+          ? 'Requiere permiso de administración.'
+          : payload?.error || 'No fue posible consultar el Kardex.';
+        setKardexMessage((current) => ({ ...current, [sku]: message }));
+        return;
+      }
+      const movements = Number(payload?.movements || 0);
+      setKardexMessage((current) => ({
+        ...current,
+        [sku]: movements > 0
+          ? `Kardex cargado · ${movements.toLocaleString('es-CL')} movimiento${movements === 1 ? '' : 's'}.`
+          : 'Kardex consultado · sin movimientos devueltos.',
+      }));
+    } catch {
+      setKardexMessage((current) => ({ ...current, [sku]: 'No fue posible consultar el Kardex.' }));
+    } finally {
+      setKardexLoading(null);
+    }
+  }
 
   if (error) {
     return (
@@ -207,13 +246,27 @@ export function LaudusInventoryReadinessCard() {
           </div>
           <div className="mt-3 divide-y rounded-md border bg-card">
             {data.laudus.negativePositions.map((row) => (
-              <div key={`${row.sku}:${row.warehouseCode}`} className="grid gap-1 px-3 py-2.5 text-xs sm:grid-cols-[120px_1fr_180px_110px] sm:items-center sm:gap-3">
+              <div key={`${row.sku}:${row.warehouseCode}`} className="grid gap-2 px-3 py-2.5 text-xs sm:grid-cols-[120px_1fr_180px_110px_130px] sm:items-center sm:gap-3">
                 <span className="font-mono">{row.sku}</span>
-                <span className="truncate" title={row.description}>{row.description}</span>
+                <div className="min-w-0">
+                  <span className="block truncate" title={row.description}>{row.description}</span>
+                  {kardexMessage[row.sku] ? <span className="mt-0.5 block text-[11px] text-muted-foreground">{kardexMessage[row.sku]}</span> : null}
+                </div>
                 <span className="text-muted-foreground">{row.warehouseName}</span>
                 <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
                   {count(row.warehouseStock)} {row.unit}
                 </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={!row.productId || Boolean(kardexLoading)}
+                  onClick={() => void loadKardex(row.productId, row.sku)}
+                >
+                  <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${kardexLoading === row.productId ? 'animate-spin' : ''}`} />
+                  Kardex
+                </Button>
               </div>
             ))}
           </div>
