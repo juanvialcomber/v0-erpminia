@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
+import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
 
 const primarySections = [
@@ -33,6 +34,7 @@ export default function FinancePage() {
         </div>
       </section>
 
+      <LaudusFinanceStatusStrip />
       <LaudusFinanceControlCard />
       <AssetCandidateReviewSignal />
 
