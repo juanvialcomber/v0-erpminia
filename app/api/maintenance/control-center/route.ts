@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
       ].filter(Boolean).join(' · ');
       actions.push({
         id: `supply-integrity:${row.work_order_id}`,
-        kind: 'supply_integrity',
+        kind: 'operational_blocker',
         priority: 9,
         title: `Conciliar abastecimiento post-cierre · ${row.work_order_number || 'OT'}`,
         description: row.title || 'Orden terminada con abastecimiento todavía pendiente',
