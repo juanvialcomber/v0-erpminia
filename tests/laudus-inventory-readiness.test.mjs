@@ -54,3 +54,10 @@ test('UI exposes Laudus authority and cross-source reconciliation without auto-o
   assert.match(card, /Laudus primario · validación cruzada activa/);
   assert.match(card, /Conciliación activa · sin overwrite automático/);
 });
+
+
+test('inventory readiness avoids the timed-out negative count on canonical_inventory_current', () => {
+  assert.match(helper, /inventory_intelligence_overview_v1/);
+  assert.match(helper, /negative_stock_products/);
+  assert.doesNotMatch(helper, /canonical_inventory_current'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('organization_id', organizationId\)\.lt\('quantity', 0\)/);
+});
