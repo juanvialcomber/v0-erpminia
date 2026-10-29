@@ -48,9 +48,9 @@ whatsapp_gate as (
     max(w.occurred_at) filter (
       where w.occurred_at > l.latest_laudus_stock_sync
         and (
-          lower(coalesce(w.body,'')) ~ '(petróleo|petroleo|diesel|existencia[s]?)'
+          lower(coalesce(w.body,'')) ~ '(existencia[s]?|sin stock|stock disponible|stock actual)'
           or (
-            lower(coalesce(w.body,'')) ~ '(bodega)'
+            lower(coalesce(w.body,'')) ~ '(petróleo|petroleo|diesel|bodega)'
             and lower(coalesce(w.body,'')) ~ '([0-9]+([\.,][0-9]+)?[[:space:]]*(l|lt|lts|litro|litros|kg|kilo|kilos|unidad|unidades))'
           )
         )
@@ -58,9 +58,9 @@ whatsapp_gate as (
     count(w.*) filter (
       where w.occurred_at > l.latest_laudus_stock_sync
         and (
-          lower(coalesce(w.body,'')) ~ '(petróleo|petroleo|diesel|existencia[s]?)'
+          lower(coalesce(w.body,'')) ~ '(existencia[s]?|sin stock|stock disponible|stock actual)'
           or (
-            lower(coalesce(w.body,'')) ~ '(bodega)'
+            lower(coalesce(w.body,'')) ~ '(petróleo|petroleo|diesel|bodega)'
             and lower(coalesce(w.body,'')) ~ '([0-9]+([\.,][0-9]+)?[[:space:]]*(l|lt|lts|litro|litros|kg|kilo|kilos|unidad|unidades))'
           )
         )
