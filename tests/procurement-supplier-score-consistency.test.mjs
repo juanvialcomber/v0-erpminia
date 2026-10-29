@@ -24,3 +24,12 @@ test('supplier control no longer renders the legacy performance score contract',
   assert.doesNotMatch(control, /performance_score/);
   assert.doesNotMatch(control, /on_time_rate/);
 });
+
+test('award decision shows delivery score with evaluated/completed coverage', () => {
+  const awardRoute = fs.readFileSync('app/api/procurement/award-evidence/route.ts','utf8');
+  const awardPanel = fs.readFileSync('components/procurement/award-evidence-panel.tsx','utf8');
+  assert.match(awardRoute, /completed_orders/);
+  assert.match(awardRoute, /delivery_scored_orders/);
+  assert.match(awardPanel, /OC evaluables/);
+  assert.match(awardPanel, /completed_orders/);
+});
