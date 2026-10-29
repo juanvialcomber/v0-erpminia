@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, supplyNeeds, procurementRequests, procurementOrders, procurementReceipts] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, supplyNeeds, procurementRequests, procurementOrders, procurementReceipts, noPurchaseDecisions] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -85,6 +85,14 @@ export async function GET(request: NextRequest) {
         .select('id,order_id,received_at')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at,user_id')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'supply_need_no_purchase_decision')
+        .eq('resource_type', 'work_order_supply_need')
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
     if (current.error) throw current.error;
@@ -100,6 +108,7 @@ export async function GET(request: NextRequest) {
     if (procurementRequests.error) throw procurementRequests.error;
     if (procurementOrders.error) throw procurementOrders.error;
     if (procurementReceipts.error) throw procurementReceipts.error;
+    if (noPurchaseDecisions.error) throw noPurchaseDecisions.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -415,6 +424,24 @@ export async function GET(request: NextRequest) {
       semantics: 'observed handoff from supply need creation to canonical procurement request, first issued purchase order and first receipt; missing stages remain unmeasured and are not treated as zero',
     };
 
+    const latestNoPurchaseByNeed = new Map<string, any>();
+    for (const row of noPurchaseDecisions.data || []) {
+      const key = String(row.resource_identifier || '');
+      if (key && !latestNoPurchaseByNeed.has(key)) latestNoPurchaseByNeed.set(key, row);
+    }
+    const noPurchaseRows = Array.from(latestNoPurchaseByNeed.values());
+    const noPurchaseExposureClp = noPurchaseRows.reduce((sum:number, row:any) => {
+      const value = Number((row.new_values as any)?.estimated_exposure_clp);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0);
+    const supplyDecisionEvidence = {
+      uniqueNoPurchaseDecisions: noPurchaseRows.length,
+      estimatedExposureReviewedClp: noPurchaseExposureClp,
+      latestAt: noPurchaseRows[0]?.created_at || null,
+      calibrationGate: noPurchaseRows.length >= 20 ? 'PASS' : 'HOLD',
+      semantics: 'estimated exposure reviewed under human no-purchase decisions; not realized savings or avoided cost until outcome closure',
+    };
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -450,6 +477,7 @@ export async function GET(request: NextRequest) {
         semantics: 'time from first supply_need_refreshed event to procurement_intake_created; human-confirmed handoff',
       },
       supplyCycle,
+      supplyDecisionEvidence,
       medianExecutionCycleHours:
         medianExecutionCycleSeconds === null
           ? null
