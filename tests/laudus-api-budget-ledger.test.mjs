@@ -41,3 +41,9 @@ test('all current Laudus execution entrypoints are usage-tracked',()=>{
     assert.match(source,/withLaudusApiUsageTracking/);
   }
 });
+
+
+test('usage-tracked routes fail closed when organization context is missing',()=>{
+  assert.match(bank,/Organización no disponible/);
+  assert.match(smoke,/Organización no disponible/);
+});
