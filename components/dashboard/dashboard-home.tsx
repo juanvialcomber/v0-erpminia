@@ -162,6 +162,7 @@ function PersonaSummaryStrip({
   personaKey: NonNullable<ReturnType<typeof resolvePersonaDashboard>>;
   summary?: InboxSummary;
   loading: boolean;
+  coverageAvailable?: boolean;
 }) {
   const persona = PERSONA_DASHBOARDS[personaKey];
   const cards: Array<{ label: string; value: number | string; detail: string }> = [
