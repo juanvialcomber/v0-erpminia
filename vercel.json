@@ -47,7 +47,7 @@
     },
     {
       "path": "/api/cron/laudus-suppliers-weekly",
-      "schedule": "50 5 * * 0"
+      "schedule": "20 6 * * 0"
     }
   ]
 }
