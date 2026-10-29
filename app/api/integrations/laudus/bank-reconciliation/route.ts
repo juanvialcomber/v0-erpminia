@@ -8,6 +8,9 @@ import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage'
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
   if (!access.authorized) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible.' }, { status: 400 });
+  }
 
   try {
     const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusBankReconciliationSummary());
