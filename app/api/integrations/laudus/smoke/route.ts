@@ -7,6 +7,7 @@ import {
   LaudusApiError,
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runLaudusReadOnlySmokeTest();
+    const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusReadOnlySmokeTest());
     return NextResponse.json({
       status: 'ok',
       configured: true,
