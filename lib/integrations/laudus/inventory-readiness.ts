@@ -84,7 +84,7 @@ export async function loadLaudusInventoryReadiness(
       .maybeSingle();
 
     if (!source.error && source.data?.enabled) {
-      const [run, unresolved] = await Promise.all([
+      const [run, unresolvedInventory, unresolvedWarehouses] = await Promise.all([
         db
           .schema('integration')
           .from('sync_runs')
@@ -100,11 +100,19 @@ export async function loadLaudusInventoryReadiness(
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', organizationId)
           .eq('source_id', source.data.id)
+          .in('entity_type', ['product', 'stock'])
           .in('resolution_status', ['pending', 'conflict', 'new_candidate']),
+        db
+          .schema('integration')
+          .from('laudus_warehouses')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .in('reconciliation_status', ['new_candidate', 'conflict']),
       ]);
 
-      if (unresolved.error) throw new Error(unresolved.error.message);
-      openReconciliation = unresolved.count ?? 0;
+      if (unresolvedInventory.error) throw new Error(unresolvedInventory.error.message);
+      if (unresolvedWarehouses.error) throw new Error(unresolvedWarehouses.error.message);
+      openReconciliation = (unresolvedInventory.count ?? 0) + (unresolvedWarehouses.count ?? 0);
 
       const status = String(run.data?.status || '').toLowerCase();
       if (status === 'partial' || status === 'failed' || openReconciliation > 0) laudusState = 'review';
