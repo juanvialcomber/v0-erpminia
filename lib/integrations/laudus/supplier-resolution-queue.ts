@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+const SUPPLIER_QUEUE_VIEW = 'supplier_resolution_queue_service_v1';
+
 export async function loadSupplierResolutionQueue(
   db: SupabaseClient,
   organizationId: string,
@@ -7,13 +9,11 @@ export async function loadSupplierResolutionQueue(
 ) {
   const [countResult, rowsResult] = await Promise.all([
     db
-      .schema('integration')
-      .from('supplier_resolution_queue_v1')
+      .from(SUPPLIER_QUEUE_VIEW)
       .select('supplier_name_key', { count: 'exact', head: true })
       .eq('organization_id', organizationId),
     db
-      .schema('integration')
-      .from('supplier_resolution_queue_v1')
+      .from(SUPPLIER_QUEUE_VIEW)
       .select(
         'supplier_name_key,display_name,purchase_order_count,first_order_date,last_order_date,currency_count,single_currency,total_amount_single_currency',
       )
