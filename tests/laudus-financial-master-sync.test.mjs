@@ -34,3 +34,11 @@ test('financial master sync remains read only toward Laudus and canonical', () =
   assert.doesNotMatch(helper, /fetch\([^)]*api\.laudus\.cl/);
   assert.doesNotMatch(helper, /method:\s*['"](?:PUT|PATCH|DELETE)['"]/);
 });
+
+
+test('financial master sync updates control-plane health', () => {
+  assert.match(helper, /markLaudusSyncRunning/);
+  assert.match(helper, /markLaudusSyncSuccess/);
+  assert.match(helper, /markLaudusSyncFailure/);
+  assert.match(helper, /apiListCalls/);
+});
