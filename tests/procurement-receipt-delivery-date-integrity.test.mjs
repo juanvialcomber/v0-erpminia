@@ -13,7 +13,7 @@ test('full operational receipt persists actual delivery date from receipt eviden
 test('historical repair is bounded to received or closed orders with real receipts', () => {
   assert.match(migration, /o\.actual_delivery_date is null/);
   assert.match(migration, /o\.status in \('received','closed'\)/);
-  assert.match(migration, /join public\.procurement_operational_receipts/);
+  assert.match(migration, /from public\.procurement_operational_receipts/);
   assert.doesNotMatch(migration, /expected_delivery_date[^\n]*actual_delivery_date/);
 });
 
