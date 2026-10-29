@@ -291,3 +291,11 @@ Estos umbrales habilitan escala inicial, no E4.
 - Caso observado: OT-2026-0011 conserva 6 faltantes históricos, pero las 6 líneas tienen stock actual suficiente en Laudus; el sistema ya no debe promover ese caso a compra.
 - Valor actual: control preventivo de una compra potencialmente redundante. Todavía no se declara costo evitado porque no existe una OC cancelada o una compra efectivamente impedida con outcome registrado.
 - Nivel: L4 decisión asistida; E1/E2 de evidencia. Gate E3: registrar el primer caso donde el usuario acepte la recomendación, cierre la necesidad sin comprar y quede evidencia del monto que realmente se evitó comprometer.
+
+## 2026-10-29 — Decisión humana de no compra
+
+- Cuando una necesidad histórica queda totalmente cubierta por stock actual y Laudus conserva autoridad primaria, Compras permite registrar explícitamente `no comprar / conciliar stock`.
+- La decisión se persiste en `audit_log` con actor, timestamp, necesidad, líneas faltantes, stock Laudus observado y fecha de sincronización.
+- La acción no cancela requerimientos, no cierra la necesidad canónica, no modifica stock y no escribe en Laudus.
+- MOTIL separa decisión de negocio de reconciliación de datos: primero se evita promover una compra innecesaria; luego la fuente canónica debe reconciliarse por su flujo autorizado.
+- Evidencia habilitada: aceptación humana de una recomendación preventiva. Esto permite medir tasa de aceptación y, cuando exista una compra realmente evitada con monto demostrable, promover el outcome a E3.
