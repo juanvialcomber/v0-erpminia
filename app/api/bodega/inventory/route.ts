@@ -135,10 +135,12 @@ export async function GET(request: NextRequest) {
       console.error('[v0] canonical inventory error:', error);
     } else if (data && data.length > 0) {
       let effectiveStock: Awaited<ReturnType<typeof loadLaudusEffectiveStock>> | null = null;
-      try {
-        effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, (data as CanonicalInventoryRow[]).map((item) => item.sku));
-      } catch (authorityError) {
-        console.error('[bodega/inventory:laudus-authority]', authorityError);
+      if (orgId) {
+        try {
+          effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, (data as CanonicalInventoryRow[]).map((item) => item.sku));
+        } catch (authorityError) {
+          console.error('[bodega/inventory:laudus-authority]', authorityError);
+        }
       }
 
       const inventory = (data as CanonicalInventoryRow[]).map((item) => {
@@ -219,10 +221,12 @@ export async function GET(request: NextRequest) {
     const total = canonicalResult.count || 0;
     const canonicalRows = (canonicalResult.data as InventoryRow[] | null) || [];
     let effectiveStock: Awaited<ReturnType<typeof loadLaudusEffectiveStock>> | null = null;
-    try {
-      effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, canonicalRows.map((item) => item.sku));
-    } catch (authorityError) {
-      console.error('[bodega/inventory:laudus-authority]', authorityError);
+    if (orgId) {
+      try {
+        effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, canonicalRows.map((item) => item.sku));
+      } catch (authorityError) {
+        console.error('[bodega/inventory:laudus-authority]', authorityError);
+      }
     }
     return NextResponse.json({
       inventory: canonicalRows.map((item) => {
