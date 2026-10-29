@@ -21,6 +21,9 @@ test('Compras shows revalidated maintenance needs before the operational pipelin
   assert.match(panel, /Enviar a Compras/);
 });
 
-test('covered historical shortages cannot be handed off from the UI', () => {
-  assert.match(panel, /covered \? <Button[^>]*disabled>Conciliar antes de comprar/);
+test('covered historical shortages require a human no-purchase decision instead of procurement handoff', () => {
+  assert.match(panel, /confirm_no_purchase/);
+  assert.match(panel, /No comprar · decisión registrada/);
+  assert.match(route, /supply_need_no_purchase_decision/);
+  assert.match(route, /does not close canonical supply need/);
 });
