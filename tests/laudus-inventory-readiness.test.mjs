@@ -12,11 +12,16 @@ test('inventory readiness separates ERP evidence from operational stock authorit
   assert.match(helper, /autoOverwrite: false/);
 });
 
-test('inventory readiness measures product identity, physical count, movements and snapshot anomalies', () => {
-  assert.match(helper, /productCoverage/);
-  assert.match(helper, /physicalCountCoverage/);
-  assert.match(helper, /movementCount/);
-  assert.match(helper, /negativeRows/);
+test('inventory readiness measures live Laudus identity, stock, warehouses and open reconciliation', () => {
+  assert.match(helper, /canonicalProductCoverage/);
+  assert.match(helper, /inventory_eligibility', 'eligible'/);
+  assert.match(helper, /eligibleProducts/);
+  assert.match(helper, /excludedProducts/);
+  assert.match(helper, /canonicalProductCoverage: pct\(laudusEligibleProductsLinked, laudusEligibleProducts\)/);
+  assert.match(helper, /laudusStockRows/);
+  assert.match(helper, /mappedPhysicalWarehouses/);
+  assert.match(helper, /latestLaudusStock/);
+  assert.match(helper, /openReconciliation/);
 });
 
 test('inventory readiness API is permission scoped and read-only', () => {
@@ -31,9 +36,12 @@ test('reconciliation readiness defaults to zero tolerance and waits for verified
   assert.match(helper, /ready_to_compare/);
 });
 
-test('UI states that Laudus cannot overwrite operational or physical stock automatically', () => {
-  assert.match(card, /saldo ERP y movimientos como evidencia/);
-  assert.match(card, /no reemplazará automáticamente el stock operacional ni un conteo físico/);
-  assert.match(card, /Tolerancia base 0/);
+test('UI states that Laudus is live ERP evidence and cannot overwrite operational stock', () => {
+  assert.match(card, /Laudus aporta catálogo, stock ERP y bodegas como evidencia/);
+  assert.match(card, /MOTIL conserva por separado el stock operacional/);
+  assert.match(card, /Productos Laudus elegibles enlazados al catálogo/);
+  assert.match(card, /fuera de alcance/);
+  assert.match(card, /Posiciones producto-bodega Laudus/);
+  assert.match(card, /Bodegas físicas conciliadas con MOTIL/);
   assert.match(card, /sin autoajuste/);
 });

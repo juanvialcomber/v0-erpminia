@@ -146,6 +146,40 @@ export async function GET(request: NextRequest) {
     } catch {
       // External integration intake is optional until its migration is deployed.
     }
+
+    try {
+      const warehouseRows = await fetchAll((from, to) => context.supabase
+        .schema('integration')
+        .from('laudus_warehouses')
+        .select('id,external_id,name,address,county,city,state,motil_warehouse_id,reconciliation_status,source_payload')
+        .eq('organization_id', context.organizationId)
+        .in('reconciliation_status', ['new_candidate', 'conflict'])
+        .range(from, to));
+
+      for (const row of warehouseRows) {
+        const proposedName = text(row.source_payload?.warehouse_candidate_proposed_match_name);
+        const proposedCode = text(row.source_payload?.warehouse_candidate_proposed_match_code);
+        const candidate = proposedName
+          ? ` Posible correspondencia: ${proposedCode ? proposedCode + ' · ' : ''}${proposedName}.`
+          : '';
+        const location = [row.address, row.county, row.city, row.state].map(text).filter(Boolean).join(' · ');
+
+        addIssue(issues, {
+          issue_key: `laudus_warehouse:${text(row.external_id) || row.id}`,
+          entity_type: 'warehouse',
+          entity_id: row.motil_warehouse_id || null,
+          issue_type: norm(row.reconciliation_status) === 'conflict' ? 'source_conflict' : 'new_external_candidate',
+          field_name: null,
+          severity: norm(row.reconciliation_status) === 'conflict' ? 'critical' : 'warning',
+          label: `Laudus bodega ${text(row.external_id) || 'sin código'} · ${text(row.name) || 'Sin nombre'}`,
+          detail: `Bodega física Laudus pendiente de revisión humana.${location ? ' ' + location + '.' : ''}${candidate} No se crea, fusiona ni enlaza automáticamente.`,
+          href: '/dashboard/bodega',
+        });
+      }
+    } catch {
+      // Warehouse staging is optional until Laudus warehouse intake exists.
+    }
+
     const productIds = new Set(products.map((row) => row.id));
     const assetIds = new Set(assets.map((row) => row.id));
     const peopleIds = new Set(people.map((row) => row.id));

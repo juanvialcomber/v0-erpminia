@@ -26,6 +26,12 @@ export async function loadLaudusInventoryReadiness(
     snapshotWarehouse,
     snapshotNegative,
     latestSnapshot,
+    laudusProducts,
+    laudusEligibleProducts,
+    laudusEligibleProductsLinked,
+    laudusStockRows,
+    laudusWarehouses,
+    latestLaudusStock,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
@@ -42,11 +48,33 @@ export async function loadLaudusInventoryReadiness(
       .order('snapshot_date', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible')),
+    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible').not('canonical_product_id', 'is', null)),
+    count(db.schema('integration').from('laudus_product_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    db
+      .schema('integration')
+      .from('laudus_warehouses')
+      .select('external_id,name,motil_warehouse_id,reconciliation_status')
+      .eq('organization_id', organizationId),
+    db
+      .schema('integration')
+      .from('laudus_product_stock')
+      .select('synced_at')
+      .eq('organization_id', organizationId)
+      .order('synced_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
+  if (laudusWarehouses.error) throw new Error(laudusWarehouses.error.message);
+  if (latestLaudusStock.error) throw new Error(latestLaudusStock.error.message);
 
-  let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
+  let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = laudusStockRows > 0
+    ? 'ready_to_compare'
+    : 'waiting_laudus';
+  let openReconciliation = 0;
 
   try {
     const source = await db
@@ -58,23 +86,51 @@ export async function loadLaudusInventoryReadiness(
       .maybeSingle();
 
     if (!source.error && source.data?.enabled) {
-      const run = await db
-        .schema('integration')
-        .from('sync_runs')
-        .select('status')
-        .eq('organization_id', organizationId)
-        .eq('source_id', source.data.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [run, unresolvedInventory, unresolvedWarehouses] = await Promise.all([
+        db
+          .schema('integration')
+          .from('sync_runs')
+          .select('status')
+          .eq('organization_id', organizationId)
+          .eq('source_id', source.data.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        db
+          .schema('integration')
+          .from('reconciliation_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('source_id', source.data.id)
+          .in('entity_type', ['product', 'stock'])
+          .in('resolution_status', ['pending', 'conflict', 'new_candidate']),
+        db
+          .schema('integration')
+          .from('laudus_warehouses')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .in('reconciliation_status', ['new_candidate', 'conflict']),
+      ]);
+
+      if (unresolvedInventory.error) throw new Error(unresolvedInventory.error.message);
+      if (unresolvedWarehouses.error) throw new Error(unresolvedWarehouses.error.message);
+      openReconciliation = (unresolvedInventory.count ?? 0) + (unresolvedWarehouses.count ?? 0);
 
       const status = String(run.data?.status || '').toLowerCase();
-      if (status === 'completed') laudusState = 'ready_to_compare';
-      if (status === 'partial' || status === 'failed') laudusState = 'review';
+      if (status === 'partial' || status === 'failed' || openReconciliation > 0) laudusState = 'review';
+      else if (status === 'completed' || laudusStockRows > 0) laudusState = 'ready_to_compare';
     }
   } catch {
-    // Expected before the private integration schema is deployed.
+    if (laudusStockRows > 0) laudusState = 'ready_to_compare';
   }
+
+  const physicalWarehouseIds = new Set(['001', '002', '003', '004']);
+  const physicalWarehouses = (laudusWarehouses.data || []).filter((row: any) =>
+    physicalWarehouseIds.has(String(row.external_id || '')),
+  );
+  const mappedPhysicalWarehouses = physicalWarehouses.filter((row: any) =>
+    Boolean(row.motil_warehouse_id) && String(row.reconciliation_status || '') === 'matched',
+  );
 
   return {
     stock: {
@@ -89,17 +145,29 @@ export async function loadLaudusInventoryReadiness(
       negativeRows: snapshotNegative,
     },
     movementCount: movements,
+    laudus: {
+      products: laudusProducts,
+      eligibleProducts: laudusEligibleProducts,
+      excludedProducts: Math.max(0, laudusProducts - laudusEligibleProducts),
+      canonicalProductCoverage: pct(laudusEligibleProductsLinked, laudusEligibleProducts),
+      stockRows: laudusStockRows,
+      warehouses: (laudusWarehouses.data || []).length,
+      physicalWarehouses: physicalWarehouses.length,
+      mappedPhysicalWarehouses: mappedPhysicalWarehouses.length,
+      latestStockSync: latestLaudusStock.data?.synced_at || null,
+      openReconciliation,
+    },
     reconciliation: {
       state: laudusState,
       defaultAbsoluteTolerance: 0,
       requiresApprovedTolerance: true,
       physicalCountUsedAsEvidence: true,
-      autoApply: false,
+      autoApply: false as const,
     },
     policy: {
-      laudusStockRole: 'erp_evidence',
-      motilOperationalStockRole: 'operational_truth',
-      autoOverwrite: false,
+      laudusStockRole: 'erp_evidence' as const,
+      motilOperationalStockRole: 'operational_truth' as const,
+      autoOverwrite: false as const,
     },
   };
 }

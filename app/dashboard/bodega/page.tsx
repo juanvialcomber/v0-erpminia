@@ -80,7 +80,7 @@ export default function BodegaPage() {
       sources={[
         sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
         sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
-        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Stock ERP y movimientos: pendiente de habilitación comercial de API.' }),
+        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando la última sincronización del ERP.' }),
         sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
       ]}
     /> : null}
@@ -93,7 +93,7 @@ export default function BodegaPage() {
         { label: 'Productos', ready: true, detail: 'Catálogo canónico disponible.' },
         { label: 'Stock por bodega', ready: true, detail: 'Modelo operacional disponible.' },
         { label: 'Conciliación', ready: true, detail: 'Conflictos se muestran antes de corregir.' },
-        { label: 'Stock Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Stock ERP y movimientos sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+        { label: 'Stock Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Stock ERP y movimientos sincronizados.' : sourceStatus.state('laudus') === 'review' ? 'Stock ERP sincronizado; existen partidas pendientes de conciliación.' : sourceStatus.state('laudus') === 'syncing' ? 'Sincronización Laudus en curso.' : 'Verificando disponibilidad de la fuente Laudus.' },
       ]}
     /> : null}
 
