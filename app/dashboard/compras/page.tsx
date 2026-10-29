@@ -18,7 +18,9 @@ type Overview = {
   canEdit: boolean;
   canonical: {
     purchaseOrders: number;
-    suppliers: number;
+    historicalPurchaseOrders: number;
+    supplierBaseline: number;
+    laudusSuppliers: number;
   };
   operational: {
     intakeRequests: number;
@@ -55,7 +57,7 @@ export default function ComprasPage() {
         <PageHeaderContent>
           <PageHeaderEyebrow>Abastecimiento</PageHeaderEyebrow>
           <PageHeaderTitle>Compras</PageHeaderTitle>
-          <PageHeaderDescription>Fuente canónica de compras, proveedores y ejecución operacional en un solo flujo.</PageHeaderDescription>
+          <PageHeaderDescription>Compras vigentes, operación y archivo histórico separados por fuente y fecha.</PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
           <Button asChild>
@@ -75,7 +77,7 @@ export default function ComprasPage() {
       />
 
       <DataReceptionReadiness
-        description="Compras ya separa evidencia canónica y operación. Cuando Laudus sincronice, las OC, proveedores, facturas y pagos entrarán como fuente reconciliable sin reemplazar decisiones humanas."
+        description="Compras separa operación vigente, archivo histórico y evidencia reconciliable. Laudus entra como fuente independiente hasta que cada registro sea conciliado."
         items={[
           { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
           { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
@@ -102,9 +104,10 @@ export default function ComprasPage() {
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6" aria-label="Resumen de Compras">
         {[
-          ['OC canónicas', data?.canonical.purchaseOrders],
-          ['Proveedores', data?.canonical.suppliers],
-          ['Solicitudes', data?.operational.intakeRequests],
+          ['OC vigentes', data?.canonical.purchaseOrders],
+          ['OC históricas', data?.canonical.historicalPurchaseOrders],
+          ['Proveedores base', data?.canonical.supplierBaseline],
+          ['Proveedores Laudus', data?.canonical.laudusSuppliers],
           ['Órdenes operativas', data?.operational.operationalOrders],
           ['Recepciones', data?.operational.receipts],
           ['Facturas', data?.operational.invoices],

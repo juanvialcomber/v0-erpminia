@@ -9,6 +9,7 @@ type PurchaseOrderRow = {
   id: string;
   po_number?: string | null;
   purchase_order_number?: string | null;
+  order_number?: string | null;
   number?: string | null;
   code?: string | null;
   vendor_name?: string | null;
@@ -50,7 +51,7 @@ type NormalizedPurchaseOrder = {
 function normalizeOrder(row: PurchaseOrderRow): NormalizedPurchaseOrder {
   return {
     id: row.id,
-    po_number: row.po_number || row.purchase_order_number || row.number || row.code || row.id,
+    po_number: row.po_number || row.purchase_order_number || row.order_number || row.number || row.code || row.id,
     vendor_name: row.vendor_name || row.vendor || row.supplier_name || row.supplier || 'Proveedor',
     item_code: row.item_code || row.reference || row.item_description || row.description || '',
     status: row.status || 'draft',
@@ -74,14 +75,19 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '0', 10);
   const pageSize = parseInt(searchParams.get('pageSize') || '50', 10);
   const status = searchParams.get('status')?.trim() || '';
+  const scope = searchParams.get('scope') === 'history' ? 'history' : 'current';
   const validPageSize = Math.min(Math.max(pageSize, 10), 500);
   const validPage = Math.max(page, 0);
   const offset = validPage * validPageSize;
 
   let canonicalQuery = supabase
-    .from('canonical_purchase_orders_current')
+    .from('canonical_purchase_orders_v1')
     .select('*', { count: 'exact' })
     .eq('organization_id', orgId);
+
+  canonicalQuery = scope === 'history'
+    ? canonicalQuery.eq('source_file', 'public.purchase_orders')
+    : canonicalQuery.or('source_file.is.null,source_file.neq.public.purchase_orders');
 
   if (search) {
     canonicalQuery = canonicalQuery.or(
@@ -104,7 +110,9 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / validPageSize),
       },
-      dataSource: 'canonical',
+      dataSource: scope === 'history' ? 'canonical-history' : 'canonical-current',
+      scope,
+      warning: scope === 'history' ? 'Archivo histórico importado; no representa compras vigentes.' : undefined,
       generated_at: new Date().toISOString(),
     });
   }
