@@ -4,14 +4,17 @@ import { LAUDUS_SYNC_POLICIES } from '@/lib/integrations/laudus/sync-policy';
 const COST_CENTER_PATH = '/purchases/costcenters/list';
 const FIXED_ASSET_PATH = '/purchases/fixedAssets/list';
 
+// Keep list projections aligned with fields observed in successful Laudus payloads.
+// Unknown fields make Laudus return HTTP 422, so do not request optional guesses here.
 const COST_CENTER_FIELDS = [
-  'costCenterId','code','name','fullPath','parentId','discontinued','modifiedAt',
+  'costCenterId','code','name','fullPath','parentId','discontinued',
 ] as const;
 
 const FIXED_ASSET_FIELDS = [
-  'fixedAssetId','name','dateAcquisition','dateRetirement','acquisitionCost',
-  'usefulLife','realizableValue','depreciationType','manufacturer','model',
-  'serialNumber','supplier','supplierId','invoiceNumber','location','modifiedAt',
+  'fixedAssetId','name','dateAcquisition','dateRetirement',
+  'usefulLife','realizableValue','depreciationType','depreciate',
+  'depreciateFromMonthOfAcquisition','taxDeductionPercentage',
+  'manufacturer','model','serialNumber','supplier','invoiceNumber','location',
 ] as const;
 
 function rowsFromPayload(payload: unknown): Record<string, unknown>[] {
