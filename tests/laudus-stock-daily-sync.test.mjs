@@ -41,6 +41,8 @@ test('stock cron is secret protected, public only through its own guard, and sch
   assert.match(route, /CRON_SECRET/);
   assert.match(route, /syncLaudusStockDaily/);
   assert.match(proxy, /\/api\/cron\/laudus-stock-daily/);
-  assert.match(vercel, /"path": "\/api\/cron\/laudus-stock-daily"/);
-  assert.match(vercel, /"schedule": "10 5 \* \* \*"/);
+  const config = JSON.parse(vercel);
+  assert.ok(config.crons.some((cron) =>
+    cron.path === '/api/cron/laudus-stock-daily' && cron.schedule === '10 5 * * *'
+  ));
 });
