@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
     const [
       purchaseOrders,
       historicalPurchaseOrders,
-      laudusPendingPurchaseOrders,
       suppliers,
       intakeRequests,
       operationalOrders,
@@ -43,13 +42,6 @@ export async function GET(request: NextRequest) {
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', context.organizationId)
           .eq('source_file', 'public.purchase_orders'),
-      ),
-      countRows(
-        context.supabase
-          .from('purchase_order_reconciliation_preview_service_v1')
-          .select('laudus_purchase_order_id', { count: 'exact', head: true })
-          .eq('organization_id', context.organizationId)
-          .eq('reconciliation_status', 'pending'),
       ),
       countRows(
         context.supabase
@@ -104,9 +96,6 @@ export async function GET(request: NextRequest) {
         historicalPurchaseOrders,
         suppliers,
       },
-      incoming: {
-        laudusPendingPurchaseOrders,
-      },
       operational: {
         intakeRequests,
         operationalOrders,
@@ -118,7 +107,6 @@ export async function GET(request: NextRequest) {
       sourcePolicy: {
         purchaseOrders: 'canonical_purchase_orders_v1 (excluye baseline histórico public.purchase_orders)',
         historicalPurchaseOrders: 'canonical_purchase_orders_v1[source_file=public.purchase_orders]',
-        laudusPendingPurchaseOrders: 'purchase_order_reconciliation_preview_service_v1[pending]',
         suppliers: 'canonical_suppliers_v1',
         documents: 'module_documents',
       },
