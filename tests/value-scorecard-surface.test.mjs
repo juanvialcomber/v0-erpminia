@@ -180,6 +180,7 @@ test('OTe value cohort measures only observed event-chain intervals through huma
 
 
 test('value dashboard separates operational award evidence from UAT', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
   assert.match(page, /procurementAwardValue/);
   assert.match(page, /Adjudicación con evidencia válida/);
   assert.match(page, /Decisiones operacionales/);
