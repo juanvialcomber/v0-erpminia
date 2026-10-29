@@ -6,6 +6,8 @@ const sync = fs.readFileSync('lib/integrations/laudus/procurement-sync.ts','utf8
 const policy = fs.readFileSync('lib/integrations/laudus/sync-policy.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_procurement_sync_domains.sql','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
+const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
+const supplierRoute = fs.readFileSync('app/api/cron/laudus-suppliers-weekly/route.ts','utf8');
 
 test('procurement sync uses current Laudus list endpoints',()=>{
   assert.match(sync,/\/purchases\/suppliers\/list/);
@@ -50,4 +52,16 @@ test('changed rows are not overstated when RPCs only report staged rows',()=>{
   const changedClaims = [...sync.matchAll(/changed:\s*(\w+)/g)].map((match) => match[1]);
   assert.ok(changedClaims.length >= 2);
   assert.ok(changedClaims.every((value) => value === '0'));
+});
+
+
+test('new Laudus cron entrypoints participate in exact API usage tracking',()=>{
+  assert.match(procurementRoute,/withLaudusApiUsageTracking/);
+  assert.match(supplierRoute,/withLaudusApiUsageTracking/);
+});
+
+test('procurement extension preserves the reduced product cadence',()=>{
+  const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
+  assert.equal(byPath.get('/api/cron/laudus-products-daily'), '0 */12 * * *');
+  assert.match(migration,/when p_domain='products' then v_now \+ interval '12 hours'/);
 });
