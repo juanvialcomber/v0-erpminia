@@ -18,6 +18,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { HomeDecisionPriorities } from '@/components/dashboard/home-decision-priorities';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import { PERSONA_DASHBOARDS, resolvePersonaDashboard } from '@/lib/dashboard/persona-dashboard';
+import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
 
 type RoleTask = {
   task_key: string;
@@ -372,6 +373,8 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
       {inboxUnavailable ? <StatePanel tone="warning" title={t.roleUnresolvedTitle} description={t.roleUnresolvedDescription} /> : null}
 
       {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} coverageAvailable={inbox.data?.coverageAvailable} /> : null}
+
+      {personaKey === 'daniel_finance' ? <LaudusFinanceStatusStrip compact /> : null}
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-4">
