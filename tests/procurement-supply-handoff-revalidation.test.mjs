@@ -17,7 +17,7 @@ test('supply handoff revalidates current Laudus stock before creating procuremen
 test('Compras shows revalidated maintenance needs before the operational pipeline', () => {
   assert.match(page, /PendingMaintenanceSupplyNeeds/);
   assert.match(panel, /MOTIL vuelve a validar stock actual antes de crear una solicitud de compra/);
-  assert.match(panel, /Conciliar antes de comprar/);
+  assert.match(panel, /Registrar no comprar/);
   assert.match(panel, /Enviar a Compras/);
 });
 
