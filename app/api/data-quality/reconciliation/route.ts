@@ -117,6 +117,84 @@ export async function GET(request: NextRequest) {
         .in('resolution_status', ['pending', 'conflict', 'new_candidate'])
         .range(from, to));
 
+      const productCandidateIds = [...new Set(
+        externalRows
+          .filter((row) => norm(row.entity_type) === 'product' && norm(row.resolution_status) === 'new_candidate')
+          .map((row) => text(row.external_id))
+          .filter(Boolean),
+      )];
+
+      const productCandidateMap = new Map<string, any>();
+      const productPositionMap = new Map<string, any[]>();
+
+      if (productCandidateIds.length) {
+        const [candidateProducts, candidateStock, warehouseRows] = await Promise.all([
+          fetchAll((from, to) => context.supabase
+            .schema('integration')
+            .from('laudus_products')
+            .select('external_id,sku,description,unit_of_measure')
+            .eq('organization_id', context.organizationId)
+            .in('external_id', productCandidateIds)
+            .range(from, to)),
+          fetchAll((from, to) => context.supabase
+            .schema('integration')
+            .from('laudus_product_stock')
+            .select('product_external_id,warehouse_external_id,lot,stock,source_date_to,synced_at')
+            .eq('organization_id', context.organizationId)
+            .in('product_external_id', productCandidateIds)
+            .range(from, to)),
+          fetchAll((from, to) => context.supabase
+            .schema('integration')
+            .from('laudus_warehouses')
+            .select('external_id,name')
+            .eq('organization_id', context.organizationId)
+            .range(from, to)),
+        ]);
+
+        for (const row of candidateProducts) productCandidateMap.set(text(row.external_id), row);
+
+        const warehouseNames = new Map(warehouseRows.map((row) => [text(row.external_id), text(row.name)]));
+        const latestPositions = new Map<string, any>();
+        for (const row of candidateStock) {
+          const productId = text(row.product_external_id);
+          const warehouseId = text(row.warehouse_external_id);
+          if (!productId || !warehouseId) continue;
+          const key = `${productId}:${warehouseId}:${text(row.lot)}`;
+          const current = latestPositions.get(key);
+          const currentAt = Date.parse(text(current?.source_date_to || current?.synced_at)) || 0;
+          const nextAt = Date.parse(text(row.source_date_to || row.synced_at)) || 0;
+          if (!current || nextAt >= currentAt) latestPositions.set(key, row);
+        }
+
+        const warehouseTotals = new Map<string, { productId: string; warehouseCode: string; stock: number }>();
+        for (const row of latestPositions.values()) {
+          const productId = text(row.product_external_id);
+          const warehouseCode = text(row.warehouse_external_id);
+          if (!productId || !warehouseCode) continue;
+          const key = `${productId}:${warehouseCode}`;
+          const current = warehouseTotals.get(key);
+          warehouseTotals.set(key, {
+            productId,
+            warehouseCode,
+            stock: Number(current?.stock || 0) + Number(row.stock || 0),
+          });
+        }
+
+        for (const row of warehouseTotals.values()) {
+          const positions = productPositionMap.get(row.productId) || [];
+          positions.push({
+            warehouseCode: row.warehouseCode,
+            warehouseName: warehouseNames.get(row.warehouseCode) || '',
+            stock: row.stock,
+          });
+          productPositionMap.set(row.productId, positions);
+        }
+
+        for (const positions of productPositionMap.values()) {
+          positions.sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode, 'es-CL'));
+        }
+      }
+
       for (const row of externalRows) {
         const entityType = externalEntityType(row.entity_type);
         const conflictReasons = Array.isArray(row.conflict_reasons)
@@ -124,12 +202,29 @@ export async function GET(request: NextRequest) {
           : [];
         const resolutionStatus = norm(row.resolution_status);
         const severity: Issue['severity'] = resolutionStatus === 'conflict' ? 'critical' : 'warning';
-        const label = `${text(row.entity_type) || 'Fuente externa'} · ${text(row.external_id) || 'Sin ID externo'}`;
+        const externalId = text(row.external_id);
+        const candidate = entityType === 'product' && resolutionStatus === 'new_candidate'
+          ? productCandidateMap.get(externalId)
+          : null;
+        const positions = candidate ? (productPositionMap.get(externalId) || []) : [];
+        const candidateLabel = candidate
+          ? [text(candidate.sku), text(candidate.description)].filter(Boolean).join(' · ')
+          : '';
+        const label = candidateLabel
+          ? `Laudus producto · ${candidateLabel}`
+          : `${text(row.entity_type) || 'Fuente externa'} · ${externalId || 'Sin ID externo'}`;
         const reason = conflictReasons.length
           ? conflictReasons.join(' · ')
           : resolutionStatus === 'new_candidate'
             ? 'Registro externo sin correspondencia canónica.'
             : 'Registro externo pendiente de conciliación.';
+        const unit = text(candidate?.unit_of_measure);
+        const stockContext = positions.length
+          ? ` Posiciones Laudus más recientes por bodega: ${positions.map((position) => {
+              const warehouse = [position.warehouseCode, position.warehouseName].filter(Boolean).join(' · ');
+              return `${warehouse || 'Bodega sin identificar'}: ${position.stock.toLocaleString('es-CL')}${unit ? ' ' + unit : ''}`;
+            }).join(' · ')}.`
+          : '';
 
         addIssue(issues, {
           issue_key: `external:${row.id}`,
@@ -139,7 +234,7 @@ export async function GET(request: NextRequest) {
           field_name: null,
           severity,
           label,
-          detail: `${reason} La evidencia externa no modifica el maestro automáticamente.`,
+          detail: `${reason}${stockContext} La evidencia externa no modifica ni crea el maestro automáticamente.`,
           href: externalHref(entityType),
         });
       }
