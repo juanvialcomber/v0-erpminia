@@ -1,5 +1,5 @@
 import { listLaudus } from '@/lib/integrations/laudus/client';
-import { LAUDUS_SYNC_POLICIES } from '@/lib/integrations/laudus/sync-policy';
+import { LAUDUS_SYNC_POLICIES, markLaudusSyncFailure, markLaudusSyncRunning, markLaudusSyncSuccess } from '@/lib/integrations/laudus/sync-policy';
 
 const PRODUCT_PATH = '/production/products/list';
 const PRODUCT_FIELDS = ['productId', 'SKU', 'description', 'unitOfMeasure'] as const;
@@ -20,6 +20,7 @@ function rowsFromPayload(payload: unknown): Record<string, unknown>[] {
 
 export async function syncLaudusProducts(organizationId: string, supabase: any) {
   const policy = LAUDUS_SYNC_POLICIES.product;
+  await markLaudusSyncRunning(supabase, organizationId, 'products');
   let runId: string | null = null;
   let apiCalls = 0;
   let processed = 0;
@@ -30,9 +31,10 @@ export async function syncLaudusProducts(organizationId: string, supabase: any) 
   let newCandidate = 0;
   let conflict = 0;
 
-  // Products are already bootstrapped. Poll the newest 500 IDs on each run so new SKUs
-  // are caught quickly without burning the 2,000-call monthly Laudus allowance.
-  for (let page = 0; page < PRODUCT_HEAD_PAGES_PER_RUN; page += 1) {
+  try {
+    // Products are already bootstrapped. Poll the newest 500 IDs on each run so new SKUs
+    // are caught quickly without burning the 2,000-call monthly Laudus allowance.
+    for (let page = 0; page < PRODUCT_HEAD_PAGES_PER_RUN; page += 1) {
     const payload = await listLaudus(PRODUCT_PATH, {
       options: { offset: page * policy.pageSize, limit: policy.pageSize },
       fields: [...PRODUCT_FIELDS],
@@ -64,7 +66,27 @@ export async function syncLaudusProducts(organizationId: string, supabase: any) 
       conflict += Number(result.conflict || 0);
     }
 
-    if (isFinalPage) break;
+      if (isFinalPage) break;
+    }
+
+    await markLaudusSyncSuccess(supabase, organizationId, 'products', {
+      runId,
+      processed,
+      changed,
+      conflicts: conflict + newCandidate,
+      apiCalls,
+      metadata: { inserted, unchanged, matched, newCandidate, conflict },
+    });
+  } catch (error) {
+    await markLaudusSyncFailure(supabase, organizationId, 'products', error, {
+      runId,
+      processed,
+      changed,
+      conflicts: conflict + newCandidate,
+      apiCalls,
+      metadata: { inserted, unchanged, matched, newCandidate, conflict },
+    });
+    throw error;
   }
 
   return {

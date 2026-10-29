@@ -36,3 +36,12 @@ test('product cron runs before stock cron and remains public only at proxy level
   assert.match(route, /CRON_SECRET/);
   assert.match(route, /cronAuthorized/);
 });
+
+
+test('product sync updates control-plane health on start success and failure', () => {
+  assert.match(sync, /markLaudusSyncRunning/);
+  assert.match(sync, /markLaudusSyncSuccess/);
+  assert.match(sync, /markLaudusSyncFailure/);
+  assert.match(sync, /apiCalls/);
+  assert.match(sync, /conflicts: conflict \+ newCandidate/);
+});
