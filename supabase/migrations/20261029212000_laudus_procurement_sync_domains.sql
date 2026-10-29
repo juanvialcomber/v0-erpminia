@@ -103,6 +103,7 @@ begin
       case
         when p_domain='suppliers' then v_now + interval '7 days'
         when p_domain in ('financial_masters','procurement') then v_now + interval '24 hours'
+        when p_domain='products' then v_now + interval '12 hours'
         else v_now + interval '6 hours'
       end,
       v_now,
