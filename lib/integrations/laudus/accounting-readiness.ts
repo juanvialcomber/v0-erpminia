@@ -61,30 +61,18 @@ export async function loadLaudusAccountingReadiness(
 
   try {
     const source = await db
-      .schema('integration')
-      .from('external_sources')
-      .select('id,enabled')
+      .from('laudus_source_status_service_v1')
+      .select('enabled,latest_status')
       .eq('organization_id', organizationId)
-      .eq('source_key', 'laudus')
       .maybeSingle();
 
     if (!source.error && source.data?.enabled) {
-      const run = await db
-        .schema('integration')
-        .from('sync_runs')
-        .select('status')
-        .eq('organization_id', organizationId)
-        .eq('source_id', source.data.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const status = String(run.data?.status || '').toLowerCase();
+      const status = String(source.data.latest_status || '').toLowerCase();
       if (status === 'completed') laudusState = 'ready_to_compare';
       if (status === 'partial' || status === 'failed') laudusState = 'review';
     }
   } catch {
-    // Expected before the private integration schema is deployed.
+    // Source status view may be unavailable during deployment.
   }
 
   return {
