@@ -30,7 +30,9 @@ export async function GET(request: NextRequest) {
         : [],
     ))].slice(0, 50);
 
-    const [stockResult, authorityResult] = await Promise.all([
+    const needIds = needs.map((need: any) => String(need.supply_need_id || '')).filter(Boolean).slice(0, 100);
+
+    const [stockResult, authorityResult, decisionResult] = await Promise.all([
       productIds.length
         ? context.supabase
             .from('laudus_inventory_reconciliation_service_v1')
@@ -44,10 +46,28 @@ export async function GET(request: NextRequest) {
         .select('authority_state,authority_reason,latest_laudus_stock_sync')
         .eq('organization_id', context.organizationId)
         .maybeSingle(),
+      needIds.length
+        ? context.supabase
+            .from('audit_log')
+            .select('resource_identifier,new_values,created_at,user_id')
+            .eq('organization_id', context.organizationId)
+            .eq('action', 'supply_need_no_purchase_decision')
+            .eq('resource_type', 'work_order_supply_need')
+            .in('resource_identifier', needIds)
+            .order('created_at', { ascending: false })
+            .limit(200)
+        : Promise.resolve({ data: [], error: null } as any),
     ]);
 
     if (stockResult.error) throw stockResult.error;
     if (authorityResult.error) throw authorityResult.error;
+    if (decisionResult.error) throw decisionResult.error;
+
+    const decisionByNeed = new Map<string, any>();
+    for (const row of decisionResult.data || []) {
+      const key = String(row.resource_identifier || '');
+      if (key && !decisionByNeed.has(key)) decisionByNeed.set(key, row);
+    }
 
     const stockByProduct = new Map(
       (stockResult.data || []).map((row: any) => [String(row.canonical_product_id || ''), row]),
@@ -71,6 +91,7 @@ export async function GET(request: NextRequest) {
           latest_laudus_stock_sync: authorityResult.data?.latest_laudus_stock_sync || null,
           authority_reason: authorityResult.data?.authority_reason || null,
         },
+        no_purchase_decision: decisionByNeed.get(String(need.supply_need_id || '')) || null,
       };
     });
 
@@ -89,7 +110,7 @@ export async function POST(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const body = (await request.json()) as { supplyNeedId?: string };
+    const body = (await request.json()) as { supplyNeedId?: string; action?: 'send_to_procurement' | 'confirm_no_purchase' };
     if (!body.supplyNeedId) {
       return NextResponse.json({ error: 'Falta la necesidad de abastecimiento' }, { status: 400 });
     }
@@ -141,7 +162,44 @@ export async function POST(request: NextRequest) {
       return Number(current?.laudus_stock || 0) >= Number(material.shortage || 0);
     });
 
-    if (authorityResult.data?.authority_state === 'laudus_primary' && allCoveredNow) {
+    const laudusPrimary = authorityResult.data?.authority_state === 'laudus_primary';
+
+    if (body.action === 'confirm_no_purchase') {
+      if (!laudusPrimary || !allCoveredNow) {
+        return NextResponse.json({ error: 'La evidencia actual no permite registrar una decisión de no compra.' }, { status: 409 });
+      }
+
+      const { error: auditError } = await context.supabase.from('audit_log').insert({
+        organization_id: context.organizationId,
+        user_id: context.userId,
+        action: 'supply_need_no_purchase_decision',
+        resource_type: 'work_order_supply_need',
+        resource_identifier: body.supplyNeedId,
+        new_values: {
+          decision: 'no_purchase_reconcile_stock',
+          shortage_lines: shortageMaterials.length,
+          source_authority: authorityResult.data?.authority_state || null,
+          latest_laudus_stock_sync: authorityResult.data?.latest_laudus_stock_sync || null,
+          evidence: shortageMaterials.map((material: any) => {
+            const current = stockByProduct.get(String(material.product_id || ''));
+            return {
+              product_id: material.product_id || null,
+              product_code: material.product_code || null,
+              shortage: Number(material.shortage || 0),
+              laudus_stock: Number(current?.laudus_stock || 0),
+            };
+          }),
+          semantics: 'human decision to avoid procurement and reconcile an already-covered historical shortage; does not close canonical supply need',
+        },
+        user_agent: request.headers.get('user-agent'),
+        status: 'completed',
+      });
+      if (auditError) throw auditError;
+
+      return NextResponse.json({ ok: true, decision: 'no_purchase_reconcile_stock' });
+    }
+
+    if (laudusPrimary && allCoveredNow) {
       return NextResponse.json({
         error: 'El faltante histórico ya está cubierto por stock Laudus. Concilia la necesidad antes de generar una compra.',
         code: 'SUPPLY_NEED_ALREADY_COVERED',
