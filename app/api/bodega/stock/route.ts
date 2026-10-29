@@ -172,7 +172,9 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     const quantityOnHand = laudusQuantity ?? Number(row.quantity || 0);
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
-    const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
+    const totalValue = laudusQuantity != null
+      ? quantityOnHand * unitCost
+      : Number(row.total_value ?? quantityOnHand * unitCost);
 
     return {
       id: row.id,
