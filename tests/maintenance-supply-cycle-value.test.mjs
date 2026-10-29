@@ -20,3 +20,10 @@ test('supply cycle remains observed timing, not savings', () => {
   assert.doesNotMatch(scorecard, /supplyCycle[^\n]{0,200}savings/i);
   assert.match(scorecard, /observed handoff/);
 });
+
+test('value scorecard measures unique no-purchase decisions without calling exposure savings', () => {
+  assert.match(scorecard, /supply_need_no_purchase_decision/);
+  assert.match(scorecard, /uniqueNoPurchaseDecisions/);
+  assert.match(scorecard, /estimatedExposureReviewedClp/);
+  assert.match(scorecard, /not realized savings or avoided cost until outcome closure/);
+});
