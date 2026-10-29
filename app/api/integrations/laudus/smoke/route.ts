@@ -12,6 +12,9 @@ import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage'
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
   if (!access.ok) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible.' }, { status: 400 });
+  }
   if (!access.admin) {
     return NextResponse.json(
       { error: 'La prueba Laudus requiere permisos de administración.' },
