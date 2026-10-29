@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       : { data: [], error: null } as any;
     if (currentStockResult.error) throw currentStockResult.error;
 
-    const currentStockByProduct = new Map(
+    const currentStockByProduct = new Map<string, { laudus_stock?: number | string | null }>(
       (currentStockResult.data || []).map((row:any) => [String(row.canonical_product_id || ''), row]),
     );
     const shortagesByOrder = new Map<string, any[]>();
