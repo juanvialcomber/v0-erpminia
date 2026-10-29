@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
+import { loadLaudusEffectiveStock } from '@/lib/integrations/laudus/effective-stock';
 
 type CanonicalInventoryRow = {
   id: string;
@@ -127,7 +128,7 @@ function referenceFor(code: string | null, benchmarks: Map<string, PriceBenchmar
   };
 }
 
-async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string } | null> {
+async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string; stockAuthority?: Record<string, unknown> } | null> {
   const pageSize = 1000;
   let start = 0;
   const rows: CanonicalInventoryRow[] = [];
@@ -158,11 +159,22 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     console.error('[bodega/stock:pricing]', error);
   }
 
+  let effectiveStock: Awaited<ReturnType<typeof loadLaudusEffectiveStock>> | null = null;
+  try {
+    effectiveStock = await loadLaudusEffectiveStock(context.supabase, context.organizationId, rows.map((row) => row.sku));
+  } catch (error) {
+    console.error('[bodega/stock:laudus-authority]', error);
+  }
+
   const items: WarehouseStockItem[] = rows.map((row) => {
-    const quantityOnHand = Number(row.quantity || 0);
+    const sku = String(row.sku || '').trim().toUpperCase();
+    const laudusQuantity = effectiveStock?.isPrimary ? effectiveStock.stockBySku.get(sku) : undefined;
+    const quantityOnHand = laudusQuantity ?? Number(row.quantity || 0);
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
-    const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
+    const totalValue = laudusQuantity != null
+      ? quantityOnHand * unitCost
+      : Number(row.total_value ?? quantityOnHand * unitCost);
 
     return {
       id: row.id,
@@ -191,7 +203,17 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
   };
 
-  return { items, summary, ...(pricingWarning ? { pricingWarning } : {}) };
+  return {
+    items,
+    summary,
+    ...(pricingWarning ? { pricingWarning } : {}),
+    stockAuthority: effectiveStock ? {
+      state: effectiveStock.authorityState,
+      reason: effectiveStock.authorityReason,
+      latestSync: effectiveStock.latestSync,
+      effectiveSource: effectiveStock.isPrimary ? 'laudus' : 'motil',
+    } : undefined,
+  };
 }
 
 export async function GET(request: NextRequest) {
