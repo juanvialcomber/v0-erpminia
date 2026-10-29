@@ -30,6 +30,12 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/laudus-financial-masters-daily',
   '/api/cron/laudus-products-daily',
   '/api/cron/laudus-stock-daily',
+  '/api/cron/laudus-procurement-daily',
+  '/api/cron/laudus-suppliers-weekly',
+  '/api/cron/laudus-warehouses-weekly',
+  '/api/cron/laudus-bank-statements-daily',
+  '/api/cron/laudus-accounting-entries-daily',
+  '/api/cron/laudus-waybills-daily',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
