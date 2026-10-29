@@ -2,6 +2,31 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 type CountResult = { count: number | null; error: { message: string } | null };
 
+type LaudusReadinessRow = {
+  enabled: boolean | null;
+  latest_run_status: string | null;
+  products: number | string | null;
+  eligible_products: number | string | null;
+  linked_eligible_products: number | string | null;
+  stock_rows: number | string | null;
+  latest_stock_sync: string | null;
+  warehouses: number | string | null;
+  physical_warehouses: number | string | null;
+  mapped_physical_warehouses: number | string | null;
+  open_reconciliation: number | string | null;
+};
+
+type LaudusReconciliationSummaryRow = {
+  compared_products: number | string | null;
+  aligned_products: number | string | null;
+  quantity_mismatches: number | string | null;
+  missing_in_motil_nonzero: number | string | null;
+  laudus_only_zero: number | string | null;
+  laudus_negative_products: number | string | null;
+  latest_laudus_stock_sync: string | null;
+  latest_motil_stock_update: string | null;
+};
+
 async function count(query: PromiseLike<CountResult>) {
   const result = await query;
   if (result.error) throw new Error(result.error.message);
@@ -11,6 +36,18 @@ async function count(query: PromiseLike<CountResult>) {
 function pct(part: number, total: number) {
   if (!total) return 0;
   return Math.round((part / total) * 1000) / 10;
+}
+
+function n(value: number | string | null | undefined) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isOlderThanHours(value: string | null | undefined, hours: number) {
+  if (!value) return true;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return true;
+  return Date.now() - timestamp > hours * 60 * 60 * 1000;
 }
 
 export async function loadLaudusInventoryReadiness(
@@ -26,12 +63,8 @@ export async function loadLaudusInventoryReadiness(
     snapshotWarehouse,
     snapshotNegative,
     latestSnapshot,
-    laudusProducts,
-    laudusEligibleProducts,
-    laudusEligibleProductsLinked,
-    laudusStockRows,
-    laudusWarehouses,
-    latestLaudusStock,
+    readinessResult,
+    reconciliationSummaryResult,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
@@ -48,89 +81,50 @@ export async function loadLaudusInventoryReadiness(
       .order('snapshot_date', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible')),
-    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible').not('canonical_product_id', 'is', null)),
-    count(db.schema('integration').from('laudus_product_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     db
-      .schema('integration')
-      .from('laudus_warehouses')
-      .select('external_id,name,motil_warehouse_id,reconciliation_status')
-      .eq('organization_id', organizationId),
-    db
-      .schema('integration')
-      .from('laudus_product_stock')
-      .select('synced_at')
+      .from('laudus_inventory_readiness_service_v1')
+      .select('enabled,latest_run_status,products,eligible_products,linked_eligible_products,stock_rows,latest_stock_sync,warehouses,physical_warehouses,mapped_physical_warehouses,open_reconciliation')
       .eq('organization_id', organizationId)
-      .order('synced_at', { ascending: false })
-      .limit(1)
+      .maybeSingle(),
+    db
+      .from('laudus_inventory_reconciliation_summary_service_v1')
+      .select('compared_products,aligned_products,quantity_mismatches,missing_in_motil_nonzero,laudus_only_zero,laudus_negative_products,latest_laudus_stock_sync,latest_motil_stock_update')
+      .eq('organization_id', organizationId)
       .maybeSingle(),
   ]);
 
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
-  if (laudusWarehouses.error) throw new Error(laudusWarehouses.error.message);
-  if (latestLaudusStock.error) throw new Error(latestLaudusStock.error.message);
+  if (readinessResult.error) throw new Error(readinessResult.error.message);
+  if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
 
-  let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = laudusStockRows > 0
-    ? 'ready_to_compare'
-    : 'waiting_laudus';
-  let openReconciliation = 0;
+  const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
+  const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
 
-  try {
-    const source = await db
-      .schema('integration')
-      .from('external_sources')
-      .select('id,enabled')
-      .eq('organization_id', organizationId)
-      .eq('source_key', 'laudus')
-      .maybeSingle();
+  const laudusProducts = n(readiness?.products);
+  const laudusEligibleProducts = n(readiness?.eligible_products);
+  const laudusEligibleProductsLinked = n(readiness?.linked_eligible_products);
+  const laudusStockRows = n(readiness?.stock_rows);
+  const openReconciliation = n(readiness?.open_reconciliation);
+  const quantityMismatches = n(reconciliationSummary?.quantity_mismatches);
+  const missingInMotilNonzero = n(reconciliationSummary?.missing_in_motil_nonzero);
+  const laudusNegativeProducts = n(reconciliationSummary?.laudus_negative_products);
+  const latestStockSync = readiness?.latest_stock_sync || reconciliationSummary?.latest_laudus_stock_sync || null;
+  const stockIsStale = isOlderThanHours(latestStockSync, 8);
 
-    if (!source.error && source.data?.enabled) {
-      const [run, unresolvedInventory, unresolvedWarehouses] = await Promise.all([
-        db
-          .schema('integration')
-          .from('sync_runs')
-          .select('status')
-          .eq('organization_id', organizationId)
-          .eq('source_id', source.data.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        db
-          .schema('integration')
-          .from('reconciliation_items')
-          .select('id', { count: 'exact', head: true })
-          .eq('organization_id', organizationId)
-          .eq('source_id', source.data.id)
-          .in('entity_type', ['product', 'stock'])
-          .in('resolution_status', ['pending', 'conflict', 'new_candidate']),
-        db
-          .schema('integration')
-          .from('laudus_warehouses')
-          .select('id', { count: 'exact', head: true })
-          .eq('organization_id', organizationId)
-          .in('reconciliation_status', ['new_candidate', 'conflict']),
-      ]);
+  let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
+  const latestRunStatus = String(readiness?.latest_run_status || '').toLowerCase();
 
-      if (unresolvedInventory.error) throw new Error(unresolvedInventory.error.message);
-      if (unresolvedWarehouses.error) throw new Error(unresolvedWarehouses.error.message);
-      openReconciliation = (unresolvedInventory.count ?? 0) + (unresolvedWarehouses.count ?? 0);
-
-      const status = String(run.data?.status || '').toLowerCase();
-      if (status === 'partial' || status === 'failed' || openReconciliation > 0) laudusState = 'review';
-      else if (status === 'completed' || laudusStockRows > 0) laudusState = 'ready_to_compare';
-    }
-  } catch {
-    if (laudusStockRows > 0) laudusState = 'ready_to_compare';
+  if (readiness?.enabled && laudusStockRows > 0) {
+    laudusState = (
+      latestRunStatus === 'partial' ||
+      latestRunStatus === 'failed' ||
+      openReconciliation > 0 ||
+      quantityMismatches > 0 ||
+      missingInMotilNonzero > 0 ||
+      laudusNegativeProducts > 0 ||
+      stockIsStale
+    ) ? 'review' : 'ready_to_compare';
   }
-
-  const physicalWarehouseIds = new Set(['001', '002', '003', '004']);
-  const physicalWarehouses = (laudusWarehouses.data || []).filter((row: any) =>
-    physicalWarehouseIds.has(String(row.external_id || '')),
-  );
-  const mappedPhysicalWarehouses = physicalWarehouses.filter((row: any) =>
-    Boolean(row.motil_warehouse_id) && String(row.reconciliation_status || '') === 'matched',
-  );
 
   return {
     stock: {
@@ -151,11 +145,19 @@ export async function loadLaudusInventoryReadiness(
       excludedProducts: Math.max(0, laudusProducts - laudusEligibleProducts),
       canonicalProductCoverage: pct(laudusEligibleProductsLinked, laudusEligibleProducts),
       stockRows: laudusStockRows,
-      warehouses: (laudusWarehouses.data || []).length,
-      physicalWarehouses: physicalWarehouses.length,
-      mappedPhysicalWarehouses: mappedPhysicalWarehouses.length,
-      latestStockSync: latestLaudusStock.data?.synced_at || null,
+      warehouses: n(readiness?.warehouses),
+      physicalWarehouses: n(readiness?.physical_warehouses),
+      mappedPhysicalWarehouses: n(readiness?.mapped_physical_warehouses),
+      latestStockSync,
+      latestMotilStockUpdate: reconciliationSummary?.latest_motil_stock_update || null,
+      stockIsStale,
       openReconciliation,
+      comparedProducts: n(reconciliationSummary?.compared_products),
+      alignedProducts: n(reconciliationSummary?.aligned_products),
+      quantityMismatches,
+      missingInMotilNonzero,
+      laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
+      negativeProducts: laudusNegativeProducts,
     },
     reconciliation: {
       state: laudusState,
