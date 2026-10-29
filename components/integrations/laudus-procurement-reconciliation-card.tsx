@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, GitMerge } from 'lucide-react';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Payload = {
   summary: {
@@ -56,9 +57,12 @@ export function LaudusProcurementReconciliationCard() {
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="border-b px-4 py-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
           <GitMerge className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Conciliación histórica de OC</h2>
+          </div>
+          <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
           Vista previa determinística. No modifica cabeceras, proveedores ni centros de costo.
