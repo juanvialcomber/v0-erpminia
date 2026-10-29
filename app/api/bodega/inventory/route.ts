@@ -6,6 +6,7 @@ import { resolveAuthContext } from '@/lib/api/auth-session';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { canonicalCategory } from '@/lib/bodega-normalization';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
+import { loadLaudusEffectiveStock } from '@/lib/integrations/laudus/effective-stock';
 
 type CanonicalInventoryRow = {
   id: string;
@@ -42,8 +43,8 @@ function toNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function mapInventoryItem(item: InventoryRow) {
-  const quantity = toNumber(item.quantity);
+function mapInventoryItem(item: InventoryRow, effectiveQuantity?: number) {
+  const quantity = effectiveQuantity ?? toNumber(item.quantity);
   const unitCost = toNumber(item.unit_cost);
 
   return {
@@ -133,7 +134,17 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[v0] canonical inventory error:', error);
     } else if (data && data.length > 0) {
-      const inventory = (data as CanonicalInventoryRow[]).map((item) => ({
+      let effectiveStock: Awaited<ReturnType<typeof loadLaudusEffectiveStock>> | null = null;
+      try {
+        effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, (data as CanonicalInventoryRow[]).map((item) => item.sku));
+      } catch (authorityError) {
+        console.error('[bodega/inventory:laudus-authority]', authorityError);
+      }
+
+      const inventory = (data as CanonicalInventoryRow[]).map((item) => {
+        const sku = String(item.sku || '').trim().toUpperCase();
+        const effectiveQuantity = effectiveStock?.isPrimary ? effectiveStock.stockBySku.get(sku) : undefined;
+        return ({
         id: item.id,
         sku: String(item.sku || ''),
         name: String(item.name || item.sku || ''),
@@ -145,7 +156,9 @@ export async function GET(request: NextRequest) {
         max_stock: toNumber(item.max_stock),
         unit_cost: toNumber(item.unit_cost),
         description: String(item.description || item.warehouse_code || ''),
-      }));
+        effective_source: effectiveQuantity != null ? 'laudus' : 'motil',
+      });
+      });
 
       return NextResponse.json({
         inventory,
@@ -155,6 +168,12 @@ export async function GET(request: NextRequest) {
           total: count || 0,
           totalPages: Math.ceil((count || 0) / validPageSize),
         },
+        stockAuthority: effectiveStock ? {
+          state: effectiveStock.authorityState,
+          reason: effectiveStock.authorityReason,
+          latestSync: effectiveStock.latestSync,
+          effectiveSource: effectiveStock.isPrimary ? 'laudus' : 'motil',
+        } : undefined,
       });
     }
   }
@@ -198,8 +217,19 @@ export async function GET(request: NextRequest) {
 
   if (!canonicalResult.error) {
     const total = canonicalResult.count || 0;
+    const canonicalRows = (canonicalResult.data as InventoryRow[] | null) || [];
+    let effectiveStock: Awaited<ReturnType<typeof loadLaudusEffectiveStock>> | null = null;
+    try {
+      effectiveStock = await loadLaudusEffectiveStock(supabase, orgId, canonicalRows.map((item) => item.sku));
+    } catch (authorityError) {
+      console.error('[bodega/inventory:laudus-authority]', authorityError);
+    }
     return NextResponse.json({
-      inventory: (canonicalResult.data as InventoryRow[] | null)?.map(mapInventoryItem) || [],
+      inventory: canonicalRows.map((item) => {
+        const sku = String(item.sku || '').trim().toUpperCase();
+        const effectiveQuantity = effectiveStock?.isPrimary ? effectiveStock.stockBySku.get(sku) : undefined;
+        return { ...mapInventoryItem(item, effectiveQuantity), effective_source: effectiveQuantity != null ? 'laudus' : 'motil' };
+      }),
       pagination: {
         page: validPage,
         pageSize: validPageSize,
@@ -207,6 +237,12 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / validPageSize),
       },
       dataSource: 'canonical',
+      stockAuthority: effectiveStock ? {
+        state: effectiveStock.authorityState,
+        reason: effectiveStock.authorityReason,
+        latestSync: effectiveStock.latestSync,
+        effectiveSource: effectiveStock.isPrimary ? 'laudus' : 'motil',
+      } : undefined,
     });
   }
 
