@@ -16,6 +16,7 @@ import { DataSourceStatusStrip } from '@/components/data/data-source-status-stri
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
+import { NegativeStockDecisionPanel } from '@/components/inventory/negative-stock-decision-panel';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -97,6 +98,8 @@ export default function BodegaPage() {
     /> : null}
 
     {negativeStockMode ? <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive"/><div><p className="font-medium">Data Health · saldo negativo</p><p className="mt-1 text-muted-foreground">Esta vista filtra posiciones cuyo saldo disponible quedó bajo cero. Antes de corregir el saldo, concilia movimientos, reservas e importación fuente. MOTIL no ajusta cantidades automáticamente.</p></div></div> : null}
+
+    {negativeStockMode ? <NegativeStockDecisionPanel /> : null}
 
     {error ? <StatePanel tone="error" title="No fue posible cargar el inventario" description={error.message} actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} className="min-h-0 py-5" /> : null}
 
