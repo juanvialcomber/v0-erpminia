@@ -14,7 +14,9 @@ test('Bodega authority gate makes Laudus primary only when no newer unresolved s
   assert.match(migration, /review_whatsapp_evidence/);
   assert.match(migration, /motil_email_source_manifest/);
   assert.match(migration, /motil_whatsapp_messages/);
-  assert.match(migration, /production_stock/);
+  assert.match(migration, /m\.domain = 'warehouse'/);
+  assert.doesNotMatch(migration, /m\.domain = 'production_stock'/);
+  assert.match(migration, /Mineral\/production stock is excluded from this authority domain/);
   assert.match(migration, /ingest_state/);
   assert.match(migration, /latest_email_stock_cutoff/);
   assert.match(migration, /whatsapp_stock_evidence_since_laudus/);
