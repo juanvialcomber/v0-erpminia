@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, ReceiptText, ShoppingCart } from 'lucide-react';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Payload = {
   orders: {
@@ -63,9 +64,12 @@ export function LaudusProcurementReadinessCard() {
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="border-b px-4 py-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Preparación histórica para Laudus</h2>
+          </div>
+          <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
           Mide qué tan reconciliable está el histórico de compras de MOTIL antes de conectar el ERP.
