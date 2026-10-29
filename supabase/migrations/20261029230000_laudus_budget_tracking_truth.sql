@@ -8,9 +8,7 @@ as
 with monthly as (
   select
     s.organization_id,
-    min(u.first_called_at) filter (
-      where u.usage_date >= date_trunc('month', current_date)::date
-    ) as exact_tracking_from,
+    min(u.first_called_at) as exact_tracking_from,
     max(u.last_called_at) filter (
       where u.usage_date >= date_trunc('month', current_date)::date
     ) as last_call_at,
