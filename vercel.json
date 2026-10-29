@@ -56,6 +56,14 @@
     {
       "path": "/api/cron/laudus-bank-statements-daily",
       "schedule": "10 7 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-accounting-entries-daily",
+      "schedule": "40 7 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-waybills-daily",
+      "schedule": "10 8 * * *"
     }
   ]
 }
