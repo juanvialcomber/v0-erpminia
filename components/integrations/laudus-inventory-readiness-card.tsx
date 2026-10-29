@@ -18,6 +18,8 @@ type Payload = {
   movementCount: number;
   laudus: {
     products: number;
+    eligibleProducts: number;
+    excludedProducts: number;
     canonicalProductCoverage: number;
     stockRows: number;
     warehouses: number;
@@ -84,8 +86,10 @@ export function LaudusInventoryReadinessCard() {
         <div className="bg-card p-4">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : pct(data.laudus.canonicalProductCoverage)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Productos Laudus enlazados al catálogo</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">{isLoading || !data ? '—' : count(data.laudus.products)} productos fuente</p>
+          <p className="mt-1 text-xs text-muted-foreground">Productos Laudus elegibles enlazados al catálogo</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {isLoading || !data ? '—' : `${count(data.laudus.eligibleProducts)} elegibles · ${count(data.laudus.excludedProducts)} fuera de alcance`}
+          </p>
         </div>
         <div className="bg-card p-4">
           <Boxes className="h-4 w-4 text-muted-foreground" />
