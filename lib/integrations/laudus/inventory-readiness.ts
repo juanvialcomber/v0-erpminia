@@ -142,7 +142,8 @@ export async function loadLaudusInventoryReadiness(
       .select('product_external_id,sku,description,unit_of_measure,laudus_stock,motil_stock,quantity_delta')
       .eq('organization_id', organizationId)
       .eq('operational_category', 'process_consumable')
-      .eq('reconciliation_state', 'quantity_mismatch'),
+      .eq('reconciliation_state', 'quantity_mismatch')
+      .gte('laudus_stock', 0),
     db
       .from('bodega_stock_source_authority_service_v1')
       .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
@@ -173,11 +174,10 @@ export async function loadLaudusInventoryReadiness(
     syncedAt: row.synced_at || null,
   }));
   const domainRank = (sku: string) => {
-    if (sku.startsWith('COMBUSTIBLE')) return 0;
-    if (sku.startsWith('EXPLOSIVO')) return 1;
-    if (sku.startsWith('FORTIFIC')) return 2;
-    if (sku.startsWith('REACTIVO')) return 3;
-    return 4;
+    if (sku.startsWith('COMBUSTIBLE') || sku.startsWith('EXPLOSIVO')) return 0;
+    if (sku.startsWith('FORTIFIC')) return 1;
+    if (sku.startsWith('REACTIVO')) return 2;
+    return 3;
   };
   const domainLabel = (sku: string) => {
     if (sku.startsWith('COMBUSTIBLE')) return 'Combustible';
