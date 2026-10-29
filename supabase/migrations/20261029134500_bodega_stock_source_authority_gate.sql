@@ -20,8 +20,8 @@ laudus as (
 latest_email as (
   select
     m.organization_id,
-    max(m.source_cutoff_date) filter (
-      where m.domain = 'production_stock'
+    max(coalesce(m.source_cutoff_date, m.email_sent_at::date)) filter (
+      where m.domain = 'warehouse'
         and m.download_state = 'downloaded'
     ) as latest_email_stock_cutoff
   from public.motil_email_source_manifest m
@@ -32,9 +32,9 @@ email_gate as (
     e.organization_id,
     e.latest_email_stock_cutoff,
     count(m.*) filter (
-      where m.domain = 'production_stock'
+      where m.domain = 'warehouse'
         and m.download_state = 'downloaded'
-        and m.source_cutoff_date = e.latest_email_stock_cutoff
+        and coalesce(m.source_cutoff_date, m.email_sent_at::date) = e.latest_email_stock_cutoff
         and coalesce(m.ingest_state, '') not in ('reconciled','promoted','completed')
     )::bigint as latest_email_pending_reconciliation
   from latest_email e
@@ -95,7 +95,7 @@ select
     when coalesce(e.latest_email_pending_reconciliation, 0) > 0
       and e.latest_email_stock_cutoff is not null
       and e.latest_email_stock_cutoff >= l.latest_laudus_stock_date
-      then 'Existe stock oficial por correo pendiente de conciliación contra Laudus.'
+      then 'Existe evidencia oficial de Bodega por correo pendiente de conciliación contra Laudus.'
     when coalesce(w.whatsapp_stock_evidence_since_laudus, 0) > 0
       then 'Existe evidencia operacional WhatsApp posterior al último stock Laudus.'
     else 'Laudus es la fuente primaria de stock; las demás fuentes actúan como contraste.'
@@ -109,4 +109,4 @@ revoke all on public.bodega_stock_source_authority_service_v1 from public, anon,
 grant select on public.bodega_stock_source_authority_service_v1 to service_role;
 
 comment on view public.bodega_stock_source_authority_service_v1 is
-  'Server-only stock source authority gate. Laudus becomes primary only when fresh and no newer unresolved official email or later WhatsApp stock evidence requires reconciliation.';
+  'Server-only Bodega stock source authority gate. Laudus becomes primary only when fresh and no newer unresolved warehouse email or later WhatsApp inventory evidence requires reconciliation. Mineral/production stock is excluded from this authority domain.';
