@@ -29,6 +29,8 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-vision',
   '/api/cron/laudus-financial-masters-daily',
   '/api/cron/laudus-stock-daily',
+  // Preview-only QA probe; removed after live contract validation.
+  '/api/qa/laudus-stock-probe',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
