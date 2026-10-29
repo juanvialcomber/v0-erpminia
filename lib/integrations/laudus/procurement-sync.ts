@@ -158,7 +158,7 @@ export async function syncLaudusSuppliers(organizationId: string, db: SupabaseLi
 
     await markLaudusSyncSuccess(db, organizationId, 'suppliers', {
       processed,
-      changed: processed,
+      changed: 0,
       apiCalls,
       metadata: { partial: listed.partial, mode: 'weekly_full_read_only' },
     });
@@ -218,7 +218,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
 
     await markLaudusSyncSuccess(db, organizationId, 'procurement', {
       processed,
-      changed: processed,
+      changed: 0,
       apiCalls,
       metadata: {
         partial,
