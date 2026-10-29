@@ -92,6 +92,43 @@ export async function GET(request: NextRequest) {
       Number(row.open_procurement_request_count || 0) > 0 ||
       Number(row.undelivered_order_count || 0) > 0
     );
+
+    const completedSupplyOrderIds = completedSupplyRows.slice(0, 50).map((row:any) => String(row.work_order_id));
+    const materialRequirementsResult = completedSupplyOrderIds.length
+      ? await context.supabase
+          .from('work_order_material_requirements')
+          .select('work_order_id,canonical_product_id,quantity_shortage,status')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', completedSupplyOrderIds)
+          .gt('quantity_shortage', 0)
+          .limit(500)
+      : { data: [], error: null } as any;
+    if (materialRequirementsResult.error) throw materialRequirementsResult.error;
+
+    const requiredProductIds = [...new Set((materialRequirementsResult.data || [])
+      .map((row:any) => String(row.canonical_product_id || ''))
+      .filter(Boolean))].slice(0, 50);
+    const currentStockResult = requiredProductIds.length
+      ? await context.supabase
+          .from('laudus_inventory_reconciliation_service_v1')
+          .select('canonical_product_id,sku,laudus_stock,laudus_synced_at')
+          .eq('organization_id', context.organizationId)
+          .in('canonical_product_id', requiredProductIds)
+          .limit(100)
+      : { data: [], error: null } as any;
+    if (currentStockResult.error) throw currentStockResult.error;
+
+    const currentStockByProduct = new Map(
+      (currentStockResult.data || []).map((row:any) => [String(row.canonical_product_id || ''), row]),
+    );
+    const shortagesByOrder = new Map<string, any[]>();
+    for (const requirement of materialRequirementsResult.data || []) {
+      const key = String(requirement.work_order_id || '');
+      const rows = shortagesByOrder.get(key) || [];
+      rows.push(requirement);
+      shortagesByOrder.set(key, rows);
+    }
+
     const actions: ActionItem[] = [];
 
     for (const row of meterReviewResult.data || []) {
@@ -146,9 +183,16 @@ export async function GET(request: NextRequest) {
       const openNeeds = Number(row.open_supply_need_count || 0);
       const openRequests = Number(row.open_procurement_request_count || 0);
       const undelivered = Number(row.undelivered_order_count || 0);
+      const requirements = shortagesByOrder.get(String(row.work_order_id)) || [];
+      const coveredNow = requirements.filter((requirement:any) => {
+        const stock = currentStockByProduct.get(String(requirement.canonical_product_id || ''));
+        return Number(stock?.laudus_stock || 0) >= Number(requirement.quantity_shortage || 0);
+      }).length;
+      const allShortagesCoveredNow = requirements.length > 0 && coveredNow === requirements.length;
       const parts = [
-        shortages > 0 ? `${shortages} faltante(s) de material` : null,
-        openNeeds > 0 ? `${openNeeds} necesidad(es) de abastecimiento abierta(s)` : null,
+        shortages > 0 ? `${shortages} faltante(s) histórico(s)` : null,
+        requirements.length > 0 ? `${coveredNow}/${requirements.length} hoy cubiertos por stock Laudus` : null,
+        openNeeds > 0 ? `${openNeeds} necesidad(es) abierta(s)` : null,
         openRequests > 0 ? `${openRequests} solicitud(es) de compra abierta(s)` : null,
         undelivered > 0 ? `${undelivered} orden(es) aún no entregada(s)` : null,
       ].filter(Boolean).join(' · ');
@@ -156,8 +200,10 @@ export async function GET(request: NextRequest) {
         id: `supply-integrity:${row.work_order_id}`,
         kind: 'operational_blocker',
         priority: 9,
-        title: `Conciliar abastecimiento post-cierre · ${row.work_order_number || 'OT'}`,
-        description: row.title || 'Orden terminada con abastecimiento todavía pendiente',
+        title: `${allShortagesCoveredNow ? 'Cerrar brecha de abastecimiento histórica' : 'Conciliar abastecimiento post-cierre'} · ${row.work_order_number || 'OT'}`,
+        description: allShortagesCoveredNow
+          ? 'La OT terminó con faltantes registrados, pero el stock Laudus actual cubre todos los materiales pendientes. Validar antes de comprar y cerrar la necesidad obsoleta.'
+          : row.title || 'Orden terminada con abastecimiento todavía pendiente',
         evidence: parts || row.supply_chain_status || 'Cadena de abastecimiento pendiente después del cierre',
         href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.work_order_id))}`,
         assetHref: assetHref(row.canonical_asset_id),
