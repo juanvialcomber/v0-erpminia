@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Clock3, Database, RefreshCw, WifiOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { LaudusSourceMark, type LaudusSourceVisualState } from '@/components/integrations/laudus-source-mark';
 import { cn } from '@/lib/utils';
 
 export type DataSourceState = 'updated' | 'syncing' | 'review' | 'offline' | 'pending';
@@ -30,6 +31,14 @@ function iconFor(state: DataSourceState) {
   if (state === 'review') return AlertTriangle;
   if (state === 'offline') return WifiOff;
   return Clock3;
+}
+
+function laudusVisualState(state: DataSourceState): LaudusSourceVisualState {
+  if (state === 'updated') return 'connected';
+  if (state === 'syncing') return 'syncing';
+  if (state === 'review') return 'review';
+  if (state === 'offline') return 'offline';
+  return 'pending';
 }
 
 function formatUpdatedAt(value?: string | null) {
@@ -76,11 +85,14 @@ export function DataSourceStatusStrip({
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
         {sources.map((source) => {
           const Icon = iconFor(source.state);
+          const isLaudus = source.key.toLocaleLowerCase('es-CL') === 'laudus';
           return (
             <div key={source.key} className="bg-card px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Icon className={cn('h-4 w-4 shrink-0 text-muted-foreground', source.state === 'syncing' && 'animate-spin')} />
+                  {isLaudus
+                    ? <LaudusSourceMark compact state={laudusVisualState(source.state)} />
+                    : <Icon className={cn('h-4 w-4 shrink-0 text-muted-foreground', source.state === 'syncing' && 'animate-spin')} />}
                   <p className="truncate text-sm font-medium">{source.label}</p>
                 </div>
                 <Badge variant={badgeVariant(source.state)} className="shrink-0">{LABELS[source.state]}</Badge>
