@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { LaudusMasterReadinessCard } from '@/components/integrations/laudus-master-readiness-card';
+import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 
 type Review = { status: 'open' | 'accepted' | 'resolved' | 'ignored'; resolution_note: string | null; evidence_reference: string | null; reviewed_at: string | null } | null;
 type Issue = { issue_key: string; entity_type: string; entity_id: string | null; issue_type: string; field_name: string | null; severity: 'observation' | 'warning' | 'critical'; label: string; detail: string; href: string; active: boolean; review: Review };
@@ -22,6 +23,7 @@ const issueLabels: Record<string, string> = { missing_field: 'Campo incompleto',
 
 export default function CalidadDatosPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/data-quality/reconciliation', fetcher, { revalidateOnFocus: false });
+  const sourceStatus = useDataSourceStatus();
   const [entity, setEntity] = useState('all');
   const [status, setStatus] = useState('open');
   const [query, setQuery] = useState('');
@@ -82,7 +84,7 @@ export default function CalidadDatosPage() {
       sources={[
         { key: 'canonical', label: 'Datos canónicos', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Productos, proveedores, activos y relaciones validadas.' },
         { key: 'operations', label: 'Operación MOTIL', state: error ? 'review' : isLoading ? 'syncing' : 'updated', detail: 'Bodega, OT, compras y registros operacionales.' },
-        { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Se incorporará a esta misma bandeja cuando la API quede habilitada.' },
+        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando conexión y frescura de Laudus.' }),
         { key: 'evidence', label: 'Evidencia externa', state: 'updated', detail: 'Archivos, DTE y fuentes permanecen separadas hasta ser conciliadas.' },
       ]}
     />
