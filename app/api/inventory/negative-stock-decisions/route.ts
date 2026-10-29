@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
   const { data: negativeRows, error: negativeError } = await context.supabase
     .from('laudus_inventory_reconciliation_service_v1')
-    .select('sku,description,unit_of_measure,laudus_stock,laudus_synced_at,motil_stock,quantity_delta,reconciliation_state')
+    .select('canonical_product_id,sku,description,unit_of_measure,laudus_stock,laudus_synced_at,motil_stock,quantity_delta,reconciliation_state')
     .eq('organization_id', context.organizationId)
     .lt('laudus_stock', 0)
     .order('laudus_stock', { ascending: true })
@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
   }
 
   const skus = [...new Set((negativeRows || []).map((row: any) => String(row.sku || '').trim()).filter(Boolean))];
+  const productIds = [...new Set((negativeRows || []).map((row: any) => String(row.canonical_product_id || '').trim()).filter(Boolean))];
   if (!skus.length) {
     return NextResponse.json({
       decisions: [],
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
       .from('product_procurement_status')
       .select('product_id,product_code,name,has_purchase_history,purchase_order_count,total_spend,weighted_average_unit_cost,minimum_unit_cost,maximum_unit_cost,last_purchase_date')
       .eq('organization_id', context.organizationId)
-      .in('product_code', skus),
+      .in('product_id', productIds.length ? productIds : ['00000000-0000-0000-0000-000000000000']),
     context.supabase
       .from('data_reconciliation_reviews')
       .select('issue_key,status,resolution_note,evidence_reference,reviewed_by,reviewed_at,updated_at')
@@ -81,8 +82,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No se pudo construir la prioridad económica de Bodega' }, { status: 500 });
   }
 
-  const procurementBySku = new Map(
-    (procurementResult.data || []).map((row: any) => [String(row.product_code || '').trim().toUpperCase(), row]),
+  const procurementByProductId = new Map(
+    (procurementResult.data || []).map((row: any) => [String(row.product_id || ''), row]),
   );
   const reviewByKey = new Map(
     (reviewsResult.data || []).map((row: any) => [String(row.issue_key), row]),
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
 
   const decisions = (negativeRows || []).map((row: any) => {
     const sku = String(row.sku || '').trim();
-    const procurement = procurementBySku.get(sku.toUpperCase()) || null;
+    const procurement = procurementByProductId.get(String(row.canonical_product_id || '')) || null;
     const review = reviewByKey.get(issueKey(sku)) || null;
     const stock = num(row.laudus_stock) || 0;
     const unitCost = num(procurement?.weighted_average_unit_cost);
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
 
   const { data: current, error: currentError } = await context.supabase
     .from('laudus_inventory_reconciliation_service_v1')
-    .select('sku,laudus_stock,laudus_synced_at')
+    .select('canonical_product_id,sku,laudus_stock,laudus_synced_at')
     .eq('organization_id', context.organizationId)
     .eq('sku', sku)
     .lt('laudus_stock', 0)
@@ -176,13 +177,6 @@ export async function POST(request: NextRequest) {
   if (!current) {
     return NextResponse.json({ error: 'La excepción ya no está activa; actualiza Bodega antes de decidir' }, { status: 409 });
   }
-
-  const { data: product } = await context.supabase
-    .from('product_procurement_status')
-    .select('product_id')
-    .eq('organization_id', context.organizationId)
-    .eq('product_code', sku)
-    .maybeSingle();
 
   const now = new Date().toISOString();
   const status = decision === 'no_aplica' ? 'ignored' : 'accepted';
@@ -200,7 +194,7 @@ export async function POST(request: NextRequest) {
       organization_id: context.organizationId,
       issue_key: issueKey(sku),
       entity_type: 'inventory',
-      entity_id: product?.product_id || null,
+      entity_id: current.canonical_product_id || null,
       issue_type: 'negative_stock',
       field_name: 'stock',
       status,
