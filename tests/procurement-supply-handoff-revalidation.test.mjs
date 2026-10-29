@@ -26,4 +26,6 @@ test('covered historical shortages require a human no-purchase decision instead 
   assert.match(panel, /No comprar · decisión registrada/);
   assert.match(route, /supply_need_no_purchase_decision/);
   assert.match(route, /does not close canonical supply need/);
+  assert.match(route, /estimated_exposure_clp/);
+  assert.match(route, /not realized savings or avoided cost until the outcome is closed/);
 });
