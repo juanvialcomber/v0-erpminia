@@ -15,14 +15,21 @@ type LaudusSyncTable =
   | 'laudus_credit_notes'
   | 'laudus_cost_centers';
 
+const LAUDUS_SYNC_SERVICE_TABLES: Record<LaudusSyncTable, string> = {
+  laudus_purchase_payments: 'laudus_purchase_payments_detail_service_v1',
+  laudus_accounts_payable: 'laudus_accounts_payable_service_v1',
+  laudus_purchase_invoices: 'laudus_purchase_invoices_service_v1',
+  laudus_credit_notes: 'laudus_credit_notes_service_v1',
+  laudus_cost_centers: 'laudus_cost_centers_service_v1',
+};
+
 async function latestTimestamp(
   db: SupabaseClient,
   table: LaudusSyncTable,
   organizationId: string,
 ) {
   const result = await db
-    .schema('integration')
-    .from(table)
+    .from(LAUDUS_SYNC_SERVICE_TABLES[table])
     .select('synced_at')
     .eq('organization_id', organizationId)
     .not('synced_at', 'is', null)
@@ -146,33 +153,32 @@ export async function loadLaudusFinanceControl(
     oldestOpenPayableRows,
     openPayableRows,
   ] = await Promise.all([
-    count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('deposited', true)),
-    count(db.schema('integration').from('laudus_purchase_payments').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).or('deposited.is.false,deposited.is.null')),
-    count(db.schema('integration').from('laudus_credit_notes').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'matched')),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'ignored')),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'pending')),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'candidate')),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'conflict')),
-    count(db.schema('integration').from('laudus_cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('discontinued', true)),
-    count(db.schema('integration').from('laudus_accounting_entries').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_asset_id', 'is', null)),
-    count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('acquisition_cost', 0)),
-    count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
-    count(db.schema('integration').from('laudus_fixed_assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('useful_life', 0)),
-    db.schema('integration').from('laudus_credit_notes').select('total_amount').eq('organization_id', organizationId),
-    db.schema('integration').from('laudus_accounting_entries').select('entry_date').eq('organization_id', organizationId).not('entry_date', 'is', null).order('entry_date', { ascending: false }).limit(1).maybeSingle(),
+    count(db.from('laudus_purchase_payments_detail_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('laudus_purchase_payments_detail_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('deposited', true)),
+    count(db.from('laudus_purchase_payments_detail_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).or('deposited.is.false,deposited.is.null')),
+    count(db.from('laudus_credit_notes_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'matched')),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'ignored')),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'pending')),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'candidate')),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'conflict')),
+    count(db.from('laudus_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('discontinued', true)),
+    count(db.from('laudus_accounting_entries_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('laudus_fixed_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('laudus_fixed_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_asset_id', 'is', null)),
+    count(db.from('laudus_fixed_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('acquisition_cost', 0)),
+    count(db.from('laudus_fixed_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
+    count(db.from('laudus_fixed_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).gt('useful_life', 0)),
+    db.from('laudus_credit_notes_service_v1').select('total_amount').eq('organization_id', organizationId),
+    db.from('laudus_accounting_entries_service_v1').select('entry_date').eq('organization_id', organizationId).not('entry_date', 'is', null).order('entry_date', { ascending: false }).limit(1).maybeSingle(),
     latestTimestamp(db, 'laudus_purchase_payments', organizationId),
     latestTimestamp(db, 'laudus_accounts_payable', organizationId),
     latestTimestamp(db, 'laudus_purchase_invoices', organizationId),
     latestTimestamp(db, 'laudus_credit_notes', organizationId),
     latestTimestamp(db, 'laudus_cost_centers', organizationId),
     db
-      .schema('integration')
-      .from('laudus_purchase_payments')
+      .from('laudus_purchase_payments_detail_service_v1')
       .select('external_id,issued_date,due_date,document,notes,bank,source_payload')
       .eq('organization_id', organizationId)
       .or('deposited.is.false,deposited.is.null')
@@ -222,8 +228,7 @@ export async function loadLaudusFinanceControl(
   );
   const supplierLookup = supplierIds.length
     ? await db
-        .schema('integration')
-        .from('laudus_suppliers')
+        .from('laudus_suppliers_service_v1')
         .select('external_id,name,legal_name')
         .eq('organization_id', organizationId)
         .in('external_id', supplierIds)
@@ -336,8 +341,7 @@ export async function loadLaudusFinanceControl(
   const topSupplierIds = topSupplierEntries.map(([supplierId]) => supplierId);
   const topSupplierLookup = topSupplierIds.length
     ? await db
-        .schema('integration')
-        .from('laudus_suppliers')
+        .from('laudus_suppliers_service_v1')
         .select('external_id,name,legal_name')
         .eq('organization_id', organizationId)
         .in('external_id', topSupplierIds)
