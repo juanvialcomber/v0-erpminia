@@ -36,6 +36,18 @@ type Payload = {
     missingInMotilNonzero: number;
     laudusOnlyZero: number;
     negativeProducts: number;
+    negativeWarehouses: number;
+    negativePositions: Array<{
+      sku: string;
+      description: string;
+      unit: string;
+      totalStock: number;
+      warehouseCode: string;
+      warehouseName: string;
+      warehouseStock: number;
+      sourceDate: string | null;
+      syncedAt: string | null;
+    }>;
   };
   authority: {
     state: string;
@@ -179,6 +191,34 @@ export function LaudusInventoryReadinessCard() {
           </p>
         </div>
       </div>
+
+      {!isLoading && data && data.laudus.negativePositions.length > 0 ? (
+        <div className="border-t border-amber-500/30 bg-amber-500/5 px-4 py-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium">
+                {count(data.laudus.negativeProducts)} SKU Laudus con saldo negativo en {count(data.laudus.negativeWarehouses)} bodega{data.laudus.negativeWarehouses === 1 ? '' : 's'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                La excepción se localiza por bodega. MOTIL no corrige el saldo: primero se revisan movimientos, recepciones, consumos o conteos en Laudus.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 divide-y rounded-md border bg-card">
+            {data.laudus.negativePositions.map((row) => (
+              <div key={`${row.sku}:${row.warehouseCode}`} className="grid gap-1 px-3 py-2.5 text-xs sm:grid-cols-[120px_1fr_180px_110px] sm:items-center sm:gap-3">
+                <span className="font-mono">{row.sku}</span>
+                <span className="truncate" title={row.description}>{row.description}</span>
+                <span className="text-muted-foreground">{row.warehouseName}</span>
+                <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                  {count(row.warehouseStock)} {row.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2">
