@@ -276,3 +276,11 @@ Estos umbrales habilitan escala inicial, no E4.
 - `procurement_award_outcomes_v1` conserva ambos scopes; `procurement_award_outcome_summary_v1` agrega únicamente evidencia operacional.
 - El scorecard publica `totalDecisions`, `operationalDecisions`, `uatDecisions` y outcomes operacionales por separado. Si no existe muestra operacional, el gate queda `NO_OPERATIONAL_SAMPLE` y evidencia E0.
 - Valor: evita inflar adopción, desempeño o ROI con pruebas de sistema. El primer gate comercial real será una adjudicación operacional humana con outcome posterior trazable.
+
+### 2026-10-29 — Supplier score sin fixtures UAT
+
+- Auditoría de procedencia: las 3 OCs operacionales, 3 recepciones, 3 facturas evaluadas y 1 devolución existentes en el flujo actual pertenecen a fixtures/UAT.
+- Por lo tanto, el score de proveedor observado hasta ahora (incluido 69,44/100) no constituye desempeño operacional real.
+- Cambio: `procurement_intake_requests` incorpora `evidence_scope`; los 3 fixtures conocidos se marcan `uat` por ID exacto y el `supplier_operational_score_v2` usa sólo OCs cuyo intake es operacional.
+- Resultado esperado con la evidencia actual: 0 OCs operacionales, 0 recepciones operacionales, 0 facturas operacionales, 0 devoluciones operacionales y score `Sin evidencia` hasta que exista una compra real.
+- Valor: evita que una decisión futura de adjudicación se apoye en desempeño generado por QA. Las pruebas permanecen trazables y disponibles para validar el software.
