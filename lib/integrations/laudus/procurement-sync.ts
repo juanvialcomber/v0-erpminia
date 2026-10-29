@@ -1,13 +1,10 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { listLaudus } from '@/lib/integrations/laudus/client';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
   markLaudusSyncSuccess,
 } from '@/lib/integrations/laudus/sync-policy';
-
-type SupabaseLike = {
-  rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: any; error: any }>;
-};
 
 type JsonRow = Record<string, any>;
 
@@ -124,7 +121,7 @@ async function listAllSuppliers() {
 }
 
 async function ingestChunks(
-  db: SupabaseLike,
+  db: SupabaseClient,
   rpc: string,
   argsFactory: (chunk: JsonRow[]) => Record<string, unknown>,
   rows: JsonRow[],
@@ -140,7 +137,7 @@ async function ingestChunks(
   return processed;
 }
 
-export async function syncLaudusSuppliers(organizationId: string, db: SupabaseLike) {
+export async function syncLaudusSuppliers(organizationId: string, db: SupabaseClient) {
   await markLaudusSyncRunning(db, organizationId, 'suppliers');
   let apiCalls = 0;
 
@@ -170,7 +167,7 @@ export async function syncLaudusSuppliers(organizationId: string, db: SupabaseLi
   }
 }
 
-export async function syncLaudusProcurement(organizationId: string, db: SupabaseLike) {
+export async function syncLaudusProcurement(organizationId: string, db: SupabaseClient) {
   await markLaudusSyncRunning(db, organizationId, 'procurement');
   let apiCalls = 0;
 
