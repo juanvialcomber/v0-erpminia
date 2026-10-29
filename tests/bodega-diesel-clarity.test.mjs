@@ -47,3 +47,11 @@ test('bodega is an operational workspace with visible ERP comparison', async () 
   assert.doesNotMatch(page, /<span>Reservado<\/span>/);
   assert.match(page, /Busca por producto o código y abre la posición para revisar su evidencia/);
 });
+
+
+test('bodega explains when Laudus wins despite a historical MOTIL difference', async () => {
+  const page = await readFile(pagePath, 'utf8');
+  assert.match(page, /Laudus es la fuente más reciente y se usa como cantidad efectiva/);
+  assert.match(page, /Se usa Laudus como cantidad efectiva porque su evidencia es más reciente/);
+  assert.match(page, /diesel\.sourcesDiffer && diesel\.effectiveSource === 'laudus'/);
+});
