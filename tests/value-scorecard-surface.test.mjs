@@ -177,3 +177,14 @@ test('OTe value cohort measures only observed event-chain intervals through huma
   assert.match(page, /Un tramo sin timestamp queda sin medir/);
   assert.match(page, /MOTIL no la infiere desde la creación/);
 });
+
+
+test('value dashboard separates operational award evidence from UAT', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  assert.match(page, /procurementAwardValue/);
+  assert.match(page, /Adjudicación con evidencia válida/);
+  assert.match(page, /Decisiones operacionales/);
+  assert.match(page, /Pruebas UAT excluidas/);
+  assert.match(page, /no cuentan como adopción, outcome ni valor económico/);
+  assert.match(page, /primera adjudicación operacional real/);
+});

@@ -267,3 +267,20 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+## 2026-10-29 — Separación formal entre UAT y evidencia operacional de adjudicación
+
+- Hallazgo cuantitativo: existe 1 decisión de adjudicación y 1 outcome asociado, pero la propia nota de decisión declara que fue un UAT productivo controlado y que no representa una compra real.
+- Cifra correcta para valor operacional: 0 adjudicaciones operacionales válidas y 0 outcomes operacionales válidos. El UAT se conserva como evidencia de funcionamiento, no como adopción ni ROI.
+- Arquitectura: `procurement_award_decisions` incorpora `evidence_scope` con valores `operational|uat`, default operacional; el UAT histórico conocido queda backfilleado por ID y nota exacta.
+- `procurement_award_outcomes_v1` conserva ambos scopes; `procurement_award_outcome_summary_v1` agrega únicamente evidencia operacional.
+- El scorecard publica `totalDecisions`, `operationalDecisions`, `uatDecisions` y outcomes operacionales por separado. Si no existe muestra operacional, el gate queda `NO_OPERATIONAL_SAMPLE` y evidencia E0.
+- Valor: evita inflar adopción, desempeño o ROI con pruebas de sistema. El primer gate comercial real será una adjudicación operacional humana con outcome posterior trazable.
+
+### 2026-10-29 — Supplier score sin fixtures UAT
+
+- Auditoría de procedencia: las 3 OCs operacionales, 3 recepciones, 3 facturas evaluadas y 1 devolución existentes en el flujo actual pertenecen a fixtures/UAT.
+- Por lo tanto, el score de proveedor observado hasta ahora (incluido 69,44/100) no constituye desempeño operacional real.
+- Cambio: `procurement_intake_requests` incorpora `evidence_scope`; los 3 fixtures conocidos se marcan `uat` por ID exacto y el `supplier_operational_score_v2` usa sólo OCs cuyo intake es operacional.
+- Resultado esperado con la evidencia actual: 0 OCs operacionales, 0 recepciones operacionales, 0 facturas operacionales, 0 devoluciones operacionales y score `Sin evidencia` hasta que exista una compra real.
+- Valor: evita que una decisión futura de adjudicación se apoye en desempeño generado por QA. Las pruebas permanecen trazables y disponibles para validar el software.

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, procurementAwardDecisions, procurementAwardOutcomes] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -65,6 +65,18 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('procurement_award_decisions')
+        .select('*')
+        .eq('organization_id', context.organizationId)
+        .order('decided_at', { ascending: false })
+        .limit(500),
+      context.supabase
+        .from('procurement_award_outcomes_v1')
+        .select('*')
+        .eq('organization_id', context.organizationId)
+        .order('decided_at', { ascending: false })
+        .limit(500),
     ]);
 
     if (current.error) throw current.error;
@@ -76,6 +88,8 @@ export async function GET(request: NextRequest) {
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
     if (maintenanceAdminTiming.error) throw maintenanceAdminTiming.error;
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
+    if (procurementAwardDecisions.error) throw procurementAwardDecisions.error;
+    if (procurementAwardOutcomes.error) throw procurementAwardOutcomes.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -332,6 +346,37 @@ export async function GET(request: NextRequest) {
           ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
           : shortageToProcurementSeconds[shortageMidpoint];
 
+    const isUatAwardEvidence = (row: any) =>
+      String(row?.evidence_scope || '').toLowerCase() === 'uat'
+      || /^uat\b/i.test(String(row?.decision_notes || '').trim());
+
+    const awardDecisionRows = procurementAwardDecisions.data || [];
+    const awardOutcomeRows = procurementAwardOutcomes.data || [];
+    const operationalAwardDecisions = awardDecisionRows.filter((row: any) => !isUatAwardEvidence(row));
+    const uatAwardDecisions = awardDecisionRows.filter((row: any) => isUatAwardEvidence(row));
+    const operationalAwardOutcomes = awardOutcomeRows.filter((row: any) => !isUatAwardEvidence(row));
+    const deliveredOperationalOutcomes = operationalAwardOutcomes.filter((row: any) => row.actual_delivery_date);
+    const closedOperationalOutcomes = operationalAwardOutcomes.filter((row: any) => row.outcome_state === 'closed');
+
+    const procurementAwardValue = {
+      totalDecisions: awardDecisionRows.length,
+      operationalDecisions: operationalAwardDecisions.length,
+      uatDecisions: uatAwardDecisions.length,
+      operationalOutcomes: operationalAwardOutcomes.length,
+      deliveredOperationalOutcomes: deliveredOperationalOutcomes.length,
+      closedOperationalOutcomes: closedOperationalOutcomes.length,
+      acceptanceSample: operationalAwardOutcomes.filter((row: any) => row.acceptance_rate_pct != null).length,
+      invoiceOutcomeSample: operationalAwardOutcomes.filter((row: any) => row.clean_invoice_rate_pct != null).length,
+      evidenceLevel:
+        closedOperationalOutcomes.length >= 10 ? 'E3'
+          : deliveredOperationalOutcomes.length > 0 ? 'E2'
+            : operationalAwardDecisions.length > 0 ? 'E1'
+              : 'E0',
+      workflowLevel: 4,
+      valueGate: operationalAwardDecisions.length > 0 ? 'MEASURING' : 'NO_OPERATIONAL_SAMPLE',
+      semantics: 'controlled UAT/test award decisions remain traceable but are excluded from operational adoption, outcomes and ROI evidence',
+    };
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -404,6 +449,7 @@ export async function GET(request: NextRequest) {
       financeReview,
       financeReviewTiming,
       maintenanceValue,
+      procurementAwardValue,
       history: history.data || null,
       definitions: {
         workflow: {
