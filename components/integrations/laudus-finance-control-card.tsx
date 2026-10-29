@@ -851,6 +851,11 @@ export function LaudusFinanceControlCard() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {number(fixedAssetLinked)} de {number(fixedAssetTotal)} enlazados. Sin evidencia suficiente no se declara valor libro real.
                   </p>
+                  <Button asChild size="sm" variant="ghost" className="mt-2 h-8 px-0">
+                    <Link href="/dashboard/finanzas/activos-laudus">
+                      Revisar activos <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </details>
