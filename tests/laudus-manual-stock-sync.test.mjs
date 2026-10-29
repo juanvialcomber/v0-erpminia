@@ -17,3 +17,12 @@ test('cron secret path remains available for scheduled stock sync', () => {
   assert.match(route, /laudus_source_status_service_v1/);
   assert.match(route, /syncLaudusStockDaily/);
 });
+
+
+test('manual sync responds immediately and continues after response', () => {
+  assert.match(route, /import \{ after, NextRequest, NextResponse \} from 'next\/server'/);
+  assert.match(route, /after\(async \(\) =>/);
+  assert.match(route, /status: 'accepted'/);
+  assert.match(route, /\{ status: 202 \}/);
+  assert.match(route, /manual sync completed/);
+});
