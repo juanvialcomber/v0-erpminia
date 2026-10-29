@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 import { syncLaudusProcurement } from '@/lib/integrations/laudus/procurement-sync';
 
 export async function GET(request: NextRequest) {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   for (const organizationId of organizationIds) {
     try {
-      results.push(await syncLaudusProcurement(organizationId, db));
+      results.push(await withLaudusApiUsageTracking(organizationId, () => syncLaudusProcurement(organizationId, db)));
     } catch (error) {
       console.error('[laudus-procurement-daily] sync failed', {
         organizationId,
