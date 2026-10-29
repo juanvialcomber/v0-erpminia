@@ -15,6 +15,8 @@ test('data quality enriches Laudus product candidates without creating masters',
   assert.match(route, /no modifica ni crea el maestro automáticamente/);
   assert.match(route, /productCandidateIds/);
   assert.match(route, /latestPositions/);
+  assert.match(route, /row\.lot/);
+  assert.match(route, /warehouseTotals/);
   assert.doesNotMatch(route, /\.insert\(/);
   assert.doesNotMatch(route, /\.update\(/);
 });
