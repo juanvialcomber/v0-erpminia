@@ -17,9 +17,9 @@ test('Laudus financial cron is secret-gated and bounded to enabled organizations
   assert.match(route, /syncLaudusFinancialMasters/);
 });
 
-test('Laudus financial cron is scheduled once daily away from existing heavy jobs', () => {
+test('Laudus financial cron is scheduled every 48 hours away from existing heavy jobs', () => {
   assert.match(vercel, /\/api\/cron\/laudus-financial-masters-daily/);
-  assert.match(vercel, /20 4 \* \* \*/);
+  assert.match(vercel, /20 4 \*\/2 \* \*/);
 });
 
 
