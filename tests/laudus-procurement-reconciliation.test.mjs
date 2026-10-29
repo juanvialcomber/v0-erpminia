@@ -33,3 +33,8 @@ test('preview endpoint is permission scoped and explicitly non-mutating', () => 
   assert.match(helper, /unknownCode/);
   assert.doesNotMatch(helper, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
+
+test('runtime reads the public server-only service view, never the private integration schema', () => {
+  assert.match(helper, /purchase_order_reconciliation_preview_service_v1/);
+  assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
+});
