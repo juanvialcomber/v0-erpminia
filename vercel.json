@@ -1,45 +1,15 @@
 {
   "buildCommand": "npm run build",
   "crons": [
-    {
-      "path": "/api/cron/maintenance-analytics-daily",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/role-kpi-snapshots-daily",
-      "schedule": "30 6 * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-daily",
-      "schedule": "30 9 * * *"
-    },
-    {
-      "path": "/api/cron/messages-push",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-history",
-      "schedule": "7,22,37,52 * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-media",
-      "schedule": "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
-    },
-    {
-      "path": "/api/cron/whatsapp-vision",
-      "schedule": "* * * * *"
-    },
-    {
-      "path": "/api/cron/laudus-financial-masters-daily",
-      "schedule": "20 4 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-products-daily",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-stock-daily",
-      "schedule": "10 */6 * * *"
-    }
+    {"path":"/api/cron/maintenance-analytics-daily","schedule":"0 1 * * *"},
+    {"path":"/api/cron/role-kpi-snapshots-daily","schedule":"30 6 * * *"},
+    {"path":"/api/cron/whatsapp-daily","schedule":"30 9 * * *"},
+    {"path":"/api/cron/messages-push","schedule":"* * * * *"},
+    {"path":"/api/cron/whatsapp-history","schedule":"7,22,37,52 * * * *"},
+    {"path":"/api/cron/whatsapp-media","schedule":"1,6,11,16,21,26,31,36,41,46,51,56 * * * *"},
+    {"path":"/api/cron/whatsapp-vision","schedule":"* * * * *"},
+    {"path":"/api/cron/laudus-financial-masters-daily","schedule":"20 4 * * *"},
+    {"path":"/api/cron/laudus-products-daily","schedule":"0 */12 * * *"},
+    {"path":"/api/cron/laudus-stock-daily","schedule":"10 */6 * * *"}
   ]
 }
