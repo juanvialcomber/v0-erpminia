@@ -13,6 +13,8 @@ test('warehouse 002 mapping is exact, bounded and aborts on drift', async () => 
   assert.match(sql, /motil_warehouse_id is null/);
   assert.match(sql, /reconciliation_status='matched'/);
   assert.match(sql, /v_count <> 1/);
+  assert.match(sql, /\(array_agg\(id\)\)\[1\]/);
+  assert.doesNotMatch(sql, /min\(id\)/i);
   assert.match(sql, /if not found then/i);
   assert.doesNotMatch(sql, /delete\s+from/i);
   assert.doesNotMatch(sql, /insert\s+into\s+public\.warehouses/i);

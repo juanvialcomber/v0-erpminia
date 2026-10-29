@@ -8,7 +8,7 @@ declare
   v_warehouse_id uuid;
   v_count integer;
 begin
-  select count(*), min(id)
+  select count(*), (array_agg(id))[1]
     into v_count, v_warehouse_id
   from public.warehouses
   where organization_id=v_org
