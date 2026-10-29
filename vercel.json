@@ -40,6 +40,14 @@
     {
       "path": "/api/cron/laudus-stock-daily",
       "schedule": "10 */6 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-procurement-daily",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-suppliers-weekly",
+      "schedule": "50 5 * * 0"
     }
   ]
 }
