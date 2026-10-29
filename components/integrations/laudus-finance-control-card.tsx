@@ -412,7 +412,10 @@ export function LaudusFinanceControlCard() {
     <Card className="overflow-hidden border-border/80 bg-card shadow-none">
       <CardContent className="space-y-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-          <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} />
+          <div className="flex flex-wrap items-center gap-2">
+            <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} />
+            <p className="text-xs font-medium text-muted-foreground">Laudus · fuente financiera</p>
+          </div>
           <div className="flex items-center gap-2">
             {!isLoading && freshnessIsStale ? <Badge variant="destructive">Dato atrasado</Badge> : null}
             <p className="text-xs text-muted-foreground">
