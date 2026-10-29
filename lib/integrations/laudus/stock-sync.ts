@@ -1,5 +1,6 @@
-import { getLaudusStockSnapshot } from '@/lib/integrations/laudus/client';
+import { getLaudusStockSnapshot, LaudusApiError } from '@/lib/integrations/laudus/client';
 import { chunkLaudusStockRows, toLaudusStockStageRows } from '@/lib/integrations/laudus/inventory';
+import { retryPolicy } from '@/lib/integrations/laudus/sync-policy';
 
 type WarehouseRow = {
   external_id: string;
@@ -12,6 +13,21 @@ type Snapshot = {
   dateTo: string | null;
   rows: Array<{ productId: string; sku: string | null; stock: number }>;
 };
+
+async function fetchStockWithRetry(args: { dateTo: string; warehouseId: string }, onCall: () => void) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      onCall();
+      return await getLaudusStockSnapshot(args);
+    } catch (error) {
+      if (!(error instanceof LaudusApiError)) throw error;
+      const decision = retryPolicy(error.status, attempt);
+      if (!decision.retry || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, decision.delayMs));
+    }
+  }
+  throw new Error('Laudus stock retry exhausted');
+}
 
 export async function syncLaudusStockDaily(organizationId: string, supabase: any) {
   const { data: warehouses, error: warehouseError } = await supabase
@@ -32,11 +48,12 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
   // Read every warehouse before staging anything. If Laudus fails mid-read,
   // MOTIL keeps the previous complete evidence snapshot untouched.
   const snapshots: Snapshot[] = [];
+  let apiCalls = 0;
   for (const warehouse of warehouseRows) {
-    const payload = await getLaudusStockSnapshot({
+    const payload = await fetchStockWithRetry({
       dateTo,
       warehouseId: warehouse.external_id,
-    });
+    }, () => { apiCalls += 1; });
     const normalized = toLaudusStockStageRows(payload, warehouse.external_id);
     snapshots.push({ warehouse, dateTo: normalized.dateTo, rows: normalized.rows });
   }
@@ -46,7 +63,7 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
     return {
       status: 'empty' as const,
       organizationId,
-      apiCalls: warehouseRows.length,
+      apiCalls,
       warehouses: warehouseRows.length,
       staged: 0,
       canonicalInventoryMutated: false,
@@ -110,7 +127,7 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
   return {
     status: 'completed' as const,
     organizationId,
-    apiCalls: warehouseRows.length,
+    apiCalls,
     warehouses: warehouseRows.length,
     runId,
     staged,
