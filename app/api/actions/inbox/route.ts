@@ -211,6 +211,7 @@ function emptyRoleInbox(name: string | null, cargoId: string, cargoName: string 
     source: 'scoped_role_task_queries_v1',
     rawTaskCount: 0,
     deduplicatedTaskCount: 0,
+    coverageAvailable: false,
   });
 }
 
@@ -238,6 +239,7 @@ function degradedInbox(
     degradedReason: 'task_query_timeout',
     rawTaskCount: null,
     deduplicatedTaskCount: null,
+    coverageAvailable: true,
   }, {
     status: 200,
     headers: {
@@ -270,6 +272,7 @@ export async function GET(request: NextRequest) {
       summary: { total: 0, owners: 0, support: 0, escalations: 0, critical: 0, overdue: 0, backlog: 0 },
       generatedAt: new Date().toISOString(),
       source: 'scoped_role_task_queries_v1',
+      coverageAvailable: false,
     });
   }
 
@@ -448,5 +451,6 @@ export async function GET(request: NextRequest) {
     source: 'scoped_role_tasks_and_personal_work_orders_v1',
     rawTaskCount: rawTasks.length,
     deduplicatedTaskCount: tasks.length,
+    coverageAvailable: true,
   });
 }
