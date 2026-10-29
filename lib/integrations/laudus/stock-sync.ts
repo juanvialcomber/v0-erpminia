@@ -38,14 +38,15 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
 
   if (warehouseError) throw new Error('Laudus warehouse lookup failed');
 
-  const warehouseRows = (warehouses || []) as WarehouseRow[];
-  if (!warehouseRows.length) throw new Error('No Laudus warehouses available');
+  const physicalWarehouseIds = new Set(['001', '002', '003', '004']);
+  const warehouseRows = ((warehouses || []) as WarehouseRow[]).filter((warehouse) => physicalWarehouseIds.has(warehouse.external_id));
+  if (!warehouseRows.length) throw new Error('No physical Laudus warehouses available');
 
   const dateTo = new Date()
     .toLocaleString('sv-SE', { timeZone: 'America/Santiago', hour12: false })
     .replace(' ', 'T');
 
-  // Read every warehouse before staging anything. If Laudus fails mid-read,
+  // Read every physical warehouse before staging anything. If Laudus fails mid-read,
   // MOTIL keeps the previous complete evidence snapshot untouched.
   const snapshots: Snapshot[] = [];
   let apiCalls = 0;
