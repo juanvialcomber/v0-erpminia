@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const route = fs.readFileSync('app/api/inventory/negative-stock-decisions/route.ts', 'utf8');
 const page = fs.readFileSync('app/dashboard/bodega/page.tsx', 'utf8');
+const panel = fs.readFileSync('components/inventory/negative-stock-decision-panel.tsx', 'utf8');
 
 test('negative stock decisions are read-only against canonical inventory', () => {
   assert.match(route, /laudus_inventory_reconciliation_service_v1/);
@@ -18,8 +19,9 @@ test('negative stock decisions require Bodega write access before feedback', () 
 });
 
 test('Bodega exposes decision-assisted review for negative stock', () => {
-  assert.match(page, /negative-stock-decisions/);
-  assert.match(page, /Prioridad por impacto/);
-  assert.match(page, /Requiere ajuste Laudus/);
-  assert.match(page, /Falta registrar movimiento/);
+  assert.match(page, /NegativeStockDecisionPanel/);
+  assert.match(panel, /negative-stock-decisions/);
+  assert.match(panel, /Prioridad por impacto/);
+  assert.match(panel, /Requiere ajuste Laudus/);
+  assert.match(panel, /Falta registrar movimiento/);
 });
