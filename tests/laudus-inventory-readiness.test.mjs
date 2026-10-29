@@ -14,6 +14,9 @@ test('inventory readiness separates ERP evidence from operational stock authorit
 
 test('inventory readiness measures live Laudus identity, stock, warehouses and open reconciliation', () => {
   assert.match(helper, /canonicalProductCoverage/);
+  assert.match(helper, /inventory_eligibility', 'eligible'/);
+  assert.match(helper, /eligibleProducts/);
+  assert.match(helper, /excludedProducts/);
   assert.match(helper, /laudusStockRows/);
   assert.match(helper, /mappedPhysicalWarehouses/);
   assert.match(helper, /latestLaudusStock/);
@@ -35,6 +38,8 @@ test('reconciliation readiness defaults to zero tolerance and waits for verified
 test('UI states that Laudus is live ERP evidence and cannot overwrite operational stock', () => {
   assert.match(card, /Laudus aporta catálogo, stock ERP y bodegas como evidencia/);
   assert.match(card, /MOTIL conserva por separado el stock operacional/);
+  assert.match(card, /Productos Laudus elegibles enlazados al catálogo/);
+  assert.match(card, /fuera de alcance/);
   assert.match(card, /Posiciones producto-bodega Laudus/);
   assert.match(card, /Bodegas físicas conciliadas con MOTIL/);
   assert.match(card, /sin autoajuste/);
