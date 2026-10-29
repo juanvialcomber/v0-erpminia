@@ -18,6 +18,7 @@ type Need = {
   shortage_lines: number;
   total_shortage_units: number;
   current_stock_review?: { source: string; covered_lines: number; shortage_lines: number; all_covered_now: boolean; latest_laudus_stock_sync?: string | null; authority_reason?: string | null };
+  no_purchase_decision?: { created_at?: string | null; user_id?: string | null; new_values?: { decision?: string | null } | null } | null;
 };
 type Response = { needs: Need[] };
 
@@ -34,20 +35,20 @@ export function PendingMaintenanceSupplyNeeds() {
   const [actionError, setActionError] = useState<string | null>(null);
   const needs = data?.needs || [];
 
-  const handoff = async (need: Need) => {
+  const postDecision = async (need: Need, action: 'send_to_procurement' | 'confirm_no_purchase') => {
     setBusyId(need.supply_need_id); setActionError(null);
     try {
       const response = await fetch('/api/procurement/supply-needs', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supplyNeedId: need.supply_need_id }),
+        body: JSON.stringify({ supplyNeedId: need.supply_need_id, action }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo enviar la necesidad a Compras.');
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la decisión.');
       await mutate();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'No se pudo enviar la necesidad a Compras.');
+      setActionError(err instanceof Error ? err.message : 'No se pudo registrar la decisión.');
       await mutate();
     } finally { setBusyId(null); }
   };
@@ -62,12 +63,13 @@ export function PendingMaintenanceSupplyNeeds() {
       {isLoading ? <div className="h-24 animate-pulse bg-muted/40" /> : null}
       {needs.map((need) => {
         const covered = need.current_stock_review?.all_covered_now === true;
+        const noPurchaseReviewed = Boolean(need.no_purchase_decision);
         return <div key={need.supply_need_id} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_220px_auto] lg:items-center">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {covered ? <CheckCircle2 className="h-4 w-4 text-muted-foreground" /> : <AlertTriangle className="h-4 w-4 text-muted-foreground" />}
               <p className="font-medium">{need.work_order_number || 'OT'} · {need.title || 'Necesidad de abastecimiento'}</p>
-              <Badge variant={covered ? 'secondary' : 'destructive'}>{covered ? 'Stock disponible hoy' : 'Faltante vigente por revisar'}</Badge>
+              <Badge variant={covered ? 'secondary' : 'destructive'}>{covered ? 'Stock disponible hoy' : 'Faltante vigente por revisar'}</Badge>{noPurchaseReviewed ? <Badge variant="outline">No comprar · decisión registrada</Badge> : null}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{need.asset_code || 'Sin activo'} · {need.shortage_lines} línea(s) · {need.total_shortage_units} unidad(es) registradas como faltantes.</p>
           </div>
@@ -78,7 +80,7 @@ export function PendingMaintenanceSupplyNeeds() {
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             {need.work_order_id ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${need.work_order_id}`}>Ver OT <ArrowRight className="ml-2 h-4 w-4" /></Link></Button> : null}
-            {covered ? <Button size="sm" variant="secondary" disabled>Conciliar antes de comprar</Button> : <Button size="sm" disabled={busyId === need.supply_need_id} onClick={() => void handoff(need)}>{busyId === need.supply_need_id ? 'Validando…' : 'Enviar a Compras'}</Button>}
+            {covered ? <Button size="sm" variant="secondary" disabled={busyId === need.supply_need_id || noPurchaseReviewed} onClick={() => void postDecision(need, 'confirm_no_purchase')}>{noPurchaseReviewed ? 'No comprar registrado' : busyId === need.supply_need_id ? 'Registrando…' : 'Registrar no comprar'}</Button> : <Button size="sm" disabled={busyId === need.supply_need_id} onClick={() => void postDecision(need, 'send_to_procurement')}>{busyId === need.supply_need_id ? 'Validando…' : 'Enviar a Compras'}</Button>}
           </div>
         </div>;
       })}
