@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { syncLaudusStockDaily } from '@/lib/integrations/laudus/stock-sync';
@@ -37,9 +37,37 @@ export async function GET(request: NextRequest) {
     }
 
     organizationIds = [context.organizationId];
+
+    const organizationId = context.organizationId;
+    after(async () => {
+      try {
+        const manualDb = await createClient();
+        const result = await syncLaudusStockDaily(organizationId, manualDb);
+        console.info('[laudus-stock-daily] manual sync completed', {
+          organizationId,
+          status: result.status,
+          runId: result.runId || null,
+          staged: result.staged || 0,
+          changed: result.changed || 0,
+        });
+      } catch (error) {
+        console.error('[laudus-stock-daily] manual sync failed', {
+          organizationId,
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    });
+
+    return NextResponse.json({
+      accepted: true,
+      organizationId,
+      status: 'accepted',
+      generatedAt: new Date().toISOString(),
+    }, { status: 202 });
   } else {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
+
   const results: Array<Record<string, unknown>> = [];
 
   for (const organizationId of organizationIds) {
