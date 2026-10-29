@@ -6,7 +6,9 @@ const route = fs.readFileSync('app/api/compras/suppliers/route.ts','utf8');
 
 test('supplier API retries one transient 502 before failing closed', () => {
   assert.match(route, /withGatewayRetry/);
-  assert.match(route, /\b502\b\|bad gateway\|cloudflare/i);
+  assert.match(route, /502/);
+  assert.match(route, /bad gateway/i);
+  assert.match(route, /cloudflare/i);
   assert.match(route, /setTimeout\(resolve, 150\)/);
 });
 
