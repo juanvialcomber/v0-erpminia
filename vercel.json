@@ -52,6 +52,10 @@
     {
       "path": "/api/cron/laudus-warehouses-weekly",
       "schedule": "50 6 * * 0"
+    },
+    {
+      "path": "/api/cron/laudus-bank-statements-daily",
+      "schedule": "10 7 * * *"
     }
   ]
 }
