@@ -43,12 +43,12 @@ test('failed staging marks its integration run failed without canonical mutation
   assert.doesNotMatch(helper, /warehouse_stock.*(?:insert|update|upsert|delete)/s);
 });
 
-test('stock cron is secret protected, public only through its own guard, and scheduled daily', () => {
+test('stock cron is secret protected, public only through its own guard, and scheduled every six hours', () => {
   assert.match(route, /CRON_SECRET/);
   assert.match(route, /syncLaudusStockDaily/);
   assert.match(proxy, /\/api\/cron\/laudus-stock-daily/);
   const config = JSON.parse(vercel);
   assert.ok(config.crons.some((cron) =>
-    cron.path === '/api/cron/laudus-stock-daily' && cron.schedule === '10 5 * * *'
+    cron.path === '/api/cron/laudus-stock-daily' && cron.schedule === '10 */6 * * *'
   ));
 });
