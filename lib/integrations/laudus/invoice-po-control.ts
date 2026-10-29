@@ -194,8 +194,7 @@ export async function loadLaudusInvoicePoControl(
   const safeLimit = Math.min(Math.max(limit, 1), MAX_OPEN_INVOICES);
 
   const openQuery = await db
-    .schema('integration')
-    .from('laudus_purchase_invoice_payment_status_v1')
+    .from('laudus_purchase_invoice_payment_status_service_v1')
     .select(
       'purchase_invoice_external_id,doc_number,supplier_external_id,supplier_name,issued_date,total_amount,currency,outstanding_amount,payment_status',
       { count: 'exact' },
@@ -219,8 +218,7 @@ export async function loadLaudusInvoicePoControl(
   const invoiceLines: InvoiceLine[] = [];
   for (const ids of chunk(invoiceIds)) {
     const result = await db
-      .schema('integration')
-      .from('laudus_purchase_invoice_lines')
+      .from('laudus_purchase_invoice_lines_service_v1')
       .select('invoice_external_id,product_external_id,sku,quantity,unit_price,line_total')
       .eq('organization_id', organizationId)
       .in('invoice_external_id', ids);
@@ -261,8 +259,7 @@ export async function loadLaudusInvoicePoControl(
   const orderHeaders: PurchaseOrder[] = [];
   for (const supplierChunk of chunk(suppliers)) {
     const result = await db
-      .schema('integration')
-      .from('laudus_purchase_orders')
+      .from('laudus_purchase_orders_service_v1')
       .select('external_id,order_number,supplier_external_id,issued_date,total_amount,currency,status')
       .eq('organization_id', organizationId)
       .in('supplier_external_id', supplierChunk)
@@ -278,8 +275,7 @@ export async function loadLaudusInvoicePoControl(
   const poLines: PurchaseOrderLine[] = [];
   for (const ids of chunk(orderIds)) {
     const result = await db
-      .schema('integration')
-      .from('laudus_purchase_order_lines')
+      .from('laudus_purchase_order_lines_service_v1')
       .select('purchase_order_external_id,product_external_id,sku,quantity,unit_price,line_total')
       .eq('organization_id', organizationId)
       .in('purchase_order_external_id', ids);
