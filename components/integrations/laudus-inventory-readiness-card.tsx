@@ -37,6 +37,15 @@ type Payload = {
     laudusOnlyZero: number;
     negativeProducts: number;
   };
+  authority: {
+    state: string;
+    reason: string;
+    laudusIsPrimary: boolean;
+    latestEmailStockCutoff: string | null;
+    latestEmailPendingReconciliation: number;
+    latestWhatsappStockEvidence: string | null;
+    whatsappStockEvidenceSinceLaudus: number;
+  };
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
     defaultAbsoluteTolerance: number;
@@ -45,8 +54,10 @@ type Payload = {
     autoApply: false;
   };
   policy: {
-    laudusStockRole: 'erp_evidence';
-    motilOperationalStockRole: 'operational_truth';
+    primaryStockSource: 'laudus' | 'reconciliation';
+    laudusStockRole: 'primary_when_consistent';
+    motilOperationalStockRole: 'comparison_evidence';
+    crossSourceValidation: readonly ['official_email', 'whatsapp'];
     autoOverwrite: false;
   };
 };
@@ -110,7 +121,27 @@ export function LaudusInventoryReadinessCard() {
           <LaudusSourceMark state={sourceState} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus aporta catálogo, stock ERP y bodegas como evidencia. MOTIL conserva por separado el stock operacional y nunca lo reemplaza automáticamente.
+          Laudus es la fuente primaria de stock cuando está fresco y no existe evidencia oficial contradictoria. Correo y WhatsApp actúan como contraste y abren conciliación antes de aceptar una cifra como vigente.
+        </p>
+      </div>
+
+      <div className={`border-b px-4 py-3 text-xs ${data?.authority.laudusIsPrimary ? 'bg-emerald-500/5' : 'bg-amber-500/5'}`}>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-medium">
+            {isLoading || !data
+              ? 'Verificando autoridad de stock.'
+              : data.authority.laudusIsPrimary
+                ? 'Fuente primaria: Laudus'
+                : 'Fuente en revisión · Laudus no se usa como verdad única'}
+          </p>
+          {!isLoading && data?.authority.latestEmailStockCutoff ? (
+            <p className="text-muted-foreground">
+              Último stock por correo: {data.authority.latestEmailStockCutoff}
+            </p>
+          ) : null}
+        </div>
+        <p className="mt-1 text-muted-foreground">
+          {isLoading || !data ? 'Comparando Laudus con correo y WhatsApp.' : data.authority.reason}
         </p>
       </div>
 
@@ -164,7 +195,7 @@ export function LaudusInventoryReadinessCard() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Evidencia ERP · sin autoajuste de stock MOTIL
+          {data?.authority.laudusIsPrimary ? 'Laudus primario · validación cruzada activa' : 'Conciliación activa · sin overwrite automático'}
         </p>
       </div>
     </section>
