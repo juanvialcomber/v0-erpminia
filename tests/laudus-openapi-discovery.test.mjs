@@ -14,9 +14,20 @@ test('capabilities classify operational domains and identify write-capable resou
     assert.match(source, new RegExp("'" + domain + "'"));
   }
   assert.match(source, /writeCapable:/);
+  assert.match(source, /kardex\|movement\|transfer/);
+  assert.match(source, /balance/);
 });
 
-test('read-only discovery never turns write methods into executable mutations', () => {
-  assert.match(source, /method === 'get' \|\| method === 'post'/);
+test('read-only discovery allows GET and list-query POST only', () => {
+  assert.match(source, /method === 'get'/);
+  assert.match(source, /method === 'post' && capability\.path\.endsWith\('\/list'\)/);
   assert.doesNotMatch(source, /readOnlyCapabilities[\s\S]*method === 'put'/);
+  assert.doesNotMatch(source, /readOnlyCapabilities[\s\S]*method === 'delete'/);
+});
+
+test('live spec discovery is bounded to public Swagger candidates and never authenticates', () => {
+  assert.match(source, /swagger\/index\.html/);
+  assert.match(source, /FALLBACK_SPEC_PATHS/);
+  assert.match(source, /loadLaudusOpenApiDocument/);
+  assert.doesNotMatch(source, /getLaudusAccessToken|Authorization|LAUDUS_PASSWORD/);
 });
