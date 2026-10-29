@@ -19,7 +19,7 @@ test('Bodega authority gate uses the newest trustworthy stock source', () => {
   assert.match(migration, /motil_whatsapp_messages/);
   assert.match(migration, /m\.domain = 'warehouse'/);
   assert.doesNotMatch(migration, /m\.domain = 'production_stock'/);
-  assert.match(migration, /Mineral\/production stock is excluded from this authority domain/);
+  assert.match(migration, /Mineral\/production stock is excluded/);
   assert.match(migration, /ingest_state/);
   assert.match(migration, /latest_email_stock_cutoff/);
   assert.match(migration, /whatsapp_stock_evidence_since_laudus/);
