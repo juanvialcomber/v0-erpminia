@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { Boxes, GitCompareArrows, History, ShieldCheck, Warehouse } from 'lucide-react';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Payload = {
   stock: {
@@ -73,9 +74,12 @@ export function LaudusInventoryReadinessCard() {
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="border-b px-4 py-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Laudus · inventario ERP</h2>
+          </div>
+          <LaudusSourceMark state={isLoading ? 'syncing' : data?.reconciliation.state === 'waiting_laudus' ? 'pending' : 'connected'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
           Laudus aporta catálogo, stock ERP y bodegas como evidencia. MOTIL conserva por separado el stock operacional y nunca lo reemplaza automáticamente.

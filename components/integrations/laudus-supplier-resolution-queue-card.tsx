@@ -2,6 +2,7 @@
 
 import useSWR from 'swr';
 import { Users } from 'lucide-react';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type QueueRow = {
   supplier_name_key: string;
@@ -40,6 +41,7 @@ export function LaudusSupplierResolutionQueueCard() {
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="flex items-start justify-between gap-4 border-b px-4 py-4">
         <div>
+          <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} className="mb-2" />
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold">Proveedores históricos por resolver</h2>

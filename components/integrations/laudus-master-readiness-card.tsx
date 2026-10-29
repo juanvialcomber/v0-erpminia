@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { CheckCircle2, Database, Link2, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Row = {
   key: string;
@@ -53,6 +54,10 @@ export function LaudusMasterReadinessCard() {
     <section className="overflow-hidden rounded-lg border bg-card">
       <div className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
+          <LaudusSourceMark
+            state={isLoading ? 'syncing' : data?.source.enabled ? 'connected' : data?.source.configured ? 'review' : 'pending'}
+            className="mb-2"
+          />
           <div className="flex flex-wrap items-center gap-2">
             <Database className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-sm font-semibold">Preparación para migración Laudus</h2>
