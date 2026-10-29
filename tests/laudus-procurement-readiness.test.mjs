@@ -30,6 +30,12 @@ test('procurement readiness is read-only and permission scoped', () => {
   assert.doesNotMatch(helper, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
 
+test('runtime readiness uses public service views instead of private canonical schema access', () => {
+  assert.match(helper, /canonical_purchase_orders_service_v1/);
+  assert.match(helper, /canonical_purchase_order_lines_service_v1/);
+  assert.doesNotMatch(helper, /\.schema\(['"]canonical['"]\)/);
+});
+
 test('UI communicates gaps without inventing data', () => {
   assert.match(card, /Preparación histórica para Laudus/);
   assert.match(card, /Proveedor enlazado/);
