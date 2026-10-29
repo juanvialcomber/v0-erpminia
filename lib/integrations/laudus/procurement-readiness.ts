@@ -2,6 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 type CountResult = { count: number | null; error: { message: string } | null };
 
+const ORDERS_VIEW = 'canonical_purchase_orders_service_v1';
+const LINES_VIEW = 'canonical_purchase_order_lines_service_v1';
+
 async function count(query: PromiseLike<CountResult>) {
   const result = await query;
   if (result.error) throw new Error(result.error.message);
@@ -47,19 +50,19 @@ export async function loadLaudusProcurementReadiness(
     dtes,
     dtesWithInvoice,
   ] = await Promise.all([
-    count(db.schema('canonical').from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_supplier_id', 'is', null)),
-    count(db.schema('canonical').from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
-    count(db.schema('canonical').from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('total_amount', 'is', null)),
-    count(db.schema('canonical').from('purchase_orders').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('currency', 'is', null).neq('currency', '')),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('quantity', 'is', null)),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit_cost', 'is', null)),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit', 'is', null).neq('unit', '')),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('quantity_received', 'is', null)),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
-    count(db.schema('canonical').from('purchase_order_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('asset_reference', 'is', null).neq('asset_reference', '')),
+    count(db.from(ORDERS_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from(ORDERS_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_supplier_id', 'is', null)),
+    count(db.from(ORDERS_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
+    count(db.from(ORDERS_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('total_amount', 'is', null)),
+    count(db.from(ORDERS_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('currency', 'is', null).neq('currency', '')),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('quantity', 'is', null)),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit_cost', 'is', null)),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('unit', 'is', null).neq('unit', '')),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('quantity_received', 'is', null)),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
+    count(db.from(LINES_VIEW).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('asset_reference', 'is', null).neq('asset_reference', '')),
     count(db.from('procurement_operational_receipts').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('procurement_operational_receipt_lines').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('procurement_operational_receipts').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('order_id', 'is', null)),
