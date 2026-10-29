@@ -299,3 +299,9 @@ Estos umbrales habilitan escala inicial, no E4.
 - La acción no cancela requerimientos, no cierra la necesidad canónica, no modifica stock y no escribe en Laudus.
 - MOTIL separa decisión de negocio de reconciliación de datos: primero se evita promover una compra innecesaria; luego la fuente canónica debe reconciliarse por su flujo autorizado.
 - Evidencia habilitada: aceptación humana de una recomendación preventiva. Esto permite medir tasa de aceptación y, cuando exista una compra realmente evitada con monto demostrable, promover el outcome a E3.
+
+## 2026-10-29 — Exposición económica de decisión `no comprar`
+
+- Para el caso OT-2026-0011, las 6 líneas históricamente faltantes suman una exposición estimada de reposición de aproximadamente $132.679 CLP usando costo histórico promedio ponderado.
+- Este monto se persiste junto a la decisión humana y a la evidencia de stock actual.
+- Semántica obligatoria: exposición estimada no equivale a ahorro, costo evitado ni ROI. Sólo podrá promoverse a E3 si el outcome demuestra que una compra equivalente realmente no se ejecutó por la decisión asistida de MOTIL.
