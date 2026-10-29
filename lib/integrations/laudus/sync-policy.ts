@@ -65,20 +65,34 @@ export type LaudusSyncMetrics = {
   metadata?: Record<string, unknown>;
 };
 
-async function getLaudusSourceId(supabase: any, organizationId: string) {
-  const { data, error } = await supabase
-    .from('laudus_source_status_service_v1')
-    .select('source_id')
-    .eq('organization_id', organizationId)
-    .maybeSingle();
+async function recordLaudusSyncControl(
+  supabase: any,
+  organizationId: string,
+  domain: LaudusSyncDomain,
+  event: 'running' | 'success' | 'failure',
+  metrics: LaudusSyncMetrics = {},
+  syncError?: unknown,
+) {
+  const message = syncError instanceof Error
+    ? syncError.message
+    : syncError == null
+      ? null
+      : String(syncError);
 
-  if (error || !data?.source_id) throw new Error('Laudus source lookup failed');
-  return String(data.source_id);
-}
+  const { error } = await supabase.rpc('motil_record_laudus_sync_control', {
+    p_organization_id: organizationId,
+    p_domain: domain,
+    p_event: event,
+    p_run_id: metrics.runId || null,
+    p_processed: Math.max(0, Math.trunc(metrics.processed || 0)),
+    p_changed: Math.max(0, Math.trunc(metrics.changed || 0)),
+    p_conflicts: Math.max(0, Math.trunc(metrics.conflicts || 0)),
+    p_api_calls: Math.max(0, Math.trunc(metrics.apiCalls || 0)),
+    p_error: message?.slice(0, 1000) || null,
+    p_metadata: metrics.metadata || {},
+  });
 
-function nextSyncDueAt(domain: LaudusSyncDomain, now: Date) {
-  const hours = domain === 'financial_masters' ? 24 : 6;
-  return new Date(now.getTime() + hours * 60 * 60 * 1000).toISOString();
+  if (error) throw new Error('Laudus sync control update failed');
 }
 
 export async function markLaudusSyncRunning(
@@ -86,22 +100,7 @@ export async function markLaudusSyncRunning(
   organizationId: string,
   domain: LaudusSyncDomain,
 ) {
-  const sourceId = await getLaudusSourceId(supabase, organizationId);
-  const now = new Date().toISOString();
-  const { error } = await supabase
-    .schema('integration')
-    .from('sync_domain_state')
-    .upsert({
-      organization_id: organizationId,
-      source_id: sourceId,
-      domain,
-      health_status: 'running',
-      last_started_at: now,
-      last_error: null,
-      updated_at: now,
-    }, { onConflict: 'source_id,domain' });
-
-  if (error) throw new Error('Laudus sync start state update failed');
+  await recordLaudusSyncControl(supabase, organizationId, domain, 'running');
 }
 
 export async function markLaudusSyncSuccess(
@@ -110,47 +109,7 @@ export async function markLaudusSyncSuccess(
   domain: LaudusSyncDomain,
   metrics: LaudusSyncMetrics,
 ) {
-  const sourceId = await getLaudusSourceId(supabase, organizationId);
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const { error: stateError } = await supabase
-    .schema('integration')
-    .from('sync_domain_state')
-    .upsert({
-      organization_id: organizationId,
-      source_id: sourceId,
-      domain,
-      last_run_id: metrics.runId || null,
-      health_status: 'healthy',
-      last_success_at: nowIso,
-      next_due_at: nextSyncDueAt(domain, now),
-      freshness_observed_at: nowIso,
-      records_processed: Math.max(0, Math.trunc(metrics.processed || 0)),
-      records_changed: Math.max(0, Math.trunc(metrics.changed || 0)),
-      conflicts: Math.max(0, Math.trunc(metrics.conflicts || 0)),
-      api_calls: Math.max(0, Math.trunc(metrics.apiCalls || 0)),
-      consecutive_failures: 0,
-      last_error: null,
-      metadata: metrics.metadata || {},
-      updated_at: nowIso,
-    }, { onConflict: 'source_id,domain' });
-
-  if (stateError) throw new Error('Laudus sync success state update failed');
-
-  const { error: incidentError } = await supabase
-    .schema('integration')
-    .from('sync_incidents')
-    .update({
-      status: 'resolved',
-      resolved_at: nowIso,
-      last_seen_at: nowIso,
-      updated_at: nowIso,
-    })
-    .eq('source_id', sourceId)
-    .eq('domain', domain)
-    .eq('status', 'open');
-
-  if (incidentError) throw new Error('Laudus sync incident resolution failed');
+  await recordLaudusSyncControl(supabase, organizationId, domain, 'success', metrics);
 }
 
 export async function markLaudusSyncFailure(
@@ -160,96 +119,5 @@ export async function markLaudusSyncFailure(
   syncError: unknown,
   metrics: LaudusSyncMetrics = {},
 ) {
-  const sourceId = await getLaudusSourceId(supabase, organizationId);
-  const nowIso = new Date().toISOString();
-  const message = syncError instanceof Error ? syncError.message : 'Unknown Laudus sync failure';
-
-  const { data: current, error: currentError } = await supabase
-    .schema('integration')
-    .from('sync_domain_state')
-    .select('consecutive_failures')
-    .eq('source_id', sourceId)
-    .eq('domain', domain)
-    .maybeSingle();
-
-  if (currentError) throw new Error('Laudus sync failure state lookup failed');
-
-  const failures = Math.max(0, Number(current?.consecutive_failures || 0)) + 1;
-  const healthStatus = failures >= 3 ? 'broken' : 'degraded';
-
-  const { error: stateError } = await supabase
-    .schema('integration')
-    .from('sync_domain_state')
-    .upsert({
-      organization_id: organizationId,
-      source_id: sourceId,
-      domain,
-      last_run_id: metrics.runId || null,
-      health_status: healthStatus,
-      last_failure_at: nowIso,
-      records_processed: Math.max(0, Math.trunc(metrics.processed || 0)),
-      records_changed: Math.max(0, Math.trunc(metrics.changed || 0)),
-      conflicts: Math.max(0, Math.trunc(metrics.conflicts || 0)),
-      api_calls: Math.max(0, Math.trunc(metrics.apiCalls || 0)),
-      consecutive_failures: failures,
-      last_error: message.slice(0, 1000),
-      metadata: metrics.metadata || {},
-      updated_at: nowIso,
-    }, { onConflict: 'source_id,domain' });
-
-  if (stateError) throw new Error('Laudus sync failure state update failed');
-
-  const incidentKey = domain + ':sync_failure';
-  const { data: currentIncident, error: incidentLookupError } = await supabase
-    .schema('integration')
-    .from('sync_incidents')
-    .select('id,occurrence_count')
-    .eq('source_id', sourceId)
-    .eq('domain', domain)
-    .eq('fingerprint', incidentKey)
-    .eq('status', 'open')
-    .maybeSingle();
-
-  if (incidentLookupError) throw new Error('Laudus sync incident lookup failed');
-
-  if (currentIncident?.id) {
-    const { error: updateError } = await supabase
-      .schema('integration')
-      .from('sync_incidents')
-      .update({
-        severity: failures >= 3 ? 'critical' : 'error',
-        message: message.slice(0, 1000),
-        details: metrics.metadata || {},
-        last_seen_at: nowIso,
-        occurrence_count: Math.max(1, Number(currentIncident.occurrence_count || 1)) + 1,
-        last_run_id: metrics.runId || null,
-        updated_at: nowIso,
-      })
-      .eq('id', currentIncident.id);
-
-    if (updateError) throw new Error('Laudus sync incident update failed');
-  } else {
-    const { error: insertError } = await supabase
-      .schema('integration')
-      .from('sync_incidents')
-      .insert({
-        organization_id: organizationId,
-        source_id: sourceId,
-        domain,
-        fingerprint: incidentKey,
-        category: 'sync_failure',
-        severity: failures >= 3 ? 'critical' : 'error',
-        status: 'open',
-        message: message.slice(0, 1000),
-        details: metrics.metadata || {},
-        first_seen_at: nowIso,
-        last_seen_at: nowIso,
-        occurrence_count: 1,
-        last_run_id: metrics.runId || null,
-        created_at: nowIso,
-        updated_at: nowIso,
-      });
-
-    if (insertError) throw new Error('Laudus sync incident insert failed');
-  }
+  await recordLaudusSyncControl(supabase, organizationId, domain, 'failure', metrics, syncError);
 }
