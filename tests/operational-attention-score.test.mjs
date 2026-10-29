@@ -63,7 +63,7 @@ test('home consumes the top three prioritized cases across authorized domains', 
 
 test('executive home separates decisions from operational tasks', () => {
   assert.match(dashboard, /HomeDecisionPriorities/);
-  assert.match(dashboard, /mode === 'management' \? <HomeDecisionPriorities dictionary=\{dictionary\} locale=\{locale\} \/>/);
+  assert.match(dashboard, /mode === 'management' && !personaKey \? <HomeDecisionPriorities dictionary=\{dictionary\} locale=\{locale\} \/>/);
   assert.match(dict, /pendingTitle: 'Acciones pendientes'/);
   assert.match(dict, /separado de las decisiones priorizadas/);
 });
