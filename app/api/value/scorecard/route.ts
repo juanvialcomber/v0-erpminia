@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, supplyNeeds, procurementRequests, procurementOrders, procurementReceipts] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -65,6 +65,26 @@ export async function GET(request: NextRequest) {
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', context.organizationId)
         .limit(5000),
+      context.supabase
+        .from('work_order_supply_needs')
+        .select('id,work_order_id,procurement_request_id,status,created_at,updated_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('canonical_procurement_requests_v1')
+        .select('id,work_order_id,created_at,status')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('procurement_operational_orders')
+        .select('id,work_order_id,intake_request_id,issued_at,status,actual_delivery_date')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
+      context.supabase
+        .from('procurement_operational_receipts')
+        .select('id,order_id,received_at')
+        .eq('organization_id', context.organizationId)
+        .limit(5000),
     ]);
 
     if (current.error) throw current.error;
@@ -76,6 +96,10 @@ export async function GET(request: NextRequest) {
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
     if (maintenanceAdminTiming.error) throw maintenanceAdminTiming.error;
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
+    if (supplyNeeds.error) throw supplyNeeds.error;
+    if (procurementRequests.error) throw procurementRequests.error;
+    if (procurementOrders.error) throw procurementOrders.error;
+    if (procurementReceipts.error) throw procurementReceipts.error;
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -332,6 +356,65 @@ export async function GET(request: NextRequest) {
           ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
           : shortageToProcurementSeconds[shortageMidpoint];
 
+    const requestById = new Map((procurementRequests.data || []).map((row:any) => [String(row.id), row]));
+    const ordersByRequest = new Map<string, any[]>();
+    for (const row of procurementOrders.data || []) {
+      const requestId = String(row.intake_request_id || '');
+      if (!requestId) continue;
+      const rows = ordersByRequest.get(requestId) || [];
+      rows.push(row);
+      ordersByRequest.set(requestId, rows);
+    }
+    const receiptsByOrder = new Map<string, any[]>();
+    for (const row of procurementReceipts.data || []) {
+      const orderId = String(row.order_id || '');
+      if (!orderId) continue;
+      const rows = receiptsByOrder.get(orderId) || [];
+      rows.push(row);
+      receiptsByOrder.set(orderId, rows);
+    }
+
+    const handoffSamples = (supplyNeeds.data || []).map((need:any) => {
+      const shortageMs = Date.parse(String(need.created_at || ''));
+      const request = need.procurement_request_id ? requestById.get(String(need.procurement_request_id)) : null;
+      const requestMs = request ? Date.parse(String(request.created_at || '')) : NaN;
+      const orders = request ? (ordersByRequest.get(String(request.id)) || []) : [];
+      const issuedOrders = orders
+        .filter((row:any) => row.issued_at)
+        .sort((a:any,b:any) => Date.parse(String(a.issued_at)) - Date.parse(String(b.issued_at)));
+      const firstOrder = issuedOrders[0] || null;
+      const orderMs = firstOrder ? Date.parse(String(firstOrder.issued_at || '')) : NaN;
+      const receipts = firstOrder ? (receiptsByOrder.get(String(firstOrder.id)) || []) : [];
+      const received = receipts
+        .filter((row:any) => row.received_at)
+        .sort((a:any,b:any) => Date.parse(String(a.received_at)) - Date.parse(String(b.received_at)))[0] || null;
+      const receivedMs = received ? Date.parse(String(received.received_at || '')) : NaN;
+      return {
+        shortageToRequestSeconds: Number.isFinite(shortageMs) && Number.isFinite(requestMs) && requestMs >= shortageMs
+          ? Math.round((requestMs - shortageMs) / 1000)
+          : null,
+        requestToOrderSeconds: Number.isFinite(requestMs) && Number.isFinite(orderMs) && orderMs >= requestMs
+          ? Math.round((orderMs - requestMs) / 1000)
+          : null,
+        orderToReceiptSeconds: Number.isFinite(orderMs) && Number.isFinite(receivedMs) && receivedMs >= orderMs
+          ? Math.round((receivedMs - orderMs) / 1000)
+          : null,
+        endToEndSeconds: Number.isFinite(shortageMs) && Number.isFinite(receivedMs) && receivedMs >= shortageMs
+          ? Math.round((receivedMs - shortageMs) / 1000)
+          : null,
+      };
+    });
+
+    const supplyCycle = {
+      supplyNeeds: (supplyNeeds.data || []).length,
+      withRequest: (supplyNeeds.data || []).filter((row:any) => Boolean(row.procurement_request_id)).length,
+      shortageToRequest: median(handoffSamples.map((row:any) => row.shortageToRequestSeconds)),
+      requestToOrder: median(handoffSamples.map((row:any) => row.requestToOrderSeconds)),
+      orderToReceipt: median(handoffSamples.map((row:any) => row.orderToReceiptSeconds)),
+      endToEnd: median(handoffSamples.map((row:any) => row.endToEndSeconds)),
+      semantics: 'observed handoff from supply need creation to canonical procurement request, first issued purchase order and first receipt; missing stages remain unmeasured and are not treated as zero',
+    };
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -366,6 +449,7 @@ export async function GET(request: NextRequest) {
         medianSeconds: medianShortageToProcurementSeconds,
         semantics: 'time from first supply_need_refreshed event to procurement_intake_created; human-confirmed handoff',
       },
+      supplyCycle,
       medianExecutionCycleHours:
         medianExecutionCycleSeconds === null
           ? null
