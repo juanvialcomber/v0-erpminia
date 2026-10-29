@@ -98,6 +98,7 @@ export function DataSourceStatusStrip({
                 <Badge variant={badgeVariant(source.state)} className="shrink-0">{LABELS[source.state]}</Badge>
               </div>
               {source.detail ? <p className="mt-2 text-xs leading-5 text-muted-foreground">{source.detail}</p> : null}
+              {isLaudus ? <Link href="/dashboard/integraciones/laudus" className="mt-2 inline-flex text-[11px] font-medium text-primary hover:underline">Ver estado Laudus</Link> : null}
               {source.updatedAt || (source.reviewCount ?? 0) > 0 ? (
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                   {source.updatedAt ? <span>Actualizado {formatUpdatedAt(source.updatedAt)}</span> : null}
