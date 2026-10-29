@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       if (key && !decisionByNeed.has(key)) decisionByNeed.set(key, row);
     }
 
-    const stockByProduct = new Map(
+    const stockByProduct = new Map<string, { laudus_stock?: number | string | null }>(
       (stockResult.data || []).map((row: any) => [String(row.canonical_product_id || ''), row]),
     );
     const laudusPrimary = authorityResult.data?.authority_state === 'laudus_primary';
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
         : { data: [], error: null } as any;
       if (costError) throw costError;
 
-      const costByProduct = new Map(
+      const costByProduct = new Map<string, { weighted_average_unit_cost?: number | string | null }>(
         (costRows || []).map((row: any) => [String(row.product_id || ''), row]),
       );
       const estimatedExposureClp = shortageMaterials.reduce((sum: number, material: any) => {
