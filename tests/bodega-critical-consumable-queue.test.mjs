@@ -10,6 +10,8 @@ test('consumable reconciliation queue preserves units and ranks per SKU', async 
 
   assert.match(readiness, /operational_category', 'process_consumable'/);
   assert.match(readiness, /reconciliation_state', 'quantity_mismatch'/);
+  assert.match(readiness, /\.gte\('laudus_stock', 0\)/);
+  assert.match(readiness, /COMBUSTIBLE'\) \|\| sku\.startsWith\('EXPLOSIVO'/);
   assert.match(readiness, /unit: String\(row\.unit_of_measure/);
   assert.match(readiness, /relativeDeltaPct/);
   assert.match(readiness, /Math\.abs\(delta\) \/ Math\.abs\(laudusStock\)/);
