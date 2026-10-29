@@ -17,6 +17,12 @@ test('daily Laudus stock sync uses verified read-only endpoint', () => {
   assert.match(helper, /laudusMutated: false/);
 });
 
+test('daily stock sync retries only transient Laudus failures with a hard attempt cap', () => {
+  assert.match(helper, /retryPolicy\(error\.status, attempt\)/);
+  assert.match(helper, /attempt < 3/);
+  assert.match(helper, /attempt === 2/);
+});
+
 test('daily stock sync reads all warehouses before staging', () => {
   const readPhase = helper.indexOf('const snapshots: Snapshot[]');
   const stagePhase = helper.indexOf("motil_ingest_laudus_product_stock");
