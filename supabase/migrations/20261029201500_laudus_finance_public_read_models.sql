@@ -4,10 +4,10 @@
 create or replace view public.laudus_purchase_payments_service_v1
 with (security_invoker=true) as
 select
-  id, organization_id, source_id, external_id, laudus_payment_id,
-  issued_date, due_date, document, deposited, payment_type, bank,
-  account_other, journal_entry_issued, journal_entry_deposited,
-  notes, source_payload, synced_at
+  id, organization_id, external_id, synced_at,
+  source_id, laudus_payment_id, issued_date, due_date, document, deposited,
+  payment_type, bank, account_other, journal_entry_issued,
+  journal_entry_deposited, notes, source_payload
 from integration.laudus_purchase_payments;
 
 create or replace view public.laudus_cost_centers_service_v1
