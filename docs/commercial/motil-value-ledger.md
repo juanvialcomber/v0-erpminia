@@ -276,3 +276,10 @@ Estos umbrales habilitan escala inicial, no E4.
 - Caso observado: el proveedor con 3 OCs completadas aparece hoy con 1/3 entregas evaluables; tras reparar las fechas de recepción de PR #120 pasará a 3/3, manteniendo 100% de puntualidad pero con evidencia completa.
 - Valor: reduce riesgo de adjudicar o juzgar proveedor usando un score inconsistente o una muestra invisible. No cambia la fórmula ni inventa confianza estadística.
 - Nivel: L3 inteligencia explicable. El siguiente gate para L4 es usar cobertura y score como evidencia visible en una decisión de adjudicación humana y medir aceptación/rechazo.
+
+### 2026-10-29 — Cobertura visible en adjudicación
+
+- La decisión de adjudicación ya mostraba precio, plazo, score v2 y dimensiones de evidencia.
+- Se agrega el denominador `delivery_scored_orders/completed_orders` dentro de la misma tarjeta de decisión.
+- Efecto: el comprador puede distinguir `100% con 1/3 OC evaluables` de `100% con 3/3`, sin alterar el score ni generar un ranking oculto.
+- Nivel: L4 de decisión asistida con evidencia de cobertura visible al momento de adjudicar.
