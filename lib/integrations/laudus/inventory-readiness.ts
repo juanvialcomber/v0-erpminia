@@ -72,7 +72,7 @@ export async function loadLaudusInventoryReadiness(
     movements,
     snapshotRows,
     snapshotWarehouse,
-    snapshotNegative,
+    overviewResult,
     latestSnapshot,
     readinessResult,
     reconciliationSummaryResult,
@@ -84,7 +84,11 @@ export async function loadLaudusInventoryReadiness(
     count(db.from('stock_movements').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_inventory_current').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_inventory_current').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('warehouse_code', 'is', null).neq('warehouse_code', '')),
-    count(db.from('canonical_inventory_current').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).lt('quantity', 0)),
+    db
+      .from('inventory_intelligence_overview_v1')
+      .select('negative_stock_products')
+      .eq('organization_id', organizationId)
+      .maybeSingle(),
     db
       .from('canonical_inventory_current')
       .select('snapshot_date')
@@ -110,6 +114,7 @@ export async function loadLaudusInventoryReadiness(
       .maybeSingle(),
   ]);
 
+  if (overviewResult.error) throw new Error(overviewResult.error.message);
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
@@ -155,7 +160,7 @@ export async function loadLaudusInventoryReadiness(
       rows: snapshotRows,
       warehouseCoverage: pct(snapshotWarehouse, snapshotRows),
       latestDate: latestSnapshot.data?.snapshot_date || null,
-      negativeRows: snapshotNegative,
+      negativeRows: n(overviewResult.data?.negative_stock_products),
     },
     movementCount: movements,
     laudus: {
