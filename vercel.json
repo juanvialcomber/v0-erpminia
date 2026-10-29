@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/laudus-financial-masters-daily",
       "schedule": "20 4 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-stock-daily",
+      "schedule": "10 5 * * *"
     }
   ]
 }
