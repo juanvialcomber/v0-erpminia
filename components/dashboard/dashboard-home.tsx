@@ -17,6 +17,7 @@ import {
 import { StatePanel } from '@/components/ui/state-panel';
 import { HomeDecisionPriorities } from '@/components/dashboard/home-decision-priorities';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
+import { PERSONA_DASHBOARDS, resolvePersonaDashboard } from '@/lib/dashboard/persona-dashboard';
 
 type RoleTask = {
   task_key: string;
@@ -93,11 +94,12 @@ function normalize(value: string | null | undefined) {
 function resolveMode(cargoName: string | null | undefined): HomeMode {
   const cargo = normalize(cargoName);
   if (/jefe ing.*pla mina|jefe.*ingenier.*planific/.test(cargo)) return 'engineering';
+  if (cargo === 'jefe de planificacion') return 'maintenance';
   if (/jefe mina peumo|jefe mina don jaime/.test(cargo)) return 'mine';
   if (/todos los cargos|gerenc|director|administrador|admin|jefatura general/.test(cargo)) return 'management';
   if (/sostenibilidad|prevencion|hse|medio ambiente/.test(cargo)) return 'sustainability';
   if (/jefe adm|administracion|finanzas|financiero/.test(cargo)) return 'finance';
-  if (/mantencion|mantenimiento|mecan|taller|jefe man\.? eq|jefe mant|planificador.*mant/.test(cargo)) return 'maintenance';
+  if (/mantencion|mantenimiento|mecan|taller|jefe man\.? eq|jefe mant|planificador.*mant|jefe de equipos moviles y estacionarios/.test(cargo)) return 'maintenance';
   if (/sondaje|perforacion|perforista/.test(cargo)) return 'drilling';
   if (/jefe.*planta|planta.*jefe|metalurg/.test(cargo)) return 'plant';
   if (/bodega|inventario|almacen/.test(cargo)) return 'inventory';
@@ -127,6 +129,61 @@ const SHORTCUT_HREFS: Record<string, string> = {
 };
 
 const fill = (template: string, value: string | number) => template.replace('{n}', String(value));
+
+function configForPersona(
+  personaKey: NonNullable<ReturnType<typeof resolvePersonaDashboard>>,
+  inbox: InboxPayload | null | undefined,
+): { eyebrow: string; title: string; description: string; metrics: Metric[]; shortcuts: Shortcut[] } {
+  const persona = PERSONA_DASHBOARDS[personaKey];
+  const summary = inbox?.summary;
+  const value = (key: keyof InboxSummary) => summary ? summary[key] : '—';
+
+  return {
+    eyebrow: persona.eyebrow,
+    title: persona.title,
+    description: persona.description,
+    metrics: [
+      { label: persona.summaryLabels.owners, value: value('owners'), detail: 'Tareas donde eres responsable directo.' },
+      { label: persona.summaryLabels.critical, value: value('critical'), detail: 'Excepciones marcadas como críticas.' },
+      { label: persona.summaryLabels.overdue, value: value('overdue'), detail: 'Pendientes cuya fecha ya venció.' },
+      { label: persona.summaryLabels.escalations, value: value('escalations'), detail: 'Casos que requieren coordinación o escalamiento.' },
+    ],
+    shortcuts: persona.shortcuts,
+  };
+}
+
+function PersonaSummaryStrip({
+  personaKey,
+  summary,
+  loading,
+}: {
+  personaKey: NonNullable<ReturnType<typeof resolvePersonaDashboard>>;
+  summary?: InboxSummary;
+  loading: boolean;
+}) {
+  const persona = PERSONA_DASHBOARDS[personaKey];
+  const cards: Array<{ label: string; value: number | string; detail: string }> = [
+    { label: persona.summaryLabels.owners, value: summary?.owners ?? '—', detail: 'Responsabilidad directa' },
+    { label: persona.summaryLabels.critical, value: summary?.critical ?? '—', detail: 'Requiere atención inmediata' },
+    { label: persona.summaryLabels.overdue, value: summary?.overdue ?? '—', detail: 'Fuera de plazo' },
+    { label: persona.summaryLabels.escalations, value: summary?.escalations ?? '—', detail: 'Cruza áreas o autoridad' },
+  ];
+
+  return (
+    <section aria-label="Estado de decisiones" className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+      {cards.map((card, index) => (
+        <div key={card.label} className="bg-card px-5 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">{card.label}</p>
+            <span className="text-[10px] tabular-nums text-muted-foreground/60">{String(index + 1).padStart(2, '0')}</span>
+          </div>
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{loading ? '—' : card.value}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
 
 function configFor(
   mode: HomeMode,
@@ -276,13 +333,17 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
   const t = dictionary.app.home;
   const inbox = useSWR<InboxPayload>('/api/actions/inbox', fetcher, { refreshInterval: 60000, revalidateOnFocus: false });
   const mode = resolveMode(inbox.data?.profile?.cargoName);
+  const personaKey = resolvePersonaDashboard(inbox.data?.profile?.cargoName);
+  const persona = personaKey ? PERSONA_DASHBOARDS[personaKey] : null;
   const [moreOpen, setMoreOpen] = useState(false);
   // Area-scoped cargos should not read unrelated global operational summaries.
   const needsBroadData = moreOpen && Boolean(inbox.data) && mode !== 'engineering' && mode !== 'mine';
   const production = useSWR<ProductionOverview | null>(needsBroadData ? '/api/produccion/canonical-overview' : null, optionalFetcher, { revalidateOnFocus: false });
   const maintenance = useSWR<MaintenanceOverview | null>(needsBroadData ? '/api/maintenance/work-order-flow?limit=200' : null, optionalFetcher, { revalidateOnFocus: false });
 
-  const config = configFor(mode, production.data, maintenance.data, inbox.data, t, locale);
+  const config = personaKey
+    ? configForPersona(personaKey, inbox.data)
+    : configFor(mode, production.data, maintenance.data, inbox.data, t, locale);
   const tasks = (inbox.data?.tasks || []).slice(0, 5);
   const loading = inbox.isLoading;
   const inboxUnavailable = Boolean(inbox.error) || (!loading && !inbox.data);
@@ -292,19 +353,29 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderEyebrow>{config.eyebrow}</PageHeaderEyebrow>
-          <PageHeaderTitle>{inbox.data?.profile?.name ? `Mi trabajo · ${inbox.data.profile.name}` : 'Mi trabajo'}</PageHeaderTitle>
-          <PageHeaderDescription>Revisa lo que requiere tu atención. Los indicadores y accesos adicionales están en Ver más.</PageHeaderDescription>
+          <PageHeaderTitle>{persona?.title || (inbox.data?.profile?.name ? `Mi trabajo · ${inbox.data.profile.name}` : 'Mi trabajo')}</PageHeaderTitle>
+          <PageHeaderDescription>
+            {persona
+              ? `${inbox.data?.profile?.name ? `${inbox.data.profile.name} · ` : ''}${persona.description}`
+              : 'Revisa lo que requiere tu atención. Los indicadores y accesos adicionales están en Ver más.'}
+          </PageHeaderDescription>
         </PageHeaderContent>
         <PageHeaderActions>
-          <Button asChild><Link href="/dashboard/acciones"><Inbox className="h-4 w-4" />{t.actions}</Link></Button>
+          {persona ? <Button asChild><Link href={persona.primaryAction.href}><ArrowRight className="h-4 w-4" />{persona.primaryAction.label}</Link></Button> : null}
+          <Button asChild variant={persona ? 'outline' : 'default'}><Link href="/dashboard/acciones"><Inbox className="h-4 w-4" />{t.actions}</Link></Button>
         </PageHeaderActions>
       </PageHeader>
 
       {inboxUnavailable ? <StatePanel tone="warning" title={t.roleUnresolvedTitle} description={t.roleUnresolvedDescription} /> : null}
 
+      {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} /> : null}
+
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-4">
-          <div><h2 className="text-lg font-semibold">{mode === 'management' ? t.pendingTitle : t.attentionTitle}</h2><p className="text-sm text-muted-foreground">{mode === 'management' ? t.pendingSubtitle : t.attentionSubtitle}</p></div>
+          <div>
+            <h2 className="text-lg font-semibold">{persona?.attentionTitle || (mode === 'management' ? t.pendingTitle : t.attentionTitle)}</h2>
+            <p className="text-sm text-muted-foreground">{persona?.attentionSubtitle || (mode === 'management' ? t.pendingSubtitle : t.attentionSubtitle)}</p>
+          </div>
           {!inboxUnavailable && (inbox.data?.summary?.critical || 0) > 0 ? <Badge variant="destructive">{fill(t.criticalCount, inbox.data?.summary?.critical || 0)}</Badge> : null}
         </div>
 
@@ -333,7 +404,7 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
         ))}
       </section> : null}
 
-      {mode === 'management' ? <HomeDecisionPriorities dictionary={dictionary} locale={locale} /> : null}
+      {mode === 'management' && !personaKey ? <HomeDecisionPriorities dictionary={dictionary} locale={locale} /> : null}
 
       <section className="space-y-3">
         <div><h2 className="text-lg font-semibold">{t.shortcutsTitle}</h2><p className="text-sm text-muted-foreground">{t.shortcutsSubtitle}</p></div>
