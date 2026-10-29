@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     if (stockResult.error) throw stockResult.error;
     if (authorityResult.error) throw authorityResult.error;
 
-    const stockByProduct = new Map(
+    const stockByProduct = new Map<string, { laudus_stock?: number | string | null }>(
       (stockResult.data || []).map((row: any) => [String(row.canonical_product_id || ''), row]),
     );
     const allCoveredNow = shortageMaterials.length > 0 && shortageMaterials.every((material: any) => {
