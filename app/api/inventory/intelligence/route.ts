@@ -75,11 +75,26 @@ export async function GET(request: NextRequest) {
           .in('sku', positionSkus)
       : Promise.resolve({ data: [], error: null } as any);
 
-    const [reconciliationResult, dieselLaudusResult, reconciliationSummaryResult, authorityResult] = await Promise.all([
+    const operationalPromise = positionSkus.length
+      ? context.supabase
+          .from('bodega_inventory_operational_service_v1')
+          .select('sku,operational_quantity,legacy_motil_quantity,quantity_delta,reconciliation_state,operational_resolution,laudus_stock_date,laudus_synced_at,motil_updated_at')
+          .eq('organization_id', organizationId)
+          .in('sku', positionSkus)
+      : Promise.resolve({ data: [], error: null } as any);
+
+    const [reconciliationResult, operationalResult, dieselLaudusResult, dieselOperationalResult, reconciliationSummaryResult, authorityResult] = await Promise.all([
       reconciliationPromise,
+      operationalPromise,
       context.supabase
         .from('laudus_inventory_reconciliation_service_v1')
         .select('sku,description,unit_of_measure,laudus_stock,stock_position_count,nonzero_stock_position_count,source_date_to,laudus_synced_at,motil_stock,motil_unit_cost,motil_updated_at,quantity_delta,reconciliation_state')
+        .eq('organization_id', organizationId)
+        .eq('sku', 'COMBUSTIBLE001')
+        .maybeSingle(),
+      context.supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku,operational_quantity,legacy_motil_quantity,quantity_delta,reconciliation_state,operational_resolution,laudus_stock_date,laudus_synced_at,motil_updated_at')
         .eq('organization_id', organizationId)
         .eq('sku', 'COMBUSTIBLE001')
         .maybeSingle(),
@@ -95,7 +110,7 @@ export async function GET(request: NextRequest) {
         .maybeSingle(),
     ]);
 
-    const reconciliationError = reconciliationResult.error || dieselLaudusResult.error || reconciliationSummaryResult.error || authorityResult.error;
+    const reconciliationError = reconciliationResult.error || operationalResult.error || dieselLaudusResult.error || dieselOperationalResult.error || reconciliationSummaryResult.error || authorityResult.error;
     if (reconciliationError) throw reconciliationError;
 
     const authority = authorityResult.data || null;
@@ -107,9 +122,15 @@ export async function GET(request: NextRequest) {
       if (normalized?.sku) reconciliationBySku.set(String(normalized.sku).toUpperCase(), normalized);
     }
 
+    const operationalBySku = new Map<string, any>();
+    for (const row of operationalResult.data || []) {
+      if (row?.sku) operationalBySku.set(String(row.sku).toUpperCase(), row);
+    }
+
     const positions = rawPositions.map((row: any) => {
       const sku = String(row.product_code || '').trim().toUpperCase();
       const laudus = reconciliationBySku.get(sku) || null;
+      const operational = operationalBySku.get(sku) || null;
       return {
         ...row,
         laudus_stock: laudus?.laudus_stock ?? null,
@@ -118,6 +139,10 @@ export async function GET(request: NextRequest) {
         laudus_quantity_delta: laudus?.quantity_delta ?? null,
         laudus_reconciliation_state: laudus?.reconciliation_state ?? 'not_in_laudus',
         laudus_stock_position_count: laudus?.stock_position_count ?? 0,
+        operational_resolution: operational?.operational_resolution ?? null,
+        operational_quantity: num(operational?.operational_quantity),
+        legacy_motil_quantity: num(operational?.legacy_motil_quantity),
+        operational_stock_date: operational?.laudus_stock_date ?? null,
         effective_quantity: laudusIsPrimary && laudus?.laudus_stock != null
           ? laudus.laudus_stock
           : row.quantity_available,
@@ -130,6 +155,7 @@ export async function GET(request: NextRequest) {
 
     const currentDiesel = dieselPositionResult.data?.[0] || null;
     const dieselLaudus = normalizeReconciliation(dieselLaudusResult.data || null);
+    const dieselOperational = dieselOperationalResult.data || null;
     const dieselSourcesDiffer = Boolean(currentDiesel || dieselLaudus) && (
       !currentDiesel ||
       !dieselLaudus ||
@@ -162,6 +188,7 @@ export async function GET(request: NextRequest) {
           ? dieselLaudus.laudus_stock
           : currentDiesel?.quantity_available ?? null,
         effectiveSource: laudusIsPrimary && dieselLaudus?.laudus_stock != null ? 'laudus' : 'motil',
+        operationalResolution: dieselOperational?.operational_resolution ?? null,
       } : null,
       reconciliationSummary: summary,
       sourceAuthority: authority ? {
@@ -175,7 +202,7 @@ export async function GET(request: NextRequest) {
         latestWhatsappStockEvidence: authority.latest_whatsapp_stock_evidence,
         whatsappStockEvidenceSinceLaudus: Number(authority.whatsapp_stock_evidence_since_laudus || 0),
       } : null,
-      source: 'public.inventory_intelligence_position_v1 + public.laudus_inventory_reconciliation_service_v1 + public.bodega_stock_source_authority_service_v1',
+      source: 'public.inventory_intelligence_position_v1 + public.laudus_inventory_reconciliation_service_v1 + public.bodega_inventory_operational_service_v1 + public.bodega_stock_source_authority_service_v1',
       canonical: true,
     });
   } catch (error) {
