@@ -35,6 +35,7 @@ type InboxPayload = {
   profile?: { name?: string | null; cargoId?: string | null; cargoName?: string | null };
   summary?: InboxSummary;
   tasks?: RoleTask[];
+  coverageAvailable?: boolean;
 };
 
 type ProductionOverview = {
@@ -136,7 +137,7 @@ function configForPersona(
 ): { eyebrow: string; title: string; description: string; metrics: Metric[]; shortcuts: Shortcut[] } {
   const persona = PERSONA_DASHBOARDS[personaKey];
   const summary = inbox?.summary;
-  const value = (key: keyof InboxSummary) => summary ? summary[key] : '—';
+  const value = (key: keyof InboxSummary) => inbox?.coverageAvailable === false ? '—' : summary ? summary[key] : '—';
 
   return {
     eyebrow: persona.eyebrow,
@@ -156,6 +157,7 @@ function PersonaSummaryStrip({
   personaKey,
   summary,
   loading,
+  coverageAvailable,
 }: {
   personaKey: NonNullable<ReturnType<typeof resolvePersonaDashboard>>;
   summary?: InboxSummary;
@@ -163,10 +165,10 @@ function PersonaSummaryStrip({
 }) {
   const persona = PERSONA_DASHBOARDS[personaKey];
   const cards: Array<{ label: string; value: number | string; detail: string }> = [
-    { label: persona.summaryLabels.owners, value: summary?.owners ?? '—', detail: 'Responsabilidad directa' },
-    { label: persona.summaryLabels.critical, value: summary?.critical ?? '—', detail: 'Requiere atención inmediata' },
-    { label: persona.summaryLabels.overdue, value: summary?.overdue ?? '—', detail: 'Fuera de plazo' },
-    { label: persona.summaryLabels.escalations, value: summary?.escalations ?? '—', detail: 'Cruza áreas o autoridad' },
+    { label: persona.summaryLabels.owners, value: coverageAvailable === false ? '—' : summary?.owners ?? '—', detail: coverageAvailable === false ? 'Sin cobertura de bandeja para este cargo' : 'Responsabilidad directa' },
+    { label: persona.summaryLabels.critical, value: coverageAvailable === false ? '—' : summary?.critical ?? '—', detail: coverageAvailable === false ? 'Sin cobertura de bandeja para este cargo' : 'Requiere atención inmediata' },
+    { label: persona.summaryLabels.overdue, value: coverageAvailable === false ? '—' : summary?.overdue ?? '—', detail: coverageAvailable === false ? 'Sin cobertura de bandeja para este cargo' : 'Fuera de plazo' },
+    { label: persona.summaryLabels.escalations, value: coverageAvailable === false ? '—' : summary?.escalations ?? '—', detail: coverageAvailable === false ? 'Sin cobertura de bandeja para este cargo' : 'Cruza áreas o autoridad' },
   ];
 
   return (
@@ -368,7 +370,7 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
 
       {inboxUnavailable ? <StatePanel tone="warning" title={t.roleUnresolvedTitle} description={t.roleUnresolvedDescription} /> : null}
 
-      {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} /> : null}
+      {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} coverageAvailable={inbox.data?.coverageAvailable} /> : null}
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-4">
