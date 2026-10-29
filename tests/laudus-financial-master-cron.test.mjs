@@ -25,5 +25,6 @@ test('Laudus financial cron is scheduled once daily away from existing heavy job
 
 test('Laudus financial cron bypasses session auth and remains protected by its own CRON_SECRET gate', () => {
   assert.match(proxy, /'\/api\/cron\/laudus-financial-masters-daily'/);
-  assert.match(route, /request\.headers\.get\('authorization'\) !== `Bearer \${secret}`/);
+  assert.match(route, /request\.headers\.get\('authorization'\) === `Bearer \${secret}`/);
+  assert.match(route, /cronAuthorized/);
 });
