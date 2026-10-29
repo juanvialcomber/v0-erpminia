@@ -18,7 +18,7 @@ test('persona dashboards are decision-first and share one reusable home', () => 
   assert.match(home, /PersonaSummaryStrip/);
   assert.match(home, /Estado de decisiones/);
   assert.match(home, /persona\.primaryAction/);
-  assert.match(home, /persona\.attentionTitle/);
+  assert.match(home, /persona\?\.attentionTitle/);
 });
 
 test('persona configuration avoids duplicate page implementations', () => {
