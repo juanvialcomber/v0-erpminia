@@ -20,9 +20,9 @@ async function latestTimestamp(
   table: LaudusSyncTable,
   organizationId: string,
 ) {
+  const serviceTable = `${table}_service_v1`;
   const result = await db
-    .schema('integration')
-    .from(table)
+    .from(serviceTable)
     .select('synced_at')
     .eq('organization_id', organizationId)
     .not('synced_at', 'is', null)
@@ -171,8 +171,7 @@ export async function loadLaudusFinanceControl(
     latestTimestamp(db, 'laudus_credit_notes', organizationId),
     latestTimestamp(db, 'laudus_cost_centers', organizationId),
     db
-      .schema('integration')
-      .from('laudus_purchase_payments')
+      .from('laudus_purchase_payments_service_v1')
       .select('external_id,issued_date,due_date,document,notes,bank,source_payload')
       .eq('organization_id', organizationId)
       .or('deposited.is.false,deposited.is.null')
@@ -222,8 +221,7 @@ export async function loadLaudusFinanceControl(
   );
   const supplierLookup = supplierIds.length
     ? await db
-        .schema('integration')
-        .from('laudus_suppliers')
+        .from('laudus_suppliers_service_v1')
         .select('external_id,name,legal_name')
         .eq('organization_id', organizationId)
         .in('external_id', supplierIds)
@@ -336,8 +334,7 @@ export async function loadLaudusFinanceControl(
   const topSupplierIds = topSupplierEntries.map(([supplierId]) => supplierId);
   const topSupplierLookup = topSupplierIds.length
     ? await db
-        .schema('integration')
-        .from('laudus_suppliers')
+        .from('laudus_suppliers_service_v1')
         .select('external_id,name,legal_name')
         .eq('organization_id', organizationId)
         .in('external_id', topSupplierIds)
