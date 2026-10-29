@@ -7,10 +7,14 @@ import {
   LaudusApiError,
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
   if (!access.ok) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible.' }, { status: 400 });
+  }
   if (!access.admin) {
     return NextResponse.json(
       { error: 'La prueba Laudus requiere permisos de administración.' },
@@ -33,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runLaudusReadOnlySmokeTest();
+    const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusReadOnlySmokeTest());
     return NextResponse.json({
       status: 'ok',
       configured: true,

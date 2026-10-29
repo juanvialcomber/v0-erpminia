@@ -3,13 +3,17 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { runLaudusBankReconciliationSummary } from '@/lib/integrations/laudus/client';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
   if (!access.authorized) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible.' }, { status: 400 });
+  }
 
   try {
-    const result = await runLaudusBankReconciliationSummary();
+    const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusBankReconciliationSummary());
     return NextResponse.json(result, {
       headers: { 'Cache-Control': 'no-store' },
     });

@@ -4,6 +4,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { syncLaudusProducts } from '@/lib/integrations/laudus/product-sync';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     after(async () => {
       try {
         const manualDb = await createClient();
-        const result = await syncLaudusProducts(organizationId, manualDb);
+        const result = await withLaudusApiUsageTracking(organizationId, () => syncLaudusProducts(organizationId, manualDb));
         console.info('[laudus-products-daily] manual sync completed', {
           organizationId,
           status: result.status,
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
   const results: Array<Record<string, unknown>> = [];
   for (const organizationId of organizationIds) {
     try {
-      results.push(await syncLaudusProducts(String(organizationId), db));
+      results.push(await withLaudusApiUsageTracking(String(organizationId), () => syncLaudusProducts(String(organizationId), db)));
     } catch (error) {
       console.error('[laudus-products-daily] sync failed', {
         organizationId,

@@ -4,6 +4,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { syncLaudusFinancialMasters } from '@/lib/integrations/laudus/financial-master-sync';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     after(async () => {
       try {
         const manualDb = await createClient();
-        const result = await syncLaudusFinancialMasters(organizationId, manualDb);
+        const result = await withLaudusApiUsageTracking(organizationId, () => syncLaudusFinancialMasters(organizationId, manualDb));
         console.info('[laudus-financial-masters-daily] manual sync completed', {
           organizationId,
           status: result.status,
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
 
   for (const organizationId of organizationIds) {
     try {
-      results.push(await syncLaudusFinancialMasters(String(organizationId), db));
+      results.push(await withLaudusApiUsageTracking(String(organizationId), () => syncLaudusFinancialMasters(String(organizationId), db)));
     } catch (error) {
       console.error('[laudus-financial-masters-daily] sync failed', {
         organizationId,
