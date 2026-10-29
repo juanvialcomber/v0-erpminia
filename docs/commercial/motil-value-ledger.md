@@ -267,3 +267,12 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+## 2026-10-29 — Separación formal entre UAT y evidencia operacional de adjudicación
+
+- Hallazgo cuantitativo: existe 1 decisión de adjudicación y 1 outcome asociado, pero la propia nota de decisión declara que fue un UAT productivo controlado y que no representa una compra real.
+- Cifra correcta para valor operacional: 0 adjudicaciones operacionales válidas y 0 outcomes operacionales válidos. El UAT se conserva como evidencia de funcionamiento, no como adopción ni ROI.
+- Arquitectura: `procurement_award_decisions` incorpora `evidence_scope` con valores `operational|uat`, default operacional; el UAT histórico conocido queda backfilleado por ID y nota exacta.
+- `procurement_award_outcomes_v1` conserva ambos scopes; `procurement_award_outcome_summary_v1` agrega únicamente evidencia operacional.
+- El scorecard publica `totalDecisions`, `operationalDecisions`, `uatDecisions` y outcomes operacionales por separado. Si no existe muestra operacional, el gate queda `NO_OPERATIONAL_SAMPLE` y evidencia E0.
+- Valor: evita inflar adopción, desempeño o ROI con pruebas de sistema. El primer gate comercial real será una adjudicación operacional humana con outcome posterior trazable.
