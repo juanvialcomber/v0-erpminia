@@ -60,6 +60,20 @@ type ApiResponse = {
     medianSeconds?: number | null;
     semantics?: string;
   } | null;
+  procurementAwardValue?: {
+    totalDecisions?: number;
+    operationalDecisions?: number;
+    uatDecisions?: number;
+    operationalOutcomes?: number;
+    deliveredOperationalOutcomes?: number;
+    closedOperationalOutcomes?: number;
+    acceptanceSample?: number;
+    invoiceOutcomeSample?: number;
+    evidenceLevel?: string;
+    workflowLevel?: number;
+    valueGate?: string;
+    semantics?: string;
+  } | null;
   maintenanceValue?: {
     workOrders?: number;
     closedWorkOrders?: number;
@@ -220,6 +234,7 @@ export default function ValueScorecardPage() {
       ? Number(score.observedImpact?.observedValueClp || 0)
       : null;
   const reviewedAmountClp = Number(financeReview.reviewedAmountClp || 0);
+  const procurementAwardValue = data?.procurementAwardValue || {};
   const maintenanceValue = data?.maintenanceValue || {};
   const maintenanceEvidenceIsMeasured = maintenanceValue.evidenceLevel === 'E2';
   const maintenanceManualSamples = maintenanceBaseline.data?.sampleCount || 0;
@@ -295,6 +310,7 @@ export default function ValueScorecardPage() {
     decisions + financeReviewTotal < 20 ? `Registrar ${20 - decisions - financeReviewTotal} decisiones humanas más para calibrar L4.` : null,
     outcomes < 5 ? `Cerrar ${5 - outcomes} resultados reales para demostrar efecto operacional.` : null,
     e3 < 3 ? `Documentar ${3 - e3} impactos E3 con evidencia económica observada.` : null,
+    (procurementAwardValue.operationalDecisions || 0) < 1 ? 'Registrar la primera adjudicación operacional real; los UAT no cuentan como adopción.' : null,
   ].filter(Boolean) as string[];
 
   return (
@@ -352,6 +368,51 @@ export default function ValueScorecardPage() {
               Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section aria-label="Evidencia de adjudicación de Compras" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Compras · decisión asistida</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Adjudicación con evidencia válida</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Las pruebas UAT se conservan para QA, pero no cuentan como adopción, outcome ni valor económico.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Nivel actual</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              L{number(procurementAwardValue.workflowLevel || 0)} · {procurementAwardValue.evidenceLevel || 'E0'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {procurementAwardValue.valueGate === 'NO_OPERATIONAL_SAMPLE' ? 'Sin muestra operacional real.' : 'Evidencia operacional en medición.'}
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Decisiones operacionales</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(procurementAwardValue.operationalDecisions || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Sólo adjudicaciones reales con decisión humana.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Pruebas UAT excluidas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(procurementAwardValue.uatDecisions || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Trazables, pero fuera de adopción y outcomes.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Outcomes con entrega</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(procurementAwardValue.deliveredOperationalOutcomes || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Entregas reales vinculadas a una adjudicación operacional.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Outcomes cerrados</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(procurementAwardValue.closedOperationalOutcomes || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Base futura para impacto E3; no implica ROI por sí sola.</p>
+          </div>
+        </div>
+        <div className="border-t px-5 py-4 text-sm text-muted-foreground">
+          Siguiente gate: primera adjudicación operacional real con resultado posterior trazable.
+          <Link href="/dashboard/compras" className="ml-2 font-medium text-primary hover:underline">Ir a Compras</Link>
         </div>
       </section>
 
