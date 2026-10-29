@@ -35,7 +35,7 @@
     },
     {
       "path": "/api/cron/laudus-products-daily",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 */12 * * *"
     },
     {
       "path": "/api/cron/laudus-stock-daily",
