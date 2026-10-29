@@ -103,20 +103,6 @@ export function LaudusInventoryReadinessCard() {
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
 
-  if (error) {
-    return (
-      <section className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-        <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          <div>
-            <p className="text-sm font-medium">Laudus · inventario no disponible</p>
-            <p className="mt-1 text-xs text-muted-foreground">MOTIL no pudo verificar la evidencia ERP. No se oculta el error ni se asume que el stock está sincronizado.</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   const [kardexLoading, setKardexLoading] = useState<string | null>(null);
   const [kardexMessage, setKardexMessage] = useState<Record<string, string>>({});
 
@@ -151,6 +137,20 @@ export function LaudusInventoryReadinessCard() {
     } finally {
       setKardexLoading(null);
     }
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+          <div>
+            <p className="text-sm font-medium">Laudus · inventario no disponible</p>
+            <p className="mt-1 text-xs text-muted-foreground">MOTIL no pudo verificar la evidencia ERP. No se oculta el error ni se asume que el stock está sincronizado.</p>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   const sourceState = isLoading
