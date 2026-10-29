@@ -267,3 +267,19 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+## 2026-10-29 — Score de proveedores consistente y con cobertura visible
+
+- Problema: `Proveedor 360°` usaba `supplier_operational_score_v2`, mientras `Control de proveedores` todavía mostraba el score legado `supplier_performance_v1`; un mismo proveedor podía verse distinto según la pantalla.
+- Cambio: ambas superficies usan el score operacional v2. `Control de proveedores` deja de consumir `performance_score` y muestra `operational_score`.
+- Cobertura: la tabla muestra `delivery_scored_orders/completed_orders` para que un porcentaje de puntualidad no oculte el tamaño real de la muestra.
+- Caso observado: el proveedor con 3 OCs completadas aparece hoy con 1/3 entregas evaluables; tras reparar las fechas de recepción de PR #120 pasará a 3/3, manteniendo 100% de puntualidad pero con evidencia completa.
+- Valor: reduce riesgo de adjudicar o juzgar proveedor usando un score inconsistente o una muestra invisible. No cambia la fórmula ni inventa confianza estadística.
+- Nivel: L3 inteligencia explicable. El siguiente gate para L4 es usar cobertura y score como evidencia visible en una decisión de adjudicación humana y medir aceptación/rechazo.
+
+### 2026-10-29 — Cobertura visible en adjudicación
+
+- La decisión de adjudicación ya mostraba precio, plazo, score v2 y dimensiones de evidencia.
+- Se agrega el denominador `delivery_scored_orders/completed_orders` dentro de la misma tarjeta de decisión.
+- Efecto: el comprador puede distinguir `100% con 1/3 OC evaluables` de `100% con 3/3`, sin alterar el score ni generar un ranking oculto.
+- Nivel: L4 de decisión asistida con evidencia de cobertura visible al momento de adjudicar.

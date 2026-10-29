@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         ? context.supabase.from('canonical_suppliers_v1').select('id, tax_id, legal_name, trade_name').eq('organization_id', context.organizationId).in('id', supplierIds)
         : Promise.resolve({ data: [], error: null }),
       supplierIds.length
-        ? context.supabase.from('supplier_operational_score_v2').select('supplier_id, operational_score, evidence_dimensions, delivery_score, delivery_scored_orders, quality_score, quantity_received, invoice_score, invoice_scored_count, returns_count').eq('organization_id', context.organizationId).in('supplier_id', supplierIds)
+        ? context.supabase.from('supplier_operational_score_v2').select('supplier_id, operational_score, evidence_dimensions, completed_orders, delivery_score, delivery_scored_orders, quality_score, quantity_received, invoice_score, invoice_scored_count, returns_count').eq('organization_id', context.organizationId).in('supplier_id', supplierIds)
         : Promise.resolve({ data: [], error: null }),
       requestIds.length
         ? context.supabase.from('canonical_procurement_requests_v1').select('id, request_number, priority, required_date, status').eq('organization_id', context.organizationId).in('id', requestIds)
