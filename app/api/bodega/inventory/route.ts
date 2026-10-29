@@ -51,7 +51,7 @@ function toNumber(value: unknown) {
 
 async function applyStockAuthority(
   supabase: ReturnType<typeof getSupabaseServerClient>,
-  organizationId: string | null,
+  organizationId: string | null | undefined,
   rows: InventoryRow[],
 ) {
   if (!organizationId || rows.length === 0) {
