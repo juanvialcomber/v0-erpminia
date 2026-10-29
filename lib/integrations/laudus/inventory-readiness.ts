@@ -16,6 +16,17 @@ type LaudusReadinessRow = {
   open_reconciliation: number | string | null;
 };
 
+type BodegaAuthorityRow = {
+  authority_state: string | null;
+  authority_reason: string | null;
+  latest_laudus_stock_sync: string | null;
+  latest_laudus_stock_date: string | null;
+  latest_email_stock_cutoff: string | null;
+  latest_email_pending_reconciliation: number | string | null;
+  latest_whatsapp_stock_evidence: string | null;
+  whatsapp_stock_evidence_since_laudus: number | string | null;
+};
+
 type LaudusReconciliationSummaryRow = {
   compared_products: number | string | null;
   aligned_products: number | string | null;
@@ -65,6 +76,7 @@ export async function loadLaudusInventoryReadiness(
     latestSnapshot,
     readinessResult,
     reconciliationSummaryResult,
+    authorityResult,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
@@ -91,14 +103,21 @@ export async function loadLaudusInventoryReadiness(
       .select('compared_products,aligned_products,quantity_mismatches,missing_in_motil_nonzero,laudus_only_zero,laudus_negative_products,latest_laudus_stock_sync,latest_motil_stock_update')
       .eq('organization_id', organizationId)
       .maybeSingle(),
+    db
+      .from('bodega_stock_source_authority_service_v1')
+      .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
+      .eq('organization_id', organizationId)
+      .maybeSingle(),
   ]);
 
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
+  if (authorityResult.error) throw new Error(authorityResult.error.message);
 
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
+  const authority = (authorityResult.data || null) as BodegaAuthorityRow | null;
 
   const laudusProducts = n(readiness?.products);
   const laudusEligibleProducts = n(readiness?.eligible_products);
@@ -110,6 +129,8 @@ export async function loadLaudusInventoryReadiness(
   const laudusNegativeProducts = n(reconciliationSummary?.laudus_negative_products);
   const latestStockSync = readiness?.latest_stock_sync || reconciliationSummary?.latest_laudus_stock_sync || null;
   const stockIsStale = isOlderThanHours(latestStockSync, 8);
+  const authorityState = authority?.authority_state || (stockIsStale ? 'review_laudus_stale' : 'review_laudus_unavailable');
+  const laudusIsPrimary = authorityState === 'laudus_primary';
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
   const latestRunStatus = String(readiness?.latest_run_status || '').toLowerCase();
@@ -119,10 +140,8 @@ export async function loadLaudusInventoryReadiness(
       latestRunStatus === 'partial' ||
       latestRunStatus === 'failed' ||
       openReconciliation > 0 ||
-      quantityMismatches > 0 ||
-      missingInMotilNonzero > 0 ||
       laudusNegativeProducts > 0 ||
-      stockIsStale
+      !laudusIsPrimary
     ) ? 'review' : 'ready_to_compare';
   }
 
@@ -159,6 +178,15 @@ export async function loadLaudusInventoryReadiness(
       laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
       negativeProducts: laudusNegativeProducts,
     },
+    authority: {
+      state: authorityState,
+      reason: authority?.authority_reason || 'No se pudo verificar la autoridad de la fuente.',
+      laudusIsPrimary,
+      latestEmailStockCutoff: authority?.latest_email_stock_cutoff || null,
+      latestEmailPendingReconciliation: n(authority?.latest_email_pending_reconciliation),
+      latestWhatsappStockEvidence: authority?.latest_whatsapp_stock_evidence || null,
+      whatsappStockEvidenceSinceLaudus: n(authority?.whatsapp_stock_evidence_since_laudus),
+    },
     reconciliation: {
       state: laudusState,
       defaultAbsoluteTolerance: 0,
@@ -167,8 +195,10 @@ export async function loadLaudusInventoryReadiness(
       autoApply: false as const,
     },
     policy: {
-      laudusStockRole: 'erp_evidence' as const,
-      motilOperationalStockRole: 'operational_truth' as const,
+      primaryStockSource: laudusIsPrimary ? 'laudus' as const : 'reconciliation' as const,
+      laudusStockRole: 'primary_when_consistent' as const,
+      motilOperationalStockRole: 'comparison_evidence' as const,
+      crossSourceValidation: ['official_email', 'whatsapp'] as const,
       autoOverwrite: false as const,
     },
   };
