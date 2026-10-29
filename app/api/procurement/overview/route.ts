@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const [
       purchaseOrders,
       historicalPurchaseOrders,
-      suppliers,
+      supplierBaseline,
+      laudusSuppliers,
       intakeRequests,
       operationalOrders,
       receipts,
@@ -46,6 +47,13 @@ export async function GET(request: NextRequest) {
       countRows(
         context.supabase
           .from('canonical_suppliers_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .eq('source_file', 'public.suppliers'),
+      ),
+      countRows(
+        context.supabase
+          .from('laudus_suppliers_service_v1')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', context.organizationId),
       ),
@@ -94,7 +102,8 @@ export async function GET(request: NextRequest) {
       canonical: {
         purchaseOrders,
         historicalPurchaseOrders,
-        suppliers,
+        supplierBaseline,
+        laudusSuppliers,
       },
       operational: {
         intakeRequests,
@@ -107,7 +116,8 @@ export async function GET(request: NextRequest) {
       sourcePolicy: {
         purchaseOrders: 'canonical_purchase_orders_v1 (excluye baseline histórico public.purchase_orders)',
         historicalPurchaseOrders: 'canonical_purchase_orders_v1[source_file=public.purchase_orders]',
-        suppliers: 'canonical_suppliers_v1',
+        supplierBaseline: 'canonical_suppliers_v1[source_file=public.suppliers]',
+        laudusSuppliers: 'laudus_suppliers_service_v1',
         documents: 'module_documents',
       },
       canEdit: access.canWrite,
