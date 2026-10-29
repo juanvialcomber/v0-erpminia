@@ -136,90 +136,76 @@ export async function GET(request: NextRequest) {
         key: 'laudus',
         label: 'Laudus',
         state: 'pending',
-        detail: 'Pendiente de habilitación comercial de API.',
+        detail: 'Conector Laudus no configurado.',
         updatedAt: null,
       };
 
       try {
+        // Runtime APIs intentionally read the public service view rather than
+        // querying the internal integration schema through PostgREST.
         const source = await context.supabase
-          .schema('integration')
-          .from('external_sources')
-          .select('id,enabled,mode,updated_at')
+          .from('laudus_source_status_service_v1')
+          .select('source_id,enabled,latest_status,latest_run_at')
           .eq('organization_id', org)
-          .eq('source_key', 'laudus')
           .maybeSingle();
 
-        if (!source.error && source.data) {
+        if (source.error) throw source.error;
+
+        if (source.data) {
+          const latestStatus = String(source.data.latest_status || '').toLowerCase();
+          const updatedAt = latestDate(source.data.latest_run_at);
+
           if (!source.data.enabled) {
             laudus = {
-              ...laudus,
-              detail: 'Conector preparado; sincronización desactivada.',
-              updatedAt: latestDate(source.data.updated_at),
+              key: 'laudus',
+              label: 'Laudus',
+              state: 'offline',
+              detail: 'Conector Laudus desactivado.',
+              updatedAt,
+            };
+          } else if (latestStatus === 'running' || latestStatus === 'queued') {
+            laudus = {
+              key: 'laudus',
+              label: 'Laudus',
+              state: 'syncing',
+              detail: 'Conectado · sincronización en curso.',
+              updatedAt,
+            };
+          } else if (latestStatus === 'failed' || latestStatus === 'partial') {
+            laudus = {
+              key: 'laudus',
+              label: 'Laudus',
+              state: 'review',
+              detail: 'Conectado · la última sincronización requiere revisión.',
+              updatedAt,
+            };
+          } else if (latestStatus === 'completed') {
+            laudus = {
+              key: 'laudus',
+              label: 'Laudus',
+              state: 'updated',
+              detail: 'Conectado · última sincronización completada.',
+              updatedAt,
             };
           } else {
-            const [latestRun, reviewCount] = await Promise.all([
-              context.supabase
-                .schema('integration')
-                .from('sync_runs')
-                .select('status,finished_at,started_at,error_summary')
-                .eq('organization_id', org)
-                .eq('source_id', source.data.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle(),
-              context.supabase
-                .schema('integration')
-                .from('reconciliation_items')
-                .select('id', { count: 'exact', head: true })
-                .eq('organization_id', org)
-                .eq('source_id', source.data.id)
-                .in('resolution_status', ['pending', 'conflict', 'new_candidate']),
-            ]);
-
-            const run = latestRun.data;
-            const unresolved = reviewCount.count ?? 0;
-            if (run?.status === 'running' || run?.status === 'queued') {
-              laudus = {
-                key: 'laudus',
-                label: 'Laudus',
-                state: 'syncing',
-                detail: 'Sincronización en curso.',
-                updatedAt: latestDate(run.started_at),
-                reviewCount: unresolved,
-              };
-            } else if (run?.status === 'failed' || run?.status === 'partial' || unresolved > 0) {
-              laudus = {
-                key: 'laudus',
-                label: 'Laudus',
-                state: 'review',
-                detail: unresolved > 0
-                  ? `${unresolved} registro(s) requieren conciliación.`
-                  : 'La última sincronización requiere revisión.',
-                updatedAt: latestDate(run?.finished_at || run?.started_at),
-                reviewCount: unresolved,
-              };
-            } else if (run?.status === 'completed') {
-              laudus = {
-                key: 'laudus',
-                label: 'Laudus',
-                state: 'updated',
-                detail: 'ERP sincronizado y sin excepciones abiertas.',
-                updatedAt: latestDate(run.finished_at),
-                reviewCount: 0,
-              };
-            } else {
-              laudus = {
-                key: 'laudus',
-                label: 'Laudus',
-                state: 'pending',
-                detail: 'Conector habilitado; primera sincronización pendiente.',
-                updatedAt: latestDate(source.data.updated_at),
-              };
-            }
+            laudus = {
+              key: 'laudus',
+              label: 'Laudus',
+              state: 'pending',
+              detail: 'Conector habilitado · primera sincronización pendiente.',
+              updatedAt,
+            };
           }
         }
-      } catch {
-        // The integration schema may not be deployed yet. That is an expected pre-activation state.
+      } catch (error) {
+        console.error('[data-sources/status] Laudus source status unavailable', error);
+        laudus = {
+          key: 'laudus',
+          label: 'Laudus',
+          state: 'review',
+          detail: 'La conexión Laudus no pudo verificarse.',
+          updatedAt: null,
+        };
       }
 
       visibleSources.push(laudus);
