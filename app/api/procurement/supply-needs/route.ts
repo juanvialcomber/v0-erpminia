@@ -169,6 +169,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'La evidencia actual no permite registrar una decisión de no compra.' }, { status: 409 });
       }
 
+      const { data: costRows, error: costError } = productIds.length
+        ? await context.supabase
+            .from('product_procurement_status')
+            .select('product_id,weighted_average_unit_cost,purchase_order_count')
+            .eq('organization_id', context.organizationId)
+            .in('product_id', productIds)
+            .limit(50)
+        : { data: [], error: null } as any;
+      if (costError) throw costError;
+
+      const costByProduct = new Map(
+        (costRows || []).map((row: any) => [String(row.product_id || ''), row]),
+      );
+      const estimatedExposureClp = shortageMaterials.reduce((sum: number, material: any) => {
+        const cost = Number(costByProduct.get(String(material.product_id || ''))?.weighted_average_unit_cost);
+        return Number.isFinite(cost) ? sum + (Number(material.shortage || 0) * cost) : sum;
+      }, 0);
+
       const { error: auditError } = await context.supabase.from('audit_log').insert({
         organization_id: context.organizationId,
         user_id: context.userId,
@@ -180,6 +198,8 @@ export async function POST(request: NextRequest) {
           shortage_lines: shortageMaterials.length,
           source_authority: authorityResult.data?.authority_state || null,
           latest_laudus_stock_sync: authorityResult.data?.latest_laudus_stock_sync || null,
+          estimated_exposure_clp: estimatedExposureClp,
+          exposure_semantics: 'historical weighted-average replacement exposure; not realized savings or avoided cost until the outcome is closed',
           evidence: shortageMaterials.map((material: any) => {
             const current = stockByProduct.get(String(material.product_id || ''));
             return {
