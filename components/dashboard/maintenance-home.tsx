@@ -34,7 +34,7 @@ function fill(template: string, vars: Record<string, string | number>) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? ''));
 }
 
-type KindKey = 'approval_needed' | 'operational_review' | 'preventive_overdue' | 'assignment_needed' | 'meter_review' | 'operational_blocker' | 'supply_integrity' | 'plan_step' | 'ready_to_close' | 'closure_evidence' | 'reliability';
+type KindKey = 'approval_needed' | 'operational_review' | 'preventive_overdue' | 'assignment_needed' | 'meter_review' | 'operational_blocker' | 'plan_step' | 'ready_to_close' | 'closure_evidence' | 'reliability';
 
 const kindMeta: Record<KindKey, { icon: typeof AlertTriangle; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   approval_needed: { icon: CheckCircle2, variant: 'secondary' },
@@ -43,7 +43,6 @@ const kindMeta: Record<KindKey, { icon: typeof AlertTriangle; variant: 'default'
   assignment_needed: { icon: Wrench, variant: 'outline' },
   meter_review: { icon: Gauge, variant: 'outline' },
   operational_blocker: { icon: ShieldAlert, variant: 'destructive' },
-  supply_integrity: { icon: ShieldAlert, variant: 'destructive' },
   plan_step: { icon: Wrench, variant: 'default' },
   ready_to_close: { icon: CheckCircle2, variant: 'secondary' },
   closure_evidence: { icon: AlertTriangle, variant: 'outline' },
@@ -60,9 +59,9 @@ const maintenanceFlow = [
   { step: '05', flowKey: 'learn' as const, href: '/dashboard/mantenimiento/decision-intelligence' },
 ] as const;
 
-const planningKinds = new Set(['approval_needed', 'operational_review', 'preventive_overdue', 'assignment_needed', 'meter_review', 'operational_blocker', 'supply_integrity', 'plan_step', 'ready_to_close', 'closure_evidence']);
-const leadershipKinds = new Set(['approval_needed', 'operational_review', 'preventive_overdue', 'assignment_needed', 'operational_blocker', 'supply_integrity', 'plan_step', 'ready_to_close', 'closure_evidence', 'reliability']);
-const oversightKinds = new Set(['operational_review', 'operational_blocker', 'supply_integrity', 'reliability']);
+const planningKinds = new Set(['approval_needed', 'operational_review', 'preventive_overdue', 'assignment_needed', 'meter_review', 'operational_blocker', 'plan_step', 'ready_to_close', 'closure_evidence']);
+const leadershipKinds = new Set(['approval_needed', 'operational_review', 'preventive_overdue', 'assignment_needed', 'operational_blocker', 'plan_step', 'ready_to_close', 'closure_evidence', 'reliability']);
+const oversightKinds = new Set(['operational_review', 'operational_blocker', 'reliability']);
 
 type WorkMode = Exclude<ViewerMode, 'execution'>;
 
