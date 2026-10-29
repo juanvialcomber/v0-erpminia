@@ -54,7 +54,7 @@ export function shouldContinuePage(
 }
 
 
-export type LaudusSyncDomain = 'products' | 'stock' | 'financial_masters';
+export type LaudusSyncDomain = 'products' | 'stock' | 'financial_masters' | 'suppliers' | 'procurement';
 
 export type LaudusSyncMetrics = {
   runId?: string | null;

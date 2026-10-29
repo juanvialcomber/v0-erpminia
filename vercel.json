@@ -35,11 +35,19 @@
     },
     {
       "path": "/api/cron/laudus-products-daily",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 */12 * * *"
     },
     {
       "path": "/api/cron/laudus-stock-daily",
       "schedule": "10 */6 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-procurement-daily",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-suppliers-weekly",
+      "schedule": "20 6 * * 0"
     }
   ]
 }

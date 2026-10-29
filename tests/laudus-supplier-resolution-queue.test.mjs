@@ -23,6 +23,11 @@ test('queue API is permission scoped and review only', () => {
   assert.match(route, /policy: 'review_only'/);
 });
 
+test('runtime reads the public server-only queue view, never the private integration schema', () => {
+  assert.match(helper, /supplier_resolution_queue_service_v1/);
+  assert.doesNotMatch(helper, /\.schema\(['"]integration['"]\)/);
+});
+
 test('UI never implies automatic supplier creation or linkage', () => {
   assert.match(card, /no crea ni enlaza proveedores/);
   assert.match(card, /RUT\/código Laudus u otra evidencia determinística/);
