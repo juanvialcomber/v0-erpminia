@@ -126,19 +126,6 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
       metadata: { warehouses: warehouseRows.length, inserted, unchanged, productResolved, productUnresolved },
     });
   } catch (error) {
-    if (runId) {
-      await supabase
-        .schema('integration')
-        .from('sync_runs')
-        .update({
-          status: 'failed',
-          finished_at: new Date().toISOString(),
-          error_summary: 'Laudus stock staging failed',
-        })
-        .eq('id', runId)
-        .eq('organization_id', organizationId)
-        .eq('status', 'running');
-    }
     await markLaudusSyncFailure(supabase, organizationId, 'stock', error, {
       runId,
       processed: staged,

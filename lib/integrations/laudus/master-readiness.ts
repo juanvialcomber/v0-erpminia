@@ -36,8 +36,7 @@ async function linkedCount(
   try {
     return await count(
       db
-        .schema('integration')
-        .from('external_entity_links')
+        .from('laudus_external_entity_links_service_v1')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
         .eq('source_id', sourceId)
@@ -58,19 +57,17 @@ export async function loadLaudusMasterReadiness(
 
   try {
     const source = await db
-      .schema('integration')
-      .from('external_sources')
-      .select('id,enabled')
+      .from('laudus_source_status_service_v1')
+      .select('source_id,enabled')
       .eq('organization_id', organizationId)
-      .eq('source_key', 'laudus')
       .maybeSingle();
 
     if (!source.error && source.data) {
-      sourceId = String(source.data.id);
+      sourceId = String(source.data.source_id);
       sourceEnabled = Boolean(source.data.enabled);
     }
   } catch {
-    // Pre-deployment state: integration schema is optional.
+    // Source status view may be unavailable during deployment.
   }
 
   const [
