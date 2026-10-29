@@ -19,7 +19,8 @@ type Overview = {
   canonical: {
     purchaseOrders: number;
     historicalPurchaseOrders: number;
-    suppliers: number;
+    supplierBaseline: number;
+    laudusSuppliers: number;
   };
   operational: {
     intakeRequests: number;
@@ -105,7 +106,8 @@ export default function ComprasPage() {
         {[
           ['OC vigentes', data?.canonical.purchaseOrders],
           ['OC históricas', data?.canonical.historicalPurchaseOrders],
-          ['Proveedores', data?.canonical.suppliers],
+          ['Proveedores base', data?.canonical.supplierBaseline],
+          ['Proveedores Laudus', data?.canonical.laudusSuppliers],
           ['Órdenes operativas', data?.operational.operationalOrders],
           ['Recepciones', data?.operational.receipts],
           ['Facturas', data?.operational.invoices],
