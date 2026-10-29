@@ -39,6 +39,17 @@ type Payload = {
     laudusOnlyZero: number;
     negativeProducts: number;
     negativeWarehouses: number;
+    criticalConsumables: Array<{
+      productId: string;
+      sku: string;
+      description: string;
+      unit: string;
+      laudusStock: number;
+      motilStock: number;
+      delta: number;
+      relativeDeltaPct: number | null;
+      domain: string;
+    }>;
     negativePositions: Array<{
       productId: string;
       sku: string;
@@ -273,6 +284,52 @@ export function LaudusInventoryReadinessCard() {
         </div>
       ) : null}
 
+      {!isLoading && data && data.laudus.criticalConsumables.length > 0 ? (
+        <div className="border-t px-4 py-4">
+          <div className="flex items-start gap-2">
+            <GitCompareArrows className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Conciliación prioritaria · consumibles</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Combustibles y explosivos primero; luego fortificación y reactivos. Las cantidades no se suman entre unidades: cada diferencia se evalúa por SKU contra Laudus.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 divide-y rounded-md border bg-card">
+            {data.laudus.criticalConsumables.map((row) => (
+              <div key={row.sku} className="grid gap-2 px-3 py-2.5 text-xs lg:grid-cols-[115px_1fr_105px_150px_125px_130px] lg:items-center lg:gap-3">
+                <span className="font-mono">{row.sku}</span>
+                <div className="min-w-0">
+                  <span className="block truncate" title={row.description}>{row.description}</span>
+                  {kardexMessage[row.sku] ? <span className="mt-0.5 block text-[11px] text-muted-foreground">{kardexMessage[row.sku]}</span> : null}
+                </div>
+                <span className="text-muted-foreground">{row.domain}</span>
+                <div className="tabular-nums">
+                  <span className="block">Laudus: {count(row.laudusStock)} {row.unit}</span>
+                  <span className="block text-muted-foreground">MOTIL: {count(row.motilStock)} {row.unit}</span>
+                </div>
+                <div className="tabular-nums">
+                  <span className="block font-semibold">{row.delta > 0 ? '+' : ''}{count(row.delta)} {row.unit}</span>
+                  <span className="block text-muted-foreground">
+                    {row.relativeDeltaPct == null ? 'Sin base relativa' : `${row.relativeDeltaPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% vs Laudus`}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={!row.productId || Boolean(kardexLoading)}
+                  onClick={() => void loadKardex(row.productId, row.sku)}
+                >
+                  <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${kardexLoading === row.productId ? 'animate-spin' : ''}`} />
+                  Kardex
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2">
           <GitCompareArrows className="mt-0.5 h-4 w-4 text-muted-foreground" />
