@@ -27,7 +27,8 @@ export async function loadLaudusInventoryReadiness(
     snapshotNegative,
     latestSnapshot,
     laudusProducts,
-    laudusProductsLinked,
+    laudusEligibleProducts,
+    laudusEligibleProductsLinked,
     laudusStockRows,
     laudusWarehouses,
     latestLaudusStock,
@@ -48,7 +49,8 @@ export async function loadLaudusInventoryReadiness(
       .limit(1)
       .maybeSingle(),
     count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
+    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible')),
+    count(db.schema('integration').from('laudus_products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('inventory_eligibility', 'eligible').not('canonical_product_id', 'is', null)),
     count(db.schema('integration').from('laudus_product_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     db
       .schema('integration')
@@ -145,7 +147,9 @@ export async function loadLaudusInventoryReadiness(
     movementCount: movements,
     laudus: {
       products: laudusProducts,
-      canonicalProductCoverage: pct(laudusProductsLinked, laudusProducts),
+      eligibleProducts: laudusEligibleProducts,
+      excludedProducts: Math.max(0, laudusProducts - laudusEligibleProducts),
+      canonicalProductCoverage: pct(laudusEligibleProductsLinked, laudusEligibleProducts),
       stockRows: laudusStockRows,
       warehouses: (laudusWarehouses.data || []).length,
       physicalWarehouses: physicalWarehouses.length,
