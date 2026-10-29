@@ -267,3 +267,41 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+
+## 2026-10-29 — Mantención → Bodega → Compras: ciclo de abastecimiento instrumentado
+
+- Problema observado: una OT cerrada puede conservar faltantes históricos y necesidades de abastecimiento abiertas; el cierre de Mantención no garantiza por sí solo que la cadena de materiales quedó resuelta.
+- Caso real: OT-2026-0011 quedó `completed` con 6 faltantes históricos y 1 necesidad de abastecimiento abierta sin solicitud de compra.
+- Cruce actual: los 6 filtros faltantes hoy tienen stock positivo en Laudus, por lo que la necesidad puede estar obsoleta y no debe promoverse automáticamente a compra.
+- Capacidad: el Centro de Mantención vuelve a exponer estos casos como bloqueo operacional post-cierre y distingue faltante histórico cubierto versus brecha vigente.
+- Medición añadida al scorecard: `supply need -> procurement request -> issued purchase order -> first receipt`.
+- Semántica: cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; etapas ausentes quedan sin medir y nunca se convierten a cero.
+- Estado observado al instrumentar: 1 necesidad de abastecimiento, 0 solicitudes vinculadas, 0 OC y 0 recepciones. El cuello de botella observable está hoy en el primer handoff Mantención/Bodega -> Compras.
+- Nivel actual: L4 por decisión asistida y E1/E2 de trazabilidad; no existe todavía evidencia E3 de ahorro, downtime evitado ni costo evitado.
+- Siguiente gate: cerrar al menos 5 ciclos completos con solicitud, OC y recepción para establecer baseline de tiempos por tramo; luego comparar cohortes y outcomes.
+- Valor comercial potencial: demostrar reducción de necesidades obsoletas, compras redundantes evitadas y menor tiempo de abastecimiento sólo cuando los outcomes estén cerrados y atribuibles.
+
+## 2026-10-29 — Gate anti-compra redundante
+
+- Problema: una necesidad histórica de Mantención podía seguir marcada con shortage aunque el stock actual de Laudus ya cubriera el material.
+- Cambio: antes de convertir una necesidad a solicitud, MOTIL revalida cada línea contra `laudus_inventory_reconciliation_service_v1` y confirma que Laudus siga siendo fuente primaria mediante `bodega_stock_source_authority_service_v1`.
+- Regla: si Laudus es primario y todas las líneas faltantes ya están cubiertas, el handoff a Compras se bloquea con `SUPPLY_NEED_ALREADY_COVERED` y se exige conciliación humana.
+- UX: Compras muestra primero las necesidades provenientes de Mantención, indicando líneas cubiertas hoy y separando `Enviar a Compras` de `Conciliar antes de comprar`.
+- Caso observado: OT-2026-0011 conserva 6 faltantes históricos, pero las 6 líneas tienen stock actual suficiente en Laudus; el sistema ya no debe promover ese caso a compra.
+- Valor actual: control preventivo de una compra potencialmente redundante. Todavía no se declara costo evitado porque no existe una OC cancelada o una compra efectivamente impedida con outcome registrado.
+- Nivel: L4 decisión asistida; E1/E2 de evidencia. Gate E3: registrar el primer caso donde el usuario acepte la recomendación, cierre la necesidad sin comprar y quede evidencia del monto que realmente se evitó comprometer.
+
+## 2026-10-29 — Decisión humana de no compra
+
+- Cuando una necesidad histórica queda totalmente cubierta por stock actual y Laudus conserva autoridad primaria, Compras permite registrar explícitamente `no comprar / conciliar stock`.
+- La decisión se persiste en `audit_log` con actor, timestamp, necesidad, líneas faltantes, stock Laudus observado y fecha de sincronización.
+- La acción no cancela requerimientos, no cierra la necesidad canónica, no modifica stock y no escribe en Laudus.
+- MOTIL separa decisión de negocio de reconciliación de datos: primero se evita promover una compra innecesaria; luego la fuente canónica debe reconciliarse por su flujo autorizado.
+- Evidencia habilitada: aceptación humana de una recomendación preventiva. Esto permite medir tasa de aceptación y, cuando exista una compra realmente evitada con monto demostrable, promover el outcome a E3.
+
+## 2026-10-29 — Exposición económica de decisión `no comprar`
+
+- Para el caso OT-2026-0011, las 6 líneas históricamente faltantes suman una exposición estimada de reposición de aproximadamente $132.679 CLP usando costo histórico promedio ponderado.
+- Este monto se persiste junto a la decisión humana y a la evidencia de stock actual.
+- Semántica obligatoria: exposición estimada no equivale a ahorro, costo evitado ni ROI. Sólo podrá promoverse a E3 si el outcome demuestra que una compra equivalente realmente no se ejecutó por la decisión asistida de MOTIL.

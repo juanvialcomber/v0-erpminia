@@ -30,6 +30,7 @@ const autopilotPreparation = (action: ActionItem): AutopilotPreparation => {
     assignment_needed: { risk: 'medium', preparedAction: 'Abrir la OT pendiente de responsable', authority: 'Planificador asigna la persona responsable' },
     meter_review: { risk: 'high', preparedAction: 'Abrir la evidencia de horómetro contradictoria', authority: 'Persona autorizada valida la lectura canónica' },
     operational_blocker: { risk: 'high', preparedAction: 'Abrir el bloqueo exacto que impide continuar o cerrar', authority: 'Responsable operativo resuelve el bloqueo en su flujo canónico' },
+    supply_integrity: { risk: 'high', preparedAction: 'Abrir la OT cerrada con abastecimiento todavía pendiente', authority: 'Mantención y Bodega validan si el faltante fue resuelto fuera del flujo o requiere regularización' },
     plan_step: { risk: 'medium', preparedAction: 'Abrir el siguiente paso pendiente del plan estándar', authority: 'Ejecutor autorizado registra la ejecución real' },
     ready_to_close: { risk: 'high', preparedAction: 'Abrir la OT con controles de cierre satisfechos', authority: 'Responsable autorizado revisa y ejecuta el cierre' },
     closure_evidence: { risk: 'medium', preparedAction: 'Abrir la evidencia faltante para cierre auditado', authority: 'Responsable completa o valida la evidencia requerida' },
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const [closeResult, preventiveResult, reliabilityResult, operationalOrdersResult, drillingReviewResult, completedOrdersResult, supervisorReviewsResult, meterReviewResult] = await Promise.all([
+    const [closeResult, preventiveResult, reliabilityResult, operationalOrdersResult, drillingReviewResult, completedOrdersResult, supervisorReviewsResult, meterReviewResult, completedSupplyResult] = await Promise.all([
       context.supabase.from('work_order_close_readiness_v2').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_reliability_by_asset_v1').select('canonical_asset_id,asset_code,asset_name,audited_closures,recurring_cause_count,max_same_cause_occurrences,has_recurring_root_cause').eq('organization_id', context.organizationId),
@@ -69,8 +70,9 @@ export async function GET(request: NextRequest) {
       context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,completion_date,assigned_to_name').eq('organization_id', context.organizationId).not('created_by', 'is', null).eq('status', 'completed').order('completion_date', { ascending: false, nullsFirst: false }).limit(100),
       context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_meter_review_queue').select('id,canonical_asset_id,submitted_hours,previous_hours,attempted_at,reason').eq('organization_id', context.organizationId).eq('status', 'pending').order('attempted_at', { ascending: false }).limit(100),
+      context.supabase.from('work_order_supply_chain_v1').select('work_order_id,work_order_number,title,canonical_asset_id,work_order_status,priority,scheduled_date,material_shortage_count,material_shortage_quantity,open_supply_need_count,supply_needs_with_request,open_procurement_request_count,procurement_order_count,undelivered_order_count,procurement_order_amount,supply_chain_status').eq('organization_id', context.organizationId).eq('work_order_status', 'completed').limit(200),
     ]);
-    const error = closeResult.error || preventiveResult.error || reliabilityResult.error || operationalOrdersResult.error || drillingReviewResult.error || completedOrdersResult.error || supervisorReviewsResult.error || meterReviewResult.error;
+    const error = closeResult.error || preventiveResult.error || reliabilityResult.error || operationalOrdersResult.error || drillingReviewResult.error || completedOrdersResult.error || supervisorReviewsResult.error || meterReviewResult.error || completedSupplyResult.error;
     if (error) throw error;
 
     const operationalOrderRows = operationalOrdersResult.data || [];
@@ -84,6 +86,49 @@ export async function GET(request: NextRequest) {
     const completedOrderRows = completedOrdersResult.data || [];
     const approvedWorkOrderIds = new Set((supervisorReviewsResult.data || []).filter((row:any) => String(row.status || '').toLowerCase() === 'approved').map((row:any) => String(row.work_order_id)));
     const pendingApprovalRows = completedOrderRows.filter((row:any) => !approvedWorkOrderIds.has(String(row.id)));
+    const completedSupplyRows = (completedSupplyResult.data || []).filter((row:any) =>
+      Number(row.material_shortage_count || 0) > 0 ||
+      Number(row.open_supply_need_count || 0) > 0 ||
+      Number(row.open_procurement_request_count || 0) > 0 ||
+      Number(row.undelivered_order_count || 0) > 0
+    );
+
+    const completedSupplyOrderIds = completedSupplyRows.slice(0, 50).map((row:any) => String(row.work_order_id));
+    const materialRequirementsResult = completedSupplyOrderIds.length
+      ? await context.supabase
+          .from('work_order_material_requirements')
+          .select('work_order_id,canonical_product_id,quantity_shortage,status')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', completedSupplyOrderIds)
+          .gt('quantity_shortage', 0)
+          .limit(500)
+      : { data: [], error: null } as any;
+    if (materialRequirementsResult.error) throw materialRequirementsResult.error;
+
+    const requiredProductIds = [...new Set((materialRequirementsResult.data || [])
+      .map((row:any) => String(row.canonical_product_id || ''))
+      .filter(Boolean))].slice(0, 50);
+    const currentStockResult = requiredProductIds.length
+      ? await context.supabase
+          .from('laudus_inventory_reconciliation_service_v1')
+          .select('canonical_product_id,sku,laudus_stock,laudus_synced_at')
+          .eq('organization_id', context.organizationId)
+          .in('canonical_product_id', requiredProductIds)
+          .limit(100)
+      : { data: [], error: null } as any;
+    if (currentStockResult.error) throw currentStockResult.error;
+
+    const currentStockByProduct = new Map<string, { laudus_stock?: number | string | null }>(
+      (currentStockResult.data || []).map((row:any) => [String(row.canonical_product_id || ''), row]),
+    );
+    const shortagesByOrder = new Map<string, any[]>();
+    for (const requirement of materialRequirementsResult.data || []) {
+      const key = String(requirement.work_order_id || '');
+      const rows = shortagesByOrder.get(key) || [];
+      rows.push(requirement);
+      shortagesByOrder.set(key, rows);
+    }
+
     const actions: ActionItem[] = [];
 
     for (const row of meterReviewResult.data || []) {
@@ -129,6 +174,38 @@ export async function GET(request: NextRequest) {
         description: `${row.title || 'Orden de trabajo terminada'}${row.assigned_to_name ? ` · ${row.assigned_to_name}` : ''}`,
         evidence: row.completion_date ? `Terminada ${new Date(row.completion_date).toLocaleString('es-CL')}` : 'OT terminada pendiente de revisión',
         href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
+        assetHref: assetHref(row.canonical_asset_id),
+      });
+    }
+
+    for (const row of completedSupplyRows) {
+      const shortages = Number(row.material_shortage_count || 0);
+      const openNeeds = Number(row.open_supply_need_count || 0);
+      const openRequests = Number(row.open_procurement_request_count || 0);
+      const undelivered = Number(row.undelivered_order_count || 0);
+      const requirements = shortagesByOrder.get(String(row.work_order_id)) || [];
+      const coveredNow = requirements.filter((requirement:any) => {
+        const stock = currentStockByProduct.get(String(requirement.canonical_product_id || ''));
+        return Number(stock?.laudus_stock || 0) >= Number(requirement.quantity_shortage || 0);
+      }).length;
+      const allShortagesCoveredNow = requirements.length > 0 && coveredNow === requirements.length;
+      const parts = [
+        shortages > 0 ? `${shortages} faltante(s) histórico(s)` : null,
+        requirements.length > 0 ? `${coveredNow}/${requirements.length} hoy cubiertos por stock Laudus` : null,
+        openNeeds > 0 ? `${openNeeds} necesidad(es) abierta(s)` : null,
+        openRequests > 0 ? `${openRequests} solicitud(es) de compra abierta(s)` : null,
+        undelivered > 0 ? `${undelivered} orden(es) aún no entregada(s)` : null,
+      ].filter(Boolean).join(' · ');
+      actions.push({
+        id: `supply-integrity:${row.work_order_id}`,
+        kind: 'operational_blocker',
+        priority: 9,
+        title: `${allShortagesCoveredNow ? 'Cerrar brecha de abastecimiento histórica' : 'Conciliar abastecimiento post-cierre'} · ${row.work_order_number || 'OT'}`,
+        description: allShortagesCoveredNow
+          ? 'La OT terminó con faltantes registrados, pero el stock Laudus actual cubre todos los materiales pendientes. Validar antes de comprar y cerrar la necesidad obsoleta.'
+          : row.title || 'Orden terminada con abastecimiento todavía pendiente',
+        evidence: parts || row.supply_chain_status || 'Cadena de abastecimiento pendiente después del cierre',
+        href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.work_order_id))}`,
         assetHref: assetHref(row.canonical_asset_id),
       });
     }
@@ -235,6 +312,7 @@ export async function GET(request: NextRequest) {
         pendingPlanSteps: closeRows.reduce((sum:number,row:any) => sum + Number(row.standard_plan_steps_pending || 0), 0),
         readyToClose: closeRows.filter((row:any) => row.ready_to_close).length,
         pendingApprovals: pendingApprovalRows.length,
+        completedWithOpenSupply: completedSupplyRows.length,
         recurringReliabilityAssets: reliabilityRows.filter((row:any) => row.has_recurring_root_cause).length,
         totalActions: actions.length,
       },
@@ -246,7 +324,7 @@ export async function GET(request: NextRequest) {
       semantics: {
         preventiveGrouping: 'Las pautas vencidas del mismo activo, vencimiento y frecuencia se agrupan sólo para coordinar la intervención. Cada pauta conserva su identidad y su OT independiente.',
       },
-      sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue'],
+      sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue','work_order_supply_chain_v1'],
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'No se pudo cargar el centro de mantenimiento' }, { status: 500 });
