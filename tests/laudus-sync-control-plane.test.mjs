@@ -26,3 +26,13 @@ test('sync control tables are private and service-role only',()=>{
   assert.match(migration,/with \(security_invoker = true\)/);
   assert.match(migration,/revoke all on public\.laudus_sync_health_service_v1 from public, anon, authenticated/);
 });
+
+
+const syncPolicy = fs.readFileSync('lib/integrations/laudus/sync-policy.ts','utf8');
+
+test('runtime sync control writes through the public RPC instead of private schema access',()=>{
+  assert.match(syncPolicy,/motil_record_laudus_sync_control/);
+  assert.doesNotMatch(syncPolicy,/schema\('integration'\)/);
+  assert.match(syncPolicy,/p_event: event/);
+  assert.match(syncPolicy,/p_api_calls/);
+});
