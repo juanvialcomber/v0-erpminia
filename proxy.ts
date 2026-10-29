@@ -28,8 +28,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-media',
   '/api/cron/whatsapp-vision',
   '/api/cron/laudus-financial-masters-daily',
-  // Preview-only QA probe; handler returns 404 outside preview and is removed after validation.
-  '/api/qa/laudus-financial-master-probe',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
