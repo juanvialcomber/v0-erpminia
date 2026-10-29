@@ -16,7 +16,20 @@ test('Bodega presents Laudus as live ERP evidence, not a pending integration', (
   assert.match(readiness, /schema\('integration'\).*laudus_products/s);
   assert.match(readiness, /laudus_product_stock/);
   assert.match(readiness, /openReconciliation/);
+  assert.match(readiness, /\.in\('entity_type', \['product', 'stock'\]\)/);
+  assert.match(readiness, /laudus_warehouses/);
+  assert.match(readiness, /unresolvedWarehouses/);
   assert.match(readiness, /laudusStockRole: 'erp_evidence'/);
   assert.match(readiness, /motilOperationalStockRole: 'operational_truth'/);
   assert.match(readiness, /autoOverwrite: false/);
+});
+
+test('data quality surfaces unresolved Laudus warehouses without auto-linking them', () => {
+  const route = fs.readFileSync('app/api/data-quality/reconciliation/route.ts', 'utf8');
+
+  assert.match(route, /laudus_warehouses/);
+  assert.match(route, /new_candidate/);
+  assert.match(route, /Bodega física Laudus pendiente de revisión humana/);
+  assert.match(route, /No se crea, fusiona ni enlaza automáticamente/);
+  assert.match(route, /warehouse_candidate_proposed_match_name/);
 });
