@@ -14,6 +14,8 @@ test('product sync reads the Laudus product list and stages through the existing
   assert.match(sync, /description/);
   assert.match(sync, /unitOfMeasure/);
   assert.match(sync, /motil_ingest_laudus_products/);
+  assert.match(sync, /PRODUCT_HEAD_PAGES_PER_RUN = 5/);
+  assert.match(sync, /direction: 'DESC'/);
   assert.match(sync, /canonicalProductsMutated: false/);
   assert.match(sync, /laudusMutated: false/);
 });
