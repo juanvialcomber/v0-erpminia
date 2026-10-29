@@ -20,6 +20,9 @@ test('Bodega authority gate makes Laudus primary only when no newer unresolved s
   assert.match(migration, /ingest_state/);
   assert.match(migration, /latest_email_stock_cutoff/);
   assert.match(migration, /whatsapp_stock_evidence_since_laudus/);
+  assert.match(migration, /existencia\[s\]\?/);
+  assert.match(migration, /petróleo\|petroleo\|diesel\|bodega/);
+  assert.match(migration, /litro\|litros\|kg\|kilo\|kilos\|unidad\|unidades/);
 });
 
 test('Bodega authority gate is a server-only read projection', () => {
