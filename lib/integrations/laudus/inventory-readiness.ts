@@ -40,6 +40,16 @@ type LaudusNegativePositionRow = {
   synced_at: string | null;
 };
 
+type LaudusConsumableMismatchRow = {
+  product_external_id: string | null;
+  sku: string | null;
+  description: string | null;
+  unit_of_measure: string | null;
+  laudus_stock: number | string | null;
+  motil_stock: number | string | null;
+  quantity_delta: number | string | null;
+};
+
 type LaudusReconciliationSummaryRow = {
   compared_products: number | string | null;
   aligned_products: number | string | null;
@@ -90,6 +100,7 @@ export async function loadLaudusInventoryReadiness(
     readinessResult,
     reconciliationSummaryResult,
     negativePositionsResult,
+    consumableMismatchesResult,
     authorityResult,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
@@ -127,6 +138,12 @@ export async function loadLaudusInventoryReadiness(
       .eq('organization_id', organizationId)
       .order('warehouse_stock', { ascending: true }),
     db
+      .from('laudus_inventory_reconciliation_service_v1')
+      .select('product_external_id,sku,description,unit_of_measure,laudus_stock,motil_stock,quantity_delta')
+      .eq('organization_id', organizationId)
+      .eq('operational_category', 'process_consumable')
+      .eq('reconciliation_state', 'quantity_mismatch'),
+    db
       .from('bodega_stock_source_authority_service_v1')
       .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
       .eq('organization_id', organizationId)
@@ -138,6 +155,7 @@ export async function loadLaudusInventoryReadiness(
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
   if (negativePositionsResult.error) throw new Error(negativePositionsResult.error.message);
+  if (consumableMismatchesResult.error) throw new Error(consumableMismatchesResult.error.message);
   if (authorityResult.error) throw new Error(authorityResult.error.message);
 
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
@@ -154,6 +172,46 @@ export async function loadLaudusInventoryReadiness(
     sourceDate: row.source_date_to || null,
     syncedAt: row.synced_at || null,
   }));
+  const domainRank = (sku: string) => {
+    if (sku.startsWith('COMBUSTIBLE')) return 0;
+    if (sku.startsWith('EXPLOSIVO')) return 1;
+    if (sku.startsWith('FORTIFIC')) return 2;
+    if (sku.startsWith('REACTIVO')) return 3;
+    return 4;
+  };
+  const domainLabel = (sku: string) => {
+    if (sku.startsWith('COMBUSTIBLE')) return 'Combustible';
+    if (sku.startsWith('EXPLOSIVO')) return 'Explosivo';
+    if (sku.startsWith('FORTIFIC')) return 'Fortificación';
+    if (sku.startsWith('REACTIVO')) return 'Reactivo';
+    return 'Consumible';
+  };
+  const criticalConsumables = ((consumableMismatchesResult.data || []) as LaudusConsumableMismatchRow[])
+    .map((row) => {
+      const sku = String(row.sku || '');
+      const laudusStock = n(row.laudus_stock);
+      const motilStock = n(row.motil_stock);
+      const delta = n(row.quantity_delta);
+      const relativeDeltaPct = laudusStock === 0 ? null : Math.round((Math.abs(delta) / Math.abs(laudusStock)) * 1000) / 10;
+      return {
+        productId: String(row.product_external_id || ''),
+        sku,
+        description: String(row.description || row.sku || ''),
+        unit: String(row.unit_of_measure || ''),
+        laudusStock,
+        motilStock,
+        delta,
+        relativeDeltaPct,
+        domain: domainLabel(sku),
+        domainRank: domainRank(sku),
+      };
+    })
+    .sort((a, b) =>
+      a.domainRank - b.domainRank ||
+      (b.relativeDeltaPct ?? -1) - (a.relativeDeltaPct ?? -1) ||
+      Math.abs(b.delta) - Math.abs(a.delta),
+    )
+    .slice(0, 12);
   const authority = (authorityResult.data || null) as BodegaAuthorityRow | null;
 
   const laudusProducts = n(readiness?.products);
@@ -216,6 +274,7 @@ export async function loadLaudusInventoryReadiness(
       negativeProducts: laudusNegativeProducts,
       negativePositions,
       negativeWarehouses: new Set(negativePositions.map((row) => row.warehouseCode).filter(Boolean)).size,
+      criticalConsumables,
     },
     authority: {
       state: authorityState,
