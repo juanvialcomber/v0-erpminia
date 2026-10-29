@@ -1,6 +1,6 @@
 import { getLaudusStockSnapshot, LaudusApiError } from '@/lib/integrations/laudus/client';
 import { chunkLaudusStockRows, toLaudusStockStageRows } from '@/lib/integrations/laudus/inventory';
-import { retryPolicy } from '@/lib/integrations/laudus/sync-policy';
+import { markLaudusSyncFailure, markLaudusSyncRunning, markLaudusSyncSuccess, retryPolicy } from '@/lib/integrations/laudus/sync-policy';
 
 type WarehouseRow = {
   external_id: string;
@@ -30,6 +30,7 @@ async function fetchStockWithRetry(args: { dateTo: string; warehouseId: string }
 }
 
 export async function syncLaudusStockDaily(organizationId: string, supabase: any) {
+  await markLaudusSyncRunning(supabase, organizationId, 'stock');
   const { data: warehouses, error: warehouseError } = await supabase
     .from('laudus_warehouses_service_v1')
     .select('external_id,laudus_warehouse_id,name')
@@ -38,14 +39,15 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
 
   if (warehouseError) throw new Error('Laudus warehouse lookup failed');
 
-  const warehouseRows = (warehouses || []) as WarehouseRow[];
-  if (!warehouseRows.length) throw new Error('No Laudus warehouses available');
+  const physicalWarehouseIds = new Set(['001', '002', '003', '004']);
+  const warehouseRows = ((warehouses || []) as WarehouseRow[]).filter((warehouse) => physicalWarehouseIds.has(warehouse.external_id));
+  if (!warehouseRows.length) throw new Error('No physical Laudus warehouses available');
 
   const dateTo = new Date()
     .toLocaleString('sv-SE', { timeZone: 'America/Santiago', hour12: false })
     .replace(' ', 'T');
 
-  // Read every warehouse before staging anything. If Laudus fails mid-read,
+  // Read every physical warehouse before staging anything. If Laudus fails mid-read,
   // MOTIL keeps the previous complete evidence snapshot untouched.
   const snapshots: Snapshot[] = [];
   let apiCalls = 0;
@@ -60,6 +62,13 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
 
   const nonEmpty = snapshots.filter((snapshot) => snapshot.rows.length > 0);
   if (!nonEmpty.length) {
+    await markLaudusSyncSuccess(supabase, organizationId, 'stock', {
+      processed: 0,
+      changed: 0,
+      conflicts: 0,
+      apiCalls,
+      metadata: { warehouses: warehouseRows.length, staged: 0 },
+    });
     return {
       status: 'empty' as const,
       organizationId,
@@ -107,6 +116,15 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
       productResolved += Number(result.product_resolved || 0);
       productUnresolved += Number(result.product_unresolved || 0);
     }
+
+    await markLaudusSyncSuccess(supabase, organizationId, 'stock', {
+      runId,
+      processed: staged,
+      changed,
+      conflicts: productUnresolved,
+      apiCalls,
+      metadata: { warehouses: warehouseRows.length, inserted, unchanged, productResolved, productUnresolved },
+    });
   } catch (error) {
     if (runId) {
       await supabase
@@ -121,6 +139,14 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
         .eq('organization_id', organizationId)
         .eq('status', 'running');
     }
+    await markLaudusSyncFailure(supabase, organizationId, 'stock', error, {
+      runId,
+      processed: staged,
+      changed,
+      conflicts: productUnresolved,
+      apiCalls,
+      metadata: { warehouses: warehouseRows.length, inserted, unchanged, productResolved, productUnresolved },
+    });
     throw error;
   }
 
