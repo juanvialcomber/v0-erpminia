@@ -20,7 +20,7 @@ select
 from integration.external_sources s
 cross join (
   values
-    ('suppliers', '50 5 * * 0', 11520, 300, 500, 40, '{"read_only":true,"mode":"weekly_full","max_pages":25}'::jsonb),
+    ('suppliers', '20 6 * * 0', 11520, 300, 500, 40, '{"read_only":true,"mode":"weekly_full","max_pages":25}'::jsonb),
     ('procurement', '40 5 * * *', 1560, 300, 500, 50, '{"read_only":true,"mode":"latest_200_per_entity","entities":["purchase_orders","purchase_invoices","purchase_payments"],"accounts_payable":"derived"}'::jsonb)
 ) as v(domain, schedule_cron, freshness_sla_minutes, max_runtime_seconds, batch_size, run_order, scope)
 where s.source_key='laudus'
