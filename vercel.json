@@ -34,6 +34,10 @@
       "schedule": "20 4 * * *"
     },
     {
+      "path": "/api/cron/laudus-products-daily",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/laudus-stock-daily",
       "schedule": "10 */6 * * *"
     }
