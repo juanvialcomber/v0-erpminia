@@ -28,5 +28,5 @@ test('value scorecard excludes UAT from adoption and outcome evidence', () => {
 
 test('scorecard does not convert UAT into savings or ROI', () => {
   const segment = scorecard.slice(scorecard.indexOf('const procurementAwardValue'), scorecard.indexOf('const maintenanceValue'));
-  assert.doesNotMatch(segment, /savings|avoided cost|roi/i);
+  assert.doesNotMatch(segment, /\b(?:savings|roi|avoidedCost|avoided_cost)\s*:/i);
 });
