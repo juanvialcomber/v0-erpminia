@@ -1,3 +1,4 @@
+import { noteLaudusApiRequest } from '@/lib/integrations/laudus/api-usage';
 const DEFAULT_BASE_URL = 'https://api.laudus.cl';
 const DEFAULT_USER_NAME = 'Motil';
 const DEFAULT_COMPANY_VAT_ID = '84542800-K';
@@ -106,14 +107,22 @@ export class LaudusApiError extends Error {
 
 async function request(path: string, init: RequestInit = {}) {
   const { baseUrl } = credentials();
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-      ...(init.headers || {}),
-    },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        ...(init.headers || {}),
+      },
+    });
+    noteLaudusApiRequest(path, response.status);
+  } catch (error) {
+    noteLaudusApiRequest(path, 0);
+    throw error;
+  }
 
   const payload = await parseResponse(response);
   if (!response.ok) {
