@@ -205,6 +205,39 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
   });
 }
 
+
+type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
+
+export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+    throw new Error('Ruta Laudus GET fuera del alcance read-only permitido.');
+  }
+
+  const token = await getLaudusAccessToken();
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === null || value === undefined || value === '') continue;
+    params.set(key, String(value));
+  }
+
+  const queryString = params.toString();
+  const requestPath = queryString ? `${path}?${queryString}` : path;
+
+  return request(requestPath, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function getLaudusStockSnapshot(args: {
+  dateTo?: string;
+  warehouseId?: string | number;
+  productCategoryId?: string | number;
+} = {}) {
+  return getLaudus('/production/products/stock', args);
+}
+
 function summarizePayload(payload: unknown) {
   const fieldsOf = (row: unknown) =>
     row && typeof row === 'object' && !Array.isArray(row)
