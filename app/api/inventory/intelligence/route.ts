@@ -130,11 +130,12 @@ export async function GET(request: NextRequest) {
 
     const currentDiesel = dieselPositionResult.data?.[0] || null;
     const dieselLaudus = normalizeReconciliation(dieselLaudusResult.data || null);
-    const hasDieselConflict = Boolean(currentDiesel || dieselLaudus) && (
+    const dieselSourcesDiffer = Boolean(currentDiesel || dieselLaudus) && (
       !currentDiesel ||
       !dieselLaudus ||
       dieselLaudus.reconciliation_state !== 'aligned'
     );
+    const hasDieselConflict = !laudusIsPrimary && dieselSourcesDiffer;
 
     const summary = reconciliationSummaryResult.data
       ? {
@@ -156,6 +157,11 @@ export async function GET(request: NextRequest) {
         current: currentDiesel,
         laudus: dieselLaudus,
         hasConflict: hasDieselConflict,
+        sourcesDiffer: dieselSourcesDiffer,
+        effectiveQuantity: laudusIsPrimary && dieselLaudus?.laudus_stock != null
+          ? dieselLaudus.laudus_stock
+          : currentDiesel?.quantity_available ?? null,
+        effectiveSource: laudusIsPrimary && dieselLaudus?.laudus_stock != null ? 'laudus' : 'motil',
       } : null,
       reconciliationSummary: summary,
       sourceAuthority: authority ? {
