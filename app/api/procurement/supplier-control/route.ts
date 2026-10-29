@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       orderLinesQuery,
       receiptsQuery,
       receiptLinesQuery,
-      context.supabase.schema('intelligence').from('supplier_performance_v1').select('*').eq('organization_id', context.organizationId).order('performance_score', { ascending: false }).limit(100),
+      context.supabase.from('supplier_operational_score_v2').select('*').eq('organization_id', context.organizationId).order('operational_score', { ascending: false, nullsFirst: false }).limit(100),
     ]);
 
     const error = [returnsResult, invoicesResult, ordersResult, orderLinesResult, receiptsResult, receiptLinesResult, performanceResult].find((result) => result.error)?.error;
