@@ -27,6 +27,18 @@ type BodegaAuthorityRow = {
   whatsapp_stock_evidence_since_laudus: number | string | null;
 };
 
+type LaudusNegativePositionRow = {
+  sku: string | null;
+  description: string | null;
+  unit_of_measure: string | null;
+  total_laudus_stock: number | string | null;
+  warehouse_external_id: string | null;
+  warehouse_name: string | null;
+  warehouse_stock: number | string | null;
+  source_date_to: string | null;
+  synced_at: string | null;
+};
+
 type LaudusReconciliationSummaryRow = {
   compared_products: number | string | null;
   aligned_products: number | string | null;
@@ -76,6 +88,7 @@ export async function loadLaudusInventoryReadiness(
     latestSnapshot,
     readinessResult,
     reconciliationSummaryResult,
+    negativePositionsResult,
     authorityResult,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
@@ -108,6 +121,11 @@ export async function loadLaudusInventoryReadiness(
       .eq('organization_id', organizationId)
       .maybeSingle(),
     db
+      .from('laudus_negative_stock_positions_service_v1')
+      .select('sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
+      .eq('organization_id', organizationId)
+      .order('warehouse_stock', { ascending: true }),
+    db
       .from('bodega_stock_source_authority_service_v1')
       .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
       .eq('organization_id', organizationId)
@@ -118,10 +136,22 @@ export async function loadLaudusInventoryReadiness(
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
+  if (negativePositionsResult.error) throw new Error(negativePositionsResult.error.message);
   if (authorityResult.error) throw new Error(authorityResult.error.message);
 
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
+  const negativePositions = ((negativePositionsResult.data || []) as LaudusNegativePositionRow[]).map((row) => ({
+    sku: String(row.sku || ''),
+    description: String(row.description || row.sku || ''),
+    unit: String(row.unit_of_measure || ''),
+    totalStock: n(row.total_laudus_stock),
+    warehouseCode: String(row.warehouse_external_id || ''),
+    warehouseName: String(row.warehouse_name || row.warehouse_external_id || 'Bodega sin nombre'),
+    warehouseStock: n(row.warehouse_stock),
+    sourceDate: row.source_date_to || null,
+    syncedAt: row.synced_at || null,
+  }));
   const authority = (authorityResult.data || null) as BodegaAuthorityRow | null;
 
   const laudusProducts = n(readiness?.products);
@@ -182,6 +212,8 @@ export async function loadLaudusInventoryReadiness(
       missingInMotilNonzero,
       laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
       negativeProducts: laudusNegativeProducts,
+      negativePositions,
+      negativeWarehouses: new Set(negativePositions.map((row) => row.warehouseCode).filter(Boolean)).size,
     },
     authority: {
       state: authorityState,
