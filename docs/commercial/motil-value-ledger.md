@@ -267,3 +267,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; ausencia de evidencia queda sin medir.
 - No se interpreta ninguno de estos tiempos como downtime evitado, ahorro o impacto causal.
 - Objetivo de evidencia: construir desde la primera OTe una cohorte comparable para evaluar velocidad de respuesta, completitud de cierre y disciplina de aprobación.
+
+
+## 2026-10-29 — Mantención → Bodega → Compras: ciclo de abastecimiento instrumentado
+
+- Problema observado: una OT cerrada puede conservar faltantes históricos y necesidades de abastecimiento abiertas; el cierre de Mantención no garantiza por sí solo que la cadena de materiales quedó resuelta.
+- Caso real: OT-2026-0011 quedó `completed` con 6 faltantes históricos y 1 necesidad de abastecimiento abierta sin solicitud de compra.
+- Cruce actual: los 6 filtros faltantes hoy tienen stock positivo en Laudus, por lo que la necesidad puede estar obsoleta y no debe promoverse automáticamente a compra.
+- Capacidad: el Centro de Mantención vuelve a exponer estos casos como bloqueo operacional post-cierre y distingue faltante histórico cubierto versus brecha vigente.
+- Medición añadida al scorecard: `supply need -> procurement request -> issued purchase order -> first receipt`.
+- Semántica: cada tramo publica muestra y mediana sólo cuando existen ambos timestamps; etapas ausentes quedan sin medir y nunca se convierten a cero.
+- Estado observado al instrumentar: 1 necesidad de abastecimiento, 0 solicitudes vinculadas, 0 OC y 0 recepciones. El cuello de botella observable está hoy en el primer handoff Mantención/Bodega -> Compras.
+- Nivel actual: L4 por decisión asistida y E1/E2 de trazabilidad; no existe todavía evidencia E3 de ahorro, downtime evitado ni costo evitado.
+- Siguiente gate: cerrar al menos 5 ciclos completos con solicitud, OC y recepción para establecer baseline de tiempos por tramo; luego comparar cohortes y outcomes.
+- Valor comercial potencial: demostrar reducción de necesidades obsoletas, compras redundantes evitadas y menor tiempo de abastecimiento sólo cuando los outcomes estén cerrados y atribuibles.
