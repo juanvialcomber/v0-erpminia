@@ -17,6 +17,7 @@ test('inventory readiness measures live Laudus identity, stock, warehouses and o
   assert.match(helper, /inventory_eligibility', 'eligible'/);
   assert.match(helper, /eligibleProducts/);
   assert.match(helper, /excludedProducts/);
+  assert.match(helper, /canonicalProductCoverage: pct\(laudusEligibleProductsLinked, laudusEligibleProducts\)/);
   assert.match(helper, /laudusStockRows/);
   assert.match(helper, /mappedPhysicalWarehouses/);
   assert.match(helper, /latestLaudusStock/);
