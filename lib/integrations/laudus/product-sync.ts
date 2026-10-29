@@ -3,6 +3,7 @@ import { LAUDUS_SYNC_POLICIES } from '@/lib/integrations/laudus/sync-policy';
 
 const PRODUCT_PATH = '/production/products/list';
 const PRODUCT_FIELDS = ['productId', 'SKU', 'description', 'unitOfMeasure'] as const;
+const PRODUCT_HEAD_PAGES_PER_RUN = 5;
 
 function rowsFromPayload(payload: unknown): Record<string, unknown>[] {
   const rows =
@@ -29,16 +30,18 @@ export async function syncLaudusProducts(organizationId: string, supabase: any) 
   let newCandidate = 0;
   let conflict = 0;
 
-  for (let page = 0; page < policy.maxPagesPerRun; page += 1) {
+  // Products are already bootstrapped. Poll the newest 500 IDs on each run so new SKUs
+  // are caught quickly without burning the 2,000-call monthly Laudus allowance.
+  for (let page = 0; page < PRODUCT_HEAD_PAGES_PER_RUN; page += 1) {
     const payload = await listLaudus(PRODUCT_PATH, {
       options: { offset: page * policy.pageSize, limit: policy.pageSize },
       fields: [...PRODUCT_FIELDS],
-      orderBy: [{ field: 'productId', direction: 'ASC' }],
+      orderBy: [{ field: 'productId', direction: 'DESC' }],
     });
     apiCalls += 1;
 
     const rows = rowsFromPayload(payload);
-    const isFinalPage = rows.length < policy.pageSize || page + 1 >= policy.maxPagesPerRun;
+    const isFinalPage = rows.length < policy.pageSize || page + 1 >= PRODUCT_HEAD_PAGES_PER_RUN;
 
     if (rows.length) {
       const { data, error } = await supabase.rpc('motil_ingest_laudus_products', {
