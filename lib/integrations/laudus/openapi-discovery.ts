@@ -80,7 +80,18 @@ function absoluteSpecUrl(candidate: string) {
 }
 
 export function extractLaudusSpecCandidates(html: string) {
-  const matches = html.match(/(?:https?:\\/\\/[^"'\\s]+|\\/[^"'\\s]+)(?:swagger|openapi)[^"'\\s]*\\.(?:json|yaml|yml)/gi) || [];
+  const tokens = html
+    .split(/[\s"'<>]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  const matches = tokens.filter((token) => {
+    const value = token.toLowerCase();
+    const looksLikeSpec = value.includes('swagger') || value.includes('openapi');
+    const supportedExt = value.endsWith('.json') || value.endsWith('.yaml') || value.endsWith('.yml');
+    return looksLikeSpec && supportedExt;
+  });
+
   const urls = [
     ...matches.map(absoluteSpecUrl).filter((value): value is string => Boolean(value)),
     ...FALLBACK_SPEC_PATHS.map((path) => absoluteSpecUrl(path)).filter((value): value is string => Boolean(value)),
