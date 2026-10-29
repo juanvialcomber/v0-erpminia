@@ -209,3 +209,12 @@ test('Daniel coverage level is explicit about four finance domains and partial a
   assert.match(card, /'Activos'/);
   assert.match(card, /Activos: .*enlazados/s);
 });
+
+
+test('Daniel finance runtime never queries the private integration schema directly', () => {
+  assert.doesNotMatch(loader, /\.schema\('integration'\)/);
+  assert.match(loader, /laudus_purchase_payments_service_v1/);
+  assert.match(loader, /laudus_cost_centers_service_v1/);
+  assert.match(loader, /laudus_fixed_assets_service_v1/);
+  assert.match(loader, /laudus_suppliers_service_v1/);
+});
