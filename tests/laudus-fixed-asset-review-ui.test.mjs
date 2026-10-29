@@ -31,7 +31,7 @@ test('fixed asset review UI exposes evidence and human authority', async () => {
   assert.match(component, /Revisión humana requerida/);
   assert.match(component, /Patente exacta/);
   assert.match(component, /Serie exacta/);
-  assert.match(component, /no modifica el activo canónico ni Laudus/i);
+  assert.match(component, /no se modifica el activo canónico ni Laudus/i);
   assert.match(component, /\/api\/integrations\/laudus\/fixed-asset-review/);
 });
 
