@@ -47,6 +47,7 @@ type WorkOrderPayload = {
   canonical_asset_id?: string;
   reviewId?: string | null;
   review_id?: string | null;
+  planningDecisionId?: string | null;
   assignedPersonId?: string | null;
   assigned_person_id?: string | null;
   title?: string;
@@ -373,6 +374,8 @@ export async function POST(request: NextRequest) {
     const requestedMaterials = body.requestedMaterials || body.requested_materials || null;
     const materials = body.materials || [];
     const creationRequestId = request.headers.get('idempotency-key')?.trim() || null;
+    const planningDecisionId = body.planningDecisionId || null;
+    if(planningDecisionId && (!UUID_PATTERN.test(planningDecisionId) || creationRequestId!==planningDecisionId)) return NextResponse.json({error:'Referencia de planificación inválida'},{status:400});
     if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: isEmergencyWork ? 'Una OTe debe quedar asociada a un equipo' : 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
     if (reviewId && !canonicalAssetId) return NextResponse.json({ error: 'Una revisión de equipo debe conservar su equipo asociado' }, { status: 400 });
     if (!body.title?.trim()) return NextResponse.json({ error: 'Describe brevemente el trabajo a realizar' }, { status: 400 });
@@ -530,6 +533,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let approvedDecision: {id:string;approved_by:string|null;canonical_asset_id:string|null;assigned_person_id:string|null;title:string;work_type:string;priority:string;scheduled_date:string|null;planned_duration_hours:number|null;description:string|null;linked_work_order_id:string|null} | null = null;
+    if(planningDecisionId){
+      const {data,error}=await context.supabase.from('maintenance_planning_decisions').select('id,approved_by,canonical_asset_id,assigned_person_id,title,work_type,priority,scheduled_date,planned_duration_hours,description,linked_work_order_id,decision_status').eq('organization_id',context.organizationId).eq('id',planningDecisionId).maybeSingle();
+      if(error)throw error;
+      if(!data||data.decision_status!=='approved'||data.approved_by!==context.authUserId) return NextResponse.json({error:'La planificación no está aprobada por el usuario actual'},{status:403});
+      if(data.canonical_asset_id!==canonicalAssetId||data.assigned_person_id!==assignedPersonId||data.title!==body.title?.trim()||data.work_type!==workType||data.priority!==(body.priority||'medium')||data.scheduled_date!==(body.scheduledDate||body.scheduled_date||null)||Number(data.planned_duration_hours||0)!==Number(body.plannedDurationHours??body.planned_duration_hours??0)||String(data.description||'')!==String(body.description||''))return NextResponse.json({error:'La OT no coincide con la planificación aprobada'},{status:409});
+      approvedDecision=data;
+      if(data.linked_work_order_id){const {data:linked,error:linkedError}=await context.supabase.from('maintenance_work_orders').select('*').eq('organization_id',context.organizationId).eq('id',data.linked_work_order_id).maybeSingle();if(linkedError)throw linkedError;if(linked)return NextResponse.json({data:mapWorkOrder(linked as WorkOrderRow,asset),idempotentReplay:true});}
+    }
     const { data: existingRequestOrder, error: existingRequestError } = await context.supabase
       .from('maintenance_work_orders')
       .select('*')
@@ -637,6 +649,10 @@ export async function POST(request: NextRequest) {
       throw new Error('No se pudo reservar un número único para la orden de trabajo. Intenta nuevamente.');
     }
 
+    if(approvedDecision){
+      const {error:decisionError}=await context.supabase.from('maintenance_planning_decisions').update({decision_status:'generated',linked_work_order_id:createdOrder.id,generated_by:context.authUserId,generated_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',approvedDecision.id).eq('organization_id',context.organizationId).eq('decision_status','approved');
+      if(decisionError)throw decisionError;
+    }
     await recordRequestedMaterials(context, createdOrder, requestedMaterials);
     await recordStructuredMaterials(context, createdOrder.id, materials);
     if (isEmergencyWork) {
