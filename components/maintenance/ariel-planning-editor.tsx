@@ -23,6 +23,11 @@ export function ArielPlanningEditor(props:Props){
  const [date,setDate]=useState<string|null>(null),[hours,setHours]=useState<string|null>(null);
  const [priority,setPriority]=useState<string|null>(null),[workType,setWorkType]=useState<string|null>(null),[assigned,setAssigned]=useState<string|null>(null);
  const [busy,setBusy]=useState(false);
+ const [assetQuery,setAssetQuery]=useState('');
+ const [selectedAssetId,setSelectedAssetId]=useState<string|null>(null);
+ const {data:assetResults}=useSWR<{assets:Array<{id:string;name:string;asset_code:string}>}>(editing&&assetQuery.trim().length>=3?'/api/maintenance/planning-decisions?assetQuery='+encodeURIComponent(assetQuery.trim()):null,fetcher,{revalidateOnFocus:false});
+ const assetId=selectedAssetId??decision?.canonical_asset_id??props.canonicalAssetId;
+
  const title=name??decision?.title??props.title;
  const scheduledDate=date??decision?.scheduled_date??props.scheduledDate??'';
  const duration=hours??String(decision?.planned_duration_hours??props.plannedHours??0);
@@ -31,13 +36,13 @@ export function ArielPlanningEditor(props:Props){
  const assignedId=assigned??decision?.assigned_person_id??'';
  const desc=description??decision?.description??'';
  async function submit(action:'save'|'approve'){
-  if(!props.canonicalAssetId){toast.error('Primero debe vincularse un equipo canónico');return;}
+  if(!assetId&&type!=='general'){toast.error('Primero debe vincularse un equipo canónico');return;}
   if(action==='approve'&&!confirm('¿Aprobar esta planificación y generar su OT con los datos indicados?'))return;
   setBusy(true);
   try{
    const r=await apiFetch('/api/maintenance/planning-decisions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({
      sourceKind:props.sourceKind,sourceId:props.sourceId,title,description:desc,scheduledDate,plannedHours:Number(duration),
-     priority:prio,workType:type,assignedPersonId:assignedId,action,revision:decision?.revision,
+     priority:prio,workType:type,assignedPersonId:assignedId,canonicalAssetId:assetId,action,revision:decision?.revision,
    })});
    const body=await r.json().catch(()=>({}));
    if(!r.ok)throw Error(body.error||'No fue posible guardar la decisión');
@@ -63,12 +68,13 @@ export function ArielPlanningEditor(props:Props){
    <div><Label>Prioridad</Label><Select value={prio} onValueChange={setPriority}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{(['low','medium','high','critical'] as const).map(v=><SelectItem key={v} value={v}>{({low:'Baja',medium:'Media',high:'Alta',critical:'Crítica'} as const)[v]}</SelectItem>)}</SelectContent></Select></div>
    <div><Label>Tipo</Label><Select value={type} onValueChange={setWorkType}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="preventive">Preventiva</SelectItem><SelectItem value="corrective">Correctiva</SelectItem><SelectItem value="general">General</SelectItem></SelectContent></Select></div>
   </div>
+  {!props.canonicalAssetId&&<div className="space-y-2"><Label>Vincular equipo</Label><Input placeholder="Buscar equipo en MOTIL" value={assetQuery} onChange={e=>setAssetQuery(e.target.value)} />{(assetResults?.assets||[]).slice(0,10).map(a=><button type="button" className="block w-full rounded border px-2 py-1 text-left text-xs hover:bg-muted" key={a.id} onClick={()=>{setSelectedAssetId(a.id);setAssetQuery(a.name)}}>{a.name} · {a.asset_code}</button>)}{assetId?<p className="text-xs text-muted-foreground">Equipo seleccionado para esta propuesta</p>:null}</div>}
   <Label>Ejecutor responsable</Label>
   <Select value={assignedId||undefined} onValueChange={setAssigned}><SelectTrigger><SelectValue placeholder="Elegir ejecutor"/></SelectTrigger><SelectContent>{(peopleData?.assignees||[]).map(p=><SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent></Select>
   <p className="text-xs text-muted-foreground">La aprobación genera una OT abierta. Su ejecución y cierre siguen requiriendo validación del supervisor. La propuesta y el archivo de Ariel se conservan.</p>
   <div className="flex flex-wrap gap-2">
    <Button size="sm" variant="outline" disabled={busy} onClick={()=>void submit('save')}>Guardar cambios</Button>
-   <Button size="sm" disabled={busy||!assignedId||!scheduledDate||!props.canonicalAssetId} onClick={()=>void submit('approve')}>Aprobar y generar OT</Button>
+   <Button size="sm" disabled={busy||!assignedId||!scheduledDate||(!assetId&&type!=='general')} onClick={()=>void submit('approve')}>Aprobar y generar OT</Button>
    <Button size="sm" variant="ghost" disabled={busy} onClick={()=>setEditing(false)}>Cancelar</Button>
   </div>
  </div>;
