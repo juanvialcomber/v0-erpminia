@@ -32,7 +32,9 @@ export async function POST(request:NextRequest){
  const {data:existing,error:existingError}=await context.supabase.from('maintenance_planning_decisions').select('*')
  .eq('organization_id',context.organizationId).eq('source_kind',kind).eq('source_id',input.sourceId).maybeSingle();
  if(existingError)throw existingError;
- if(existing && existing.decision_status!=='draft')return NextResponse.json({error:'La decisión ya fue aprobada o cerrada'},{status:409});
+ if(existing?.decision_status==='generated'||existing?.decision_status==='rejected')return NextResponse.json({error:'Decisión cerrada'},{status:409});
+ if(existing?.decision_status==='approved' && action!=='approve')return NextResponse.json({error:'La decisión ya fue aprobada; no puede editarse'},{status:409});
+ if(existing?.decision_status==='approved' && action==='approve' && existing.approved_by!==context.authUserId)return NextResponse.json({error:'Solo quien aprobó puede reintentar generar la OT'},{status:403});
  if(existing&&input.revision!==existing.revision)return NextResponse.json({error:'La planificación cambió. Actualiza antes de guardar.'},{status:409});
  let sourceAssetId:string|null=null,sourceTitle='',sourceDate:string|null=null,sourceHours:number|null=null,sourceType='preventive',sourcePriority='medium';
  if(kind==='official_weekly'){
@@ -71,11 +73,11 @@ export async function POST(request:NextRequest){
   const {data:openOrders,error:orderError}=await context.supabase.from('maintenance_work_orders').select('id,title,scheduled_date,status')
    .eq('organization_id',context.organizationId).eq('canonical_asset_id',sourceAssetId).not('status','in','("completed","closed","cancelled","canceled")').limit(25);
   if(orderError)throw orderError;
-  if((openOrders||[]).some((o:any)=>o.scheduled_date===plannedDate&&o.title?.trim().toLowerCase()===title.toLowerCase()))
+  if(existing?.decision_status!=='approved' && (openOrders||[]).some((o:any)=>o.scheduled_date===plannedDate&&o.title?.trim().toLowerCase()===title.toLowerCase()))
    return NextResponse.json({error:'Existe una OT abierta para este equipo, título y fecha. Revisa la orden antes de aprobar.'},{status:409});
  }
  const payload={organization_id:context.organizationId,source_kind:kind,source_id:input.sourceId,canonical_asset_id:sourceAssetId,title,description:input.description??existing?.description??null,work_type:workType,priority,scheduled_date:plannedDate,planned_duration_hours:hours,assigned_person_id:person,decision_status:action==='approve'?'approved':'draft',review_note:'Revisión de Ariel para generar OT',revision:(existing?.revision||0)+1,last_edited_by:context.authUserId,...(action==='approve'?{approved_by:context.authUserId,approved_at:new Date().toISOString()}:{})};
- const {data:decision,error:writeError}=await context.supabase.from('maintenance_planning_decisions').upsert(payload,{onConflict:'organization_id,source_kind,source_id'}).select('*').single();
+ const {data:decision,error:writeError}=existing?.decision_status==='approved' ? await context.supabase.from('maintenance_planning_decisions').select('*').eq('id',existing.id).eq('organization_id',context.organizationId).single() : await context.supabase.from('maintenance_planning_decisions').upsert(payload,{onConflict:'organization_id,source_kind,source_id'}).select('*').single();
  if(writeError)throw writeError;
  if(action==='save')return NextResponse.json({decision});
  // Approval is explicit. Then reuse the canonical OT endpoint with stable idempotency.
