@@ -45,6 +45,7 @@ type ReviewRow = {
 
 type Payload = {
   readOnly: boolean;
+  canReview: boolean;
   summary: {
     laudusAssets: number;
     canonicalAssets: number;
@@ -134,7 +135,7 @@ export function LaudusFixedAssetReview() {
   const current = rows[safeIndex] || null;
 
   async function recordDecision(decision: 'confirm_candidate' | 'reject_candidate' | 'defer') {
-    if (!current || saving) return;
+    if (!current || saving || !data?.canReview) return;
     const reason = rationale.trim();
     if (reason.length < 5) {
       setMessage('Explica brevemente el motivo de la decisión.');
@@ -341,7 +342,9 @@ export function LaudusFixedAssetReview() {
           <div className="border-t px-4 py-4">
             <p className="text-sm font-medium">Decisión humana</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Registra la revisión y su motivo. Confirmar una coincidencia no enlaza todavía el activo: sólo deja evidencia para el paso de promoción controlada.
+              {data?.canReview
+                ? 'Registra la revisión y su motivo. Confirmar una coincidencia no enlaza todavía el activo: sólo deja evidencia para el paso de promoción controlada.'
+                : 'Tu acceso a Finanzas es de lectura. La evidencia puede revisarse, pero sólo un usuario con permiso de edición puede registrar una decisión.'}
             </p>
             <Textarea
               className="mt-3 min-h-24"
@@ -349,14 +352,14 @@ export function LaudusFixedAssetReview() {
               value={rationale}
               onChange={(event) => setRationale(event.target.value)}
               placeholder="Ej.: patente coincide con el activo MOTIL y la fecha de adquisición es compatible."
-              disabled={Boolean(saving)}
+              disabled={!data?.canReview || Boolean(saving)}
             />
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={Boolean(saving) || rationale.trim().length < 5}
+                  disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5}
                   onClick={() => void recordDecision('defer')}
                 >
                   {saving === 'defer' ? 'Guardando…' : 'Diferir'}
@@ -364,7 +367,7 @@ export function LaudusFixedAssetReview() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={Boolean(saving) || rationale.trim().length < 5}
+                  disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5}
                   onClick={() => void recordDecision('reject_candidate')}
                 >
                   {saving === 'reject_candidate' ? 'Guardando…' : 'Rechazar candidato'}
@@ -372,7 +375,7 @@ export function LaudusFixedAssetReview() {
               </div>
               <Button
                 type="button"
-                disabled={Boolean(saving) || rationale.trim().length < 5 || !current.candidate.assetId}
+                disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5 || !current.candidate.assetId}
                 onClick={() => void recordDecision('confirm_candidate')}
               >
                 {saving === 'confirm_candidate' ? 'Guardando…' : 'Registrar coincidencia'}
