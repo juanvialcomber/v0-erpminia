@@ -615,6 +615,7 @@ export async function POST(request: NextRequest) {
           meter_unit: body.meterUnit || body.meter_unit || null,
           cost_center_id: body.costCenterId || body.cost_center_id || null,
           creation_request_id: creationRequestId,
+          ...(planningDecisionId ? { planning_decision_id: planningDecisionId } : {}),
           created_by: context.authUserId,
           updated_at: new Date().toISOString(),
         })
