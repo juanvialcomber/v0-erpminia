@@ -39,9 +39,10 @@ export async function POST(request:NextRequest){
  let sourceAssetId:string|null=null,sourceTitle='',sourceDate:string|null=null,sourceHours:number|null=null,sourceType='preventive',sourcePriority='medium';
  if(kind==='official_weekly'){
   const {data:source,error}=await context.supabase.from('planning_weekly_work_items')
-   .select('id,title,canonical_asset_id,planned_date,planned_hours,work_type_raw,priority_raw,source_id,planning_weekly_work_sources!inner(is_current)')
+   .select('id,title,canonical_asset_id,planned_date,planned_hours,work_type_raw,priority_raw,source_status,source_id,planning_weekly_work_sources!inner(is_current)')
    .eq('id',input.sourceId).eq('organization_id',context.organizationId).eq('planning_weekly_work_sources.is_current',true).maybeSingle();
   if(error)throw error;if(!source)return NextResponse.json({error:'Trabajo semanal no vigente'},{status:404});
+  if(action==='approve' && String(source.source_status||'').trim().toLowerCase()==='terminado')return NextResponse.json({error:'El trabajo está reportado como terminado. Concilia primero su ejecución y una posible OT existente.'},{status:409});
   sourceAssetId=source.canonical_asset_id;sourceTitle=source.title;sourceDate=source.planned_date;sourceHours=source.planned_hours==null?null:Number(source.planned_hours);
   sourceType=String(source.work_type_raw||'').toLowerCase().includes('correctiva')?'corrective':'preventive';
   sourcePriority=String(source.priority_raw||'').toLowerCase().includes('alta')?'high':'medium';
