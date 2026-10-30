@@ -557,6 +557,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'La solicitud ya pertenece a otra faena.' }, { status: 403 });
       }
       const replayedOrder = existingRequestOrder as WorkOrderRow;
+      if(planningDecisionId&&approvedDecision){
+        const {error:linkError}=await context.supabase.from('maintenance_planning_decisions')
+          .update({decision_status:'generated',linked_work_order_id:replayedOrder.id,generated_by:context.authUserId,generated_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+          .eq('id',approvedDecision.id).eq('organization_id',context.organizationId).eq('decision_status','approved');
+        if(linkError)throw linkError;
+        const {data:sourceInfo,error:sourceError}=await context.supabase.from('maintenance_planning_decisions').select('source_kind,source_id')
+          .eq('id',planningDecisionId).eq('organization_id',context.organizationId).single();
+        if(sourceError)throw sourceError;
+        if(sourceInfo.source_kind==='official_weekly'){
+          const {error:weeklyError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:replayedOrder.id,updated_at:new Date().toISOString()})
+          .eq('id',sourceInfo.source_id).eq('organization_id',context.organizationId);
+          if(weeklyError)throw weeklyError;
+        }
+      }
       await recordRequestedMaterials(context, replayedOrder, requestedMaterials);
       await recordStructuredMaterials(context, replayedOrder.id, materials);
       if (isEmergencyWork) {
