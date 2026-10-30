@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { OfficialWeeklyWorkPlan } from './official-weekly-work-plan';
+import { ArielPlanningEditor } from './ariel-planning-editor';
 import useSWR from 'swr';
 import { AlertTriangle, CalendarDays, CheckCircle2, PackageSearch, RefreshCw, Wrench } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
 
 type WeeklyDecision = {
+  sourceRowId: string | null;
   canonicalAssetId: string | null;
   assetCode: string | null;
   assetName: string | null;
@@ -165,7 +167,8 @@ export function WeeklyMaintenancePlanning() {
               </>}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col gap-2 min-w-0">
+              {!row.scheduledWorkOrder && row.sourceRowId && row.canonicalAssetId && row.evidenceFreshness !== 'stale' && <ArielPlanningEditor sourceKind="preventive_priority" sourceId={row.sourceRowId} title={row.interval ? `Mantención ${row.interval} ${row.meterUnit || 'h'} · ${row.assetName || 'Equipo'}` : 'Mantención preventiva'} scheduledDate={null} plannedHours={row.standardPlan?.estimatedDurationHours ?? null} priority={row.priority?.startsWith('P1')?'critical':row.priority?.startsWith('P2')?'high':'medium'} workType="preventive" canonicalAssetId={row.canonicalAssetId} onFinished={()=>void mutate()}/>}
               {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
                 : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
                 : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
