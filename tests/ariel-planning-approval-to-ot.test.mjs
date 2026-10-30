@@ -18,7 +18,7 @@ test('Ariel edits a separate, versioned proposal; source Excel is immutable',()=
 });
 test('approved proposal is required for linked OT, with stable idempotency and unique linkage',()=>{
  assert.match(route,/getMaintenanceWorkOrderCreationCapability/);
- assert.match(route,/Aprobar/);
+ assert.match(route,/approve/);
  assert.match(route,/createWorkOrder\(otRequest\)/);
  assert.match(route,/decision.id/);
  assert.match(create,/approved_by!==context.authUserId/);
