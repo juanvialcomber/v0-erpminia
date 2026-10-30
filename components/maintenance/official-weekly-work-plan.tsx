@@ -2,13 +2,14 @@
 
 import useSWR from 'swr';
 import Link from 'next/link';
+import { ArielPlanningEditor } from './ariel-planning-editor';
 import { apiFetch } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 type OfficialSource = {id:string; mine:string;source_file:string; week_start:string;week_end:string;source_url:string|null};
-type OfficialWork = {id:string;source_id:string;source_row:number;planned_date:string|null;assigned_name:string|null;asset_label:string;canonical_asset_id:string|null;title:string;priority_raw:string|null;planned_hours:number|null;source_status:string|null;reconciliation_status:string;review_reason:string|null;linked_work_order_id:string|null;};
+type OfficialWork = {id:string;source_id:string;source_row:number;planned_date:string|null;assigned_name:string|null;asset_label:string;canonical_asset_id:string|null;title:string;priority_raw:string|null;planned_hours:number|null;source_status:string|null;reconciliation_status:string;review_reason:string|null;linked_work_order_id:string|null;work_type_raw:string|null;};
 type Response = {sources:OfficialSource[];items:OfficialWork[];summary:{total:number;review:number;completedReported:number;linkedOrders:number;plannedHours:number};officialMaster:{source:string;p1:number;p2:number;pending:Array<{sourceRow:number;mine:string;assetName:string;priority:string;matched:boolean}>};authority:string};
 const fetcher=async(url:string):Promise<Response>=>{const r=await apiFetch(url);const d=await r.json();if(!r.ok)throw new Error(d?.error||'No disponible');return d;};
 
@@ -34,7 +35,7 @@ export function OfficialWeeklyWorkPlan(){
        <p className="text-sm font-medium">{item.title}</p>
        <p className="text-xs text-muted-foreground">{item.planned_date||'Sin fecha'} · {item.asset_label} · {item.assigned_name||'Sin responsable'} · {item.planned_hours??'—'} HH · Fila {item.source_row}</p>
       </div>
-      <div className="shrink-0">{item.linked_work_order_id?<Button asChild variant="outline" size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${item.linked_work_order_id}`}>Abrir OT</Link></Button>:<span className="text-xs text-muted-foreground">{item.canonical_asset_id?'Pendiente de programar':'Vincular equipo'}</span>}</div>
+      <div className="min-w-0 lg:max-w-sm">{!item.linked_work_order_id && <ArielPlanningEditor sourceKind="official_weekly" sourceId={item.id} title={item.title} scheduledDate={item.planned_date} plannedHours={item.planned_hours} priority={item.priority_raw?.toLowerCase().includes('alta')?'high':'medium'} workType={item.work_type_raw?.toLowerCase().includes('correctiva')?'corrective':'preventive'} canonicalAssetId={item.canonical_asset_id} onFinished={()=>void mutate()}/>} {item.linked_work_order_id?<Button asChild variant="outline" size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${item.linked_work_order_id}`}>Abrir OT</Link></Button>:<span className="text-xs text-muted-foreground">{item.canonical_asset_id?'Pendiente de programar':'Vincular equipo'}</span>}</div>
      </div>)}
     </div>
    </CardContent></Card>)}
