@@ -28,3 +28,12 @@ test('official program is in Ariel current planning surface',()=>{
  assert.match(screen,/Trabajos por faena/);
  assert.match(screen,/Ver fuente/);
 });
+test('urgencias oficiales preservan filas P1/P2 aunque falte vinculación de equipo',()=>{
+ assert.match(route,/officialMaster/);
+ assert.match(route,/workbook_priority_raw/);
+ assert.match(route,/P1 - VENCIDO/);
+ assert.match(route,/P2 - INMEDIATO/);
+ assert.match(route,/pending:priorityRows\.filter\(r=>!r\.matched\)/);
+ assert.match(screen,/Prioridades del maestro/);
+ assert.match(screen,/Pendientes de vincular/);
+});
