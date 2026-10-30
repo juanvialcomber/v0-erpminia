@@ -29,6 +29,7 @@ type ReviewRow = {
   exact_serial_support?: boolean | null;
   manufacturer_support?: boolean | null;
   best_name_similarity?: number | null;
+  score_gap?: number | null;
   second_name_similarity?: number | null;
   laudus_rows_for_candidate?: number | null;
 };
@@ -158,6 +159,165 @@ export async function GET(request: NextRequest) {
     console.error('[laudus/fixed-asset-review]', error);
     return NextResponse.json(
       { error: 'No fue posible cargar la revisión de activos Laudus.' },
+      { status: 500 },
+    );
+  }
+}
+
+
+const REVIEW_DECISIONS = new Set(['confirm_candidate', 'reject_candidate', 'defer']);
+
+export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
+  if (!access.authorized) return access.response;
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  try {
+    const body = await request.json().catch(() => null) as {
+      externalId?: unknown;
+      decision?: unknown;
+      rationale?: unknown;
+    } | null;
+
+    const externalId = String(body?.externalId || '').trim();
+    const decision = String(body?.decision || '').trim();
+    const rationale = String(body?.rationale || '').trim();
+
+    if (!externalId) {
+      return NextResponse.json({ error: 'Activo Laudus requerido.' }, { status: 400 });
+    }
+    if (!REVIEW_DECISIONS.has(decision)) {
+      return NextResponse.json({ error: 'Decisión de revisión inválida.' }, { status: 400 });
+    }
+    if (rationale.length < 5 || rationale.length > 500) {
+      return NextResponse.json({ error: 'El motivo debe tener entre 5 y 500 caracteres.' }, { status: 400 });
+    }
+
+    const { data: existingDecision, error: existingError } = await context.supabase
+      .from('laudus_fixed_asset_review_decisions')
+      .select('decision,decided_at')
+      .eq('organization_id', context.organizationId)
+      .eq('laudus_external_id', externalId)
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (existingDecision) {
+      return NextResponse.json({
+        error: 'Este activo Laudus ya tiene una decisión registrada.',
+        decision: existingDecision.decision,
+        decidedAt: existingDecision.decided_at,
+      }, { status: 409 });
+    }
+
+    const { data: review, error: reviewError } = await context.supabase.rpc(
+      'motil_laudus_fixed_asset_review_queue',
+      {
+        p_organization_id: context.organizationId,
+        p_limit: 500,
+      },
+    );
+    if (reviewError) throw reviewError;
+
+    const queue = Array.isArray((review as { queue?: ReviewRow[] } | null)?.queue)
+      ? ((review as { queue: ReviewRow[] }).queue || [])
+      : [];
+    const candidate = queue.find((row) =>
+      String(row.laudus_external_id || '') === externalId && !row.decision
+    );
+
+    if (!candidate) {
+      return NextResponse.json({
+        error: 'El candidato ya no está disponible en la cola vigente. Actualiza antes de decidir.',
+      }, { status: 409 });
+    }
+
+    const candidateAssetId = candidate.canonical_asset_id
+      ? String(candidate.canonical_asset_id)
+      : null;
+    if (decision === 'confirm_candidate' && !candidateAssetId) {
+      return NextResponse.json({
+        error: 'No existe un activo MOTIL candidato para confirmar.',
+      }, { status: 400 });
+    }
+
+    if (candidateAssetId) {
+      const { data: canonicalAsset, error: canonicalError } = await context.supabase
+        .schema('canonical')
+        .from('assets')
+        .select('id')
+        .eq('organization_id', context.organizationId)
+        .eq('id', candidateAssetId)
+        .maybeSingle();
+      if (canonicalError) throw canonicalError;
+      if (!canonicalAsset) {
+        return NextResponse.json({
+          error: 'El activo MOTIL candidato ya no existe en el maestro canónico.',
+        }, { status: 409 });
+      }
+    }
+
+    const candidateSnapshot = {
+      laudus: {
+        externalId,
+        name: candidate.laudus_name || null,
+        manufacturer: candidate.laudus_manufacturer || null,
+        model: candidate.laudus_model || null,
+        serialNumber: candidate.laudus_serial_number || null,
+        acquisitionDate: candidate.acquisition_date || null,
+        supplierName: candidate.supplier_name || null,
+        invoiceNumber: candidate.invoice_number || null,
+      },
+      candidate: {
+        assetId: candidateAssetId,
+        code: candidate.canonical_asset_code || null,
+        name: candidate.canonical_asset_name || null,
+        manufacturer: candidate.canonical_manufacturer || null,
+        model: candidate.canonical_model || null,
+        serialNumber: candidate.canonical_serial_number || null,
+        licensePlate: candidate.canonical_license_plate || null,
+        location: candidate.canonical_location || null,
+      },
+      evidence: {
+        level: candidate.evidence_level || null,
+        exactPlate: Boolean(candidate.exact_plate_support),
+        exactSerial: Boolean(candidate.exact_serial_support),
+        manufacturer: Boolean(candidate.manufacturer_support),
+        nameSimilarity: n(candidate.best_name_similarity),
+        secondNameSimilarity: n(candidate.second_name_similarity),
+        scoreGap: n(candidate.score_gap),
+        laudusRowsForCandidate: n(candidate.laudus_rows_for_candidate),
+      },
+    };
+
+    const { data: saved, error: saveError } = await context.supabase
+      .from('laudus_fixed_asset_review_decisions')
+      .insert({
+        organization_id: context.organizationId,
+        laudus_external_id: externalId,
+        candidate_asset_id: candidateAssetId,
+        decision,
+        evidence_level: candidate.evidence_level || null,
+        name_similarity: candidate.best_name_similarity ?? null,
+        score_gap: candidate.score_gap ?? null,
+        rationale,
+        reviewer_user_id: context.userId,
+        candidate_snapshot: candidateSnapshot,
+      })
+      .select('id,decision,rationale,decided_at')
+      .single();
+    if (saveError) throw saveError;
+
+    return NextResponse.json({
+      ok: true,
+      review: saved,
+      canonicalMutated: false,
+      laudusMutated: false,
+    });
+  } catch (error) {
+    console.error('[laudus/fixed-asset-review POST]', error);
+    return NextResponse.json(
+      { error: 'No fue posible registrar la decisión de revisión.' },
       { status: 500 },
     );
   }
