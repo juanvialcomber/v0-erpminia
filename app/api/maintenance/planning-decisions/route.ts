@@ -63,6 +63,7 @@ export async function POST(request:NextRequest){
   sourceAssetId=source.canonical_asset_id;sourceTitle='Mantención '+(source.interval_mp||'')+' '+(source.meter_unit||'h')+' · '+(source.asset_name||'Equipo');
   sourceDate=source.scheduled_date;sourcePriority=String(source.priority||'').startsWith('P1')?'critical':String(source.priority||'').startsWith('P2')?'high':'medium';
  }
+ if(kind==='official_weekly' && !input.canonicalAssetId && existing?.canonical_asset_id){sourceAssetId=existing.canonical_asset_id;}
  if(kind==='official_weekly'&&input.canonicalAssetId && input.canonicalAssetId!==sourceAssetId){
   if(!UUID.test(input.canonicalAssetId))return NextResponse.json({error:'Equipo seleccionado no válido'},{status:400});
   const {data:asset,error:assetError}=await context.supabase.from('maintenance_canonical_assets_v1')
