@@ -537,6 +537,7 @@ export async function POST(request: NextRequest) {
     if(planningDecisionId){
       const {data,error}=await context.supabase.from('maintenance_planning_decisions').select('id,approved_by,canonical_asset_id,assigned_person_id,title,work_type,priority,scheduled_date,planned_duration_hours,description,linked_work_order_id,decision_status').eq('organization_id',context.organizationId).eq('id',planningDecisionId).maybeSingle();
       if(error)throw error;
+      if(data?.decision_status==='generated'&&data.linked_work_order_id){const {data:linked,error:linkError}=await context.supabase.from('maintenance_work_orders').select('*').eq('organization_id',context.organizationId).eq('id',data.linked_work_order_id).maybeSingle();if(linkError)throw linkError;if(linked)return NextResponse.json({data:mapWorkOrder(linked as WorkOrderRow,asset),idempotentReplay:true});}
       if(!data||data.decision_status!=='approved'||data.approved_by!==context.authUserId) return NextResponse.json({error:'La planificación no está aprobada por el usuario actual'},{status:403});
       if(data.canonical_asset_id!==canonicalAssetId||data.assigned_person_id!==assignedPersonId||data.title!==body.title?.trim()||data.work_type!==workType||data.priority!==(body.priority||'medium')||data.scheduled_date!==(body.scheduledDate||body.scheduled_date||null)||Number(data.planned_duration_hours||0)!==Number(body.plannedDurationHours??body.planned_duration_hours??0)||String(data.description||'')!==String(body.description||''))return NextResponse.json({error:'La OT no coincide con la planificación aprobada'},{status:409});
       approvedDecision=data;
@@ -653,6 +654,14 @@ export async function POST(request: NextRequest) {
     if(approvedDecision){
       const {error:decisionError}=await context.supabase.from('maintenance_planning_decisions').update({decision_status:'generated',linked_work_order_id:createdOrder.id,generated_by:context.authUserId,generated_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',approvedDecision.id).eq('organization_id',context.organizationId).eq('decision_status','approved');
       if(decisionError)throw decisionError;
+    }
+    if(planningDecisionId){
+      const {data:sourceDecision,error:sourceError}=await context.supabase.from('maintenance_planning_decisions').select('source_kind,source_id').eq('id',planningDecisionId).eq('organization_id',context.organizationId).single();
+      if(sourceError)throw sourceError;
+      if(sourceDecision.source_kind==='official_weekly'){
+        const {error:linkedSourceError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:createdOrder.id,updated_at:new Date().toISOString()}).eq('id',sourceDecision.source_id).eq('organization_id',context.organizationId);
+        if(linkedSourceError)throw linkedSourceError;
+      }
     }
     await recordRequestedMaterials(context, createdOrder, requestedMaterials);
     await recordStructuredMaterials(context, createdOrder.id, materials);
