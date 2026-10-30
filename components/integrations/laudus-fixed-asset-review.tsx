@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type AssetSide = {
@@ -44,6 +45,7 @@ type ReviewRow = {
 
 type Payload = {
   readOnly: boolean;
+  canReview: boolean;
   summary: {
     laudusAssets: number;
     canonicalAssets: number;
@@ -97,13 +99,16 @@ function date(value: string | null) {
 }
 
 export function LaudusFixedAssetReview() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/fixed-asset-review',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const [search, setSearch] = useState('');
   const [index, setIndex] = useState(0);
+  const [rationale, setRationale] = useState('');
+  const [saving, setSaving] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -128,6 +133,47 @@ export function LaudusFixedAssetReview() {
 
   const safeIndex = rows.length ? Math.min(index, rows.length - 1) : 0;
   const current = rows[safeIndex] || null;
+
+  async function recordDecision(decision: 'confirm_candidate' | 'reject_candidate' | 'defer') {
+    if (!current || saving || !data?.canReview) return;
+    const reason = rationale.trim();
+    if (reason.length < 5) {
+      setMessage('Explica brevemente el motivo de la decisión.');
+      return;
+    }
+
+    setSaving(decision);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/fixed-asset-review', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          externalId: current.externalId,
+          decision,
+          rationale: reason,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
+
+      setRationale('');
+      setIndex(0);
+      setMessage(
+        decision === 'confirm_candidate'
+          ? 'Coincidencia registrada para revisión posterior de enlace.'
+          : decision === 'reject_candidate'
+            ? 'Candidato rechazado y retirado de la cola activa.'
+            : 'Caso diferido con su evidencia conservada.',
+      );
+      await mutate();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No fue posible registrar la decisión.');
+    } finally {
+      setSaving(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -291,6 +337,51 @@ export function LaudusFixedAssetReview() {
             <p className="mt-3 text-xs text-muted-foreground">
               La evidencia ayuda a priorizar la revisión, pero no confirma identidad por sí sola. No se modifica el activo canónico ni Laudus desde esta pantalla.
             </p>
+          </div>
+
+          <div className="border-t px-4 py-4">
+            <p className="text-sm font-medium">Decisión humana</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {data?.canReview
+                ? 'Registra la revisión y su motivo. Confirmar una coincidencia no enlaza todavía el activo: sólo deja evidencia para el paso de promoción controlada.'
+                : 'Tu acceso a Finanzas es de lectura. La evidencia puede revisarse, pero sólo un usuario con permiso de edición puede registrar una decisión.'}
+            </p>
+            <Textarea
+              className="mt-3 min-h-24"
+              maxLength={500}
+              value={rationale}
+              onChange={(event) => setRationale(event.target.value)}
+              placeholder="Ej.: patente coincide con el activo MOTIL y la fecha de adquisición es compatible."
+              disabled={!data?.canReview || Boolean(saving)}
+            />
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5}
+                  onClick={() => void recordDecision('defer')}
+                >
+                  {saving === 'defer' ? 'Guardando…' : 'Diferir'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5}
+                  onClick={() => void recordDecision('reject_candidate')}
+                >
+                  {saving === 'reject_candidate' ? 'Guardando…' : 'Rechazar candidato'}
+                </Button>
+              </div>
+              <Button
+                type="button"
+                disabled={!data?.canReview || Boolean(saving) || rationale.trim().length < 5 || !current.candidate.assetId}
+                onClick={() => void recordDecision('confirm_candidate')}
+              >
+                {saving === 'confirm_candidate' ? 'Guardando…' : 'Registrar coincidencia'}
+              </Button>
+            </div>
+            {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
           </div>
         </section>
       )}
