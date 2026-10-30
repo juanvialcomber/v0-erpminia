@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { OfficialWeeklyWorkPlan } from './official-weekly-work-plan';
 import useSWR from 'swr';
 import { AlertTriangle, CalendarDays, CheckCircle2, PackageSearch, RefreshCw, Wrench } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
@@ -182,6 +183,8 @@ export function WeeklyMaintenancePlanning() {
         </Card>)}
       </div>}
     </section>
+
+    <OfficialWeeklyWorkPlan />
 
     <Card className="shadow-none">
       <CardHeader><CardTitle className="text-base">Después de esta semana</CardTitle></CardHeader>
