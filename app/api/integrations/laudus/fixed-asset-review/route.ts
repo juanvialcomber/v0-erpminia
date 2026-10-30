@@ -129,6 +129,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       readOnly: true,
+      canReview: access.canWrite,
       source: 'Laudus + MOTIL',
       summary: {
         laudusAssets: n(summary.laudus_assets),
