@@ -10,7 +10,7 @@ import {Textarea} from '@/components/ui/textarea';
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
 import Link from 'next/link';
 
-type Decision={id:string;source_kind:string;source_id:string;title:string;description:string|null;work_type:string;priority:string;scheduled_date:string|null;planned_duration_hours:number|null;assigned_person_id:string|null;decision_status:string;revision:number;linked_work_order_id:string|null};
+type Decision={id:string;source_kind:string;source_id:string;canonical_asset_id:string|null;title:string;description:string|null;work_type:string;priority:string;scheduled_date:string|null;planned_duration_hours:number|null;assigned_person_id:string|null;decision_status:string;revision:number;linked_work_order_id:string|null};
 type Person={id:string;full_name:string;role_title:string|null};
 const fetcher=async(url:string)=>{const r=await apiFetch(url);const d=await r.json();if(!r.ok)throw Error(d.error||'No disponible');return d;};
 type Props={sourceKind:'official_weekly'|'preventive_priority';sourceId:string;title:string;scheduledDate:string|null;plannedHours:number|null;priority:'low'|'medium'|'high'|'critical';workType:'preventive'|'corrective'|'general';canonicalAssetId:string|null;onFinished?:()=>void};
