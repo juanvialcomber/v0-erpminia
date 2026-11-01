@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       .limit(1000),
     context.supabase
       .from('planning_maintenance_priority_v1')
-      .select('canonical_asset_id,asset_code,asset_name,mine_raw,meter_unit,interval_mp,current_reading_at,current_reading,remaining_meter,criticality_raw,priority,recommended_action,scheduled_date,programming_status_raw,responsible_raw,parts_status_raw,source_file,imported_at')
+      .select('source_row_id,canonical_asset_id,asset_code,asset_name,mine_raw,meter_unit,interval_mp,current_reading_at,current_reading,remaining_meter,criticality_raw,priority,recommended_action,scheduled_date,programming_status_raw,responsible_raw,parts_status_raw,source_file,imported_at')
       .eq('organization_id', context.organizationId)
       .in('priority', ['P1 - VENCIDO','P2 - INMEDIATO','P3 - PROGRAMAR','P4 - PLANIFICAR'])
       .limit(200),
@@ -216,6 +216,7 @@ export async function GET(request: NextRequest) {
         : null;
       const evidenceFreshness = readingAgeDays == null ? 'unknown' : readingAgeDays <= 30 ? 'current' : 'stale';
       return {
+        sourceRowId: row.source_row_id || null,
         canonicalAssetId: assetId || null,
         assetCode: row.asset_code || null,
         assetName: row.asset_name || row.asset_code || null,
