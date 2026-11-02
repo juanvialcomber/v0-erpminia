@@ -10,7 +10,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import { ProductionSourceSnapshot } from '@/components/production/production-source-snapshot';
 
-type SourceCutoff={stats:{cutoff:string|null;source:string|null;totalExtractedTons:number|null;plannedToDateTons:number|null;forecastEndMonthTons:number|null;fineExtractedTons:number|null};stock:{cutoff:string|null;source:string|null;plantStockTons:number|null;transportedWeekTons:number|null}};
+type SourceCutoff={stats:{cutoff:string|null;source:string|null;totalExtractedTons:number|null;plannedToDateTons:number|null;plannedMonthTons:number|null;forecastEndMonthTons:number|null;fineExtractedTons:number|null};stock:{cutoff:string|null;source:string|null;plantStockTons:number|null;transportedWeekTons:number|null}};
 
 type Overview = {
   counts: { materialMovements:number; plantShifts:number; metallurgyResults:number; concentrateShipments:number; drillingReports:number; drillingHoles:number };
@@ -62,8 +62,9 @@ export function ProduccionDashboard(){
   const pace=plan?.paceIndexPct ?? null;
   const paceLabel=pace===null?'—':pace>=97?'En ritmo':pace>=90?'Leve desvío':'Bajo ritmo';
   const sourceActual=sourceCutoff?.stats.totalExtractedTons??null;
-  const sourcePlan=sourceCutoff?.stats.plannedToDateTons??null;
-  const sourceDelta=sourceActual!==null&&sourcePlan!==null?sourceActual-sourcePlan:null;
+  const sourceMonthPlan=sourceCutoff?.stats.plannedMonthTons??null;
+  const sourceForecast=sourceCutoff?.stats.forecastEndMonthTons??null;
+  const sourceDelta=sourceForecast!==null&&sourceMonthPlan!==null?sourceForecast-sourceMonthPlan:null;
   const attentionSignal=data.intelligence.find(signal=>signal.level!=='info')||data.intelligence[0]||null;
   const reviewQueue=data.coverage.queue;
   const reviewTotal=reviewQueue.importExceptions+reviewQueue.movementNormalization+reviewQueue.movementValidation+reviewQueue.entityReconciliation+reviewQueue.plantShifts+reviewQueue.metallurgy+reviewQueue.drillLocations+data.quality.hold;
@@ -82,12 +83,12 @@ export function ProduccionDashboard(){
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué pasó</p>
         <p className="mt-2 text-sm font-medium">{sourceCutoff?.stats.cutoff?('Corte oficial al '+date(sourceCutoff.stats.cutoff)):'Sin corte operacional reciente acreditado'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceActual!==null?(tons(sourceActual,1)+' extraídas a planta · fino reportado '+tons(sourceCutoff?.stats.fineExtractedTons??0,2)):'MOTIL mantiene la ausencia de fuente como dato no disponible, no como cero.'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceActual!==null?(tons(sourceActual,1)+' extraídas a planta'+(sourceCutoff?.stats.fineExtractedTons!=null?' · fino reportado '+tons(sourceCutoff.stats.fineExtractedTons,2):'')):'MOTIL mantiene la ausencia de fuente como dato no disponible, no como cero.'}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué requiere atención</p>
-        <p className="mt-2 text-sm font-medium">{sourceDelta!==null?(sourceDelta>=0?'Extracción sobre plan a la fecha':'Extracción bajo plan a la fecha'):(attentionSignal?.title||'Sin señal actual calculable')}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceDelta!==null?((sourceDelta>=0?'+':'')+n(sourceDelta,1)+' t versus el plan informado al mismo corte. Dato fuente; no equivale a tratamiento ni recuperación.'):(attentionSignal?.detail||'No hay una comparación actual sustentada por la fuente disponible.')}</p>
+        <p className="mt-2 text-sm font-medium">{sourceDelta!==null?(sourceDelta>=0?'Proyección sobre plan mensual':'Proyección bajo plan mensual'):(attentionSignal?.title||'Sin señal actual calculable')}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceDelta!==null?((sourceDelta>=0?'+':'')+n(sourceDelta,1)+' t de proyección al cierre versus el plan mensual oficial. Dato fuente; no equivale a tratamiento ni recuperación.'):(attentionSignal?.detail||'No hay una comparación actual sustentada por la fuente disponible.')}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué validar</p>
