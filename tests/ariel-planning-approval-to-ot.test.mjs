@@ -25,6 +25,12 @@ test('approved proposal is required for linked OT, with stable idempotency and u
  assert.match(create,/planning_decision_id: planningDecisionId/);
  assert.match(migration,/maintenance_work_orders_one_per_planning_decision/);
  assert.match(editor,/Aprobar y generar OT/);
+ assert.match(editor,/Revisar y aprobar/);
+ assert.match(weekly,/Reportado terminado · revisar cierre/);
+ assert.match(weekly,/Listo para revisión de Ariel/);
+ assert.match(weekly,/assignedName=\{item\.assigned_name\}/);
+ assert.match(editor,/sourceAssignee/);
+ assert.match(weekly,/item\.title\.trim\(\)\.toLowerCase\(\)==='orden y aseo'\?'general'/);
 });
 test('no automatic OT on GET or preview and completed source does not generate OT',()=>{
  assert.doesNotMatch(read('app/api/maintenance/official-weekly-plan/route.ts'),/export async function POST/);
