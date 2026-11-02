@@ -81,9 +81,9 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 </div>
                 <div className="flex items-center gap-3">
                   <a href={primaryPhoto?.preview_url || primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="underline underline-offset-2">Abrir imagen</a>
-                  {primaryPhoto?.original_url ? (
-                    <a href={primaryPhoto.original_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
-                      <Download className="h-3.5 w-3.5" />Original
+                  {primaryPhoto?.download_url || primaryPhoto?.original_url ? (
+                    <a href={primaryPhoto.download_url || primaryPhoto.original_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+                      <Download className="h-3.5 w-3.5" />Descargar original
                     </a>
                   ) : null}
                 </div>
