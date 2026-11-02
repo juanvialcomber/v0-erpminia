@@ -84,3 +84,10 @@ test('OT evidence UI fails gracefully if a preview cannot render', () => {
   assert.match(component, /onError=\{\(\) => setFailed\(true\)\}/);
   assert.match(component, /Vista web no disponible\. El archivo original sigue conservado\./);
 });
+
+
+test('progressive close queue hides broken evidence thumbnails instead of showing broken images', () => {
+  assert.match(closeQueue, /function EvidenceThumbnail/);
+  assert.match(closeQueue, /onError=\{\(\) => setFailed\(true\)\}/);
+  assert.match(closeQueue, /Vista no disponible; el archivo original permanece guardado\./);
+});
