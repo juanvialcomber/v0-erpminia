@@ -557,6 +557,7 @@ function ScheduleSlide({ data }: { data: any }) {
 
 function FleetSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
+  const management = data?.management || {};
   const sites = useMemo(() => {
     const map = new Map<string, { total: number; stopped: number; operational: number; unknown: number; attention: number }>();
     for (const row of rows) {
@@ -572,26 +573,68 @@ function FleetSlide({ data }: { data: any }) {
     return [...map.entries()].map(([label, item]) => ({ label, ...item })).sort((a, b) => b.total - a.total);
   }, [rows]);
 
+  const reportedAvailability = management.availabilityMethod === 'reported_snapshot_v1'
+    ? Number(management.availabilityPct)
+    : null;
+  const reportedCoverage = management.availabilityMethod === 'reported_snapshot_v1'
+    ? Number(management.availabilityCoveragePct)
+    : null;
+
   return (
     <div className="grid h-full min-h-0 gap-3 p-3 xl:grid-cols-[1.15fr_.85fr] xl:[&>section]:min-h-0">
-      <Panel title="Disponibilidad de equipos por mina" subtitle="Estado reportado con evidencia · no equivale a disponibilidad horaria">
+      <Panel title="Control general de flota" subtitle="Estado actual por mina + disponibilidad reportada sólo donde existe denominador trazable">
+        {reportedAvailability !== null && Number.isFinite(reportedAvailability) ? (
+          <div className="mb-3 grid gap-3 rounded-lg border border-[var(--tower-copper)]/30 bg-[var(--tower-copper-soft)] p-4 md:grid-cols-[1.4fr_.8fr_.8fr_.8fr]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[var(--tower-ink-muted)]">Don Jaime · disponibilidad reportada</p>
+              <p className="mt-1 text-4xl font-semibold tabular-nums text-[var(--tower-copper)]">{number(reportedAvailability, 1)}%</p>
+              <p className="mt-1 text-sm text-[var(--tower-ink-muted)]">Snapshot diario · no equivale a disponibilidad horaria</p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--tower-ink-muted)]">Cobertura</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{Number.isFinite(reportedCoverage) ? `${number(reportedCoverage, 1)}%` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--tower-ink-muted)]">Indisponibles</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{number(management.availabilityCurrentUnavailable, 0)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-[var(--tower-ink-muted)]">Último corte</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{shortDate(management.availabilityLatestDate)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-3 rounded-lg border border-dashed p-3 text-sm text-[var(--tower-ink-muted)]">
+            Disponibilidad reportada Don Jaime: sin base clasificada todavía. Se muestran estados actuales sin convertirlos en porcentaje de disponibilidad.
+          </div>
+        )}
+
         {sites.length === 0 ? <EmptyState title="Sin equipos clasificados por mina" text="No hay registros con fuente suficiente." /> : null}
         <div className="space-y-2">
-          {sites.slice(0, 8).map((site) => {
-            const classified = site.operational + site.stopped;
-            const pct = classified > 0 ? Math.round(site.operational / classified * 100) : null;
-            return <div key={site.label} className="tower-detail-row rounded-md border border-border/60 p-2">
+          {sites.slice(0, 8).map((site) => (
+            <div key={site.label} className="tower-detail-row rounded-md border border-border/60 p-2">
               <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0"><div className="text-base font-semibold">{site.label}</div><div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div></div>
-                <div className="shrink-0 text-right"><div className="text-2xl font-semibold tabular-nums">{pct === null ? 'Sin dato' : `${pct}%`}</div><div className="text-sm text-[var(--tower-ink-muted)]">Sobre {classified} con estado conocido</div></div>
+                <div className="min-w-0">
+                  <div className="text-base font-semibold">{site.label}</div>
+                  <div className="mt-1 text-sm text-[var(--tower-ink-muted)]">{site.total} equipos registrados · {site.attention} requieren atención</div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-2xl font-semibold tabular-nums">{site.stopped}</div>
+                  <div className="text-sm text-[var(--tower-ink-muted)]">detenidos reportados</div>
+                </div>
               </div>
               <div className="mt-2 flex h-3 overflow-hidden rounded bg-muted">
                 <div className="bg-[var(--tower-green)]" style={{ width: `${site.total ? site.operational / site.total * 100 : 0}%` }} />
                 <div className="bg-destructive/80" style={{ width: `${site.total ? site.stopped / site.total * 100 : 0}%` }} />
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--tower-ink-muted)]"><span>{site.operational} operativos reportados</span><span>{site.stopped} detenidos</span><span>{site.unknown} sin estado confirmado</span></div>
-            </div>;
-          })}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--tower-ink-muted)]">
+                <span>{site.operational} operativos reportados</span>
+                <span>{site.stopped} detenidos</span>
+                <span>{site.unknown} sin estado confirmado</span>
+                <span>Sin % derivado de este snapshot</span>
+              </div>
+            </div>
+          ))}
         </div>
       </Panel>
       <Panel title="Equipos que requieren atención" subtitle="Prioridad, OT, repuestos y señal reciente">
