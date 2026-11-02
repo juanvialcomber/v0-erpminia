@@ -4,12 +4,16 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
 
-test('maintenance control tower is a true passive full-screen wallboard', () => {
+test('maintenance control tower is a full-screen read-only wallboard with presentation controls only', () => {
   assert.match(source, /fixed inset-0 z-\[9999\]/);
   assert.match(source, /Solo lectura/);
   assert.match(source, /createPortal/);
   assert.match(source, /document\.body/);
-  assert.doesNotMatch(source, /<Button|<Input|<Select|<form|onClick=/);
+  assert.doesNotMatch(source, /<Input|<Select|<form/);
+  assert.match(source, /aria-label="Vista anterior"/);
+  assert.match(source, /aria-label="Vista siguiente"/);
+  assert.match(source, /Pausar rotación/);
+  assert.match(source, /Pantalla completa/);
 });
 
 test('maintenance control tower keeps six fixed views and independent refresh cadence', () => {
@@ -186,4 +190,30 @@ test('fixed wallboard adapts row visibility automatically to viewport height', (
   assert.match(source, /max-height: 700px/);
   assert.match(source, /attention\.slice\(0, 6\)/);
   assert.match(source, /signals\.slice\(0, 6\)/);
+});
+
+
+test('wallboard TV controls support play pause next previous fullscreen and keyboard shortcuts', () => {
+  assert.match(source, /const \[isPlaying, setIsPlaying\] = useState\(true\)/);
+  assert.match(source, /goToSlide\(-1\)/);
+  assert.match(source, /goToSlide\(1\)/);
+  assert.match(source, /togglePlayback/);
+  assert.match(source, /requestFullscreen/);
+  assert.match(source, /event\.key === 'ArrowLeft'/);
+  assert.match(source, /event\.key === 'ArrowRight'/);
+  assert.match(source, /event\.code === 'Space'/);
+  assert.match(source, /event\.key\.toLowerCase\(\) === 'f'/);
+});
+
+test('wallboard exposes official weekly planning separately from canonical work orders', () => {
+  assert.match(api, /planning_weekly_work_sources/);
+  assert.match(api, /planning_weekly_work_items/);
+  assert.match(api, /weeklyPlanning/);
+  assert.match(api, /weeklyPlannedWorks/);
+  assert.match(api, /linkedWorkOrderNumber/);
+  assert.match(source, /Plan semanal oficial/);
+  assert.match(source, /planificación recibida de Ariel/);
+  assert.match(source, /no crea OT automáticamente/);
+  assert.match(source, /Órdenes en ejecución/);
+  assert.match(source, /Sin OT/);
 });
