@@ -33,8 +33,16 @@ type WaybillRow = {
   quality_flags: string[] | null;
 };
 
+type SourceFreshness = {
+  latestSync: string | null;
+  healthStatus: string;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+};
+
 type Payload = {
   summary: { invoices: number; waybills: number; visibleInvoices: number; visibleWaybills: number };
+  freshness: { invoices: SourceFreshness; waybills: SourceFreshness };
   invoices: InvoiceRow[];
   waybills: WaybillRow[];
 };
@@ -71,13 +79,23 @@ export function LaudusPurchaseDocuments() {
     return `${row.doc_number || ''} ${row.supplier_name || ''} ${row.supplier_tax_id || ''} ${row.warehouse_name || ''} ${row.notes || ''}`.toLowerCase().includes(needle);
   }), [data?.waybills, needle]);
 
+  const activeFreshness = data?.freshness?.[mode];
+
   return (
     <Card className="shadow-none">
       <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <CardTitle>Histórico Laudus</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle>Histórico Laudus</CardTitle>
+              {activeFreshness ? (
+                <Badge variant={activeFreshness.healthStatus === 'healthy' ? 'secondary' : activeFreshness.healthStatus === 'broken' ? 'destructive' : 'outline'}>
+                  {activeFreshness.healthStatus === 'healthy' ? 'Actualizado' : activeFreshness.healthStatus === 'broken' ? 'Sync interrumpido' : 'Revisar sync'}
+                </Badge>
+              ) : null}
+            </div>
             <CardDescription>Consulta de facturas y guías ya alojadas en MOTIL. Sólo lectura; Laudus conserva autoridad documental.</CardDescription>
+            {activeFreshness?.latestSync ? <p className="mt-1 text-xs text-muted-foreground">Última copia disponible: {new Date(activeFreshness.latestSync).toLocaleString('es-CL')}</p> : null}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => setMode('invoices')} className={`rounded-md border px-3 py-1.5 text-xs font-medium ${mode === 'invoices' ? 'bg-foreground text-background' : 'bg-background'}`}>
@@ -96,6 +114,11 @@ export function LaudusPurchaseDocuments() {
         </div>
 
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
+        {activeFreshness && activeFreshness.healthStatus !== 'healthy' ? (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+            Estos documentos permanecen consultables como histórico, pero la sincronización actual requiere revisión.{activeFreshness.lastError ? ` ${activeFreshness.lastError}` : ''}
+          </p>
+        ) : null}
         {isLoading ? <p className="text-sm text-muted-foreground">Cargando histórico Laudus…</p> : null}
 
         {!isLoading && !error && mode === 'invoices' ? (
