@@ -9,6 +9,37 @@ import {
 const BANK_STATEMENT_PATH = '/accounting/bankStatements/list';
 const BANK_STATEMENT_FIELDS = ['bankStatementId','number','year','dateFrom','dateTo','initialBalance','modifiedAt','bank.bankId','bank.name','bank.account','bank.currencyCode'] as const;
 
+function readField(row: Record<string, unknown>, dotted: string) {
+  const flat = dotted.replace(/\./g, '_');
+  if (row[flat] !== undefined) return row[flat];
+  if (row[dotted] !== undefined) return row[dotted];
+  let current: any = row;
+  for (const key of dotted.split('.')) {
+    if (!current || typeof current !== 'object') return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function normalizeStatement(row: Record<string, unknown>) {
+  return {
+    ...row,
+    bankStatementId: readField(row, 'bankStatementId') ?? null,
+    number: readField(row, 'number') ?? null,
+    year: readField(row, 'year') ?? null,
+    dateFrom: readField(row, 'dateFrom') ?? null,
+    dateTo: readField(row, 'dateTo') ?? null,
+    initialBalance: readField(row, 'initialBalance') ?? null,
+    modifiedAt: readField(row, 'modifiedAt') ?? null,
+    bank: {
+      bankId: readField(row, 'bank.bankId') ?? null,
+      name: readField(row, 'bank.name') ?? null,
+      account: readField(row, 'bank.account') ?? null,
+      currencyCode: readField(row, 'bank.currencyCode') ?? null,
+    },
+  };
+}
+
 function rowsFromPayload(payload: unknown): Record<string, unknown>[] {
   const rows =
     Array.isArray(payload) ? payload :
@@ -37,7 +68,7 @@ export async function syncLaudusBankStatements(
     });
     apiCalls += 1;
 
-    const rows = rowsFromPayload(payload);
+    const rows = rowsFromPayload(payload).map(normalizeStatement);
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
       p_accounting_entries: [],
