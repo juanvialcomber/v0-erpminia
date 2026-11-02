@@ -56,7 +56,7 @@ export function ArielPlanningEditor(props:Props){
  }
  if(decision?.decision_status==='generated'&&decision.linked_work_order_id)return <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${decision.linked_work_order_id}`}>Abrir OT</Link></Button>;
  if(!result?.canWrite)return <span className="text-xs text-muted-foreground">Solo lectura</span>;
- if(!editing)return <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={()=>setEditing(true)}>Editar propuesta</Button>{decision?.decision_status==='approved'?<span className="text-xs text-amber-600">Aprobada, OT pendiente</span>:null}</div>;
+ if(!editing)return <div className="flex flex-wrap items-center gap-2"><Button size="sm" onClick={()=>setEditing(true)}>Revisar y aprobar</Button>{decision?.decision_status==='approved'?<span className="text-xs text-amber-600">Aprobada, OT pendiente</span>:<span className="text-xs text-muted-foreground">Confirmar ejecutor y generar OT</span>}</div>;
  return <div className="w-full space-y-3 rounded-lg border p-3">
   <div className="grid gap-2">
    <Label>Trabajo</Label><Input value={title} onChange={e=>setName(e.target.value)} maxLength={240}/>
