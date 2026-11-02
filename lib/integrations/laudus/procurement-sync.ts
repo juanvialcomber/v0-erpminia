@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudus } from '@/lib/integrations/laudus/client';
+import { listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -84,12 +84,12 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
   let partial = false;
 
   for (let page = 0; page < maxPages; page += 1) {
-    const payload = await listLaudus(path, {
+    const listed = await listLaudusWithOrderFallback(path, {
       options: { offset: page * 100, limit: 100 },
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
-    calls += 1;
-    const pageRows = rowsFrom(payload);
+    calls += listed.apiCalls;
+    const pageRows = rowsFrom(listed.payload);
     rows.push(...pageRows);
 
     if (pageRows.length < 100) return { rows, calls, partial: false };
@@ -105,12 +105,12 @@ async function listAllSuppliers() {
   let partial = false;
 
   for (let page = 0; page < 25; page += 1) {
-    const payload = await listLaudus('/purchases/suppliers/list', {
+    const listed = await listLaudusWithOrderFallback('/purchases/suppliers/list', {
       options: { offset: page * 100, limit: 100 },
       orderBy: [{ field: 'supplierId', direction: 'DESC' }],
     });
-    calls += 1;
-    const pageRows = rowsFrom(payload);
+    calls += listed.apiCalls;
+    const pageRows = rowsFrom(listed.payload);
     rows.push(...pageRows);
 
     if (pageRows.length < 100) return { rows, calls, partial: false };
