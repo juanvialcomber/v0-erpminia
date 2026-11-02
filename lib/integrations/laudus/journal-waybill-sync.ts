@@ -10,11 +10,15 @@ type JsonRow = Record<string, any>;
 
 const ACCOUNTING_ENTRY_FIELDS = [
   'journalEntryId','journalEntryNumber','date','type','typeNumber','approved',
-  'generated','generatedBy','bookId','notes','createdAt','modifiedAt','lines',
+  'generated','generatedBy','bookId','notes','createdAt','modifiedAt',
 ] as const;
 
 const WAYBILL_FIELDS = [
-  'purchaseWaybillId','docNumber','supplier','warehouse','issuedDate','notes','modifiedAt','items',
+  'purchaseWaybillId','docNumber','issuedDate','notes','modifiedAt',
+  'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+  'warehouse.warehouseId','warehouse.name',
+  'items.itemId','items.product.productId','items.product.sku',
+  'items.product.description','items.product.unitOfMeasure','items.quantity',
 ] as const;
 
 function rowsFrom(payload: unknown): JsonRow[] {
@@ -29,6 +33,19 @@ function rowsFrom(payload: unknown): JsonRow[] {
     }
   }
   return [];
+}
+
+function readField(row: JsonRow, dotted: string) {
+  const flat = dotted.replace(/\./g, '_');
+  if (row[flat] !== undefined) return row[flat];
+  if (row[dotted] !== undefined) return row[dotted];
+
+  let current: any = row;
+  for (const key of dotted.split('.')) {
+    if (!current || typeof current !== 'object') return undefined;
+    current = current[key];
+  }
+  return current;
 }
 
 async function listRecent(path: string, fields: readonly string[], orderField: string, maxPages = 2) {
@@ -53,36 +70,50 @@ async function listRecent(path: string, fields: readonly string[], orderField: s
 }
 
 function flattenWaybill(row: JsonRow): JsonRow[] {
-  const supplier = row.supplier && typeof row.supplier === 'object' ? row.supplier : {};
-  const warehouse = row.warehouse && typeof row.warehouse === 'object' ? row.warehouse : {};
-  const items = Array.isArray(row.items) ? row.items : [];
-
   const base = {
-    purchaseWaybillId: row.purchaseWaybillId ?? row.id ?? null,
-    docNumber: row.docNumber ?? null,
-    issuedDate: row.issuedDate ?? null,
-    supplier_supplierId: supplier.supplierId ?? row.supplierId ?? null,
-    supplier_name: supplier.name ?? row.supplierName ?? null,
-    supplier_legalName: supplier.legalName ?? row.supplierLegalName ?? null,
-    supplier_VATId: supplier.VATId ?? supplier.vatId ?? row.supplierVATId ?? null,
-    warehouse_warehouseId: warehouse.warehouseId ?? row.warehouseId ?? null,
-    warehouse_name: warehouse.name ?? row.warehouseName ?? null,
+    purchaseWaybillId: readField(row, 'purchaseWaybillId') ?? row.id ?? null,
+    docNumber: readField(row, 'docNumber') ?? null,
+    issuedDate: readField(row, 'issuedDate') ?? null,
+    supplier_supplierId: readField(row, 'supplier.supplierId') ?? null,
+    supplier_name: readField(row, 'supplier.name') ?? null,
+    supplier_legalName: readField(row, 'supplier.legalName') ?? null,
+    supplier_VATId: readField(row, 'supplier.VATId') ?? null,
+    warehouse_warehouseId: readField(row, 'warehouse.warehouseId') ?? null,
+    warehouse_name: readField(row, 'warehouse.name') ?? null,
   };
 
-  if (items.length === 0) return [base];
+  const items = Array.isArray(row.items) ? row.items : [];
+  if (items.length) {
+    return items.map((item: JsonRow) => {
+      const product = item.product && typeof item.product === 'object' ? item.product : {};
+      return {
+        ...base,
+        items_itemId: item.itemId ?? null,
+        items_product_productId: product.productId ?? item.productId ?? null,
+        items_product_sku: product.sku ?? product.SKU ?? item.sku ?? item.SKU ?? null,
+        items_product_description: product.description ?? item.description ?? null,
+        items_product_unitOfMeasure: product.unitOfMeasure ?? item.unitOfMeasure ?? null,
+        items_quantity: item.quantity ?? null,
+      };
+    });
+  }
 
-  return items.map((item: JsonRow) => {
-    const product = item.product && typeof item.product === 'object' ? item.product : {};
-    return {
+  const itemId = readField(row, 'items.itemId');
+  const productId = readField(row, 'items.product.productId');
+  const sku = readField(row, 'items.product.sku');
+  if (itemId != null || productId != null || sku != null) {
+    return [{
       ...base,
-      items_itemId: item.itemId ?? null,
-      items_product_productId: product.productId ?? item.productId ?? null,
-      items_product_sku: product.sku ?? item.sku ?? null,
-      items_product_description: product.description ?? item.description ?? null,
-      items_product_unitOfMeasure: product.unitOfMeasure ?? item.unitOfMeasure ?? null,
-      items_quantity: item.quantity ?? null,
-    };
-  });
+      items_itemId: itemId ?? null,
+      items_product_productId: productId ?? null,
+      items_product_sku: sku ?? null,
+      items_product_description: readField(row, 'items.product.description') ?? null,
+      items_product_unitOfMeasure: readField(row, 'items.product.unitOfMeasure') ?? null,
+      items_quantity: readField(row, 'items.quantity') ?? null,
+    }];
+  }
+
+  return [base];
 }
 
 export async function syncLaudusAccountingEntries(organizationId: string, db: SupabaseClient) {
