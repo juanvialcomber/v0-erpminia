@@ -6,6 +6,7 @@ import { Calculator, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type EconomicsRow = {
   canonicalAssetId: string | null;
@@ -58,7 +59,7 @@ export function LaudusFixedAssetEconomicsCard() {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía Laudus</CardTitle>
+            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact /><CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía Laudus</CardTitle></div>
             <CardDescription>Costo de adquisición, vida útil y depreciación recuperados en lectura para candidatos de identidad fuerte.</CardDescription>
           </div>
           <div className="flex items-center gap-2"><Badge variant="outline">Sólo lectura</Badge><Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>{enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}</Button></div>
