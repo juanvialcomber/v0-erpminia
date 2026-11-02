@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
 import { formatWorkOrderNumber } from '@/lib/maintenance/work-order-display';
+import { optimizeEvidencePhoto } from '@/lib/maintenance/optimize-evidence-photo';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 type EvidenceResponse = {
@@ -185,7 +186,9 @@ export function MobileWorkOrderFlow({
     setMessage(null);
     try {
       const supabase = createSupabaseClient();
-      for (const file of Array.from(files)) {
+      for (const sourceFile of Array.from(files)) {
+        const optimized = await optimizeEvidencePhoto(sourceFile);
+        const file = optimized.file;
         const prepareResponse = await fetch(`/api/maintenance/work-orders/${workOrderId}/evidence`, {
           method: 'POST',
           credentials: 'include',
@@ -241,6 +244,7 @@ export function MobileWorkOrderFlow({
         if (!completeResponse.ok) throw new Error(completed?.error || 'La foto subió, pero no se pudo registrar.');
       }
       await mutateEvidence();
+      toast.success('Fotos cargadas', { description: 'Las imágenes grandes se optimizan automáticamente antes de subir.' });
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo guardar la evidencia.');
     } finally {
