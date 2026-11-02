@@ -68,6 +68,16 @@ test('coverage uses expected Base Equipos gaps and unresolved assets never enter
   assert.match(importer, /reportedCanonicalIds/);
 });
 
+test('coverage denominator is deduplicated by expected equipment observation, not raw rows', () => {
+  assert.match(reportedApi, /expectedObservationKey/);
+  assert.match(reportedApi, /expectedObservationKeys/);
+  assert.match(reportedApi, /expectedObservations/);
+  assert.match(reportedApi, /evidenceCoveragePercentage: pct\(classifiedRows\.length, expectedObservations\)/);
+  assert.match(reportedApi, /unresolvedReportedRows/);
+  assert.match(ui, /observaciones esperadas/);
+  assert.match(ui, /sin identidad canónica/);
+});
+
 test('reported availability keeps STANDBY and unknown evidence out of the denominator', () => {
   assert.match(importer, /status === 'STANDBY'/);
   assert.match(importer, /classification: 'review_required'/);
