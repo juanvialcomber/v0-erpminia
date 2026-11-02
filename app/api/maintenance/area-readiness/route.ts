@@ -97,6 +97,24 @@ export async function GET(request:NextRequest){
     const prod=productionSource.data;
     const auth=bodegaAuthority.data;
     const rec=bodegaReconciliation.data;
+    const {data:mineSourceRows,error:mineSourceError}=prod?.source_file
+      ? await db.from('production_source_normalized_records')
+          .select('record_type,normalized_values')
+          .eq('organization_id',context.organizationId)
+          .eq('source_file',prod.source_file)
+          .eq('semantic_status','source_reported')
+          .in('record_type',['extraction_actual_peumo','extraction_plan_peumo','extraction_actual_don_jaime','extraction_plan_don_jaime'])
+      : {data:[],error:null};
+    if(mineSourceError)throw mineSourceError;
+    const mineValue=(recordType:string)=>{
+      const row=(mineSourceRows||[]).find(item=>item.record_type===recordType);
+      const raw=(row?.normalized_values as {value?:unknown}|null)?.value;
+      return typeof raw==='number'&&Number.isFinite(raw)?raw:null;
+    };
+    const peumoActual=mineValue('extraction_actual_peumo');
+    const peumoPlan=mineValue('extraction_plan_peumo');
+    const jaimeActual=mineValue('extraction_actual_don_jaime');
+    const jaimePlan=mineValue('extraction_plan_don_jaime');
 
     const areas:Array<{key:string;name:string;status:AreaStatus;cutoff:string|null;facts:string[];nextAction:string;href:string}>=[
       {
@@ -109,6 +127,18 @@ export async function GET(request:NextRequest){
         key:'production',name:'Producción',status:prod?.period_end?'current_source':'awaiting_source',cutoff:prod?.period_end||null,
         facts:[prod?.source_file||'Sin estadística canónica reciente',`${productionHold} controles de calidad por revisar`],
         nextAction:productionHold>0?'Validar controles de calidad del corte actual':'Revisar resumen del último corte',
+        href:'/dashboard/produccion',
+      },
+      {
+        key:'mine-peumo',name:'Mina Peumo',status:peumoActual!==null?'current_source':'awaiting_source',cutoff:prod?.period_end||null,
+        facts:[peumoActual===null?'Sin extracción actual acreditada':`${peumoActual.toLocaleString('es-CL',{maximumFractionDigits:1})} t extraídas a planta`,peumoPlan===null?'Sin plan comparable en la fuente':`${peumoPlan.toLocaleString('es-CL',{maximumFractionDigits:1})} t planificadas al corte`],
+        nextAction:'Validar extracción, sectores y trabajos del corte con Jefatura de Mina',
+        href:'/dashboard/produccion',
+      },
+      {
+        key:'mine-don-jaime',name:'Mina Don Jaime',status:jaimeActual!==null?'current_source':'awaiting_source',cutoff:prod?.period_end||null,
+        facts:[jaimeActual===null?'Sin extracción actual acreditada':`${jaimeActual.toLocaleString('es-CL',{maximumFractionDigits:1})} t extraídas a planta`,jaimePlan===null?'Sin plan comparable en la fuente':`${jaimePlan.toLocaleString('es-CL',{maximumFractionDigits:1})} t planificadas al corte`],
+        nextAction:'Validar extracción, sectores y trabajos del corte con Jefatura de Mina',
         href:'/dashboard/produccion',
       },
       {
