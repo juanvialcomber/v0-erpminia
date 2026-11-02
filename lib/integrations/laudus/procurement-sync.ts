@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
+import { LaudusApiError, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -7,6 +7,18 @@ import {
 } from '@/lib/integrations/laudus/sync-policy';
 
 type JsonRow = Record<string, any>;
+
+const ORDER_FIELDS = [
+  'purchaseOrderId','supplier','issuedDate','dueDate','status','warehouse','notes','modifiedAt','items',
+] as const;
+
+const INVOICE_FIELDS = [
+  'purchaseInvoiceId','docNumber','supplier','warehouse','issuedDate','dueDate','totals','modifiedAt','items',
+] as const;
+
+const PAYMENT_FIELDS = [
+  'paymentId','paymentType','issuedDate','dueDate','document','deposited','bank','notes','modifiedAt','purchaseInvoices',
+] as const;
 
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) return payload.filter((row): row is JsonRow => Boolean(row && typeof row === 'object' && !Array.isArray(row)));
@@ -78,7 +90,7 @@ function paymentRows(row: JsonRow): JsonRow[] {
   }));
 }
 
-async function listRecent(path: string, orderField: string, maxPages = 2) {
+async function listRecent(path: string, fields: readonly string[], orderField: string, maxPages = 2) {
   const rows: JsonRow[] = [];
   let calls = 0;
   let partial = false;
@@ -86,6 +98,7 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
   for (let page = 0; page < maxPages; page += 1) {
     const listed = await listLaudusWithOrderFallback(path, {
       options: { offset: page * 100, limit: 100 },
+      fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
     calls += listed.apiCalls;
@@ -173,9 +186,9 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
 
   try {
     const [orders, invoices, payments] = await Promise.all([
-      listRecent('/purchases/orders/list', 'issuedDate', 2),
-      listRecent('/purchases/invoices/list', 'issuedDate', 2),
-      listRecent('/purchases/payments/list', 'issuedDate', 2),
+      listRecent('/purchases/orders/list', ORDER_FIELDS, 'modifiedAt', 2),
+      listRecent('/purchases/invoices/list', INVOICE_FIELDS, 'modifiedAt', 2),
+      listRecent('/purchases/payments/list', PAYMENT_FIELDS, 'modifiedAt', 2),
     ]);
 
     apiCalls += orders.calls + invoices.calls + payments.calls;
@@ -241,7 +254,12 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       accountsPayableDerived: true,
     };
   } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
+    await markLaudusSyncFailure(db, organizationId, 'procurement', error, {
+      apiCalls,
+      metadata: error instanceof LaudusApiError
+        ? { path: error.path, status: error.status, upstreamCode: error.upstreamCode, readOnly: true }
+        : { readOnly: true },
+    });
     throw error;
   }
 }
