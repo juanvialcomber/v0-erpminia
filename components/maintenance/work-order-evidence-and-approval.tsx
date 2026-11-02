@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle2, Download, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -19,7 +19,12 @@ function formatDate(value?: string | null) {
 }
 
 export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrderId: string; status?: string | null }) {
-  const evidence = useSWR(`/api/maintenance/work-orders/${workOrderId}/evidence`, fetcher);
+  const evidence = useSWR(`/api/maintenance/work-orders/${workOrderId}/evidence`, fetcher, {
+    refreshInterval: 10 * 60 * 1000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 15_000,
+  });
   const review = useSWR(status === 'completed' ? `/api/maintenance/work-orders/${workOrderId}/review` : null, fetcher);
 
   const photos = evidence.data?.evidence || [];
@@ -62,26 +67,40 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
         <CardContent>
           {photos.length ? (
             <div className="space-y-3">
-              <a href={primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted">
-                {primaryPhoto?.signed_url ? (
+              <a href={primaryPhoto?.preview_url || primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted">
+                {primaryPhoto?.preview_url || primaryPhoto?.signed_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={primaryPhoto.signed_url} alt={primaryPhoto.file_name || 'Evidencia principal de OT'} className="max-h-[560px] w-full object-contain" />
+                  <img src={primaryPhoto.preview_url || primaryPhoto.signed_url} alt={primaryPhoto.file_name || 'Evidencia principal de OT'} className="max-h-[560px] w-full object-contain" />
                 ) : <div className="flex min-h-64 items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground" /></div>}
               </a>
-              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <span>{formatDate(primaryPhoto?.created_at)}</span>
-                <span>Abrir imagen completa</span>
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span>{formatDate(primaryPhoto?.created_at)}</span>
+                  {primaryPhoto?.preview_transformed ? <span className="rounded border px-2 py-0.5">HEIC · vista web</span> : null}
+                  {primaryPhoto?.preview_error ? <span className="text-destructive">{primaryPhoto.preview_error}</span> : null}
+                </div>
+                <div className="flex items-center gap-3">
+                  <a href={primaryPhoto?.preview_url || primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="underline underline-offset-2">Abrir imagen</a>
+                  {primaryPhoto?.original_url ? (
+                    <a href={primaryPhoto.original_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+                      <Download className="h-3.5 w-3.5" />Original
+                    </a>
+                  ) : null}
+                </div>
               </div>
               {photos.length > 1 ? (
                 <div className="flex gap-2 overflow-x-auto pb-2 print:hidden" aria-label="Miniaturas de evidencia">
-                  {photos.map((photo: { id: string; file_name?: string | null; signed_url?: string | null }, index: number) => (
-                    <button key={photo.id} type="button" onClick={() => setSelectedPhotoId(photo.id)} aria-label={`Ver fotografía ${index + 1}`} aria-pressed={photo.id === primaryPhoto?.id} className={`h-20 w-24 shrink-0 overflow-hidden rounded-md border-2 bg-muted ${photo.id === primaryPhoto?.id ? 'border-primary' : 'border-transparent'}`}>
-                      {photo.signed_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photo.signed_url} alt={photo.file_name || `Evidencia ${index + 1}`} className="h-full w-full object-cover" />
-                      ) : <ImageIcon className="mx-auto h-6 w-6 text-muted-foreground" />}
-                    </button>
-                  ))}
+                  {photos.map((photo: { id: string; file_name?: string | null; signed_url?: string | null; preview_url?: string | null; thumbnail_url?: string | null }, index: number) => {
+                    const thumbnail = photo.thumbnail_url || photo.preview_url || photo.signed_url || null;
+                    return (
+                      <button key={photo.id} type="button" onClick={() => setSelectedPhotoId(photo.id)} aria-label={`Ver fotografía ${index + 1}`} aria-pressed={photo.id === primaryPhoto?.id} className={`h-20 w-24 shrink-0 overflow-hidden rounded-md border-2 bg-muted ${photo.id === primaryPhoto?.id ? 'border-primary' : 'border-transparent'}`}>
+                        {thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumbnail} alt={photo.file_name || `Evidencia ${index + 1}`} className="h-full w-full object-cover" />
+                        ) : <ImageIcon className="mx-auto h-6 w-6 text-muted-foreground" />}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
