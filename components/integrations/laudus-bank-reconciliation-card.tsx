@@ -28,10 +28,32 @@ const money = (value: number) => new Intl.NumberFormat('es-CL', { style: 'curren
 
 export function LaudusBankReconciliationCard() {
   const [enabled, setEnabled] = useState(false);
-  const { data, error, isLoading } = useSWR<Payload>(enabled ? '/api/integrations/laudus/bank-reconciliation' : null, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<Payload>(enabled ? '/api/integrations/laudus/bank-reconciliation' : null, fetcher, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState('');
+
+  const refreshStatements = async () => {
+    setRefreshing(true);
+    setRefreshMessage('');
+    try {
+      const response = await fetch('/api/integrations/laudus/bank-statements-sync', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudieron actualizar cartolas Laudus');
+      setRefreshMessage(`Cartolas actualizadas · ${Number(payload?.processed || 0).toLocaleString('es-CL')} registros`);
+      setEnabled(true);
+      await mutate();
+    } catch (cause) {
+      setRefreshMessage(cause instanceof Error ? cause.message : 'No se pudieron actualizar cartolas Laudus');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <Card className="shadow-none">
@@ -44,13 +66,19 @@ export function LaudusBankReconciliationCard() {
             </div>
             <CardDescription>Consulta bajo demanda de diferencias banco ↔ libro. No contabiliza ni concilia automáticamente.</CardDescription>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
-            {enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
+              {enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void refreshStatements()} disabled={refreshing}>
+              {refreshing ? 'Actualizando…' : 'Actualizar cartolas'}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {!enabled ? <p className="text-sm text-muted-foreground">Se consulta sólo cuando se necesita para proteger el cupo mensual de la API.</p> : null}
+        {refreshMessage ? <p className="text-xs text-muted-foreground">{refreshMessage}</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data?.status === 'empty' ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">Laudus no devolvió una cartola bancaria disponible para conciliar.</p> : null}
         {data?.status === 'available' ? (
