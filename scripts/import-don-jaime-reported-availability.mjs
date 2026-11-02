@@ -277,7 +277,7 @@ async function main() {
                      gmail_message_id=coalesce(excluded.gmail_message_id,maintenance_reported_availability_sources.gmail_message_id),
                      received_at=coalesce(excluded.received_at,maintenance_reported_availability_sources.received_at),
                      source_owner=coalesce(excluded.source_owner,maintenance_reported_availability_sources.source_owner),
-                     is_current=true,status=excluded.status
+                     is_current=excluded.is_current,status=excluded.status
        returning id`,
       [
         args.organizationId,
