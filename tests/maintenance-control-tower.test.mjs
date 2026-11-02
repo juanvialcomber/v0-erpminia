@@ -71,7 +71,10 @@ test('wallboard remains operationally read-only while allowing presentation cont
 test('wallboard publishes availability only from the reported snapshot denominator', () => {
   assert.match(api, /maintenance_reported_availability_daily_v1/);
   assert.match(api, /reportedAvailabilityClassified/);
+  assert.match(api, /reportedAvailabilityExpectedKeys/);
+  assert.match(api, /reportedAvailabilityExpected/);
   assert.match(api, /availabilityMethod: reportedAvailabilityPct == null \? null : 'reported_snapshot_v1'/);
+  assert.match(api, /observaciones esperadas clasificadas/);
   assert.match(api, /no equivale a disponibilidad horaria/);
   assert.match(page, /Don Jaime · disponibilidad reportada/);
   assert.match(page, /Sin % derivado de este snapshot/);
