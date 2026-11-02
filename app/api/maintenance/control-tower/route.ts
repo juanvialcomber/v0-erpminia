@@ -225,6 +225,25 @@ export async function GET(request: NextRequest) {
       weeklyWorkItems = weeklyItemsResult.data || [];
     }
 
+    let reportedAvailabilityRows: any[] = [];
+    const reportedAvailabilityResult = await context.supabase
+      .from('maintenance_reported_availability_daily_v1')
+      .select('reported_date,availability_classification,availability_numerator,availability_denominator')
+      .eq('organization_id', context.organizationId)
+      .eq('mine', 'Don Jaime')
+      .gte('reported_date', santiagoDay(-29))
+      .lte('reported_date', santiagoDay())
+      .order('reported_date', { ascending: true })
+      .limit(5000);
+    if (reportedAvailabilityResult.error) {
+      const availabilityError = String(reportedAvailabilityResult.error.message || '');
+      if (!/maintenance_reported_availability_daily_v1|schema cache|does not exist|relation/i.test(availabilityError)) {
+        throw reportedAvailabilityResult.error;
+      }
+    } else {
+      reportedAvailabilityRows = reportedAvailabilityResult.data || [];
+    }
+
     const assets = assetsResult.data || [];
     const planningRows = planningResult.data || [];
     const emailRows = emailResult.data || [];
@@ -712,6 +731,22 @@ export async function GET(request: NextRequest) {
     const preventiveCompleted = completedWorkOrders.filter((order) => String(order.work_type).toLowerCase() === 'preventive').length;
     const correctiveCompleted = completedWorkOrders.filter((order) => String(order.work_type).toLowerCase() === 'corrective').length;
 
+    const reportedAvailabilityClassified = reportedAvailabilityRows.filter((row: any) => Number(row.availability_denominator || 0) === 1);
+    const reportedAvailabilityAvailable = reportedAvailabilityClassified.filter((row: any) => Number(row.availability_numerator || 0) === 1);
+    const reportedAvailabilityPct = reportedAvailabilityClassified.length
+      ? Math.round((reportedAvailabilityAvailable.length / reportedAvailabilityClassified.length) * 1000) / 10
+      : null;
+    const reportedAvailabilityCoveragePct = reportedAvailabilityRows.length
+      ? Math.round((reportedAvailabilityClassified.length / reportedAvailabilityRows.length) * 1000) / 10
+      : null;
+    const reportedAvailabilityLatestDate = newest(...reportedAvailabilityRows.map((row: any) => textValue(row.reported_date)));
+    const reportedAvailabilityLatestRows = reportedAvailabilityLatestDate
+      ? reportedAvailabilityRows.filter((row: any) => textValue(row.reported_date) === reportedAvailabilityLatestDate)
+      : [];
+    const reportedAvailabilityCurrentUnavailable = reportedAvailabilityLatestRows.filter(
+      (row: any) => row.availability_classification === 'unavailable'
+    ).length;
+
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       refreshSeconds: 60,
@@ -807,8 +842,15 @@ export async function GET(request: NextRequest) {
         preventiveCompleted,
         correctiveCompleted,
         recordedDowntimeHours: workOrders.reduce((sum, order) => sum + (numberValue(order.down_time_hours) || 0), 0) || null,
-        availabilityPct: null,
-        availabilityBasis: 'Sin base canónica de disponibilidad diaria',
+        availabilityPct: reportedAvailabilityPct,
+        availabilityCoveragePct: reportedAvailabilityCoveragePct,
+        availabilityMethod: reportedAvailabilityPct == null ? null : 'reported_snapshot_v1',
+        availabilityMine: 'Don Jaime',
+        availabilityLatestDate: reportedAvailabilityLatestDate,
+        availabilityCurrentUnavailable: reportedAvailabilityCurrentUnavailable,
+        availabilityBasis: reportedAvailabilityPct == null
+          ? 'Sin base de disponibilidad reportada validada'
+          : `Disponibilidad reportada Don Jaime · ${reportedAvailabilityClassified.length}/${reportedAvailabilityRows.length} observaciones clasificables · no equivale a disponibilidad horaria`,
       },
       inventory: {
         source: 'bodega_inventory',
