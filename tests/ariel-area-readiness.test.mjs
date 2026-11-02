@@ -22,3 +22,13 @@ test('area workspace exposes evidence gap and next action with human authority',
   assert.match(page,/Cada jefe valida su propia información/);
   assert.match(planning,/\/dashboard\/mantenimiento\/areas/);
 });
+
+test('Ariel area readiness phase 2 includes people HSE and legal evidence',()=>{
+  assert.match(route,/from\('people'\)/);
+  assert.match(route,/sostenibilidad_nonconformances/);
+  assert.match(route,/legal_cases/);
+  assert.match(route,/name:'RRHH'/);
+  assert.match(route,/name:'Sostenibilidad \/ HSE'/);
+  assert.match(route,/name:'Legal'/);
+  assert.match(route,/evidencia candidata no acredita aplicabilidad ni cumplimiento/i);
+});
