@@ -56,9 +56,12 @@ test('wallboard rotates six operational views every thirty seconds and refreshes
   assert.match(api, /rotationSeconds: 30/);
 });
 
-test('wallboard remains informational only', () => {
+test('wallboard remains operationally read-only while allowing presentation controls', () => {
   assert.match(page, /Solo lectura/);
-  assert.doesNotMatch(page, /onClick=/);
+  assert.match(page, /aria-label="Vista anterior"/);
+  assert.match(page, /aria-label="Vista siguiente"/);
+  assert.match(page, /Pausar rotación/);
+  assert.match(page, /Pantalla completa/);
   assert.doesNotMatch(page, /<Button/);
   assert.doesNotMatch(page, /<Input/);
   assert.doesNotMatch(page, /<Select/);
