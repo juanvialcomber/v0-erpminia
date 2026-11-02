@@ -83,8 +83,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const bucket = context.supabase.storage.from(row.storage_bucket);
     const needsWebPreview = WEB_PREVIEW_TYPES.has(String(row.mime_type || '').toLowerCase());
 
-    const [originalResult, previewResult, thumbnailResult] = await Promise.all([
+    const [originalResult, downloadResult, previewResult, thumbnailResult] = await Promise.all([
       bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS),
+      bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, { download: true }),
       needsWebPreview
         ? bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, {
             transform: { width: 1600, height: 1600, resize: 'contain', quality: 86 },
@@ -98,6 +99,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ]);
 
     const originalUrl = originalResult.data?.signedUrl || null;
+    const downloadUrl = downloadResult.data?.signedUrl || originalUrl;
     const previewUrl = needsWebPreview
       ? previewResult.data?.signedUrl || null
       : originalUrl;
@@ -118,6 +120,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       preview_url: previewUrl,
       thumbnail_url: thumbnailUrl,
       original_url: originalUrl,
+      download_url: downloadUrl,
       preview_transformed: needsWebPreview,
       preview_error: needsWebPreview && !previewUrl ? previewResult.error?.message || 'No se pudo generar vista web.' : null,
     };
