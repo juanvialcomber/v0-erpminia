@@ -740,7 +740,7 @@ export async function GET(request: NextRequest) {
           if (!date) return null;
           if (row.canonical_asset_id) return `${date}:asset:${row.canonical_asset_id}`;
           if (row.evidence_role === 'expected_missing') {
-            const raw = textValue(row.raw_asset_name).trim().toLowerCase().replace(/\s+/g, ' ');
+            const raw = (textValue(row.raw_asset_name) || '').trim().toLowerCase().replace(/\s+/g, ' ');
             return raw ? `${date}:expected:${raw}` : null;
           }
           return null;
