@@ -13,7 +13,7 @@ import Link from 'next/link';
 type Decision={id:string;source_kind:string;source_id:string;canonical_asset_id:string|null;title:string;description:string|null;work_type:string;priority:string;scheduled_date:string|null;planned_duration_hours:number|null;assigned_person_id:string|null;decision_status:string;revision:number;linked_work_order_id:string|null};
 type Person={id:string;full_name:string;role_title:string|null};
 const fetcher=async(url:string)=>{const r=await apiFetch(url);const d=await r.json();if(!r.ok)throw Error(d.error||'No disponible');return d;};
-type Props={sourceKind:'official_weekly'|'preventive_priority';sourceId:string;title:string;scheduledDate:string|null;plannedHours:number|null;priority:'low'|'medium'|'high'|'critical';workType:'preventive'|'corrective'|'general';canonicalAssetId:string|null;onFinished?:()=>void};
+type Props={sourceKind:'official_weekly'|'preventive_priority';sourceId:string;title:string;scheduledDate:string|null;plannedHours:number|null;priority:'low'|'medium'|'high'|'critical';workType:'preventive'|'corrective'|'general';canonicalAssetId:string|null;assignedName?:string|null;onFinished?:()=>void};
 export function ArielPlanningEditor(props:Props){
  const {data:result,mutate}=useSWR<{decisions:Decision[];canWrite:boolean}>('/api/maintenance/planning-decisions',fetcher,{revalidateOnFocus:false});
  const {data:peopleData}=useSWR<{assignees:Person[]}>('/api/maintenance/assignees',fetcher,{revalidateOnFocus:false});
@@ -33,7 +33,8 @@ export function ArielPlanningEditor(props:Props){
  const duration=hours??String(decision?.planned_duration_hours??props.plannedHours??0);
  const prio=priority??decision?.priority??props.priority;
  const type=workType??decision?.work_type??props.workType;
- const assignedId=assigned??decision?.assigned_person_id??'';
+ const sourceAssignee=props.assignedName?(peopleData?.assignees||[]).find(p=>p.full_name.trim().toLocaleLowerCase('es-CL')===props.assignedName?.trim().toLocaleLowerCase('es-CL')):undefined;
+ const assignedId=assigned??decision?.assigned_person_id??sourceAssignee?.id??'';
  const desc=description??decision?.description??'';
  async function submit(action:'save'|'approve'){
   if(!assetId&&type!=='general'){toast.error('Primero debe vincularse un equipo canónico');return;}
