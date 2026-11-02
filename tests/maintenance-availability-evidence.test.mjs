@@ -75,6 +75,20 @@ test('report importer trusts internal report date and preserves provenance', () 
   assert.match(importer, /official_master_unique_plate/);
 });
 
+test('report importer prevents duplicate asset observations from double counting', () => {
+  assert.match(importer, /duplicateCanonicalIds/);
+  assert.match(importer, /Activo canónico repetido dentro del mismo reporte diario/);
+  assert.match(importer, /classification = 'review_required'/);
+  assert.match(importer, /basename\(args\.file\)/);
+  assert.match(importer, /Ariel López/);
+});
+
+test('reported availability periods follow Santiago local date', () => {
+  assert.match(reportedApi, /America\/Santiago/);
+  assert.match(reportedApi, /santiagoDay\(-6\)/);
+  assert.match(reportedApi, /santiagoDay\(-29\)/);
+});
+
 test('legacy by-zone endpoint no longer labels operational share as availability', () => {
   assert.match(byZoneApi, /availabilityPercentage:\s*null/);
   assert.match(byZoneApi, /operationalSharePercentage/);
