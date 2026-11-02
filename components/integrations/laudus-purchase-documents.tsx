@@ -88,14 +88,14 @@ export function LaudusPurchaseDocuments() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : activeFreshness?.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle>Histórico Laudus</CardTitle></div>
+              <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : activeFreshness?.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle>Facturas y guías</CardTitle></div>
               {activeFreshness ? (
                 <Badge variant={activeFreshness.healthStatus === 'healthy' ? 'secondary' : activeFreshness.healthStatus === 'broken' ? 'destructive' : 'outline'}>
                   {activeFreshness.healthStatus === 'healthy' ? 'Actualizado' : activeFreshness.healthStatus === 'broken' ? 'Sync interrumpido' : 'Revisar sync'}
                 </Badge>
               ) : null}
             </div>
-            <CardDescription>Consulta de facturas y guías ya alojadas en MOTIL. Sólo lectura; Laudus conserva autoridad documental.</CardDescription>
+            <CardDescription>Documentos ERP ya disponibles en MOTIL.</CardDescription>
             {activeFreshness?.latestSync ? <p className="mt-1 text-xs text-muted-foreground">Última copia disponible: {new Date(activeFreshness.latestSync).toLocaleString('es-CL')}</p> : null}
           </div>
           <div className="flex gap-2">
@@ -117,7 +117,7 @@ export function LaudusPurchaseDocuments() {
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {activeFreshness && activeFreshness.healthStatus !== 'healthy' ? (
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-            Estos documentos permanecen consultables como histórico, pero la sincronización actual requiere revisión.{activeFreshness.lastError ? ` ${activeFreshness.lastError}` : ''}
+            Los documentos siguen disponibles, pero la actualización requiere revisión.{activeFreshness.lastError ? ` ${activeFreshness.lastError}` : ''}
           </p>
         ) : null}
         {isLoading ? <p className="text-sm text-muted-foreground">Cargando histórico Laudus…</p> : null}
@@ -127,7 +127,7 @@ export function LaudusPurchaseDocuments() {
             {invoices.length ? invoices.map((row) => (
               <div key={row.external_id} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.2fr)_140px_150px_150px] lg:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Factura {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : <Badge variant="secondary">Fuente Laudus</Badge>}</div>
+                  <div className="flex flex-wrap items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Factura {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : }</div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{row.supplier_name || 'Proveedor sin nombre'} · {row.supplier_tax_id || 'Sin RUT'} · {row.warehouse_name || 'Sin bodega'}</p>
                 </div>
                 <div className="text-sm text-muted-foreground">{date(row.issued_date)}</div>
@@ -143,7 +143,7 @@ export function LaudusPurchaseDocuments() {
             {waybills.length ? waybills.map((row) => (
               <div key={row.external_id} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.4fr)_160px_180px] lg:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><Truck className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Guía {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : <Badge variant="secondary">Fuente Laudus</Badge>}</div>
+                  <div className="flex flex-wrap items-center gap-2"><Truck className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Guía {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : }</div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{row.supplier_name || 'Proveedor sin nombre'} · {row.supplier_tax_id || 'Sin RUT'}</p>
                   {row.notes ? <p className="mt-1 truncate text-xs text-muted-foreground">{row.notes}</p> : null}
                 </div>
@@ -154,7 +154,7 @@ export function LaudusPurchaseDocuments() {
           </div>
         ) : null}
 
-        <p className="text-xs text-muted-foreground">Se muestran hasta 100 documentos recientes por tipo. La vista no crea, corrige ni contabiliza documentos.</p>
+        <p className="text-xs text-muted-foreground">Se muestran hasta 100 documentos recientes por tipo · Fuente: Laudus.</p>
       </CardContent>
     </Card>
   );
