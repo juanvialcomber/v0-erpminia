@@ -10,6 +10,8 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import { ProductionSourceSnapshot } from '@/components/production/production-source-snapshot';
 
+type SourceCutoff={stats:{cutoff:string|null;source:string|null;totalExtractedTons:number|null;plannedToDateTons:number|null;plannedMonthTons:number|null;forecastEndMonthTons:number|null;fineExtractedTons:number|null};stock:{cutoff:string|null;source:string|null;plantStockTons:number|null;transportedWeekTons:number|null}};
+
 type Overview = {
   counts: { materialMovements:number; plantShifts:number; metallurgyResults:number; concentrateShipments:number; drillingReports:number; drillingHoles:number };
   quality: { status:'PASS'|'HOLD'; pass:number; hold:number; sourceFiles:number; sourceSheets:number; supplementalRecords:number; sourceAnomalies:number; referenceOnly:number };
@@ -32,6 +34,7 @@ type Overview = {
 };
 
 const fetcher = async (url:string):Promise<Overview> => { const r=await fetch(url,{credentials:'include'}); const j=await r.json(); if(!r.ok) throw new Error(j.error||'No fue posible cargar Producción'); return j; };
+const sourceFetcher=async(url:string):Promise<SourceCutoff>=>{const r=await fetch(url,{credentials:'include',cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'No fue posible cargar el corte fuente');return j;};
 const n=(v:number,d=0)=>v.toLocaleString('es-CL',{maximumFractionDigits:d});
 const tons=(v:number,d=0)=>`${n(v,d)} t`;
 const pct=(v:number|null|undefined,d=1)=>v===null||v===undefined?'—':`${n(v,d)}%`;
@@ -49,6 +52,7 @@ const domains=[
 
 export function ProduccionDashboard(){
   const {data,error,isLoading,mutate}=useSWR<Overview>('/api/produccion/canonical-overview',fetcher);
+  const {data:sourceCutoff}=useSWR<SourceCutoff>('/api/produccion/source-cutoff',sourceFetcher,{revalidateOnFocus:false});
   const { canEdit, ready } = useModuleAccess();
   if(error) return <StatePanel tone="error" title="No fue posible cargar Producción" description={error.message} actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>}/>;
   if(isLoading||!data) return <StatePanel tone="neutral" title="Cargando Producción" description="Leyendo los datos más recientes."/>;
@@ -57,6 +61,10 @@ export function ProduccionDashboard(){
   const plan=p?.plan;
   const pace=plan?.paceIndexPct ?? null;
   const paceLabel=pace===null?'—':pace>=97?'En ritmo':pace>=90?'Leve desvío':'Bajo ritmo';
+  const sourceActual=sourceCutoff?.stats.totalExtractedTons??null;
+  const sourceMonthPlan=sourceCutoff?.stats.plannedMonthTons??null;
+  const sourceForecast=sourceCutoff?.stats.forecastEndMonthTons??null;
+  const sourceDelta=sourceForecast!==null&&sourceMonthPlan!==null?sourceForecast-sourceMonthPlan:null;
   const attentionSignal=data.intelligence.find(signal=>signal.level!=='info')||data.intelligence[0]||null;
   const reviewQueue=data.coverage.queue;
   const reviewTotal=reviewQueue.importExceptions+reviewQueue.movementNormalization+reviewQueue.movementValidation+reviewQueue.entityReconciliation+reviewQueue.plantShifts+reviewQueue.metallurgy+reviewQueue.drillLocations+data.quality.hold;
@@ -66,7 +74,7 @@ export function ProduccionDashboard(){
       <PageHeaderContent>
         <PageHeaderEyebrow>Producción</PageHeaderEyebrow>
         <PageHeaderTitle>Producción</PageHeaderTitle>
-        <PageHeaderDescription>{p?'Primero mostramos el dato más reciente. El histórico de planta queda separado por fecha.':'Sin período operacional disponible.'}</PageHeaderDescription>
+        <PageHeaderDescription>{sourceCutoff?.stats.cutoff?'El corte oficial más reciente se muestra primero; la metalurgia detallada histórica queda separada por fecha.':'Sin corte operacional reciente disponible.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>{ready && canEdit('prod_operaciones') ? <Button asChild variant="outline"><Link href="/dashboard/produccion/ingreso-datos"><Upload className="h-4 w-4"/>Ingresar datos</Link></Button> : null}</PageHeaderActions>
     </PageHeader>
@@ -74,13 +82,13 @@ export function ProduccionDashboard(){
     <section aria-label="Resumen para reunión" className="grid gap-3 lg:grid-cols-3">
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué pasó</p>
-        <p className="mt-2 text-sm font-medium">{p?('Datos operacionales hasta '+date(p.dataThrough)):'Sin período operacional acreditado'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{p?(tons(p.treatedTons,1)+' tratados · recuperación '+pct(p.avgRecoveryPct,2)+' · '+p.deterministicShifts+'/'+p.plantShifts+' turnos determinísticos'):'MOTIL mantiene la ausencia de fuente como dato no disponible, no como cero.'}</p>
+        <p className="mt-2 text-sm font-medium">{sourceCutoff?.stats.cutoff?('Corte oficial al '+date(sourceCutoff.stats.cutoff)):'Sin corte operacional reciente acreditado'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceActual!==null?(tons(sourceActual,1)+' extraídas a planta'+(sourceCutoff?.stats.fineExtractedTons!=null?' · fino reportado '+tons(sourceCutoff.stats.fineExtractedTons,2):'')):'MOTIL mantiene la ausencia de fuente como dato no disponible, no como cero.'}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué requiere atención</p>
-        <p className="mt-2 text-sm font-medium">{attentionSignal?.title||'Sin señales operacionales prioritarias'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{attentionSignal?.detail||'No hay una alerta derivada de la evidencia disponible para el período.'}</p>
+        <p className="mt-2 text-sm font-medium">{sourceDelta!==null?(sourceDelta>=0?'Proyección sobre plan mensual':'Proyección bajo plan mensual'):(attentionSignal?.title||'Sin señal actual calculable')}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceDelta!==null?((sourceDelta>=0?'+':'')+n(sourceDelta,1)+' t de proyección al cierre versus el plan mensual oficial. Dato fuente; no equivale a tratamiento ni recuperación.'):(attentionSignal?.detail||'No hay una comparación actual sustentada por la fuente disponible.')}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué validar</p>

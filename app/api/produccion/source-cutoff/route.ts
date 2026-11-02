@@ -65,8 +65,11 @@ export async function GET(request:NextRequest){
   const monthJaime=value(stat.get('extraction_actual_don_jaime'));
   const planPeumo=value(stat.get('extraction_plan_peumo'));
   const planJaime=value(stat.get('extraction_plan_don_jaime'));
+  const monthPlanPeumo=value(stat.get('extraction_month_plan_peumo'));
+  const monthPlanJaime=value(stat.get('extraction_month_plan_don_jaime'));
   const monthTotal=monthPeumo===null||monthJaime===null?null:monthPeumo+monthJaime;
-  const monthPlan=planPeumo===null||planJaime===null?null:planPeumo+planJaime;
+  const planToDate=planPeumo===null||planJaime===null?null:planPeumo+planJaime;
+  const monthPlan=monthPlanPeumo===null||monthPlanJaime===null?null:monthPlanPeumo+monthPlanJaime;
   const forecastEndMonth=value(stat.get('forecast_end_month_reported'));
   const fineExtracted=value(stat.get('fine_extracted_reported'));
 
@@ -95,7 +98,7 @@ export async function GET(request:NextRequest){
       cutoff:statsDoc?.period_end||null,source:statsDoc?.source_file||null,
       periodStart:stats.find(r=>r.record_type==='extraction_actual_peumo')?.period_start||null,
       peumoExtractedTons:monthPeumo,donJaimeExtractedTons:monthJaime,
-      totalExtractedTons:monthTotal,plannedToDateTons:monthPlan,
+      totalExtractedTons:monthTotal,plannedToDateTons:planToDate,plannedMonthTons:monthPlan,
       forecastEndMonthTons:forecastEndMonth,fineExtractedTons:fineExtracted,
     },
     stock:{

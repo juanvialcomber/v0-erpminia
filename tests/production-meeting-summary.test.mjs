@@ -16,3 +16,17 @@ test('production meeting summary keeps source absence honest',()=>{
   assert.match(dashboard,/ausencia de fuente como dato no disponible, no como cero/);
   assert.match(dashboard,/Revisar fuentes/);
 });
+
+test('production meeting summary prioritizes the freshest official source cutoff over stale detailed flow',()=>{
+  assert.match(dashboard,/sourceCutoff/);
+  assert.match(dashboard,/Corte oficial al/);
+  assert.match(dashboard,/Proyección bajo plan mensual|Proyección sobre plan mensual/);
+  assert.doesNotMatch(dashboard,/fineExtractedTons\?\?0/);
+});
+
+test('source cutoff API exposes monthly plan separately from plan-to-date',()=>{
+  const route=readFileSync(new URL('../app/api/produccion/source-cutoff/route.ts',import.meta.url),'utf8');
+  assert.match(route,/extraction_month_plan_peumo/);
+  assert.match(route,/extraction_month_plan_don_jaime/);
+  assert.match(route,/plannedMonthTons/);
+});
