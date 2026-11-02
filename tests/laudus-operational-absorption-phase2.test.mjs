@@ -45,3 +45,13 @@ test('accounting cost-center UI refuses false attribution when line-level center
   assert.match(accountingCard, /entriesWithCostCenter === 0/);
   assert.match(accountingCard, /No se atribuyen movimientos a centros por suposición/);
 });
+
+
+test('Treasury can inspect Laudus bank reconciliation without automatic API burn or writes', () => {
+  const bankCard = readFileSync(new URL('../components/integrations/laudus-bank-reconciliation-card.tsx', import.meta.url), 'utf8');
+  const treasury = readFileSync(new URL('../app/dashboard/finanzas/pagos/page.tsx', import.meta.url), 'utf8');
+  assert.match(bankCard, /enabled \? '\/api\/integrations\/laudus\/bank-reconciliation' : null/);
+  assert.match(bankCard, /No contabiliza ni concilia automáticamente/);
+  assert.match(bankCard, /LaudusSourceMark/);
+  assert.match(treasury, /LaudusBankReconciliationCard/);
+});
