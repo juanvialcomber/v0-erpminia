@@ -17,3 +17,9 @@ test('Tesoreria exposes read-only Laudus accounts payable inside MOTIL', () => {
   assert.match(pagos, /No registra pagos ni modifica el ERP/);
   assert.match(pagos, /Laudus sigue siendo autoridad financiera/);
 });
+
+
+test('Finance suppliers exposes Laudus historical supplier resolution inside MOTIL', () => {
+  const suppliersPage = readFileSync(new URL('../app/dashboard/finanzas/proveedores/page.tsx', import.meta.url), 'utf8');
+  assert.match(suppliersPage, /LaudusSupplierResolutionQueueCard/);
+});
