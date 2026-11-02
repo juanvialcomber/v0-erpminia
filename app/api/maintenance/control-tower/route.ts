@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
     let reportedAvailabilityRows: any[] = [];
     const reportedAvailabilityResult = await context.supabase
       .from('maintenance_reported_availability_daily_v1')
-      .select('reported_date,availability_classification,availability_numerator,availability_denominator')
+      .select('reported_date,evidence_role,canonical_asset_id,raw_asset_name,reconciliation_status,availability_classification,availability_numerator,availability_denominator')
       .eq('organization_id', context.organizationId)
       .eq('mine', 'Don Jaime')
       .gte('reported_date', santiagoDay(-29))
@@ -733,11 +733,26 @@ export async function GET(request: NextRequest) {
 
     const reportedAvailabilityClassified = reportedAvailabilityRows.filter((row: any) => Number(row.availability_denominator || 0) === 1);
     const reportedAvailabilityAvailable = reportedAvailabilityClassified.filter((row: any) => Number(row.availability_numerator || 0) === 1);
+    const reportedAvailabilityExpectedKeys = new Set(
+      reportedAvailabilityRows
+        .map((row: any) => {
+          const date = textValue(row.reported_date);
+          if (!date) return null;
+          if (row.canonical_asset_id) return `${date}:asset:${row.canonical_asset_id}`;
+          if (row.evidence_role === 'expected_missing') {
+            const raw = textValue(row.raw_asset_name).trim().toLowerCase().replace(/\s+/g, ' ');
+            return raw ? `${date}:expected:${raw}` : null;
+          }
+          return null;
+        })
+        .filter(Boolean)
+    );
+    const reportedAvailabilityExpected = reportedAvailabilityExpectedKeys.size;
     const reportedAvailabilityPct = reportedAvailabilityClassified.length
       ? Math.round((reportedAvailabilityAvailable.length / reportedAvailabilityClassified.length) * 1000) / 10
       : null;
-    const reportedAvailabilityCoveragePct = reportedAvailabilityRows.length
-      ? Math.round((reportedAvailabilityClassified.length / reportedAvailabilityRows.length) * 1000) / 10
+    const reportedAvailabilityCoveragePct = reportedAvailabilityExpected
+      ? Math.round((reportedAvailabilityClassified.length / reportedAvailabilityExpected) * 1000) / 10
       : null;
     const reportedAvailabilityLatestDate = newest(...reportedAvailabilityRows.map((row: any) => textValue(row.reported_date)));
     const reportedAvailabilityLatestRows = reportedAvailabilityLatestDate
@@ -850,7 +865,7 @@ export async function GET(request: NextRequest) {
         availabilityCurrentUnavailable: reportedAvailabilityCurrentUnavailable,
         availabilityBasis: reportedAvailabilityPct == null
           ? 'Sin base de disponibilidad reportada validada'
-          : `Disponibilidad reportada Don Jaime · ${reportedAvailabilityClassified.length}/${reportedAvailabilityRows.length} observaciones clasificables · no equivale a disponibilidad horaria`,
+          : `Disponibilidad reportada Don Jaime · ${reportedAvailabilityClassified.length}/${reportedAvailabilityExpected} observaciones esperadas clasificadas · no equivale a disponibilidad horaria`,
       },
       inventory: {
         source: 'bodega_inventory',
