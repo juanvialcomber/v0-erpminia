@@ -80,7 +80,16 @@ test('report importer prevents duplicate asset observations from double counting
   assert.match(importer, /Activo canónico repetido dentro del mismo reporte diario/);
   assert.match(importer, /classification = 'review_required'/);
   assert.match(importer, /basename\(args\.file\)/);
-  assert.match(importer, /Ariel López/);
+});
+
+test('reported availability reuses email manifest provenance and quarantines date conflicts', () => {
+  assert.match(reportedMigration, /source_manifest_id uuid references public\.motil_email_source_manifest/);
+  assert.match(importer, /motil_email_source_manifest/);
+  assert.match(importer, /manifestDateConflict/);
+  assert.match(importer, /sourceStatus = manifestDateConflict \? 'review_required' : 'official_source'/);
+  assert.match(importer, /sourceIsCurrent = !manifestDateConflict/);
+  assert.match(importer, /is_current=excluded\.is_current/);
+  assert.doesNotMatch(importer, /source_owner text not null default 'Ariel López'/);
 });
 
 test('reported availability periods follow Santiago local date', () => {
