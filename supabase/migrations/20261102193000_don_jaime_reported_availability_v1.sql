@@ -33,7 +33,10 @@ create table if not exists public.maintenance_reported_availability_rows (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null,
   source_id uuid not null references public.maintenance_reported_availability_sources(id) on delete restrict,
+  source_sheet text not null default 'Reporte Diario',
   source_row integer not null check (source_row > 0),
+  evidence_role text not null default 'reported'
+    check (evidence_role in ('reported','expected_missing')),
   raw_asset_name text not null,
   canonical_asset_id uuid references canonical.assets(id) on delete set null,
   raw_status text not null,
@@ -63,7 +66,7 @@ create table if not exists public.maintenance_reported_availability_rows (
   reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (source_id, source_row),
+  unique (source_id, source_sheet, source_row),
   unique (organization_id, row_hash)
 );
 
@@ -96,7 +99,9 @@ select
   s.gmail_message_id,
   s.received_at,
   r.id as row_id,
+  r.source_sheet,
   r.source_row,
+  r.evidence_role,
   r.canonical_asset_id,
   a.asset_code,
   a.name as asset_name,
@@ -139,4 +144,4 @@ where s.is_current = true
 grant select on public.maintenance_reported_availability_daily_v1 to service_role;
 
 comment on view public.maintenance_reported_availability_daily_v1 is
-  'V1 reported availability from daily equipment snapshots. Denominator is classified daily observations, not scheduled minutes. STANDBY remains review_required until operational semantics are approved.';
+  'V1 reported availability from daily equipment snapshots. Rows are the union of reported equipment plus expected Base Equipos gaps. Denominator includes only reconciled, classified daily observations; coverage measures classified observations against that expected/observed universe. STANDBY remains review_required until operational semantics are approved.';
