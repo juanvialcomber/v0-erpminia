@@ -64,10 +64,10 @@ test('OT evidence UI refreshes expiring private URLs before expiry', () => {
   assert.match(component, /refreshInterval: 10 \* 60 \* 1000/);
   assert.match(component, /revalidateOnFocus: true/);
   assert.match(component, /revalidateOnReconnect: true/);
-  assert.match(component, /primaryPhoto\.preview_url \|\| primaryPhoto\.signed_url/);
+  assert.match(component, /primaryPhoto\?\.preview_url \|\| primaryPhoto\?\.signed_url/);
   assert.match(component, /thumbnail_url/);
   assert.match(component, /HEIC · vista web/);
-  assert.match(component, /primaryPhoto\.download_url \|\| primaryPhoto\.original_url/);
+  assert.match(component, /primaryPhoto\?\.download_url \|\| primaryPhoto\?\.original_url/);
   assert.match(component, /Descargar original/);
 });
 
