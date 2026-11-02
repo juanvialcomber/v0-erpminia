@@ -24,7 +24,7 @@ test('contextual kardex is explicit, bounded and staging-only', () => {
   assert.match(kardexApi, /stagingOnly: true/);
   assert.match(kardexApi, /canonicalMutated: false/);
   assert.match(kardexApi, /laudusMutated: false/);
-  assert.match(kardexCard, /No consume API hasta que se solicita el historial/);
+  assert.match(kardexCard, /Consulta el historial sólo cuando lo necesitas/);
   assert.match(productPage, /LaudusProductKardexCard/);
 });
 
