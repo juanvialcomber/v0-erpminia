@@ -72,8 +72,8 @@ export function LaudusAccountingCostCenters() {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data?.freshness.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4"/>Movimiento contable Laudus</CardTitle></div>
-            <CardDescription>Lectura por centro de costo para análisis dentro de MOTIL. No representa saldo contable actual ni modifica asientos.</CardDescription>
+            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data?.freshness.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4"/>Contabilidad</CardTitle></div>
+            <CardDescription>Cobertura contable por centro de costo.</CardDescription>
           </div>
           {data ? <div className="flex flex-wrap gap-2"><Badge variant="outline">{data.summary.totalEntries.toLocaleString('es-CL')} asientos alojados</Badge><Badge variant={data.summary.costCenterCoveragePct > 0 ? 'secondary' : 'destructive'}>{data.summary.costCenterCoveragePct}% con centro</Badge></div> : null}
         </div>
@@ -87,9 +87,9 @@ export function LaudusAccountingCostCenters() {
         {isLoading ? <p className="text-sm text-muted-foreground">Cargando movimientos Laudus…</p> : null}
         {!isLoading && !error && data?.summary.entriesWithCostCenter === 0 ? (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-            <p className="text-sm font-medium">La relación asiento → centro de costo todavía no está disponible en la copia actual.</p>
+            <p className="text-sm font-medium">Centros de costo pendientes</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              MOTIL conserva {data.summary.totalEntries.toLocaleString('es-CL')} cabeceras de asientos, pero el centro de costo vive a nivel de línea en Laudus. No se atribuyen movimientos a centros por suposición.
+              {data.summary.totalEntries.toLocaleString('es-CL')} asientos disponibles. Falta el detalle por línea para asociarlos con seguridad a centros de costo.
             </p>
             {data.freshness.lastError ? <p className="mt-2 text-xs text-muted-foreground">Sync contable: {data.freshness.lastError}</p> : null}
           </div>
@@ -112,7 +112,7 @@ export function LaudusAccountingCostCenters() {
             )) : <p className="p-6 text-center text-sm text-muted-foreground">No hay centros para este filtro.</p>}
           </div>
         ) : null}
-        <p className="text-xs text-muted-foreground">El resumen usa una ventana acotada de hasta 1.000 asientos recientes para evitar consultas pesadas. La contabilidad oficial permanece en Laudus.</p>
+        <p className="text-xs text-muted-foreground">Fuente: Laudus · hasta 1.000 asientos recientes.</p>
       </CardContent>
     </Card>
   );
