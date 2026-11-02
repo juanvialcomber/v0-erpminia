@@ -126,6 +126,47 @@ export default function MaintenanceControlTowerPage() {
   }, []);
 
   useEffect(() => {
+    document.documentElement.classList.add('motil-tv-wallboard-active');
+    document.body.classList.add('motil-tv-wallboard-active');
+
+    let wakeLock: { release?: () => Promise<void> } | null = null;
+    const acquireWakeLock = async () => {
+      try {
+        const nav = navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<{ release?: () => Promise<void> }> } };
+        if (document.visibilityState === 'visible' && nav.wakeLock?.request) {
+          wakeLock = await nav.wakeLock.request('screen');
+        }
+      } catch {
+        // Wake Lock is best-effort; Google TV browsers may not expose the API.
+      }
+    };
+
+    const requestFullscreen = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(() => undefined);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') requestFullscreen();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void acquireWakeLock();
+    };
+
+    void acquireWakeLock();
+    window.addEventListener('pointerdown', requestFullscreen, { once: true });
+    window.addEventListener('keydown', onKeyDown, { once: true });
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      document.documentElement.classList.remove('motil-tv-wallboard-active');
+      document.body.classList.remove('motil-tv-wallboard-active');
+      document.removeEventListener('visibilitychange', onVisibility);
+      void wakeLock?.release?.();
+    };
+  }, []);
+
+  useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const sync = () => setReduceMotion(media.matches);
     sync();
@@ -166,6 +207,34 @@ export default function MaintenanceControlTowerPage() {
   return createPortal(
     <div className="motil-control-tower fixed inset-0 z-[9999] flex h-[100dvh] min-h-0 w-screen flex-col gap-2 overflow-hidden bg-[var(--tower-canvas)] p-3 text-[var(--tower-ink)] 2xl:p-4">
       <style>{`
+        html.motil-tv-wallboard-active,
+        body.motil-tv-wallboard-active {
+          overflow: hidden !important;
+          overscroll-behavior: none;
+          background: var(--tower-canvas);
+        }
+        .motil-control-tower {
+          box-sizing: border-box;
+          padding:
+            max(12px, env(safe-area-inset-top))
+            max(16px, env(safe-area-inset-right))
+            max(12px, env(safe-area-inset-bottom))
+            max(16px, env(safe-area-inset-left));
+          -webkit-user-select: none;
+          user-select: none;
+          touch-action: none;
+        }
+        @media (pointer: fine) {
+          .motil-control-tower { cursor: none; }
+        }
+        @media (min-width: 1800px) and (min-height: 900px) {
+          .motil-control-tower { padding: clamp(18px, 1.25vw, 28px); gap: 10px; }
+          .motil-control-tower .tower-screen-heading { font-size: clamp(2.25rem, 2.45vw, 3.4rem); line-height: 1.05; }
+        }
+        @media (min-width: 3000px) and (min-height: 1600px) {
+          .motil-control-tower { font-size: 1.15rem; padding: 32px; }
+          .motil-control-tower .tower-screen-heading { font-size: 4.2rem; line-height: 1; }
+        }
         @media (max-height: 950px) {
           .motil-control-tower .tower-detail-row:nth-child(n+6) { display: none; }
           .motil-control-tower .tower-extra-row:nth-child(n+6) { display: none; }
