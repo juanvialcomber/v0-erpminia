@@ -89,18 +89,8 @@ function shortDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short' }).format(new Date(`${value}T12:00:00Z`));
 }
 
-function coverageTone(value: number | null | undefined) {
-  if (value == null) return 'text-muted-foreground';
-  if (value >= 95) return 'text-emerald-600 dark:text-emerald-400';
-  if (value >= 80) return 'text-amber-600 dark:text-amber-400';
-  return 'text-destructive';
-}
-
-function availabilityTone(value: number | null | undefined) {
-  if (value == null) return 'text-muted-foreground';
-  if (value >= 90) return 'text-emerald-600 dark:text-emerald-400';
-  if (value >= 80) return 'text-amber-600 dark:text-amber-400';
-  return 'text-destructive';
+function metricTone(value: number | null | undefined) {
+  return value == null ? 'text-muted-foreground' : 'text-foreground';
 }
 
 export function AvailabilitySemaphore() {
@@ -224,12 +214,12 @@ export function AvailabilitySemaphore() {
           <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
             <div className="bg-card p-4">
               <p className="text-xs text-muted-foreground">Disponibilidad reportada</p>
-              <p className={cn('mt-2 text-3xl font-semibold', availabilityTone(s.availabilityPercentage))}>{pct(s.availabilityPercentage)}</p>
+              <p className={cn('mt-2 text-3xl font-semibold', metricTone(s.availabilityPercentage))}>{pct(s.availabilityPercentage)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{s.availableObservations}/{s.classifiedObservations} observaciones disponibles</p>
             </div>
             <div className="bg-card p-4">
               <p className="text-xs text-muted-foreground">Cobertura de evidencia</p>
-              <p className={cn('mt-2 text-3xl font-semibold', coverageTone(s.evidenceCoveragePercentage))}>{pct(s.evidenceCoveragePercentage)}</p>
+              <p className={cn('mt-2 text-3xl font-semibold', metricTone(s.evidenceCoveragePercentage))}>{pct(s.evidenceCoveragePercentage)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{s.classifiedObservations}/{s.sourceRows} filas clasificables</p>
             </div>
             <div className="bg-card p-4">
@@ -266,8 +256,8 @@ export function AvailabilitySemaphore() {
                     style={{ width: `${Math.max(0, Math.min(100, day.availabilityPercentage || 0))}%` }}
                   />
                 </div>
-                <span className={cn('text-right text-sm font-semibold', availabilityTone(day.availabilityPercentage))}>{pct(day.availabilityPercentage)}</span>
-                <span className={cn('text-right text-xs', coverageTone(day.evidenceCoveragePercentage))}>{pct(day.evidenceCoveragePercentage)}</span>
+                <span className={cn('text-right text-sm font-semibold', metricTone(day.availabilityPercentage))}>{pct(day.availabilityPercentage)}</span>
+                <span className={cn('text-right text-xs', metricTone(day.evidenceCoveragePercentage))}>{pct(day.evidenceCoveragePercentage)}</span>
               </div>
             )) : <p className="text-sm text-muted-foreground">Sin días clasificables en este período.</p>}
           </CardContent>
@@ -286,11 +276,11 @@ export function AvailabilitySemaphore() {
                   <p className="text-xs text-muted-foreground">{item.familySource === 'canonical' ? 'Familia canónica' : 'Familia parcial/derivada'}</p>
                 </div>
                 <div className="text-right">
-                  <p className={cn('text-sm font-semibold', availabilityTone(item.availabilityPercentage))}>{pct(item.availabilityPercentage)}</p>
+                  <p className={cn('text-sm font-semibold', metricTone(item.availabilityPercentage))}>{pct(item.availabilityPercentage)}</p>
                   <p className="text-[11px] text-muted-foreground">disp.</p>
                 </div>
                 <div className="text-right">
-                  <p className={cn('text-sm font-semibold', coverageTone(item.evidenceCoveragePercentage))}>{pct(item.evidenceCoveragePercentage)}</p>
+                  <p className={cn('text-sm font-semibold', metricTone(item.evidenceCoveragePercentage))}>{pct(item.evidenceCoveragePercentage)}</p>
                   <p className="text-[11px] text-muted-foreground">cobertura</p>
                 </div>
               </div>
@@ -337,11 +327,11 @@ export function AvailabilitySemaphore() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Disponibilidad</p>
-                    <p className={cn('font-semibold', availabilityTone(asset.availabilityPercentage))}>{pct(asset.availabilityPercentage)}</p>
+                    <p className={cn('font-semibold', metricTone(asset.availabilityPercentage))}>{pct(asset.availabilityPercentage)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Cobertura</p>
-                    <p className={cn('font-semibold', coverageTone(asset.evidenceCoveragePercentage))}>{pct(asset.evidenceCoveragePercentage)}</p>
+                    <p className={cn('font-semibold', metricTone(asset.evidenceCoveragePercentage))}>{pct(asset.evidenceCoveragePercentage)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Observaciones</p>
