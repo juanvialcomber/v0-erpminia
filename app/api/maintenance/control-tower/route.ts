@@ -200,6 +200,31 @@ export async function GET(request: NextRequest) {
       latestEmailResult.error || whatsappInputResult.error || supplyChainResult.error || workOrderEvidenceResult.error || supervisorReviewsResult.error || preventiveSchedulesResult.error || materialRequirementsResult.error || canonicalProductsResult.error || bodegaInventoryResult.error;
     if (error) throw error;
 
+    const weeklySourcesResult = await context.supabase
+      .from('planning_weekly_work_sources')
+      .select('id,source_file,source_sheet,gmail_message_id,mine,week_start,week_end,reported_at,source_owner,status,is_current,imported_at')
+      .eq('organization_id', context.organizationId)
+      .eq('is_current', true)
+      .order('reported_at', { ascending: false, nullsFirst: false })
+      .limit(50);
+    if (weeklySourcesResult.error) throw weeklySourcesResult.error;
+
+    const weeklySources = weeklySourcesResult.data || [];
+    const weeklySourceIds = weeklySources.map((row: any) => String(row.id));
+    let weeklyWorkItems: any[] = [];
+    if (weeklySourceIds.length) {
+      const weeklyItemsResult = await context.supabase
+        .from('planning_weekly_work_items')
+        .select('id,source_id,source_row,activity_number,planned_date,shift_name,assigned_name,asset_label,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,reported_hours,source_status,source_progress,execution_date,observations,materials,reconciliation_status,review_reason,linked_work_order_id,reviewed_at,created_at,updated_at')
+        .eq('organization_id', context.organizationId)
+        .in('source_id', weeklySourceIds)
+        .order('planned_date', { ascending: true, nullsFirst: false })
+        .order('source_row', { ascending: true })
+        .limit(1000);
+      if (weeklyItemsResult.error) throw weeklyItemsResult.error;
+      weeklyWorkItems = weeklyItemsResult.data || [];
+    }
+
     const assets = assetsResult.data || [];
     const planningRows = planningResult.data || [];
     const emailRows = emailResult.data || [];
@@ -444,6 +469,71 @@ export async function GET(request: NextRequest) {
     const unassignedOpen = openWorkOrders.filter((order) => !textValue(order.assigned_to_name));
     const inProgressOpen = openWorkOrders.filter((order) => ['in_progress', 'in-progress', 'paused'].includes(String(order.status || '').toLowerCase()));
     const criticalOpen = openWorkOrders.filter((order) => priorityRank(order.priority) === 1);
+
+    const weeklySourceById = new Map(weeklySources.map((row: any) => [String(row.id), row]));
+    const workOrderById = new Map(workOrders.map((row: any) => [String(row.id), row]));
+    const sourceStatusIsDone = (status: unknown) => /complet|cerrad|finaliz|ejecutad|terminad/i.test(String(status || ''));
+    const weeklyPlanningRows = weeklyWorkItems.map((item: any) => {
+      const source = weeklySourceById.get(String(item.source_id || '')) || null;
+      const linkedOrder = item.linked_work_order_id ? workOrderById.get(String(item.linked_work_order_id)) : null;
+      const linkedOrderClosed = linkedOrder ? isClosed(linkedOrder.status) : false;
+      const linkedOrderInProgress = linkedOrder
+        ? ['in_progress', 'in-progress', 'paused'].includes(String(linkedOrder.status || '').toLowerCase())
+        : false;
+      const plannedDate = textValue(item.planned_date);
+      const sourceDone = sourceStatusIsDone(item.source_status);
+      const stage = linkedOrderClosed
+        ? 'Finalizado'
+        : linkedOrderInProgress
+          ? 'En ejecución'
+          : linkedOrder
+            ? 'OT creada'
+            : sourceDone
+              ? 'Reportado finalizado'
+              : 'Planificado';
+      return {
+        id: item.id,
+        sourceId: item.source_id,
+        sourceFile: textValue(source?.source_file),
+        sourceSheet: textValue(source?.source_sheet),
+        sourceReportedAt: textValue(source?.reported_at),
+        sourceOwner: textValue(source?.source_owner),
+        mine: textValue(source?.mine) || 'Sin faena',
+        weekStart: textValue(source?.week_start),
+        weekEnd: textValue(source?.week_end),
+        activityNumber: textValue(item.activity_number),
+        plannedDate,
+        shiftName: textValue(item.shift_name),
+        assignedName: textValue(item.assigned_name),
+        assetLabel: textValue(item.asset_label) || 'Sin equipo',
+        canonicalAssetId: textValue(item.canonical_asset_id),
+        title: textValue(item.title) || 'Trabajo planificado',
+        workType: textValue(item.work_type_raw),
+        priority: textValue(item.priority_raw),
+        plannedHours: numberValue(item.planned_hours),
+        reportedHours: numberValue(item.reported_hours),
+        sourceStatus: textValue(item.source_status),
+        sourceProgress: numberValue(item.source_progress),
+        executionDate: textValue(item.execution_date),
+        observations: textValue(item.observations),
+        materials: textValue(item.materials),
+        reconciliationStatus: textValue(item.reconciliation_status),
+        reviewReason: textValue(item.review_reason),
+        linkedWorkOrderId: textValue(item.linked_work_order_id),
+        linkedWorkOrderNumber: textValue(linkedOrder?.work_order_number),
+        stage,
+        overdue: Boolean(plannedDate && plannedDate < today && !sourceDone && !linkedOrderClosed),
+      };
+    });
+    const weeklyPlanningOpen = weeklyPlanningRows.filter((row: any) => !['Finalizado', 'Reportado finalizado'].includes(row.stage));
+    const weeklyPlanningToday = weeklyPlanningOpen.filter((row: any) => row.plannedDate === today);
+    const weeklyPlanningTomorrow = weeklyPlanningOpen.filter((row: any) => row.plannedDate === tomorrow);
+    const weeklyPlanningUnlinked = weeklyPlanningOpen.filter((row: any) => !row.linkedWorkOrderId);
+    const weeklyPlanningReview = weeklyPlanningRows.filter((row: any) =>
+      !row.canonicalAssetId ||
+      !['matched', 'approved', 'resolved'].includes(String(row.reconciliationStatus || '').toLowerCase())
+    );
+
     const stoppedRows = currentRows.filter((row) => row.reportedStopped);
     const attentionRows = currentRows.filter((row) => row.reportedStopped || row.openWorkOrders > 0 || row.priorityRank <= 2 || row.partsPending);
 
@@ -654,6 +744,35 @@ export async function GET(request: NextRequest) {
         pendingWhatsAppInputs: pendingWhatsappInputs.length,
         linkedEmailAssets: rows.filter((row) => row.emailReportDate).length,
         linkedWhatsAppAssets: rows.filter((row) => row.whatsappOccurredAt).length,
+        weeklyPlannedWorks: weeklyPlanningRows.length,
+        weeklyPlannedOpen: weeklyPlanningOpen.length,
+        weeklyPlannedToday: weeklyPlanningToday.length,
+        weeklyPlannedTomorrow: weeklyPlanningTomorrow.length,
+        weeklyPlannedUnlinked: weeklyPlanningUnlinked.length,
+        weeklyPlannedReview: weeklyPlanningReview.length,
+      },
+      weeklyPlanning: {
+        role: 'official_planning_source',
+        sourceCount: weeklySources.length,
+        sources: weeklySources.map((source: any) => ({
+          id: source.id,
+          file: textValue(source.source_file),
+          sheet: textValue(source.source_sheet),
+          mine: textValue(source.mine),
+          weekStart: textValue(source.week_start),
+          weekEnd: textValue(source.week_end),
+          reportedAt: textValue(source.reported_at),
+          owner: textValue(source.source_owner),
+          status: textValue(source.status),
+        })),
+        rows: weeklyPlanningRows
+          .sort((a: any, b: any) => {
+            const rank = (row: any) => row.overdue ? 0 : row.plannedDate === today ? 1 : row.plannedDate === tomorrow ? 2 : 3;
+            return rank(a) - rank(b) ||
+              String(a.plannedDate || '').localeCompare(String(b.plannedDate || '')) ||
+              String(a.mine || '').localeCompare(String(b.mine || ''));
+          })
+          .slice(0, 200),
       },
       coordination: {
         role: 'planning_coordination',

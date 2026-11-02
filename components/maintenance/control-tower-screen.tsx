@@ -12,6 +12,11 @@ import {
   Clock3,
   Gauge,
   Monitor,
+  Pause,
+  Play,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
   Radio,
   ShieldAlert,
   TimerReset,
@@ -119,6 +124,8 @@ export default function MaintenanceControlTowerPage() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [secondsToNext, setSecondsToNext] = useState(30);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [rotationKey, setRotationKey] = useState(0);
   const rotationMs = 30_000;
 
   useEffect(() => {
@@ -136,19 +143,64 @@ export default function MaintenanceControlTowerPage() {
   useEffect(() => {
     const startedAt = Date.now();
     const clock = window.setInterval(() => {
-      const current = new Date();
-      setNow(current);
-      const elapsed = (Date.now() - startedAt) % rotationMs;
+      setNow(new Date());
+      if (!isPlaying) return;
+      const elapsed = Date.now() - startedAt;
       setSecondsToNext(Math.max(1, Math.ceil((rotationMs - elapsed) / 1000)));
     }, 1000);
-    const timer = window.setInterval(() => {
+    if (!isPlaying) {
+      setSecondsToNext(30);
+      return () => window.clearInterval(clock);
+    }
+    const timer = window.setTimeout(() => {
       setSlideIndex((current) => (current + 1) % slides.length);
+      setRotationKey((current) => current + 1);
     }, rotationMs);
     return () => {
       window.clearInterval(clock);
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [isPlaying, rotationKey, slideIndex]);
+
+  const goToSlide = (direction: -1 | 1) => {
+    setSlideIndex((current) => (current + direction + slides.length) % slides.length);
+    setRotationKey((current) => current + 1);
+    setSecondsToNext(30);
+  };
+
+  const togglePlayback = () => {
+    setIsPlaying((current) => !current);
+    setRotationKey((current) => current + 1);
+    setSecondsToNext(30);
+  };
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.();
+    } else {
+      await document.exitFullscreen?.();
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goToSlide(-1);
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        goToSlide(1);
+      } else if (event.code === 'Space') {
+        event.preventDefault();
+        togglePlayback();
+      } else if (event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        void toggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   if (!mounted) return null;
 
@@ -234,20 +286,33 @@ export default function MaintenanceControlTowerPage() {
       </main>
 
       <footer className="z-10 shrink-0 border-t border-[var(--tower-border)] bg-[var(--tower-canvas)] pt-2 pb-1">
-        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 text-sm text-[var(--tower-ink-muted)]">
+        <div className="grid items-center gap-3 text-sm text-[var(--tower-ink-muted)] lg:grid-cols-[1fr_auto_1fr]">
           <div className="flex items-center gap-2">
             <Clock3 className="h-4 w-4" />
-            Próxima vista en {secondsToNext} s · datos cada {data?.refreshSeconds || 60} s
+            {isPlaying ? <>Próxima vista en {secondsToNext} s</> : <>Rotación en pausa</>} · datos cada {data?.refreshSeconds || 60} s
           </div>
-          <div className="flex items-center gap-1.5" aria-label="Progreso de vistas">
-            {slides.map((item, index) => (
-              <span
-                key={item.key}
-                className={cn('h-1.5 rounded-full transition-[width] duration-300', index === slideIndex ? 'w-8 bg-[var(--tower-copper)]' : 'w-3 bg-[var(--tower-border)]')}
-              />
-            ))}
+          <div className="flex items-center justify-center gap-2" aria-label="Controles de Torre de Control">
+            <button type="button" onClick={() => goToSlide(-1)} aria-label="Vista anterior" title="Anterior · Flecha izquierda" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] text-[var(--tower-ink)] transition hover:bg-[var(--tower-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tower-copper)]">
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button type="button" onClick={togglePlayback} aria-label={isPlaying ? 'Pausar rotación' : 'Reanudar rotación'} title={isPlaying ? 'Pausar · Espacio' : 'Reproducir · Espacio'} className="inline-flex h-12 min-w-16 items-center justify-center rounded-full border border-[var(--tower-copper)] bg-[var(--tower-copper-soft)] px-4 text-[var(--tower-copper)] transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tower-copper)]">
+              {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            </button>
+            <button type="button" onClick={() => goToSlide(1)} aria-label="Vista siguiente" title="Siguiente · Flecha derecha" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] text-[var(--tower-ink)] transition hover:bg-[var(--tower-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tower-copper)]">
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <button type="button" onClick={() => void toggleFullscreen()} aria-label="Pantalla completa" title="Pantalla completa · F" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--tower-border)] bg-[var(--tower-surface)] text-[var(--tower-ink)] transition hover:bg-[var(--tower-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tower-copper)]">
+              <Maximize2 className="h-5 w-5" />
+            </button>
           </div>
-          <div>{data?.summary?.activeAssets || 0}/{data?.summary?.canonicalAssets || 0} equipos con señal actual · corte {data?.operationalCutoff || 'sin corte'}</div>
+          <div className="flex items-center justify-end gap-4 text-right">
+            <div className="flex items-center gap-1.5" aria-label="Progreso de vistas">
+              {slides.map((item, index) => (
+                <span key={item.key} className={cn('h-1.5 rounded-full transition-[width] duration-300', index === slideIndex ? 'w-8 bg-[var(--tower-copper)]' : 'w-3 bg-[var(--tower-border)]')} />
+              ))}
+            </div>
+            <span>{data?.summary?.activeAssets || 0}/{data?.summary?.canonicalAssets || 0} equipos con señal actual</span>
+          </div>
         </div>
       </footer>
     </div>,
@@ -415,6 +480,7 @@ function PreventiveSlide({ data }: { data: any }) {
 
 function ScheduleSlide({ data }: { data: any }) {
   const rows = Array.isArray(data?.workOrders) ? data.workOrders : [];
+  const planned = Array.isArray(data?.weeklyPlanning?.rows) ? data.weeklyPlanning.rows : [];
   const today = String(data?.coordination?.today || '');
   const tomorrow = String(data?.coordination?.tomorrow || '');
   const open = rows
@@ -423,40 +489,68 @@ function ScheduleSlide({ data }: { data: any }) {
       const rank = (row: any) => row.overdue ? 0 : row.scheduledDate === today ? 1 : row.scheduledDate === tomorrow ? 2 : 3;
       return rank(a) - rank(b) || String(a.scheduledDate || '').localeCompare(String(b.scheduledDate || ''));
     });
+  const plannedActive = planned.filter((row: any) => !['Finalizado', 'Reportado finalizado'].includes(String(row.stage || '')));
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-3">
-      <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-5">
-        <SmallMetric label="Vencidas" value={data?.summary?.overdueOpenWorkOrders} />
-        <SmallMetric label="Para hoy" value={data?.summary?.dueTodayOpenWorkOrders} />
-        <SmallMetric label="Para mañana" value={data?.summary?.dueTomorrowOpenWorkOrders} />
-        <SmallMetric label="Mañana por confirmar" value={data?.summary?.dueTomorrowNotReadyWorkOrders} />
-        <SmallMetric label="Sin responsable" value={data?.summary?.unassignedOpenWorkOrders} />
+      <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-6">
+        <SmallMetric label="Planificados" value={data?.summary?.weeklyPlannedWorks} />
+        <SmallMetric label="Para hoy" value={data?.summary?.weeklyPlannedToday} />
+        <SmallMetric label="Para mañana" value={data?.summary?.weeklyPlannedTomorrow} />
+        <SmallMetric label="Sin OT" value={data?.summary?.weeklyPlannedUnlinked} />
+        <SmallMetric label="OT abiertas" value={data?.summary?.openWorkOrders} />
+        <SmallMetric label="Por revisar" value={data?.summary?.weeklyPlannedReview} />
       </div>
-      <Panel
-        title="Programa de ejecución"
-        subtitle={`Planificación + materiales · stock informado ${dateTime(data?.inventory?.latestAt)} · reservas de Bodega por separado`}
-      >
-        <DataTable
-          headers={['OT', 'Fecha', 'Equipo', 'Responsable', 'Etapa', 'Prioridad', 'Preparación']}
-          columnTemplate=".8fr .7fr 1.55fr 1.35fr 1.45fr .8fr 1.25fr"
-          rows={open.slice(0, 8).map((row: any) => [
-            row.workOrderNumber,
-            shortDate(row.scheduledDate),
-            row.assetName,
-            row.assignedTo || 'Sin responsable',
-            `${row.overdue ? 'Vencida · ' : row.scheduledDate === today ? 'Hoy · ' : row.scheduledDate === tomorrow ? 'Mañana · ' : ''}${row.lifecycleStage || statusLabel(row.status)}`,
-            priorityLabel(row.priority),
-            row.executionReadiness || 'Por confirmar',
-          ])}
-        />
-      </Panel>
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[1.2fr_.8fr]">
+        <Panel
+          title="Programa de ejecución"
+          subtitle={`Plan semanal oficial · ${data?.weeklyPlanning?.sourceCount || 0} fuente(s) vigentes · planificación recibida de Ariel · no crea OT automáticamente`}
+        >
+          {plannedActive.length ? (
+            <DataTable
+              headers={['Fecha', 'Mina', 'Equipo', 'Trabajo', 'Responsable', 'Estado', 'OT']}
+              columnTemplate=".65fr .8fr 1.25fr 1.8fr 1.1fr .9fr .75fr"
+              rows={plannedActive.slice(0, 8).map((row: any) => [
+                shortDate(row.plannedDate),
+                row.mine,
+                row.assetLabel,
+                row.title,
+                row.assignedName || 'Sin responsable',
+                row.stage,
+                row.linkedWorkOrderNumber || '—',
+              ])}
+            />
+          ) : (
+            <EmptyState title="Sin trabajos planificados vigentes" text="No hay filas activas en las fuentes semanales oficiales." />
+          )}
+        </Panel>
+        <Panel
+          title="Órdenes en ejecución"
+          subtitle={`OT canónicas · Mañana por confirmar: ${data?.summary?.dueTomorrowNotReadyWorkOrders || 0} · stock informado ${dateTime(data?.inventory?.latestAt)} · reservas de Bodega por separado`}
+        >
+          {open.length ? (
+            <DataTable
+              headers={['OT', 'Fecha', 'Equipo', 'Etapa', 'Preparación']}
+              columnTemplate=".8fr .65fr 1.35fr 1.1fr 1.2fr"
+              rows={open.slice(0, 8).map((row: any) => [
+                row.workOrderNumber,
+                shortDate(row.scheduledDate),
+                row.assetName,
+                `${row.overdue ? 'Vencida · ' : row.scheduledDate === today ? 'Hoy · ' : row.scheduledDate === tomorrow ? 'Mañana · ' : ''}${row.lifecycleStage || statusLabel(row.status)}`,
+                row.executionReadiness || 'Por confirmar',
+              ])}
+            />
+          ) : (
+            <EmptyState title="Sin OT abiertas" text="La planificación puede existir sin haberse convertido aún en una OT." />
+          )}
+        </Panel>
+      </div>
+      <div className="grid gap-2 md:grid-cols-4">
+        <BasisRow label="Fuentes semanales vigentes" value={data?.weeklyPlanning?.sourceCount || 0} />
         <BasisRow label="Productos de Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
         <BasisRow label="Productos con stock disponible" value={data?.inventory?.positiveStockSkus || 0} />
         <BasisRow label="Productos por revisar" value={data?.inventory?.conflictedSkus || 0} />
       </div>
-      {open.length === 0 ? <EmptyState title="Sin OT abiertas" text="No hay trabajo activo pendiente de coordinación." /> : null}
     </div>
   );
 }
