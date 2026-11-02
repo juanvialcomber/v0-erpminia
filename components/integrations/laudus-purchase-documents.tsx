@@ -143,7 +143,7 @@ export function LaudusPurchaseDocuments() {
             {waybills.length ? waybills.map((row) => (
               <div key={row.external_id} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.4fr)_160px_180px] lg:items-center">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2"><Truck className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Guía {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : }</div>
+                  <div className="flex flex-wrap items-center gap-2"><Truck className="h-4 w-4 text-muted-foreground"/><p className="font-medium">Guía {row.doc_number || 'sin número'}</p>{row.quality_flags?.length ? <Badge variant="outline">Revisar calidad</Badge> : null}</div>
                   <p className="mt-1 truncate text-xs text-muted-foreground">{row.supplier_name || 'Proveedor sin nombre'} · {row.supplier_tax_id || 'Sin RUT'}</p>
                   {row.notes ? <p className="mt-1 truncate text-xs text-muted-foreground">{row.notes}</p> : null}
                 </div>
