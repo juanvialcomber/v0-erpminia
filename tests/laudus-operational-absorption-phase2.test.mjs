@@ -33,3 +33,15 @@ test('asset economics are visible in Finance without changing identity authority
   assert.match(assetEconomics, /Sólo lectura/);
   assert.match(assetEconomics, /no modifica ni Laudus ni Ficha 360/i);
 });
+
+
+test('live fixed-asset economics are opt-in to protect the Laudus API budget', () => {
+  assert.match(assetEconomics, /enabled \? '\/api\/integrations\/laudus\/fixed-asset-economics' : null/);
+  assert.match(assetEconomics, /Consulta bajo demanda/);
+});
+
+test('accounting cost-center UI refuses false attribution when line-level center data is absent', () => {
+  const accountingCard = readFileSync(new URL('../components/integrations/laudus-accounting-cost-centers.tsx', import.meta.url), 'utf8');
+  assert.match(accountingCard, /entriesWithCostCenter === 0/);
+  assert.match(accountingCard, /No se atribuyen movimientos a centros por suposición/);
+});
