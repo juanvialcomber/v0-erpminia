@@ -31,13 +31,25 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const productId = String(body?.productId || '').trim();
+  const warehouseId = String(body?.warehouseId || '').trim();
+  const requestedDateTo = String(body?.dateTo || '').trim();
   if (!/^[0-9]{1,18}$/.test(productId)) {
     return NextResponse.json({ error: 'productId Laudus inválido.' }, { status: 400 });
+  }
+  if (warehouseId && !/^[A-Za-z0-9_-]{1,3}$/.test(warehouseId)) {
+    return NextResponse.json({ error: 'warehouseId Laudus inválido.' }, { status: 400 });
+  }
+  if (requestedDateTo && !/^\d{4}-\d{2}-\d{2}$/.test(requestedDateTo)) {
+    return NextResponse.json({ error: 'dateTo inválido.' }, { status: 400 });
   }
 
   try {
     const payload = await withLaudusApiUsageTracking(context.organizationId, () =>
-      getLaudus(`/production/products/${encodeURIComponent(productId)}/kardex`),
+      getLaudus(`/production/products/${encodeURIComponent(productId)}/kardex`, {
+        ...(warehouseId ? { warehouseId } : {}),
+        ...(requestedDateTo ? { dateTo: requestedDateTo } : {}),
+        calculateTransformations: false,
+      }),
     );
     const rows = rowsFrom(payload);
     if (rows.length > 500) {
@@ -55,6 +67,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       productId,
+      warehouseId: warehouseId || null,
+      dateTo: requestedDateTo || null,
       movements: rows.length,
       persisted: true,
       stagingOnly: true,
