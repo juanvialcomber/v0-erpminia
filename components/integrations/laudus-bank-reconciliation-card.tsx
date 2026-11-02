@@ -62,9 +62,9 @@ export function LaudusBankReconciliationCard() {
           <div>
             <div className="flex items-center gap-2">
               <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data?.status === 'available' ? 'connected' : enabled ? 'review' : 'pending'} compact />
-              <CardTitle className="flex items-center gap-2"><Landmark className="h-4 w-4"/>Conciliación bancaria Laudus</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Landmark className="h-4 w-4"/>Conciliación bancaria</CardTitle>
             </div>
-            <CardDescription>Consulta bajo demanda de diferencias banco ↔ libro. No contabiliza ni concilia automáticamente.</CardDescription>
+            <CardDescription>Diferencias banco ↔ libro, con fuente Laudus.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
@@ -77,7 +77,7 @@ export function LaudusBankReconciliationCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!enabled ? <p className="text-sm text-muted-foreground">Se consulta sólo cuando se necesita para proteger el cupo mensual de la API.</p> : null}
+        {!enabled ? <p className="text-sm text-muted-foreground">Consulta disponible bajo demanda.</p> : null}
         {refreshMessage ? <p className="text-xs text-muted-foreground">{refreshMessage}</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data?.status === 'empty' ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">Laudus no devolvió una cartola bancaria disponible para conciliar.</p> : null}
@@ -100,7 +100,7 @@ export function LaudusBankReconciliationCard() {
                 </div>
               </div>
             ) : <Badge variant="secondary">Sin diferencias observadas en la cartola consultada</Badge>}
-            <p className="text-xs text-muted-foreground">Esta consulta es diagnóstica y no persiste ni modifica conciliaciones en Laudus.</p>
+            <p className="text-xs text-muted-foreground">Fuente Laudus · revisión financiera en MOTIL.</p>
           </>
         ) : null}
       </CardContent>
