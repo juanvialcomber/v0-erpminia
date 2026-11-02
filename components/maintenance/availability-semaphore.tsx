@@ -60,6 +60,13 @@ type ReportedAvailabilityResponse = {
     latestDetail?: string | null;
     sourceFile: string;
   }>;
+  sources?: Array<{
+    sourceId: string;
+    reportedDate: string;
+    sourceFile: string;
+    gmailMessageId?: string | null;
+    receivedAt?: string | null;
+  }>;
   currentUnavailable?: Array<{
     canonicalAssetId?: string | null;
     assetName: string;
@@ -236,8 +243,14 @@ export function AvailabilitySemaphore() {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
-            <strong className="font-medium text-foreground">Regla:</strong> {data.evidence?.denominator} {data.evidence?.standbyRule}
+          <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <strong className="font-medium text-foreground">Regla:</strong> {data.evidence?.denominator} {data.evidence?.standbyRule}
+            </div>
+            <div className="text-xs">
+              Fuente más reciente: <span className="font-medium text-foreground">{data.sources?.[0]?.sourceFile || '—'}</span>
+              {data.sources?.[0]?.reportedDate ? <> · corte {shortDate(data.sources[0].reportedDate)}</> : null}
+            </div>
           </div>
         </CardContent>
       </Card>
