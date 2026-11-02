@@ -6,6 +6,7 @@ import { FileText, Search, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type InvoiceRow = {
   external_id: string;
@@ -87,7 +88,7 @@ export function LaudusPurchaseDocuments() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>Histórico Laudus</CardTitle>
+              <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : activeFreshness?.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle>Histórico Laudus</CardTitle></div>
               {activeFreshness ? (
                 <Badge variant={activeFreshness.healthStatus === 'healthy' ? 'secondary' : activeFreshness.healthStatus === 'broken' ? 'destructive' : 'outline'}>
                   {activeFreshness.healthStatus === 'healthy' ? 'Actualizado' : activeFreshness.healthStatus === 'broken' ? 'Sync interrumpido' : 'Revisar sync'}
