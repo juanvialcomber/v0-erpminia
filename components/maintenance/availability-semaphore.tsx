@@ -21,10 +21,12 @@ type PeriodKey = '7d' | '30d' | 'month';
 
 type ReportedAggregate = {
   sourceRows: number;
+  expectedObservations: number;
   classifiedObservations: number;
   availableObservations: number;
   unavailableObservations: number;
   reviewRequired: number;
+  unresolvedReportedRows: number;
   availabilityPercentage: number | null;
   evidenceCoveragePercentage: number | null;
 };
@@ -220,7 +222,7 @@ export function AvailabilitySemaphore() {
             <div className="bg-card p-4">
               <p className="text-xs text-muted-foreground">Cobertura de evidencia</p>
               <p className={cn('mt-2 text-3xl font-semibold', metricTone(s.evidenceCoveragePercentage))}>{pct(s.evidenceCoveragePercentage)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.classifiedObservations}/{s.sourceRows} filas clasificables</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.classifiedObservations}/{s.expectedObservations} observaciones esperadas</p>
             </div>
             <div className="bg-card p-4">
               <p className="text-xs text-muted-foreground">Indisponibles al último corte</p>
