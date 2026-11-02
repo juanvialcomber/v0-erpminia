@@ -53,6 +53,8 @@ test('private OT evidence generates browser-safe HEIC previews while preserving 
   assert.match(evidenceRoute, /transform: \{ width: 1600, height: 1600, resize: 'contain', quality: 86 \}/);
   assert.match(evidenceRoute, /transform: \{ width: 320, height: 240, resize: 'cover', quality: 74 \}/);
   assert.match(evidenceRoute, /original_url: originalUrl/);
+  assert.match(evidenceRoute, /download_url: downloadUrl/);
+  assert.match(evidenceRoute, /download: true/);
   assert.match(evidenceRoute, /preview_transformed: needsWebPreview/);
   assert.match(evidenceRoute, /'Cache-Control': 'private, no-store, max-age=0'/);
   assert.doesNotMatch(evidenceRoute, /\.remove\(\[row\.storage_path\]\)/);
@@ -65,7 +67,8 @@ test('OT evidence UI refreshes expiring private URLs before expiry', () => {
   assert.match(component, /primaryPhoto\.preview_url \|\| primaryPhoto\.signed_url/);
   assert.match(component, /thumbnail_url/);
   assert.match(component, /HEIC · vista web/);
-  assert.match(component, /primaryPhoto\.original_url/);
+  assert.match(component, /primaryPhoto\.download_url \|\| primaryPhoto\.original_url/);
+  assert.match(component, /Descargar original/);
 });
 
 test('progressive close queue uses the same refreshed web-safe previews', () => {
