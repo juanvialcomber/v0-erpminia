@@ -232,7 +232,7 @@ export function AvailabilitySemaphore() {
             <div className="bg-card p-4">
               <p className="text-xs text-muted-foreground">Días con reporte</p>
               <p className="mt-2 text-3xl font-semibold">{s.reportDays}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{s.reviewRequired} observaciones requieren revisión</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.reviewRequired} por revisar · {s.unresolvedReportedRows} sin identidad canónica</p>
             </div>
           </div>
 
