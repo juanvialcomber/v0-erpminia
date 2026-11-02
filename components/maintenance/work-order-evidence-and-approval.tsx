@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { CheckCircle2, Download, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,25 @@ const fetcher = async (url: string) => {
 function formatDate(value?: string | null) {
   if (!value) return '';
   return new Date(value).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function EvidenceImage({ src, alt, className, compact = false }: { src?: string | null; alt: string; className: string; compact?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+
+  if (!src || failed) {
+    return (
+      <div className={compact ? 'flex h-full w-full items-center justify-center bg-muted' : 'flex min-h-64 w-full flex-col items-center justify-center gap-2 bg-muted p-4 text-center'}>
+        <ImageIcon className={compact ? 'h-5 w-5 text-muted-foreground' : 'h-8 w-8 text-muted-foreground'} />
+        {!compact ? <span className="text-sm text-muted-foreground">Vista web no disponible. El archivo original sigue conservado.</span> : null}
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} className={className} onError={() => setFailed(true)} />
+  );
 }
 
 export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrderId: string; status?: string | null }) {
@@ -68,10 +87,11 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
           {photos.length ? (
             <div className="space-y-3">
               <a href={primaryPhoto?.preview_url || primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted">
-                {primaryPhoto?.preview_url || primaryPhoto?.signed_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={primaryPhoto.preview_url || primaryPhoto.signed_url} alt={primaryPhoto.file_name || 'Evidencia principal de OT'} className="max-h-[560px] w-full object-contain" />
-                ) : <div className="flex min-h-64 items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground" /></div>}
+                <EvidenceImage
+                  src={primaryPhoto?.preview_url || primaryPhoto?.signed_url}
+                  alt={primaryPhoto?.file_name || 'Evidencia principal de OT'}
+                  className="max-h-[560px] w-full object-contain"
+                />
               </a>
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
                 <div className="flex flex-wrap items-center gap-2">
@@ -94,10 +114,12 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                     const thumbnail = photo.thumbnail_url || photo.preview_url || photo.signed_url || null;
                     return (
                       <button key={photo.id} type="button" onClick={() => setSelectedPhotoId(photo.id)} aria-label={`Ver fotografía ${index + 1}`} aria-pressed={photo.id === primaryPhoto?.id} className={`h-20 w-24 shrink-0 overflow-hidden rounded-md border-2 bg-muted ${photo.id === primaryPhoto?.id ? 'border-primary' : 'border-transparent'}`}>
-                        {thumbnail ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={thumbnail} alt={photo.file_name || `Evidencia ${index + 1}`} className="h-full w-full object-cover" />
-                        ) : <ImageIcon className="mx-auto h-6 w-6 text-muted-foreground" />}
+                        <EvidenceImage
+                          src={thumbnail}
+                          alt={photo.file_name || `Evidencia ${index + 1}`}
+                          className="h-full w-full object-cover"
+                          compact
+                        />
                       </button>
                     );
                   })}
