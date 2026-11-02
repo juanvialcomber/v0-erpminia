@@ -122,9 +122,11 @@ async function storeDownloadError(db: ReturnType<typeof greenDb>, job: DownloadJ
     download_status: permanent ? 'unsupported' : exhausted ? 'unavailable' : 'retry',
     download_lease_until: null, download_error_code: code,
     download_next_at: new Date(Date.now() + Math.min(60, 2 ** Math.min(6, job.attempt_no)) * 60000).toISOString(),
-    scan_status: terminal ? 'manual' : undefined,
-    scan_error_code: terminal ? 'source_unavailable_for_scan' : undefined,
-    scan_lease_until: terminal ? null : undefined,
+    ...(terminal ? {
+      scan_status: 'manual',
+      scan_error_code: 'source_unavailable_for_scan',
+      scan_lease_until: null,
+    } : {}),
     updated_at: new Date().toISOString(),
   }).eq('id', job.job_id).eq('organization_id', job.org_id);
   if (saveError) console.error('[whatsapp-evidence] download error-state write failed', saveError.code);
