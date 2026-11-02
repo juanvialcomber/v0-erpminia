@@ -30,6 +30,7 @@ test('approved proposal is required for linked OT, with stable idempotency and u
  assert.match(weekly,/Listo para revisión de Ariel/);
  assert.match(weekly,/assignedName=\{item\.assigned_name\}/);
  assert.match(editor,/sourceAssignee/);
+ assert.match(weekly,/item\.title\.trim\(\)\.toLowerCase\(\)==='orden y aseo'\?'general'/);
 });
 test('no automatic OT on GET or preview and completed source does not generate OT',()=>{
  assert.doesNotMatch(read('app/api/maintenance/official-weekly-plan/route.ts'),/export async function POST/);
