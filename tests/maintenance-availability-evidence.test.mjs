@@ -49,6 +49,18 @@ test('reported availability uses classified daily observations as numerator and 
   assert.match(reportedMigration, /availability_denominator/);
 });
 
+test('coverage uses expected Base Equipos gaps and unresolved assets never enter availability', () => {
+  assert.match(reportedMigration, /evidence_role in \('reported','expected_missing'\)/);
+  assert.match(reportedMigration, /Rows are the union of reported equipment plus expected Base Equipos gaps/);
+  assert.match(importer, /Base Equipos/);
+  assert.match(importer, /expectedRows/);
+  assert.match(importer, /evidenceRole: 'expected_missing'/);
+  assert.match(importer, /Equipo esperado en Base Equipos sin estado diario reportado/);
+  assert.match(importer, /if \(resolution\.status !== 'matched'\)/);
+  assert.match(importer, /classification = 'review_required'/);
+  assert.match(importer, /reportedCanonicalIds/);
+});
+
 test('reported availability keeps STANDBY and unknown evidence out of the denominator', () => {
   assert.match(importer, /status === 'STANDBY'/);
   assert.match(importer, /classification: 'review_required'/);
@@ -77,7 +89,7 @@ test('report importer trusts internal report date and preserves provenance', () 
 
 test('report importer prevents duplicate asset observations from double counting', () => {
   assert.match(importer, /duplicateCanonicalIds/);
-  assert.match(importer, /Activo canónico repetido dentro del mismo reporte diario/);
+  assert.match(importer, /Activo repetido dentro del mismo reporte diario/);
   assert.match(importer, /classification = 'review_required'/);
   assert.match(importer, /basename\(args\.file\)/);
 });
@@ -89,7 +101,7 @@ test('reported availability reuses email manifest provenance and quarantines dat
   assert.match(importer, /sourceStatus = manifestDateConflict \? 'review_required' : 'official_source'/);
   assert.match(importer, /sourceIsCurrent = !manifestDateConflict/);
   assert.match(importer, /is_current=excluded\.is_current/);
-  assert.doesNotMatch(importer, /source_owner text not null default 'Ariel López'/);
+  assert.doesNotMatch(reportedMigration, /source_owner text not null default 'Ariel López'/);
 });
 
 test('reported availability periods follow Santiago local date', () => {
