@@ -6,6 +6,7 @@ import { BookOpen, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Center = {
   centerId: string;
@@ -71,7 +72,7 @@ export function LaudusAccountingCostCenters() {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4"/>Movimiento contable Laudus</CardTitle>
+            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data?.freshness.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4"/>Movimiento contable Laudus</CardTitle></div>
             <CardDescription>Lectura por centro de costo para análisis dentro de MOTIL. No representa saldo contable actual ni modifica asientos.</CardDescription>
           </div>
           {data ? <div className="flex flex-wrap gap-2"><Badge variant="outline">{data.summary.totalEntries.toLocaleString('es-CL')} asientos alojados</Badge><Badge variant={data.summary.costCenterCoveragePct > 0 ? 'secondary' : 'destructive'}>{data.summary.costCenterCoveragePct}% con centro</Badge></div> : null}
