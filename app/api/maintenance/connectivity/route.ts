@@ -44,7 +44,7 @@ export async function GET(request:NextRequest){
       db.from('motil_whatsapp_daily_reports').select('report_date,status,message_count,error_code,generated_at')
         .eq('organization_id',context.organizationId).order('report_date',{ascending:false}).limit(1).maybeSingle(),
       count(db.from('motil_whatsapp_attachments').select('id',{count:'exact',head:true})
-        .eq('organization_id',context.organizationId).eq('scan_status','waiting').eq('download_status','stored')),
+        .eq('organization_id',context.organizationId).eq('download_status','stored').in('scan_status',['pending','retry','processing','waiting'])),
       count(db.from('motil_whatsapp_attachments').select('id',{count:'exact',head:true})
         .eq('organization_id',context.organizationId).in('download_status',['unavailable','unsupported']).eq('scan_status','waiting')),
       count(db.from('motil_email_source_manifest').select('id',{count:'exact',head:true})
