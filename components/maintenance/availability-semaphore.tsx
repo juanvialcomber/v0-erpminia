@@ -1,163 +1,374 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { Activity, AlertTriangle, ArrowRight, Gauge, RefreshCw, Wrench } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowRight, CalendarDays, Database, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
+import { cn } from '@/lib/utils';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la evidencia de disponibilidad');
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar disponibilidad');
   return payload;
 };
 
-type AvailabilityAsset = {
-  id: string;
-  assetCode?: string | null;
-  assetName?: string | null;
-  assetType?: string | null;
-  location?: string | null;
-  observedStatus: 'operational' | 'maintenance' | 'unavailable' | 'unknown';
-  rawStatus?: string | null;
-  openWorkOrders: number;
-  criticalOpenOrders: number;
-  overduePreventives: number;
-  runtimeReadingCount: number;
-  latestMeterHours?: number | string | null;
-  auditedClosures: number;
-  auditedDowntimeHours?: number | string | null;
-  availabilityPercentage: null;
-  nextAction: string;
+type PeriodKey = '7d' | '30d' | 'month';
+
+type ReportedAggregate = {
+  sourceRows: number;
+  classifiedObservations: number;
+  availableObservations: number;
+  unavailableObservations: number;
+  reviewRequired: number;
+  availabilityPercentage: number | null;
+  evidenceCoveragePercentage: number | null;
 };
 
-type AvailabilityResponse = {
-  summary: {
-    totalAssets: number;
-    canonicalOperational: number;
-    canonicalMaintenance: number;
-    canonicalUnavailable: number;
-    canonicalStatusUnknown: number;
-    assetsWithOpenWorkOrders: number;
-    assetsWithOverduePreventive: number;
-    assetsWithRuntimeReadings: number;
-    assetsWithDowntimeEvidence: number;
-    availabilityPercentage: null;
-    availabilityCalculableAssets: number;
-    evidenceStatus: string;
+type ReportedAvailabilityResponse = {
+  status: 'ready' | 'no_data' | 'schema_pending';
+  mine: string;
+  range: { from: string; to: string; period: string };
+  filters?: {
+    families?: string[];
   };
-  assets: AvailabilityAsset[];
-  evidence?: { availabilityRule?: string };
+  summary: (ReportedAggregate & {
+    reportDays: number;
+    latestReportedDate: string | null;
+    currentUnavailable: number;
+  }) | null;
+  daily?: Array<ReportedAggregate & { date: string }>;
+  families?: Array<ReportedAggregate & {
+    family: string;
+    familySource: 'canonical' | 'mixed_or_derived';
+  }>;
+  assets?: Array<ReportedAggregate & {
+    id: string;
+    assetCode?: string | null;
+    assetName: string;
+    family: string;
+    familySource: string;
+    latestDate: string;
+    latestStatus: string;
+    latestClassification: string;
+    latestDetail?: string | null;
+    sourceFile: string;
+  }>;
+  currentUnavailable?: Array<{
+    canonicalAssetId?: string | null;
+    assetName: string;
+    family: string;
+    status: string;
+    detail?: string | null;
+    sourceFile: string;
+    reportedDate: string;
+  }>;
+  evidence?: {
+    methodology?: string;
+    numerator?: string;
+    denominator?: string;
+    standbyRule?: string;
+    coverageRule?: string;
+    timedAvailability?: string;
+    familyRule?: string;
+    note?: string;
+  };
   timestamp: string;
 };
 
-function statusLabel(status: AvailabilityAsset['observedStatus']) {
-  if (status === 'operational') return 'Operacional informado';
-  if (status === 'maintenance') return 'En mantenimiento';
-  if (status === 'unavailable') return 'No disponible informado';
-  return 'Estado no informado';
+function pct(value: number | null | undefined) {
+  return value == null ? '—' : `${value.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
-function statusVariant(status: AvailabilityAsset['observedStatus']): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (status === 'unavailable') return 'destructive';
-  if (status === 'maintenance') return 'secondary';
-  return 'outline';
+function shortDate(value: string | null | undefined) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short' }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function coverageTone(value: number | null | undefined) {
+  if (value == null) return 'text-muted-foreground';
+  if (value >= 95) return 'text-emerald-600 dark:text-emerald-400';
+  if (value >= 80) return 'text-amber-600 dark:text-amber-400';
+  return 'text-destructive';
+}
+
+function availabilityTone(value: number | null | undefined) {
+  if (value == null) return 'text-muted-foreground';
+  if (value >= 90) return 'text-emerald-600 dark:text-emerald-400';
+  if (value >= 80) return 'text-amber-600 dark:text-amber-400';
+  return 'text-destructive';
 }
 
 export function AvailabilitySemaphore() {
-  const { data, error, isLoading, mutate } = useSWR<AvailabilityResponse>('/api/maintenance/availability/summary', fetcher, { revalidateOnFocus: false });
+  const [period, setPeriod] = useState<PeriodKey>('30d');
+  const [family, setFamily] = useState('Todas');
+  const query = new URLSearchParams({ mine: 'Don Jaime', period });
+  if (family !== 'Todas') query.set('family', family);
 
-  if (isLoading) return <StatePanel tone="loading" title="Reuniendo evidencia de disponibilidad" description="Consultando activos canónicos, OT, horómetros y detenciones auditadas." />;
-  if (error || !data?.summary) return <StatePanel tone="error" title="No fue posible cargar disponibilidad" description={error instanceof Error ? error.message : 'Reintenta la consulta.'} actions={<Button variant="outline" onClick={() => void mutate()}><RefreshCw className="h-4 w-4" />Reintentar</Button>} />;
+  const { data, error, isLoading, mutate } = useSWR<ReportedAvailabilityResponse>(
+    `/api/maintenance/availability/reported?${query.toString()}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const { data: unfiltered } = useSWR<ReportedAvailabilityResponse>(
+    `/api/maintenance/availability/reported?mine=Don+Jaime&period=${period}`,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const families = useMemo(
+    () => ['Todas', ...((unfiltered?.filters?.families || []).filter(Boolean))],
+    [unfiltered?.filters?.families],
+  );
+
+  if (isLoading) {
+    return (
+      <StatePanel
+        tone="loading"
+        title="Calculando disponibilidad reportada"
+        description="Reuniendo snapshots diarios, activos reconciliados y cobertura de evidencia de Mina Don Jaime."
+      />
+    );
+  }
+
+  if (error) {
+    return (
+      <StatePanel
+        tone="error"
+        title="No fue posible cargar disponibilidad"
+        description={error instanceof Error ? error.message : 'Reintenta la consulta.'}
+        actions={<Button variant="outline" onClick={() => void mutate()}><RefreshCw className="h-4 w-4" />Reintentar</Button>}
+      />
+    );
+  }
+
+  if (!data || data.status === 'schema_pending') {
+    return (
+      <StatePanel
+        tone="empty"
+        title="Modelo V1 listo para activar"
+        description="La vista de disponibilidad reportada está preparada, pero la migración y la carga histórica todavía no están aplicadas en este entorno. No se publica ningún porcentaje mientras falte esa base."
+      />
+    );
+  }
+
+  if (data.status === 'no_data' || !data.summary) {
+    return (
+      <StatePanel
+        tone="empty"
+        title="Sin snapshots diarios en el período"
+        description="No hay evidencia diaria clasificada para Mina Don Jaime en este rango. La ausencia de registros no se interpreta como 0% de disponibilidad."
+      />
+    );
+  }
 
   const s = data.summary;
-  const priorityAssets = (data.assets || []).filter((asset) => asset.nextAction !== 'Sin acción prioritaria').slice(0, 12);
+  const worstAssets = (data.assets || [])
+    .filter((asset) => asset.classifiedObservations > 0)
+    .slice(0, 12);
 
   return (
     <div className="space-y-6">
       <Card className="shadow-none">
-        <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Disponibilidad basada en evidencia</p>
-            <CardTitle className="mt-1 text-xl">Porcentaje aún no calculable</CardTitle>
-            <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-              Motil no publicará un porcentaje de disponibilidad hasta contar con una ventana operativa comparable que distinga horas programadas, operación y detención.
+        <CardHeader className="gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Mina Don Jaime</Badge>
+              <Badge variant="secondary">V1 · snapshot diario</Badge>
+              {family !== 'Todas' ? <Badge variant="outline">{family}</Badge> : null}
+            </div>
+            <CardTitle className="text-xl">Disponibilidad reportada</CardTitle>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Porcentaje derivado exclusivamente de estados diarios clasificables. No reemplaza disponibilidad técnica horaria ni utiliza minutos inventados.
             </p>
           </div>
-          <Badge variant="outline">Sin base temporal suficiente</Badge>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-6">
-            {[
-              ['Activos canónicos', s.totalAssets],
-              ['Estado operacional', s.canonicalOperational],
-              ['En mantenimiento', s.canonicalMaintenance],
-              ['Estado sin informar', s.canonicalStatusUnknown],
-              ['Con OT abierta', s.assetsWithOpenWorkOrders],
-              ['Preventivo vencido', s.assetsWithOverduePreventive],
-            ].map(([label, value]) => (
-              <div key={String(label)} className="bg-card p-4">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-2 text-xl font-semibold">{String(value)}</p>
-              </div>
-            ))}
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center gap-2 text-sm font-medium"><Gauge className="h-4 w-4" />Horómetro utilizable</div>
-              <p className="mt-2 text-2xl font-semibold">{s.assetsWithRuntimeReadings}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Activos con lectura acumulada real disponible.</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex rounded-md border p-1" aria-label="Período">
+              {([
+                ['7d', '7 días'],
+                ['30d', '30 días'],
+                ['month', 'Mes'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPeriod(value)}
+                  className={cn(
+                    'min-h-9 rounded px-3 text-xs font-medium transition-colors',
+                    period === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center gap-2 text-sm font-medium"><Activity className="h-4 w-4" />Detención auditada</div>
-              <p className="mt-2 text-2xl font-semibold">{s.assetsWithDowntimeEvidence}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Activos con cierres auditados que registran evidencia de detención.</p>
+            <label className="sr-only" htmlFor="availability-family">Familia</label>
+            <select
+              id="availability-family"
+              value={family}
+              onChange={(event) => setFamily(event.target.value)}
+              className="min-h-11 rounded-md border bg-background px-3 text-sm"
+            >
+              {families.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-card p-4">
+              <p className="text-xs text-muted-foreground">Disponibilidad reportada</p>
+              <p className={cn('mt-2 text-3xl font-semibold', availabilityTone(s.availabilityPercentage))}>{pct(s.availabilityPercentage)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.availableObservations}/{s.classifiedObservations} observaciones disponibles</p>
             </div>
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4" />Disponibilidad calculable</div>
-              <p className="mt-2 text-2xl font-semibold">{s.availabilityCalculableAssets}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Se mantiene en cero mientras no exista una ventana operativa comparable.</p>
+            <div className="bg-card p-4">
+              <p className="text-xs text-muted-foreground">Cobertura de evidencia</p>
+              <p className={cn('mt-2 text-3xl font-semibold', coverageTone(s.evidenceCoveragePercentage))}>{pct(s.evidenceCoveragePercentage)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.classifiedObservations}/{s.sourceRows} filas clasificables</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-xs text-muted-foreground">Indisponibles al último corte</p>
+              <p className="mt-2 text-3xl font-semibold">{s.currentUnavailable}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Corte {shortDate(s.latestReportedDate)}</p>
+            </div>
+            <div className="bg-card p-4">
+              <p className="text-xs text-muted-foreground">Días con reporte</p>
+              <p className="mt-2 text-3xl font-semibold">{s.reportDays}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.reviewRequired} observaciones requieren revisión</p>
             </div>
           </div>
 
           <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
-            {data.evidence?.availabilityRule || 'La disponibilidad requiere evidencia temporal compatible.'}
+            <strong className="font-medium text-foreground">Regla:</strong> {data.evidence?.denominator} {data.evidence?.standbyRule}
           </div>
         </CardContent>
       </Card>
 
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-4 w-4" />Tendencia diaria</CardTitle>
+            <p className="text-sm text-muted-foreground">Cada punto se recalcula desde numerador y denominador del día; no promedia porcentajes.</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(data.daily || []).length ? (data.daily || []).map((day) => (
+              <div key={day.date} className="grid grid-cols-[76px_1fr_70px_70px] items-center gap-3 rounded-md border px-3 py-2">
+                <span className="text-xs font-medium">{shortDate(day.date)}</span>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${Math.max(0, Math.min(100, day.availabilityPercentage || 0))}%` }}
+                  />
+                </div>
+                <span className={cn('text-right text-sm font-semibold', availabilityTone(day.availabilityPercentage))}>{pct(day.availabilityPercentage)}</span>
+                <span className={cn('text-right text-xs', coverageTone(day.evidenceCoveragePercentage))}>{pct(day.evidenceCoveragePercentage)}</span>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">Sin días clasificables en este período.</p>}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4" />Familias</CardTitle>
+            <p className="text-sm text-muted-foreground">Agregación por días-equipo. Las familias derivadas se identifican y no reemplazan el maestro canónico.</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(data.families || []).map((item) => (
+              <div key={item.family} className="grid grid-cols-[1fr_90px_90px] items-center gap-3 rounded-md border px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.family}</p>
+                  <p className="text-xs text-muted-foreground">{item.familySource === 'canonical' ? 'Familia canónica' : 'Familia parcial/derivada'}</p>
+                </div>
+                <div className="text-right">
+                  <p className={cn('text-sm font-semibold', availabilityTone(item.availabilityPercentage))}>{pct(item.availabilityPercentage)}</p>
+                  <p className="text-[11px] text-muted-foreground">disp.</p>
+                </div>
+                <div className="text-right">
+                  <p className={cn('text-sm font-semibold', coverageTone(item.evidenceCoveragePercentage))}>{pct(item.evidenceCoveragePercentage)}</p>
+                  <p className="text-[11px] text-muted-foreground">cobertura</p>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {(data.currentUnavailable || []).length > 0 ? (
+        <Card className="border-destructive/30 shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-destructive" />Indisponibles al último reporte</CardTitle>
+            <p className="text-sm text-muted-foreground">Sólo estados explícitamente clasificados como indisponibles en la evidencia del último corte.</p>
+          </CardHeader>
+          <CardContent className="divide-y rounded-lg border">
+            {(data.currentUnavailable || []).map((item, index) => (
+              <div key={`${item.canonicalAssetId || item.assetName}-${index}`} className="grid gap-2 py-3 first:pt-0 last:pb-0 md:grid-cols-[1.2fr_.7fr_.8fr_1.5fr] md:items-center">
+                <div>
+                  <p className="font-medium">{item.assetName}</p>
+                  <p className="text-xs text-muted-foreground">{item.family}</p>
+                </div>
+                <Badge variant="destructive" className="w-fit">{item.status}</Badge>
+                <span className="text-xs text-muted-foreground">{shortDate(item.reportedDate)}</span>
+                <span className="text-sm text-muted-foreground">{item.detail || 'Sin diagnóstico informado'}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><Wrench className="h-4 w-4" />Equipos que requieren atención</CardTitle>
-          <p className="text-sm text-muted-foreground">Priorizados por preventivo vencido, OT prioritaria, OT abierta o estado informado de mantenimiento. No es un ranking de impacto productivo.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-4 w-4" />Disponibilidad por máquina</CardTitle>
+          <p className="text-sm text-muted-foreground">Ordenada desde menor disponibilidad. El porcentaje se calcula sobre observaciones clasificables del equipo.</p>
         </CardHeader>
         <CardContent>
-          {priorityAssets.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No hay acciones operacionales prioritarias derivadas de estas fuentes.</div>
-          ) : (
+          {worstAssets.length ? (
             <div className="divide-y rounded-lg border">
-              {priorityAssets.map((asset) => (
-                <div key={asset.id} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.4fr)_150px_120px_160px_auto] lg:items-center">
+              {worstAssets.map((asset) => (
+                <div key={asset.id} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.5fr)_130px_120px_130px_auto] lg:items-center">
                   <div className="min-w-0">
-                    <p className="font-medium">{asset.assetCode || asset.assetName || 'Activo'}</p>
-                    <p className="truncate text-xs text-muted-foreground">{[asset.assetName, asset.assetType, asset.location].filter(Boolean).join(' · ') || 'Sin detalle adicional'}</p>
+                    <p className="truncate font-medium">{asset.assetName}</p>
+                    <p className="truncate text-xs text-muted-foreground">{asset.family} · último estado: {asset.latestStatus}</p>
                   </div>
-                  <Badge variant={statusVariant(asset.observedStatus)} className="w-fit">{statusLabel(asset.observedStatus)}</Badge>
-                  <div><p className="text-xs text-muted-foreground">OT abiertas</p><p className="font-medium">{asset.openWorkOrders}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Siguiente acción</p><p className="text-sm font-medium">{asset.nextAction}</p></div>
-                  <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/equipos/${encodeURIComponent(asset.id)}/ficha`}>Ficha 360<ArrowRight className="h-4 w-4" /></Link></Button>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Disponibilidad</p>
+                    <p className={cn('font-semibold', availabilityTone(asset.availabilityPercentage))}>{pct(asset.availabilityPercentage)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Cobertura</p>
+                    <p className={cn('font-semibold', coverageTone(asset.evidenceCoveragePercentage))}>{pct(asset.evidenceCoveragePercentage)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Observaciones</p>
+                    <p className="font-medium">{asset.classifiedObservations}/{asset.sourceRows}</p>
+                  </div>
+                  {asset.id.startsWith('unresolved:') ? (
+                    <Badge variant="outline">Por conciliar</Badge>
+                  ) : (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={`/dashboard/mantenimiento/equipos/${encodeURIComponent(asset.id)}/ficha`}>
+                        Ficha 360<ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No hay máquinas con denominador válido en este período.</div>
           )}
         </CardContent>
       </Card>
 
-      <p className="text-center text-xs text-muted-foreground">Actualizado: {new Date(data.timestamp).toLocaleString('es-CL')}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" />Método: snapshot diario reportado · fuente trazable · sin minutos inferidos</span>
+        <span>Actualizado: {new Date(data.timestamp).toLocaleString('es-CL')}</span>
+      </div>
     </div>
   );
 }
