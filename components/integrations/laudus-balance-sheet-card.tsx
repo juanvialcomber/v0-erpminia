@@ -71,9 +71,9 @@ export function LaudusBalanceSheetCard() {
           <div>
             <div className="flex items-center gap-2">
               <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact />
-              <CardTitle className="flex items-center gap-2"><Scale className="h-4 w-4" />Balance Laudus</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Scale className="h-4 w-4" />Balance</CardTitle>
             </div>
-            <CardDescription>Snapshot contable de 8 columnas bajo demanda. No reemplaza el cierre ni estados financieros aprobados.</CardDescription>
+            <CardDescription>Vista contable de 8 columnas con fuente Laudus.</CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
             {enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar balance'}
@@ -81,7 +81,7 @@ export function LaudusBalanceSheetCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!enabled ? <p className="text-sm text-muted-foreground">La consulta se ejecuta sólo cuando Finanzas la necesita para proteger el cupo API.</p> : null}
+        {!enabled ? <p className="text-sm text-muted-foreground">Consulta disponible bajo demanda.</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data ? (
           <>
@@ -91,7 +91,7 @@ export function LaudusBalanceSheetCard() {
               <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Gastos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.expenses)}</p></div>
               <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Ingresos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.incomes)}</p></div>
             </div>
-            <p className="text-xs text-muted-foreground">Fecha de corte: {data.dateTo} · {data.records.toLocaleString('es-CL')} cuentas devueltas · consulta no persistida.</p>
+            <p className="text-xs text-muted-foreground">Fecha de corte: {data.dateTo} · {data.records.toLocaleString('es-CL')} cuentas · Fuente: Laudus.</p>
           </>
         ) : null}
       </CardContent>
