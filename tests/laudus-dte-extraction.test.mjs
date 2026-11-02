@@ -10,7 +10,7 @@ const coverage = readFileSync(new URL('../app/api/integrations/laudus/coverage/r
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8');
 
 test('Laudus client permits DTE only inside the existing read-only allowlist', () => {
-  assert.match(client, /path\.startsWith\('\/DTE\/'\)/);
+  assert.equal((client.match(/path\.startsWith\('\/DTE\/'\)/g) || []).length >= 2, true);
   assert.doesNotMatch(client, /createLaudusDte|updateLaudusDte|deleteLaudusDte/);
 });
 
