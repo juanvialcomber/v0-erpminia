@@ -57,6 +57,9 @@ export function ProduccionDashboard(){
   const plan=p?.plan;
   const pace=plan?.paceIndexPct ?? null;
   const paceLabel=pace===null?'—':pace>=97?'En ritmo':pace>=90?'Leve desvío':'Bajo ritmo';
+  const attentionSignal=data.intelligence.find(signal=>signal.level!=='info')||data.intelligence[0]||null;
+  const reviewQueue=data.coverage.queue;
+  const reviewTotal=reviewQueue.importExceptions+reviewQueue.movementNormalization+reviewQueue.movementValidation+reviewQueue.entityReconciliation+reviewQueue.plantShifts+reviewQueue.metallurgy+reviewQueue.drillLocations+data.quality.hold;
 
   return <div className="space-y-6">
     <PageHeader>
@@ -67,6 +70,25 @@ export function ProduccionDashboard(){
       </PageHeaderContent>
       <PageHeaderActions>{ready && canEdit('prod_operaciones') ? <Button asChild variant="outline"><Link href="/dashboard/produccion/ingreso-datos"><Upload className="h-4 w-4"/>Ingresar datos</Link></Button> : null}</PageHeaderActions>
     </PageHeader>
+
+    <section aria-label="Resumen para reunión" className="grid gap-3 lg:grid-cols-3">
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué pasó</p>
+        <p className="mt-2 text-sm font-medium">{p?('Datos operacionales hasta '+date(p.dataThrough)):'Sin período operacional acreditado'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{p?(tons(p.treatedTons,1)+' tratados · recuperación '+pct(p.avgRecoveryPct,2)+' · '+p.deterministicShifts+'/'+p.plantShifts+' turnos determinísticos'):'MOTIL mantiene la ausencia de fuente como dato no disponible, no como cero.'}</p>
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué requiere atención</p>
+        <p className="mt-2 text-sm font-medium">{attentionSignal?.title||'Sin señales operacionales prioritarias'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{attentionSignal?.detail||'No hay una alerta derivada de la evidencia disponible para el período.'}</p>
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué validar</p>
+        <p className="mt-2 text-sm font-medium">{reviewTotal>0?(n(reviewTotal)+' controles requieren revisión'):'Sin controles pendientes en la cola actual'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Importación, transporte, identidades, planta, metalurgia, ubicación de pozos y controles de calidad. La validación sigue siendo humana.</p>
+        <Link href="/dashboard/produccion/fuentes" className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">Revisar fuentes <ArrowRight className="h-3 w-3"/></Link>
+      </div>
+    </section>
 
     <WhatsappOperationalUpdates mode="overview"/>
     <ProductionSourceSnapshot/>
