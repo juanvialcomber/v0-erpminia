@@ -58,3 +58,13 @@ test('Laudus errors expose only safe diagnostic stage and status metadata', () =
   assert.match(route, /upstreamStatus: laudusError\?\.status/);
   assert.doesNotMatch(route, /password|tokenFromPayload|Authorization: Bearer/);
 });
+
+
+test('Laudus list reads retry once without orderBy on upstream 422 only', () => {
+  assert.match(client, /listLaudusWithOrderFallback/);
+  assert.match(client, /error instanceof LaudusApiError/);
+  assert.match(client, /error\.status === 422/);
+  assert.match(client, /query\.orderBy\.length > 0/);
+  assert.match(client, /orderBy: \[\]/);
+  assert.match(client, /apiCalls: 2/);
+});
