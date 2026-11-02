@@ -29,7 +29,7 @@ export default function AreaReadinessPage(){
         <PageHeaderTitle>Estado de áreas</PageHeaderTitle>
         <PageHeaderDescription>Una vista para coordinar la reunión: evidencia disponible, brecha visible y siguiente acción. Cada jefe valida su propia información.</PageHeaderDescription>
       </PageHeaderContent>
-      <PageHeaderActions><Button variant="outline" onClick={()=>void mutate()} disabled={isLoading}><RefreshCw className="h-4 w-4"/>Actualizar</Button></PageHeaderActions>
+      <PageHeaderActions><Button variant="outline" asChild><Link href="/dashboard/mantenimiento/conectividad">Conectividad</Link></Button><Button variant="outline" onClick={()=>void mutate()} disabled={isLoading}><RefreshCw className="h-4 w-4"/>Actualizar</Button></PageHeaderActions>
     </PageHeader>
 
     {error?<StatePanel tone="error" title="Estado de áreas no disponible" description={error.message} actions={<Button variant="outline" onClick={()=>void mutate()}>Reintentar</Button>}/>:null}
