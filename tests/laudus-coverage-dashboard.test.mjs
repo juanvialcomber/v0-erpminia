@@ -32,9 +32,9 @@ test('Laudus quality page combines coverage, public capability discovery and rec
   assert.match(page, /\/api\/integrations\/laudus\/coverage/);
   assert.match(page, /\/api\/integrations\/laudus\/discovery-360/);
   assert.match(page, /\/api\/data-quality\/reconciliation/);
-  assert.match(page, /Inconsistencias Laudus/);
-  assert.match(page, /Información adicional disponible en Laudus/);
-  assert.match(page, /no modifica Laudus ni los maestros canónicos/i);
+  assert.match(page, /Revisiones/);
+  assert.match(page, /Detalle técnico de la integración/);
+  assert.match(page, /Las diferencias se resuelven desde la conciliación con evidencia/);
 });
 
 test('Data quality navigation exposes the Laudus section', () => {
