@@ -12,8 +12,8 @@ test('journal and waybill sync use exact Swagger v2 list paths',()=>{
 });
 
 test('both deltas are bounded to latest 200 and remain staging-only',()=>{
-  assert.match(sync,/listRecent\('\/accounting\/journal\/entries\/list', 'modifiedAt', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/waybills\/list', 'issuedDate', 2\)/);
+  assert.match(sync,/listRecent\('\/accounting\/journal\/entries\/list', ACCOUNTING_ENTRY_FIELDS, 'modifiedAt', 2\)/);
+  assert.match(sync,/listRecent\('\/purchases\/waybills\/list', WAYBILL_FIELDS, 'modifiedAt', 2\)/);
   assert.match(sync,/motil_ingest_laudus_extended_finance/);
   assert.match(sync,/motil_ingest_laudus_waybill_rows/);
   assert.doesNotMatch(sync,/\.insert\(|\.update\(|\.delete\(/);
