@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
+import { LaudusApiError, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -7,6 +7,15 @@ import {
 } from '@/lib/integrations/laudus/sync-policy';
 
 type JsonRow = Record<string, any>;
+
+const ACCOUNTING_ENTRY_FIELDS = [
+  'journalEntryId','journalEntryNumber','date','type','typeNumber','approved',
+  'generated','generatedBy','bookId','notes','createdAt','modifiedAt','lines',
+] as const;
+
+const WAYBILL_FIELDS = [
+  'purchaseWaybillId','docNumber','supplier','warehouse','issuedDate','notes','modifiedAt','items',
+] as const;
 
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) {
@@ -22,7 +31,7 @@ function rowsFrom(payload: unknown): JsonRow[] {
   return [];
 }
 
-async function listRecent(path: string, orderField: string, maxPages = 2) {
+async function listRecent(path: string, fields: readonly string[], orderField: string, maxPages = 2) {
   const rows: JsonRow[] = [];
   let apiCalls = 0;
   let partial = false;
@@ -30,6 +39,7 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
   for (let page = 0; page < maxPages; page += 1) {
     const listed = await listLaudusWithOrderFallback(path, {
       options: { offset: page * 100, limit: 100 },
+      fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
     apiCalls += listed.apiCalls;
@@ -79,7 +89,7 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
   await markLaudusSyncRunning(db, organizationId, 'accounting_entries');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/accounting/journal/entries/list', 'modifiedAt', 2);
+    const listed = await listRecent('/accounting/journal/entries/list', ACCOUNTING_ENTRY_FIELDS, 'modifiedAt', 2);
     apiCalls += listed.apiCalls;
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
@@ -101,7 +111,12 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, apiCalls, partial: listed.partial };
   } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'accounting_entries', error, { apiCalls });
+    await markLaudusSyncFailure(db, organizationId, 'accounting_entries', error, {
+      apiCalls,
+      metadata: error instanceof LaudusApiError
+        ? { path: error.path, status: error.status, upstreamCode: error.upstreamCode, readOnly: true }
+        : { readOnly: true },
+    });
     throw error;
   }
 }
@@ -110,7 +125,7 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
   await markLaudusSyncRunning(db, organizationId, 'waybills');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/purchases/waybills/list', 'issuedDate', 2);
+    const listed = await listRecent('/purchases/waybills/list', WAYBILL_FIELDS, 'modifiedAt', 2);
     apiCalls += listed.apiCalls;
     const flattened = listed.rows.flatMap(flattenWaybill).filter((row) => row.purchaseWaybillId != null);
 
@@ -144,7 +159,12 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, lines, apiCalls, partial: listed.partial };
   } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'waybills', error, { apiCalls });
+    await markLaudusSyncFailure(db, organizationId, 'waybills', error, {
+      apiCalls,
+      metadata: error instanceof LaudusApiError
+        ? { path: error.path, status: error.status, upstreamCode: error.upstreamCode, readOnly: true }
+        : { readOnly: true },
+    });
     throw error;
   }
 }
