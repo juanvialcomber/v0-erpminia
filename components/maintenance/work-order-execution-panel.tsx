@@ -93,7 +93,16 @@ type WorkOrderSummary = {
 };
 
 export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { workOrderId: string; readOnly?: boolean }) {
-  const { data: photoData } = useSWR(workOrderId ? `/api/maintenance/work-orders/${workOrderId}/evidence` : null, fetcher);
+  const { data: photoData } = useSWR(
+    workOrderId ? `/api/maintenance/work-orders/${workOrderId}/evidence` : null,
+    fetcher,
+    {
+      refreshInterval: 10 * 60 * 1000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 15_000,
+    },
+  );
   const { data, error, isLoading, mutate } = useSWR(
     workOrderId ? `/api/maintenance/work-orders/${workOrderId}/execution` : null,
     fetcher,
@@ -121,7 +130,13 @@ export function WorkOrderExecutionPanel({ workOrderId, readOnly = false }: { wor
   const services = (Array.isArray(data?.externalServices) ? data.externalServices : []) as ExternalService[];
   const events = (Array.isArray(data?.events) ? data.events : []) as WorkOrderEvent[];
   const costs = data?.costs || {};
-  const reportPhotos = (Array.isArray(photoData?.evidence) ? photoData.evidence : []).filter((photo: { signed_url?: string | null }) => Boolean(photo.signed_url)) as Array<{ id: string; signed_url: string; file_name?: string | null }>;
+  const reportPhotos = (Array.isArray(photoData?.evidence) ? photoData.evidence : [])
+    .map((photo: { id: string; file_name?: string | null; signed_url?: string | null; preview_url?: string | null }) => ({
+      id: photo.id,
+      file_name: photo.file_name,
+      signed_url: photo.preview_url || photo.signed_url || null,
+    }))
+    .filter((photo: { signed_url?: string | null }) => Boolean(photo.signed_url)) as Array<{ id: string; signed_url: string; file_name?: string | null }>;
 
   const printReport = async () => {
     const images = Array.from(document.querySelectorAll<HTMLImageElement>('#work-order-final-report img'));
