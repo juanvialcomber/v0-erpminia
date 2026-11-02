@@ -83,6 +83,15 @@ function familyForRow(row: ReportedRow) {
   return { label: 'Otros', source: 'derived_name_v1' };
 }
 
+function santiagoDay(offsetDays = 0) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(Date.now() + offsetDays * 86400000));
+}
+
 function dateRange(request: NextRequest) {
   const url = request.nextUrl;
   const explicitFrom = url.searchParams.get('from');
@@ -90,19 +99,10 @@ function dateRange(request: NextRequest) {
   if (explicitFrom && explicitTo) return { from: explicitFrom, to: explicitTo, period: 'custom' };
 
   const period = url.searchParams.get('period') || '30d';
-  const today = new Date();
-  const to = today.toISOString().slice(0, 10);
-  if (period === '7d') {
-    const fromDate = new Date(today);
-    fromDate.setUTCDate(fromDate.getUTCDate() - 6);
-    return { from: fromDate.toISOString().slice(0, 10), to, period };
-  }
-  if (period === 'month') {
-    return { from: `${to.slice(0, 7)}-01`, to, period };
-  }
-  const fromDate = new Date(today);
-  fromDate.setUTCDate(fromDate.getUTCDate() - 29);
-  return { from: fromDate.toISOString().slice(0, 10), to, period: '30d' };
+  const to = santiagoDay();
+  if (period === '7d') return { from: santiagoDay(-6), to, period };
+  if (period === 'month') return { from: `${to.slice(0, 7)}-01`, to, period };
+  return { from: santiagoDay(-29), to, period: '30d' };
 }
 
 function pct(numerator: number, denominator: number) {
