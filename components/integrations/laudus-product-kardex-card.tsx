@@ -59,7 +59,7 @@ async function trigger(url: string, { arg }: { arg: { productId: string; warehou
     body: JSON.stringify(arg),
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar el Kardex Laudus');
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo consultar el Kardex ERP');
   return payload as Response;
 }
 
@@ -89,7 +89,7 @@ export function LaudusProductKardexCard({
     return (
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Kardex Laudus</CardTitle>
+          <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Kardex ERP</CardTitle>
           <CardDescription>Este producto todavía no tiene un vínculo Laudus validado.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -114,10 +114,10 @@ export function LaudusProductKardexCard({
           <div>
             <div className="flex items-center gap-2">
               <LaudusSourceMark state={isMutating ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact />
-              <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Kardex Laudus</CardTitle>
+              <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Kardex ERP</CardTitle>
             </div>
             <CardDescription>
-              Movimiento ERP del producto vinculado. Consulta bajo demanda; no reemplaza el Kardex operativo MOTIL.
+              Historial ERP del producto vinculado, disponible bajo demanda.
             </CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => void execute()} disabled={isMutating}>
@@ -133,14 +133,13 @@ export function LaudusProductKardexCard({
         </div>
 
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
-        {!queried ? <p className="text-sm text-muted-foreground">No consume API hasta que se solicita el historial.</p> : null}
+        {!queried ? <p className="text-sm text-muted-foreground">Consulta el historial sólo cuando lo necesitas.</p> : null}
 
         {data ? (
           <>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{data.movements.toLocaleString('es-CL')} movimientos</Badge>
-              <Badge variant="outline">Staging MOTIL</Badge>
-              <Badge variant="outline">Laudus sin cambios</Badge>
+              <Badge variant="outline">Fuente Laudus</Badge>
             </div>
             {rows.length ? (
               <div className="divide-y overflow-hidden rounded-lg border">
@@ -159,7 +158,7 @@ export function LaudusProductKardexCard({
             ) : (
               <p className="rounded-lg border p-4 text-sm text-muted-foreground">Kardex consultado. La vista detallada se alimentará desde staging cuando existan movimientos retornados.</p>
             )}
-            <p className="text-xs text-muted-foreground">El stock ERP y el stock operativo MOTIL siguen siendo fuentes distintas hasta conciliación explícita.</p>
+            <p className="text-xs text-muted-foreground">Fuente ERP para contraste con el stock operativo MOTIL.</p>
           </>
         ) : null}
       </CardContent>
