@@ -64,6 +64,10 @@
     {
       "path": "/api/cron/laudus-waybills-daily",
       "schedule": "10 8 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-dtes-daily",
+      "schedule": "40 8 * * *"
     }
   ]
 }
