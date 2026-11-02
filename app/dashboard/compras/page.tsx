@@ -27,6 +27,7 @@ type Overview = {
     invoices: number;
     accountsPayable: number;
     documents: number;
+    openMatchExceptions: number;
   };
 };
 
@@ -63,6 +64,25 @@ export default function ComprasPage() {
           </Button>
         </PageHeaderActions>
       </PageHeader>
+
+      <section aria-label="Resumen para reunión" className="grid gap-3 lg:grid-cols-3">
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Necesidad</p>
+          <p className="mt-2 text-sm font-medium">{isLoading||error?'—':data?.operational.intakeRequests.toLocaleString('es-CL')+' solicitudes registradas'}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">La necesidad conserva su origen y debe pasar por cotización/adjudicación antes de transformarse en compra.</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Ejecución</p>
+          <p className="mt-2 text-sm font-medium">{isLoading||error?'—':data?.operational.operationalOrders.toLocaleString('es-CL')+' OC operativas · '+data?.operational.receipts.toLocaleString('es-CL')+' recepciones'}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">Seguimiento desde la orden hasta la recepción, sin confundir OC histórica con operación vigente.</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Validación</p>
+          <p className="mt-2 text-sm font-medium">{isLoading||error?'—':data?.operational.openMatchExceptions.toLocaleString('es-CL')+' excepciones de conciliación abiertas'}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{isLoading||error?'No se reemplaza una fuente faltante por cero.':data?.operational.invoices.toLocaleString('es-CL')+' facturas · '+data?.operational.accountsPayable.toLocaleString('es-CL')+' cuentas por pagar. La decisión final sigue siendo humana.'}</p>
+          <Link href="/dashboard/compras/flujo" className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">Revisar flujo <ArrowRight className="h-3 w-3"/></Link>
+        </div>
+      </section>
 
       <DataSourceStatusStrip
         reviewHref="/dashboard/calidad-datos"

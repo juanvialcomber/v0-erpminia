@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       invoices,
       accountsPayable,
       documents,
+      openMatchExceptions,
     ] = await Promise.all([
       countRows(
         context.supabase
@@ -79,6 +80,13 @@ export async function GET(request: NextRequest) {
           .eq('is_active', true)
           .is('deleted_at', null),
       ),
+      countRows(
+        context.supabase
+          .from('procurement_match_exceptions')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .not('status', 'in', '("resolved","closed")'),
+      ),
     ]);
 
     return NextResponse.json({
@@ -93,6 +101,7 @@ export async function GET(request: NextRequest) {
         invoices,
         accountsPayable,
         documents,
+        openMatchExceptions,
       },
       sourcePolicy: {
         purchaseOrders: 'canonical_purchase_orders_current',
