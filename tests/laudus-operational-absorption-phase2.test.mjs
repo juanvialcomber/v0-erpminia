@@ -17,7 +17,7 @@ test('historical Laudus purchase documents remain bounded and read-only', () => 
   assert.match(purchaseRoute, /noLaudusMutation: true/);
   assert.doesNotMatch(purchaseRoute, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
   assert.match(invoicePage, /LaudusPurchaseDocuments/);
-  assert.match(purchaseCard, /Sólo lectura/);
+  assert.match(purchaseCard, /Facturas y guías/);
 });
 
 test('cost center accounting view is bounded and does not claim current balances', () => {
@@ -43,7 +43,7 @@ test('live fixed-asset economics are opt-in to protect the Laudus API budget', (
 test('accounting cost-center UI refuses false attribution when line-level center data is absent', () => {
   const accountingCard = readFileSync(new URL('../components/integrations/laudus-accounting-cost-centers.tsx', import.meta.url), 'utf8');
   assert.match(accountingCard, /entriesWithCostCenter === 0/);
-  assert.match(accountingCard, /No se atribuyen movimientos a centros por suposición/);
+  assert.match(accountingCard, /Centros de costo pendientes/);
 });
 
 
@@ -51,7 +51,7 @@ test('Treasury can inspect Laudus bank reconciliation without automatic API burn
   const bankCard = readFileSync(new URL('../components/integrations/laudus-bank-reconciliation-card.tsx', import.meta.url), 'utf8');
   const treasury = readFileSync(new URL('../app/dashboard/finanzas/pagos/page.tsx', import.meta.url), 'utf8');
   assert.match(bankCard, /enabled \? '\/api\/integrations\/laudus\/bank-reconciliation' : null/);
-  assert.match(bankCard, /No contabiliza ni concilia automáticamente/);
+  assert.match(bankCard, /Diferencias banco ↔ libro/);
   assert.match(bankCard, /LaudusSourceMark/);
   assert.match(treasury, /LaudusBankReconciliationCard/);
 });
