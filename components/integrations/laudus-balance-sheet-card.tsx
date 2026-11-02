@@ -39,29 +39,12 @@ const fetcher = async (url: string): Promise<Payload> => {
   return payload as Payload;
 };
 
-const money = (value: number) =>
-  new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0));
-
 export function LaudusBalanceSheetCard() {
   const [enabled, setEnabled] = useState(false);
   const { data, error, isLoading } = useSWR<Payload>(
     enabled ? '/api/integrations/laudus/balance-sheet' : null,
     fetcher,
     { revalidateOnFocus: false, revalidateIfStale: false },
-  );
-
-  const totals = (data?.rows || []).reduce<{ assets: number; liabilities: number; expenses: number; incomes: number }>(
-    (acc, row) => ({
-      assets: acc.assets + Number(row.assets || 0),
-      liabilities: acc.liabilities + Number(row.liabilities || 0),
-      expenses: acc.expenses + Number(row.expenses || 0),
-      incomes: acc.incomes + Number(row.incomes || 0),
-    }),
-    { assets: 0, liabilities: 0, expenses: 0, incomes: 0 },
   );
 
   return (
@@ -85,13 +68,13 @@ export function LaudusBalanceSheetCard() {
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data ? (
           <>
-            <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
-              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Activos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.assets)}</p></div>
-              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Pasivos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.liabilities)}</p></div>
-              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Gastos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.expenses)}</p></div>
-              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Ingresos</p><p className="mt-1 text-lg font-semibold tabular-nums">{money(totals.incomes)}</p></div>
+            <div className="rounded-lg border p-4">
+              <p className="text-sm font-medium">{data.records.toLocaleString('es-CL')} cuentas con actividad</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Corte {data.dateTo}. La vista evita sumar Activos, Pasivos, Gastos e Ingresos hasta validar oficialmente la jerarquía contable devuelta por Laudus.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">Fecha de corte: {data.dateTo} · {data.records.toLocaleString('es-CL')} cuentas · Fuente: Laudus.</p>
+            <p className="text-xs text-muted-foreground">Fuente: Laudus.</p>
           </>
         ) : null}
       </CardContent>
