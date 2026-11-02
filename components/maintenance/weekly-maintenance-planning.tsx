@@ -108,6 +108,7 @@ export function WeeklyMaintenancePlanning() {
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar</Button>
+        <Button variant="outline" asChild><Link href="/dashboard/mantenimiento/areas">Estado de áreas</Link></Button>
         <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Planes estándar</Link></Button>
       </div>
     </header>
