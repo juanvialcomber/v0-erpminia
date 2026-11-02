@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       warehouseId: warehouseId || null,
       dateTo: requestedDateTo || null,
       movements: rows.length,
+      rows: rows.slice(-50),
       persisted: true,
       stagingOnly: true,
       canonicalMutated: false,
