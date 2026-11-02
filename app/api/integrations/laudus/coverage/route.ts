@@ -63,6 +63,47 @@ export async function GET(request: NextRequest) {
     }
   }));
 
+  const SALES_DATASETS = [
+    ['sales_customers', 'Clientes', 'sales_customer'],
+    ['sales_salesmen', 'Vendedores', 'sales_salesman'],
+    ['sales_orders', 'Órdenes de venta', 'sales_order'],
+    ['sales_invoices', 'Facturas de venta', 'sales_invoice'],
+    ['sales_waybills', 'Guías de venta', 'sales_waybill'],
+    ['sales_receipts', 'Cobranzas', 'sales_receipt'],
+  ] as const;
+
+  const salesDatasets = await Promise.all(SALES_DATASETS.map(async ([key, label, entityType]) => {
+    try {
+      const { count, error } = await integration
+        .from('raw_records')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', context.organizationId)
+        .eq('entity_type', entityType)
+        .eq('is_current', true);
+      if (error) throw error;
+      const records = Number(count || 0);
+      return {
+        key,
+        label,
+        table: 'raw_records',
+        entityType,
+        records,
+        status: (records > 0 ? 'integrated' : 'empty') as DatasetStatus,
+      };
+    } catch {
+      return {
+        key,
+        label,
+        table: 'raw_records',
+        entityType,
+        records: null,
+        status: 'unavailable' as DatasetStatus,
+      };
+    }
+  }));
+
+  const allDatasets = [...datasets, ...salesDatasets];
+
   let health: any[] = [];
   try {
     const { data, error } = await context.supabase
@@ -76,8 +117,8 @@ export async function GET(request: NextRequest) {
     health = [];
   }
 
-  const totalRecords = datasets.reduce((sum, row) => sum + (row.records || 0), 0);
-  const integratedDatasets = datasets.filter((row) => row.status === 'integrated').length;
+  const totalRecords = allDatasets.reduce((sum, row) => sum + (row.records || 0), 0);
+  const integratedDatasets = allDatasets.filter((row) => row.status === 'integrated').length;
   const healthyDomains = health.filter((row) => row.health_status === 'healthy').length;
   const unhealthyDomains = health.filter((row) => row.health_status !== 'healthy').length;
   const openIncidents = health.reduce((sum, row) => sum + Number(row.open_incidents || 0), 0);
@@ -86,13 +127,13 @@ export async function GET(request: NextRequest) {
     generatedAt: new Date().toISOString(),
     summary: {
       totalRecords,
-      datasets: datasets.length,
+      datasets: allDatasets.length,
       integratedDatasets,
       healthyDomains,
       unhealthyDomains,
       openIncidents,
     },
-    datasets,
+    datasets: allDatasets,
     health,
   });
 }
