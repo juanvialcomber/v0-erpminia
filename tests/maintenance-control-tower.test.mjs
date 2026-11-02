@@ -197,11 +197,13 @@ test('preventive slide separates hour and kilometer bases and reports active sch
   assert.match(page, /Plan preventivo vigente/);
 });
 
-test('fleet slide separates known equipment states and unknown status by mine', () => {
-  assert.match(page, /Disponibilidad de equipos por mina/);
-  assert.match(page, /site\.operational \+ site\.stopped/);
+test('fleet slide separates current state from reported availability by mine', () => {
+  assert.match(page, /Control general de flota/);
+  assert.match(page, /Estado actual por mina \+ disponibilidad reportada sólo donde existe denominador trazable/);
   assert.match(page, /site\.unknown/);
-  assert.match(page, /Sobre \{classified\} con estado conocido/);
+  assert.match(page, /Sin % derivado de este snapshot/);
+  assert.doesNotMatch(page, /site\.operational \+ site\.stopped/);
+  assert.doesNotMatch(page, /Sobre \{classified\} con estado conocido/);
 });
 
 
