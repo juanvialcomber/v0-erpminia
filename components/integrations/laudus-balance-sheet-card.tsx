@@ -54,7 +54,7 @@ export function LaudusBalanceSheetCard() {
     { revalidateOnFocus: false, revalidateIfStale: false },
   );
 
-  const totals = (data?.rows || []).reduce(
+  const totals = (data?.rows || []).reduce<{ assets: number; liabilities: number; expenses: number; incomes: number }>(
     (acc, row) => ({
       assets: acc.assets + Number(row.assets || 0),
       liabilities: acc.liabilities + Number(row.liabilities || 0),
