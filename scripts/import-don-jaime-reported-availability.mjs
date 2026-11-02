@@ -135,8 +135,10 @@ function rowsFromWorkbook(bytes, filename) {
     if (!rawStatus) continue;
 
     const state = normalizeState(rawStatus);
-    const raw = {
+    output.push({
+      sourceSheet: sheetName,
       sourceRow: index + 1,
+      evidenceRole: 'reported',
       rawAssetName,
       rawStatus,
       ...state,
@@ -148,13 +150,54 @@ function rowsFromWorkbook(bytes, filename) {
       responsible: indexOf('Responsable') >= 0 ? text(row[indexOf('Responsable')]) : null,
       planningObservation: indexOf('Observación planificación') >= 0 ? text(row[indexOf('Observación planificación')]) : null,
       costCenterRaw: indexOf('CC') >= 0 ? text(row[indexOf('CC')]) : null,
-    };
-    output.push(raw);
+    });
   }
 
-  return { sheetName, reportedDate, rows: output };
-}
+  const baseSheetName = workbook.SheetNames.includes('Base Equipos') ? 'Base Equipos' : null;
+  const expectedRows = [];
+  if (baseSheetName) {
+    const baseSheet = workbook.Sheets[baseSheetName];
+    const baseMatrix = XLSX.utils.sheet_to_json(baseSheet, { header: 1, defval: null, raw: true });
+    let baseHeaderIndex = -1;
+    let baseHeaders = [];
+    for (let index = 0; index < Math.min(baseMatrix.length, 10); index += 1) {
+      const labels = (baseMatrix[index] || []).map((value) => text(value) || '');
+      if (labels.includes('Equipo')) {
+        baseHeaderIndex = index;
+        baseHeaders = labels;
+        break;
+      }
+    }
+    if (baseHeaderIndex >= 0) {
+      const baseIndexOf = (label) => baseHeaders.indexOf(label);
+      for (let index = baseHeaderIndex + 1; index < baseMatrix.length; index += 1) {
+        const row = baseMatrix[index] || [];
+        const rawAssetName = text(row[baseIndexOf('Equipo')]);
+        if (!rawAssetName) continue;
+        expectedRows.push({
+          sourceSheet: baseSheetName,
+          sourceRow: index + 1,
+          evidenceRole: 'expected_missing',
+          rawAssetName,
+          rawStatus: 'SIN INFORMACIÓN',
+          normalizedState: 'unknown',
+          classification: 'review_required',
+          downtimeKind: null,
+          meterUnit: baseIndexOf('Unidad') >= 0 ? text(row[baseIndexOf('Unidad')]) : null,
+          meterValue: null,
+          detail: null,
+          workPerformed: null,
+          partRequired: null,
+          responsible: null,
+          planningObservation: baseIndexOf('Observación') >= 0 ? text(row[baseIndexOf('Observación')]) : null,
+          costCenterRaw: null,
+        });
+      }
+    }
+  }
 
+  return { sheetName, baseSheetName, reportedDate, rows: output, expectedRows };
+}
 function plate(value) {
   const match = normalized(value).match(/\b([A-Z]{4})\s?(\d{2})\b/);
   return match ? `${match[1]}-${match[2]}` : null;
@@ -228,6 +271,7 @@ async function main() {
     reportedDate: parsed.reportedDate,
     sheet: parsed.sheetName,
     rows: parsed.rows.length,
+    expectedBaseRows: parsed.expectedRows.length,
     stateCounts,
     includedAvailable: parsed.rows.filter((row) => row.classification === 'available').length,
     includedUnavailable: parsed.rows.filter((row) => row.classification === 'unavailable').length,
@@ -296,9 +340,28 @@ async function main() {
     );
     const sourceId = source.rows[0].id;
 
-    const resolvedRows = parsed.rows.map((row) => ({ row, resolution: resolveAsset(row, maps) }));
+    const reportedResolvedRows = parsed.rows.map((row) => ({ row, resolution: resolveAsset(row, maps) }));
+    const reportedCanonicalIds = new Set(
+      reportedResolvedRows
+        .filter((item) => item.resolution.status === 'matched' && item.resolution.canonicalAssetId)
+        .map((item) => item.resolution.canonicalAssetId),
+    );
+    const reportedRawKeys = new Set(parsed.rows.map((row) => normalized(row.rawAssetName)).filter(Boolean));
+
+    const expectedMissingResolvedRows = parsed.expectedRows
+      .map((row) => ({ row, resolution: resolveAsset(row, maps) }))
+      .filter((item) => {
+        if (item.resolution.canonicalAssetId && reportedCanonicalIds.has(item.resolution.canonicalAssetId)) return false;
+        return !reportedRawKeys.has(normalized(item.row.rawAssetName));
+      });
+
+    const resolvedRows = [...reportedResolvedRows, ...expectedMissingResolvedRows];
+
     const matchedAssetCounts = new Map();
-    for (const item of resolvedRows) {
+    const rawNameCounts = new Map();
+    for (const item of reportedResolvedRows) {
+      const rawKey = normalized(item.row.rawAssetName);
+      if (rawKey) rawNameCounts.set(rawKey, (rawNameCounts.get(rawKey) || 0) + 1);
       if (item.resolution.status !== 'matched' || !item.resolution.canonicalAssetId) continue;
       matchedAssetCounts.set(
         item.resolution.canonicalAssetId,
@@ -308,33 +371,50 @@ async function main() {
     const duplicateCanonicalIds = new Set(
       [...matchedAssetCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id),
     );
+    const duplicateRawKeys = new Set(
+      [...rawNameCounts.entries()].filter(([, count]) => count > 1).map(([key]) => key),
+    );
 
     let matched = 0;
     let unresolved = 0;
     let duplicateRows = 0;
+    let expectedMissing = 0;
     for (const item of resolvedRows) {
       const { row } = item;
       let resolution = item.resolution;
       let classification = row.classification;
-      if (resolution.canonicalAssetId && duplicateCanonicalIds.has(resolution.canonicalAssetId)) {
+
+      if (row.evidenceRole === 'expected_missing') {
+        expectedMissing += 1;
+        classification = 'review_required';
+      }
+
+      if (resolution.status !== 'matched') {
+        classification = 'review_required';
+      }
+
+      const duplicateCanonical = resolution.canonicalAssetId && duplicateCanonicalIds.has(resolution.canonicalAssetId);
+      const duplicateRaw = row.evidenceRole === 'reported' && duplicateRawKeys.has(normalized(row.rawAssetName));
+      if (duplicateCanonical || duplicateRaw) {
         duplicateRows += 1;
         classification = 'review_required';
         resolution = {
           ...resolution,
           status: 'ambiguous',
-          reviewReason: 'Activo canónico repetido dentro del mismo reporte diario; excluido del denominador hasta revisión.',
+          reviewReason: 'Activo repetido dentro del mismo reporte diario; excluido del denominador hasta revisión.',
         };
       }
 
       if (resolution.status === 'matched') matched += 1;
       else unresolved += 1;
-      const rowHash = sha(sourceSha, parsed.sheetName, row.sourceRow, row.rawAssetName, row.rawStatus, row.meterValue);
+      const rowHash = sha(sourceSha, row.sourceSheet, row.sourceRow, row.rawAssetName, row.rawStatus, row.meterValue);
       await client.query(
         `insert into public.maintenance_reported_availability_rows
-          (organization_id,source_id,source_row,raw_asset_name,canonical_asset_id,raw_status,normalized_state,availability_classification,downtime_kind,meter_unit,meter_value,detail,work_performed,part_required,responsible,planning_observation,cost_center_raw,source_payload,row_hash,reconciliation_status,reconciliation_method,review_reason,validation_status)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18::jsonb,$19,$20,$21,$22,'valid')
-         on conflict (source_id,source_row)
-         do update set canonical_asset_id=excluded.canonical_asset_id,
+          (organization_id,source_id,source_sheet,source_row,evidence_role,raw_asset_name,canonical_asset_id,raw_status,normalized_state,availability_classification,downtime_kind,meter_unit,meter_value,detail,work_performed,part_required,responsible,planning_observation,cost_center_raw,source_payload,row_hash,reconciliation_status,reconciliation_method,review_reason,validation_status)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23,$24,'valid')
+         on conflict (source_id,source_sheet,source_row)
+         do update set evidence_role=excluded.evidence_role,
+                       canonical_asset_id=excluded.canonical_asset_id,
                        raw_status=excluded.raw_status,
                        normalized_state=excluded.normalized_state,
                        availability_classification=excluded.availability_classification,
@@ -348,10 +428,34 @@ async function main() {
                        reconciliation_method=excluded.reconciliation_method,
                        review_reason=excluded.review_reason,
                        updated_at=now()`,
-        [args.organizationId,sourceId,row.sourceRow,row.rawAssetName,resolution.canonicalAssetId,row.rawStatus,row.normalizedState,classification,row.downtimeKind,row.meterUnit,row.meterValue,row.detail,row.workPerformed,row.partRequired,row.responsible,row.planningObservation,row.costCenterRaw,JSON.stringify(row),rowHash,resolution.status,resolution.method,resolution.reviewReason || null],
+        [
+          args.organizationId,
+          sourceId,
+          row.sourceSheet,
+          row.sourceRow,
+          row.evidenceRole,
+          row.rawAssetName,
+          resolution.canonicalAssetId,
+          row.rawStatus,
+          row.normalizedState,
+          classification,
+          row.downtimeKind,
+          row.meterUnit,
+          row.meterValue,
+          row.detail,
+          row.workPerformed,
+          row.partRequired,
+          row.responsible,
+          row.planningObservation,
+          row.costCenterRaw,
+          JSON.stringify(row),
+          rowHash,
+          resolution.status,
+          resolution.method,
+          resolution.reviewReason || (row.evidenceRole === 'expected_missing' ? 'Equipo esperado en Base Equipos sin estado diario reportado.' : null),
+        ],
       );
     }
-
     await client.query('commit');
     console.log(JSON.stringify({
       ...dryRun,
@@ -359,6 +463,7 @@ async function main() {
       matched,
       unresolved,
       duplicateRows,
+      expectedMissing,
       sourceManifestId: manifest?.id || null,
       manifestDateConflict,
       sourceStatus,
