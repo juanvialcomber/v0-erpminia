@@ -270,7 +270,7 @@ export async function GET(request: NextRequest) {
         numerator: 'Observaciones diarias clasificadas como disponibles.',
         denominator: 'Observaciones diarias clasificables: disponible + indisponible.',
         standbyRule: 'STANDBY se mantiene fuera del denominador hasta validación operacional.',
-        coverageRule: 'Cobertura = observaciones clasificables / filas de evidencia dentro del filtro.',
+        coverageRule: 'Cobertura = observaciones clasificables reconciliadas / universo esperado u observado del reporte.',
         timedAvailability: 'No utiliza minutos programados ni reemplaza la futura disponibilidad técnica horaria.',
         familyRule: 'Prioriza categoría/tipo canónico; si falta, usa familia derivada por nombre y la etiqueta como derivada.',
       },
