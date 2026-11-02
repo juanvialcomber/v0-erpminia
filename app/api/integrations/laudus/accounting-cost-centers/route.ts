@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const integration = context.supabase.schema('integration');
 
   try {
-    const [entriesResult, centersResult] = await Promise.all([
+    const [entriesResult, centersResult, totalEntries, entriesWithCenter, health] = await Promise.all([
       integration
         .from('laudus_accounting_entries')
         .select('external_id,entry_number,entry_date,journal_code,entry_type,description,cost_center_external_id,debit_total,credit_total,currency_code,synced_at')
@@ -32,10 +32,28 @@ export async function GET(request: NextRequest) {
         .from('laudus_cost_centers')
         .select('external_id,code,name,reconciliation_status')
         .eq('organization_id', context.organizationId),
+      integration
+        .from('laudus_accounting_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', context.organizationId),
+      integration
+        .from('laudus_accounting_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', context.organizationId)
+        .not('cost_center_external_id', 'is', null),
+      context.supabase
+        .from('laudus_sync_health_service_v1')
+        .select('health_status,last_success_at,last_error')
+        .eq('organization_id', context.organizationId)
+        .eq('domain', 'accounting_entries')
+        .maybeSingle(),
     ]);
 
     if (entriesResult.error) throw entriesResult.error;
     if (centersResult.error) throw centersResult.error;
+    if (totalEntries.error) throw totalEntries.error;
+    if (entriesWithCenter.error) throw entriesWithCenter.error;
+    if (health.error) throw health.error;
 
     const centers = new Map((centersResult.data || []).map((row: any) => [
       String(row.external_id || ''),
@@ -94,6 +112,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       readOnly: true,
+      summary: {
+        totalEntries: totalEntries.count ?? 0,
+        entriesWithCostCenter: entriesWithCenter.count ?? 0,
+        costCenterCoveragePct: totalEntries.count ? Math.round(((entriesWithCenter.count ?? 0) / totalEntries.count) * 1000) / 10 : 0,
+      },
+      freshness: {
+        healthStatus: health.data?.health_status || 'unknown',
+        lastSuccessAt: health.data?.last_success_at || null,
+        lastError: health.data?.last_error || null,
+      },
       sample: {
         entriesRead: (entriesResult.data || []).length,
         maxRows: MAX_ROWS,
