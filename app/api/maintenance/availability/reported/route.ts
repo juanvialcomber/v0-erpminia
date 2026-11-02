@@ -13,6 +13,7 @@ type ReportedRow = {
   received_at: string | null;
   row_id: string;
   source_row: number;
+  evidence_role: 'reported' | 'expected_missing';
   canonical_asset_id: string | null;
   asset_code: string | null;
   asset_name: string | null;
@@ -109,19 +110,35 @@ function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((1000 * numerator) / denominator) / 10 : null;
 }
 
+function expectedObservationKey(row: ReportedRow) {
+  if (row.canonical_asset_id) return `${row.reported_date}:asset:${row.canonical_asset_id}`;
+  if (row.evidence_role === 'expected_missing') {
+    const rawKey = normalized(row.raw_asset_name);
+    return rawKey ? `${row.reported_date}:expected:${rawKey}` : null;
+  }
+  return null;
+}
+
 function aggregate(rows: Array<ReportedRow & { family: string; familySource: string }>) {
   const totalRows = rows.length;
   const classifiedRows = rows.filter((row) => Number(row.availability_denominator || 0) === 1);
   const availableRows = classifiedRows.filter((row) => Number(row.availability_numerator || 0) === 1);
   const unavailableRows = classifiedRows.length - availableRows.length;
+  const expectedObservationKeys = new Set(rows.map(expectedObservationKey).filter(Boolean));
+  const expectedObservations = expectedObservationKeys.size;
+  const unresolvedReportedRows = rows.filter(
+    (row) => row.evidence_role === 'reported' && !row.canonical_asset_id
+  ).length;
   return {
     sourceRows: totalRows,
+    expectedObservations,
     classifiedObservations: classifiedRows.length,
     availableObservations: availableRows.length,
     unavailableObservations: unavailableRows,
+    unresolvedReportedRows,
     reviewRequired: rows.filter((row) => row.availability_classification === 'review_required' || row.reconciliation_status !== 'matched').length,
     availabilityPercentage: pct(availableRows.length, classifiedRows.length),
-    evidenceCoveragePercentage: pct(classifiedRows.length, totalRows),
+    evidenceCoveragePercentage: pct(classifiedRows.length, expectedObservations),
   };
 }
 
@@ -270,7 +287,7 @@ export async function GET(request: NextRequest) {
         numerator: 'Observaciones diarias clasificadas como disponibles.',
         denominator: 'Observaciones diarias clasificables: disponible + indisponible.',
         standbyRule: 'STANDBY se mantiene fuera del denominador hasta validación operacional.',
-        coverageRule: 'Cobertura = observaciones clasificables reconciliadas / universo esperado u observado del reporte.',
+        coverageRule: 'Cobertura = observaciones clasificables reconciliadas / observaciones esperadas, deduplicadas por fecha + activo canónico; faltantes de Base Equipos permanecen en el denominador.',
         timedAvailability: 'No utiliza minutos programados ni reemplaza la futura disponibilidad técnica horaria.',
         familyRule: 'Prioriza categoría/tipo canónico; si falta, usa familia derivada por nombre y la etiqueta como derivada.',
       },
