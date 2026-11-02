@@ -66,19 +66,23 @@ export function LaudusBankReconciliationCard() {
             </div>
             <CardDescription>Diferencias banco ↔ libro, con fuente Laudus.</CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
-              {enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}
+          {!enabled ? (
+            <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={isLoading}>
+              {isLoading ? 'Consultando…' : 'Ver conciliación'}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => void refreshStatements()} disabled={refreshing}>
-              {refreshing ? 'Actualizando…' : 'Actualizar cartolas'}
-            </Button>
-          </div>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {!enabled ? <p className="text-sm text-muted-foreground">Consulta disponible bajo demanda.</p> : null}
-        {refreshMessage ? <p className="text-xs text-muted-foreground">{refreshMessage}</p> : null}
+        {enabled ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">{refreshMessage || 'Consulta cargada desde Laudus.'}</p>
+            <Button size="sm" variant="ghost" onClick={() => void refreshStatements()} disabled={refreshing}>
+              {refreshing ? 'Actualizando…' : 'Actualizar cartolas'}
+            </Button>
+          </div>
+        ) : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data?.status === 'empty' ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">Laudus no devolvió una cartola bancaria disponible para conciliar.</p> : null}
         {data?.status === 'available' ? (
