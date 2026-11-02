@@ -87,6 +87,22 @@ function localDateTimeValue() {
   return local.toISOString().slice(0, 16);
 }
 
+function EvidenceThumbnail({ src, alt }: { src?: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (!src || failed) {
+    return (
+      <div className="flex h-full w-full items-center justify-center" title="Vista no disponible; el archivo original permanece guardado.">
+        <Camera className="h-4 w-4 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setFailed(true)} />
+  );
+}
+
 export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale: Locale; dictionary: Dictionary }) {
   const t = dictionary.app.workOrderCloseQueue;
   const numberLocale = locale === 'en' ? 'en-US' : 'es-CL';
@@ -473,14 +489,7 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                         title={photo.preview_transformed ? `${photo.file_name} · vista web HEIC` : photo.file_name}
                       >
                         <div className="h-16 overflow-hidden rounded-md border bg-muted">
-                        {thumbnail ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={thumbnail} alt={photo.file_name || 'Evidencia'} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <Camera className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
+                        <EvidenceThumbnail src={thumbnail} alt={photo.file_name || 'Evidencia'} />
                         </div>
                       </a>
                     );
