@@ -32,3 +32,15 @@ test('Ariel area readiness phase 2 includes people HSE and legal evidence',()=>{
   assert.match(route,/name:'Legal'/);
   assert.match(route,/evidencia candidata no acredita aplicabilidad ni cumplimiento/i);
 });
+
+test('Ariel readiness separates plant transport drilling and topography instead of hiding them under production',()=>{
+  assert.match(route,/name:'Planta \/ Metalurgia'/);
+  assert.match(route,/name:'Transporte de Mineral'/);
+  assert.match(route,/name:'Perforación'/);
+  assert.match(route,/name:'Topografía'/);
+  assert.match(route,/production_plant_shifts/);
+  assert.match(route,/production_material_movements/);
+  assert.match(route,/production_drilling_source_reports/);
+  assert.match(route,/production_monthly_plans/);
+  assert.match(route,/No existe todavía fuente canónica de levantamientos/);
+});
