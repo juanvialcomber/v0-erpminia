@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../components/maintenance/control-tower-screen.tsx', import.meta.url), 'utf8');
+const api = readFileSync(new URL('../app/api/maintenance/control-tower/route.ts', import.meta.url), 'utf8');
 
 test('maintenance control tower is a full-screen read-only wallboard with presentation controls only', () => {
   assert.match(source, /fixed inset-0 z-\[9999\]/);
