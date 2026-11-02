@@ -7,7 +7,7 @@ import {
 } from '@/lib/integrations/laudus/sync-policy';
 
 const BANK_STATEMENT_PATH = '/accounting/bankStatements/list';
-const BANK_STATEMENT_FIELDS = ['bankStatementId', 'dateFrom', 'dateTo', 'initialBalance'] as const;
+const BANK_STATEMENT_FIELDS = ['bankStatementId','number','year','dateFrom','dateTo','initialBalance','modifiedAt','bank.bankId','bank.name','bank.account','bank.currencyCode'] as const;
 
 function rowsFromPayload(payload: unknown): Record<string, unknown>[] {
   const rows =
