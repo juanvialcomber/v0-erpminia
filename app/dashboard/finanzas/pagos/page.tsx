@@ -34,6 +34,7 @@ type DialogMode = 'due' | 'pay' | 'reconcile' | null;
 
 export default function PayablesPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/finance/payables', fetcher);
+  const { data: laudusFinance, error: laudusError, isLoading: laudusLoading } = useSWR('/api/integrations/laudus/finance-control', fetcher);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
@@ -192,6 +193,43 @@ export default function PayablesPage() {
         </CardContent>
       </Card>
     ) : null}
+
+    <Card className="shadow-none">
+      <CardHeader>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Laudus · lectura</p>
+            <CardTitle className="mt-1">Exposición histórica de cuentas por pagar</CardTitle>
+            <CardDescription>Vista read-only desde Laudus para consultar obligaciones sin salir de MOTIL. No registra pagos ni modifica el ERP.</CardDescription>
+          </div>
+          {laudusFinance?.accountsPayable?.latestSync ? <Badge variant="outline">Actualizado {new Date(laudusFinance.accountsPayable.latestSync).toLocaleString('es-CL')}</Badge> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {laudusError ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">No fue posible consultar la exposición Laudus.</p> : null}
+        {laudusLoading ? <p className="text-sm text-muted-foreground">Cargando exposición Laudus…</p> : null}
+        {!laudusLoading && !laudusError && laudusFinance?.accountsPayable ? (
+          <>
+            <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">CxP abiertas</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.openItems || 0).toLocaleString('es-CL')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Saldo abierto CLP</p><p className="mt-1 text-xl font-semibold">{money(laudusFinance.accountsPayable.openAmountClp || 0, 'CLP')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.overdueItems || 0).toLocaleString('es-CL')}</p><p className="mt-1 text-xs text-muted-foreground">{money(laudusFinance.accountsPayable.overdueAmountClp || 0, 'CLP')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Próximos 7 días</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.dueWithin7Days || 0).toLocaleString('es-CL')}</p><p className="mt-1 text-xs text-muted-foreground">{money(laudusFinance.accountsPayable.dueSoonAmountClp || 0, 'CLP')}</p></div>
+            </div>
+            <div className="divide-y overflow-hidden rounded-lg border">
+              {(laudusFinance.accountsPayable.oldestOpenItems || []).map((row: any) => (
+                <div key={row.externalId} className="grid gap-2 p-4 sm:grid-cols-[minmax(0,1fr)_120px_140px] sm:items-center">
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{row.supplierName}</p><p className="mt-0.5 text-xs text-muted-foreground">{row.documentNumber || 'Sin número'} · vence {row.dueDate || 'sin fecha'}</p></div>
+                  <div className="text-xs text-muted-foreground sm:text-right">{row.status || 'Abierta'}</div>
+                  <div className="text-sm font-semibold tabular-nums sm:text-right">{money(row.outstandingAmount, row.currency || 'CLP')}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Laudus sigue siendo autoridad financiera para estos registros. MOTIL los muestra para análisis y seguimiento; cualquier acción financiera requiere el flujo operacional y revisión humana correspondiente.</p>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
