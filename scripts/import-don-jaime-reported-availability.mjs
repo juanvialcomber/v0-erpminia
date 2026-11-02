@@ -257,18 +257,21 @@ async function main() {
     const manifestCutoff = manifest?.source_cutoff_date ? String(manifest.source_cutoff_date).slice(0, 10) : null;
     const manifestDateConflict = Boolean(manifestCutoff && manifestCutoff !== parsed.reportedDate);
     const sourceStatus = manifestDateConflict ? 'review_required' : 'official_source';
+    const sourceIsCurrent = !manifestDateConflict;
 
-    await client.query(
-      `update public.maintenance_reported_availability_sources
-          set is_current=false, status='archived'
-        where organization_id=$1 and lower(mine)=lower($2) and reported_date=$3 and is_current=true`,
-      [args.organizationId, args.mine, parsed.reportedDate],
-    );
+    if (sourceIsCurrent) {
+      await client.query(
+        `update public.maintenance_reported_availability_sources
+            set is_current=false, status='archived'
+          where organization_id=$1 and lower(mine)=lower($2) and reported_date=$3 and is_current=true`,
+        [args.organizationId, args.mine, parsed.reportedDate],
+      );
+    }
 
     const source = await client.query(
       `insert into public.maintenance_reported_availability_sources
         (organization_id,mine,reported_date,source_manifest_id,source_file,source_sha256,source_sheet,gmail_message_id,received_at,source_owner,status,is_current)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        on conflict (organization_id,source_sha256,source_sheet)
        do update set source_manifest_id=coalesce(excluded.source_manifest_id,maintenance_reported_availability_sources.source_manifest_id),
                      gmail_message_id=coalesce(excluded.gmail_message_id,maintenance_reported_availability_sources.gmail_message_id),
@@ -288,6 +291,7 @@ async function main() {
         args.receivedAt || manifest?.email_sent_at || null,
         args.sourceOwner || manifest?.email_sender || null,
         sourceStatus,
+        sourceIsCurrent,
       ],
     );
     const sourceId = source.rows[0].id;
@@ -358,6 +362,7 @@ async function main() {
       sourceManifestId: manifest?.id || null,
       manifestDateConflict,
       sourceStatus,
+      sourceIsCurrent,
     }, null, 2));
   } catch (error) {
     await client.query('rollback');
