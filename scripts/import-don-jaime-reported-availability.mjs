@@ -245,6 +245,18 @@ async function main() {
   try {
     await client.query('begin');
     const maps = await crosswalk(client, args.organizationId, args.mine);
+    const manifestResult = await client.query(
+      `select id,gmail_message_id,email_sent_at,email_sender,filename,source_cutoff_date,source_profile
+         from public.motil_email_source_manifest
+        where organization_id=$1 and source_sha256=$2
+        order by email_sent_at desc nulls last, created_at desc
+        limit 1`,
+      [args.organizationId, sourceSha],
+    );
+    const manifest = manifestResult.rows[0] || null;
+    const manifestCutoff = manifest?.source_cutoff_date ? String(manifest.source_cutoff_date).slice(0, 10) : null;
+    const manifestDateConflict = Boolean(manifestCutoff && manifestCutoff !== parsed.reportedDate);
+    const sourceStatus = manifestDateConflict ? 'review_required' : 'official_source';
 
     await client.query(
       `update public.maintenance_reported_availability_sources
@@ -255,14 +267,28 @@ async function main() {
 
     const source = await client.query(
       `insert into public.maintenance_reported_availability_sources
-        (organization_id,mine,reported_date,source_file,source_sha256,source_sheet,gmail_message_id,received_at,source_owner,status,is_current)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'official_source',true)
+        (organization_id,mine,reported_date,source_manifest_id,source_file,source_sha256,source_sheet,gmail_message_id,received_at,source_owner,status,is_current)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true)
        on conflict (organization_id,source_sha256,source_sheet)
-       do update set gmail_message_id=coalesce(excluded.gmail_message_id,maintenance_reported_availability_sources.gmail_message_id),
+       do update set source_manifest_id=coalesce(excluded.source_manifest_id,maintenance_reported_availability_sources.source_manifest_id),
+                     gmail_message_id=coalesce(excluded.gmail_message_id,maintenance_reported_availability_sources.gmail_message_id),
                      received_at=coalesce(excluded.received_at,maintenance_reported_availability_sources.received_at),
-                     is_current=true,status='official_source'
+                     source_owner=coalesce(excluded.source_owner,maintenance_reported_availability_sources.source_owner),
+                     is_current=true,status=excluded.status
        returning id`,
-      [args.organizationId,args.mine,parsed.reportedDate,basename(args.file),sourceSha,parsed.sheetName,args.gmailMessageId || null,args.receivedAt || null,args.sourceOwner || 'Ariel López'],
+      [
+        args.organizationId,
+        args.mine,
+        parsed.reportedDate,
+        manifest?.id || null,
+        basename(args.file),
+        sourceSha,
+        parsed.sheetName,
+        args.gmailMessageId || manifest?.gmail_message_id || null,
+        args.receivedAt || manifest?.email_sent_at || null,
+        args.sourceOwner || manifest?.email_sender || null,
+        sourceStatus,
+      ],
     );
     const sourceId = source.rows[0].id;
 
@@ -323,7 +349,16 @@ async function main() {
     }
 
     await client.query('commit');
-    console.log(JSON.stringify({ ...dryRun, committed: true, matched, unresolved, duplicateRows }, null, 2));
+    console.log(JSON.stringify({
+      ...dryRun,
+      committed: true,
+      matched,
+      unresolved,
+      duplicateRows,
+      sourceManifestId: manifest?.id || null,
+      manifestDateConflict,
+      sourceStatus,
+    }, null, 2));
   } catch (error) {
     await client.query('rollback');
     throw error;
