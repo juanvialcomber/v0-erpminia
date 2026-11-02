@@ -526,7 +526,7 @@ function ScheduleSlide({ data }: { data: any }) {
         </Panel>
         <Panel
           title="Órdenes en ejecución"
-          subtitle={`OT canónicas · stock informado ${dateTime(data?.inventory?.latestAt)} · reservas de Bodega por separado`}
+          subtitle={`OT canónicas · Mañana por confirmar: ${data?.summary?.dueTomorrowNotReadyWorkOrders || 0} · stock informado ${dateTime(data?.inventory?.latestAt)} · reservas de Bodega por separado`}
         >
           {open.length ? (
             <DataTable
