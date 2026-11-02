@@ -34,6 +34,8 @@ type Entry = {
 };
 
 type Payload = {
+  summary: { totalEntries: number; entriesWithCostCenter: number; costCenterCoveragePct: number };
+  freshness: { healthStatus: string; lastSuccessAt: string | null; lastError: string | null };
   sample: { entriesRead: number; maxRows: number };
   byCenter: Center[];
   recentEntries: Entry[];
@@ -72,7 +74,7 @@ export function LaudusAccountingCostCenters() {
             <CardTitle className="flex items-center gap-2"><BookOpen className="h-4 w-4"/>Movimiento contable Laudus</CardTitle>
             <CardDescription>Lectura por centro de costo para análisis dentro de MOTIL. No representa saldo contable actual ni modifica asientos.</CardDescription>
           </div>
-          {data ? <Badge variant="outline">{data.sample.entriesRead.toLocaleString('es-CL')} asientos recientes analizados</Badge> : null}
+          {data ? <div className="flex flex-wrap gap-2"><Badge variant="outline">{data.summary.totalEntries.toLocaleString('es-CL')} asientos alojados</Badge><Badge variant={data.summary.costCenterCoveragePct > 0 ? 'secondary' : 'destructive'}>{data.summary.costCenterCoveragePct}% con centro</Badge></div> : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -82,7 +84,16 @@ export function LaudusAccountingCostCenters() {
         </div>
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {isLoading ? <p className="text-sm text-muted-foreground">Cargando movimientos Laudus…</p> : null}
-        {!isLoading && !error ? (
+        {!isLoading && !error && data?.summary.entriesWithCostCenter === 0 ? (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+            <p className="text-sm font-medium">La relación asiento → centro de costo todavía no está disponible en la copia actual.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              MOTIL conserva {data.summary.totalEntries.toLocaleString('es-CL')} cabeceras de asientos, pero el centro de costo vive a nivel de línea en Laudus. No se atribuyen movimientos a centros por suposición.
+            </p>
+            {data.freshness.lastError ? <p className="mt-2 text-xs text-muted-foreground">Sync contable: {data.freshness.lastError}</p> : null}
+          </div>
+        ) : null}
+        {!isLoading && !error && data?.summary.entriesWithCostCenter > 0 ? (
           <div className="divide-y overflow-hidden rounded-lg border">
             {centers.length ? centers.slice(0, 50).map((row) => (
               <div key={row.centerId} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.2fr)_110px_150px_150px] lg:items-center">
