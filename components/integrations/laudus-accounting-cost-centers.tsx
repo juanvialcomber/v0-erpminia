@@ -94,7 +94,7 @@ export function LaudusAccountingCostCenters() {
             {data.freshness.lastError ? <p className="mt-2 text-xs text-muted-foreground">Sync contable: {data.freshness.lastError}</p> : null}
           </div>
         ) : null}
-        {!isLoading && !error && data?.summary.entriesWithCostCenter > 0 ? (
+        {!isLoading && !error && Number(data?.summary.entriesWithCostCenter || 0) > 0 ? (
           <div className="divide-y overflow-hidden rounded-lg border">
             {centers.length ? centers.slice(0, 50).map((row) => (
               <div key={row.centerId} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.2fr)_110px_150px_150px] lg:items-center">
