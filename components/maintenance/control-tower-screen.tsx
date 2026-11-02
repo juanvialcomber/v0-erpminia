@@ -548,7 +548,7 @@ function ScheduleSlide({ data }: { data: any }) {
       <div className="grid gap-2 md:grid-cols-4">
         <BasisRow label="Fuentes semanales vigentes" value={data?.weeklyPlanning?.sourceCount || 0} />
         <BasisRow label="Productos Bodega vinculados" value={data?.inventory?.matchedCanonicalSkus || 0} />
-        <BasisRow label="Stock disponible informado" value={data?.inventory?.positiveStockSkus || 0} />
+        <BasisRow label="Productos con stock disponible" value={data?.inventory?.positiveStockSkus || 0} />
         <BasisRow label="Productos por revisar" value={data?.inventory?.conflictedSkus || 0} />
       </div>
     </div>
