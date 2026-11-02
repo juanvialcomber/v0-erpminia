@@ -1,0 +1,27 @@
+{
+  "id": "/monitor/mantenimiento",
+  "name": "MOTIL Torre de Control",
+  "short_name": "Torre MOTIL",
+  "description": "Torre de Control de Mantenimiento de Compañía Minera La Patagua.",
+  "start_url": "/monitor/mantenimiento",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-512.png?brand=motil-original",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png?brand=motil-original",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
