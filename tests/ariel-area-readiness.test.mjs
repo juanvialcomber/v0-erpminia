@@ -22,3 +22,34 @@ test('area workspace exposes evidence gap and next action with human authority',
   assert.match(page,/Cada jefe valida su propia información/);
   assert.match(planning,/\/dashboard\/mantenimiento\/areas/);
 });
+
+test('Ariel area readiness phase 2 includes people HSE and legal evidence',()=>{
+  assert.match(route,/from\('people'\)/);
+  assert.match(route,/sostenibilidad_nonconformances/);
+  assert.match(route,/legal_cases/);
+  assert.match(route,/name:'RRHH'/);
+  assert.match(route,/name:'Sostenibilidad \/ HSE'/);
+  assert.match(route,/name:'Legal'/);
+  assert.match(route,/evidencia candidata no acredita aplicabilidad ni cumplimiento/i);
+});
+
+test('Ariel readiness separates plant transport drilling and topography instead of hiding them under production',()=>{
+  assert.match(route,/name:'Planta \/ Metalurgia'/);
+  assert.match(route,/name:'Transporte de Mineral'/);
+  assert.match(route,/name:'Perforación'/);
+  assert.match(route,/name:'Topografía'/);
+  assert.match(route,/production_plant_shifts/);
+  assert.match(route,/production_material_movements/);
+  assert.match(route,/production_drilling_source_reports/);
+  assert.match(route,/production_monthly_plans/);
+  assert.match(route,/No existe todavía fuente canónica de levantamientos/);
+});
+
+test('Ariel readiness includes Peumo and Don Jaime from the latest normalized production source',()=>{
+  assert.match(route,/production_source_normalized_records/);
+  assert.match(route,/extraction_actual_peumo/);
+  assert.match(route,/extraction_actual_don_jaime/);
+  assert.match(route,/name:'Mina Peumo'/);
+  assert.match(route,/name:'Mina Don Jaime'/);
+  assert.match(route,/Validar extracción, sectores y trabajos del corte con Jefatura de Mina/);
+});
