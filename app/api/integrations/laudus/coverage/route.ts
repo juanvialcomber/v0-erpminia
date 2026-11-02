@@ -18,6 +18,9 @@ const DATASETS = [
   ['bank_statements', 'Cartolas bancarias', 'laudus_bank_statements'],
   ['accounting_entries', 'Asientos contables', 'laudus_accounting_entries'],
   ['waybills', 'Guías de compra', 'laudus_waybills'],
+  ['credit_notes', 'Notas de crédito', 'laudus_credit_notes'],
+  ['dtes', 'DTE pendientes', 'laudus_dtes'],
+  ['product_kardex', 'Kardex consultado', 'laudus_product_kardex'],
 ] as const;
 
 type DatasetStatus = 'integrated' | 'empty' | 'unavailable';
