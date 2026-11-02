@@ -53,6 +53,7 @@ export default function BodegaPage() {
   const dieselCurrent = diesel?.current || null;
   const dieselLaudus = diesel?.laudus || null;
   const sourceAuthority = error ? null : data?.sourceAuthority || null;
+  const reconciliationSummary = error ? null : data?.reconciliationSummary || null;
   const valuationTrusted = Boolean(sourceAuthority?.laudusIsPrimary) && !diesel?.hasConflict;
 
   const attention = [
@@ -73,6 +74,25 @@ export default function BodegaPage() {
         {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
       </PageHeaderActions>
     </PageHeader>
+
+    {!negativeStockMode ? <section aria-label="Resumen para reunión" className="grid gap-3 lg:grid-cols-3">
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Estado</p>
+        <p className="mt-2 text-sm font-medium">{sourceAuthority?.laudusIsPrimary?'Laudus es la fuente primaria de stock':'Fuente de stock en revisión'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceAuthority?.latestLaudusStockDate?'Corte ERP '+dateOnly(sourceAuthority.latestLaudusStockDate)+' · sincronizado '+dateTime(sourceAuthority.latestLaudusStockSync):'Sin corte Laudus acreditado.'}</p>
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Diferencias</p>
+        <p className="mt-2 text-sm font-medium">{reconciliationSummary?number(reconciliationSummary.quantityMismatches)+' diferencias de cantidad':'Conciliación no disponible'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{reconciliationSummary?(number(reconciliationSummary.alignedProducts)+' productos alineados · '+number(reconciliationSummary.missingInMotilNonzero)+' con stock Laudus sin contraparte MOTIL'):'No se reemplaza una conciliación ausente por cero.'}</p>
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisión</p>
+        <p className="mt-2 text-sm font-medium">{Number(overview.negative_stock_products||0)>0?number(overview.negative_stock_products)+' saldos negativos por conciliar':'Sin saldos negativos pendientes'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Las diferencias se revisan antes de ajustar stock, comprometer disponibilidad o disparar compras.</p>
+        <Link href={Number(overview.negative_stock_products||0)>0?'/dashboard/bodega?status=negative':'/dashboard/bodega/fuentes'} className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">{Number(overview.negative_stock_products||0)>0?'Conciliar saldos':'Revisar fuentes'} <ArrowRight className="h-3 w-3"/></Link>
+      </div>
+    </section> : null}
 
     {!negativeStockMode ? <DataSourceStatusStrip
       reviewHref="/dashboard/calidad-datos"
