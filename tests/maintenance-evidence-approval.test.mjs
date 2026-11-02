@@ -77,3 +77,10 @@ test('progressive close queue uses the same refreshed web-safe previews', () => 
   assert.match(closeQueue, /photo\.preview_url \|\| photo\.signed_url/);
   assert.match(closeQueue, /vista web HEIC/);
 });
+
+
+test('OT evidence UI fails gracefully if a preview cannot render', () => {
+  assert.match(component, /function EvidenceImage/);
+  assert.match(component, /onError=\{\(\) => setFailed\(true\)\}/);
+  assert.match(component, /Vista web no disponible\. El archivo original sigue conservado\./);
+});
