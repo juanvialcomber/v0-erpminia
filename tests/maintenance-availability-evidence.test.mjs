@@ -38,6 +38,13 @@ test('availability UI distinguishes reported snapshot availability from timed av
   assert.match(dictionaries, /cost centers no se interpretan como equipos/i);
 });
 
+test('availability UI does not invent performance thresholds before an approved target exists', () => {
+  assert.doesNotMatch(ui, /value >= 95/);
+  assert.doesNotMatch(ui, /value >= 90/);
+  assert.doesNotMatch(ui, /value >= 80/);
+  assert.match(ui, /metricTone/);
+});
+
 test('reported availability uses classified daily observations as numerator and denominator', () => {
   assert.match(reportedApi, /reported_snapshot_v1/);
   assert.match(reportedApi, /availability_numerator/);
