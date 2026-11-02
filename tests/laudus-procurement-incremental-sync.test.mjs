@@ -18,9 +18,9 @@ test('procurement sync uses current Laudus list endpoints',()=>{
 });
 
 test('transaction sync is bounded and supplier scan is weekly-bounded',()=>{
-  assert.match(sync,/listRecent\('\/purchases\/orders\/list', 'issuedDate', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/invoices\/list', 'issuedDate', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/payments\/list', 'issuedDate', 2\)/);
+  assert.match(sync,/listRecent\('\/purchases\/orders\/list', ORDER_FIELDS, 'modifiedAt', 2\)/);
+  assert.match(sync,/listRecent\('\/purchases\/invoices\/list', INVOICE_FIELDS, 'modifiedAt', 2\)/);
+  assert.match(sync,/listRecent\('\/purchases\/payments\/list', PAYMENT_FIELDS, 'modifiedAt', 2\)/);
   assert.match(sync,/for \(let page = 0; page < 25; page \+= 1\)/);
   assert.match(sync,/limit: 100/);
 });
