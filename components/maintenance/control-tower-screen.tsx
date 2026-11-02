@@ -495,16 +495,16 @@ function ScheduleSlide({ data }: { data: any }) {
     <div className="flex h-full min-h-0 flex-col gap-3 p-3">
       <div className="grid gap-px overflow-hidden rounded-md border bg-border md:grid-cols-6">
         <SmallMetric label="Planificados" value={data?.summary?.weeklyPlannedWorks} />
-        <SmallMetric label="Plan hoy" value={data?.summary?.weeklyPlannedToday} />
-        <SmallMetric label="Plan mañana" value={data?.summary?.weeklyPlannedTomorrow} />
+        <SmallMetric label="Para hoy" value={data?.summary?.weeklyPlannedToday} />
+        <SmallMetric label="Para mañana" value={data?.summary?.weeklyPlannedTomorrow} />
         <SmallMetric label="Sin OT" value={data?.summary?.weeklyPlannedUnlinked} />
         <SmallMetric label="OT abiertas" value={data?.summary?.openWorkOrders} />
         <SmallMetric label="Por revisar" value={data?.summary?.weeklyPlannedReview} />
       </div>
       <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[1.2fr_.8fr]">
         <Panel
-          title="Plan semanal oficial"
-          subtitle={`${data?.weeklyPlanning?.sourceCount || 0} fuente(s) vigentes · planificación recibida de Ariel · no crea OT automáticamente`}
+          title="Programa de ejecución"
+          subtitle={`Plan semanal oficial · ${data?.weeklyPlanning?.sourceCount || 0} fuente(s) vigentes · planificación recibida de Ariel · no crea OT automáticamente`}
         >
           {plannedActive.length ? (
             <DataTable
