@@ -13,6 +13,7 @@ export type OpenApiDocument = { paths?: Record<string, OpenApiPath> };
 const WRITE_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 const SWAGGER_UI_URL = 'https://api.laudus.cl/swagger/index.html';
 const FALLBACK_SPEC_PATHS = [
+  '/swagger/v2/swagger.json',
   '/swagger/v1/swagger.json',
   '/swagger/swagger.json',
   '/swagger/docs/v1',
