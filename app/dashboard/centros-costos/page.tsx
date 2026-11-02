@@ -1,5 +1,6 @@
 import { CostCenterCoverageQueue } from '@/components/dashboard/cost-center-coverage-queue';
 import { CostCentersWorkspace } from '@/components/dashboard/cost-centers-workspace';
+import { LaudusAccountingCostCenters } from '@/components/integrations/laudus-accounting-cost-centers';
 import {
   PageHeader,
   PageHeaderContent,
@@ -34,6 +35,8 @@ export default function CostCentersPage() {
         </div>
         <CostCenterCoverageQueue />
       </section>
+
+      <LaudusAccountingCostCenters />
 
       <section className="space-y-3" aria-labelledby="cost-center-structure-title">
         <div>
