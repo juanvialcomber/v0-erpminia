@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { Calculator, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 type EconomicsRow = {
   canonicalAssetId: string | null;
@@ -48,7 +50,8 @@ const money = (value: number | null | undefined) => value == null
   : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
 
 export function LaudusFixedAssetEconomicsCard() {
-  const { data, error, isLoading } = useSWR<Payload>('/api/integrations/laudus/fixed-asset-economics', fetcher, { revalidateOnFocus: false });
+  const [enabled, setEnabled] = useState(false);
+  const { data, error, isLoading } = useSWR<Payload>(enabled ? '/api/integrations/laudus/fixed-asset-economics' : null, fetcher, { revalidateOnFocus: false, revalidateIfStale: false });
 
   return (
     <Card className="shadow-none">
@@ -58,10 +61,11 @@ export function LaudusFixedAssetEconomicsCard() {
             <CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía Laudus</CardTitle>
             <CardDescription>Costo de adquisición, vida útil y depreciación recuperados en lectura para candidatos de identidad fuerte.</CardDescription>
           </div>
-          <Badge variant="outline">Sólo lectura</Badge>
+          <div className="flex items-center gap-2"><Badge variant="outline">Sólo lectura</Badge><Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>{enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}</Button></div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!enabled ? <p className="text-sm text-muted-foreground">Consulta bajo demanda para evitar llamadas innecesarias a la API de Laudus.</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {isLoading ? <p className="text-sm text-muted-foreground">Consultando economía de activos Laudus…</p> : null}
         {!isLoading && !error && data ? (
