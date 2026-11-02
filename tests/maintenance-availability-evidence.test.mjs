@@ -38,6 +38,12 @@ test('availability UI distinguishes reported snapshot availability from timed av
   assert.match(dictionaries, /cost centers no se interpretan como equipos/i);
 });
 
+test('availability UI keeps source freshness visible', () => {
+  assert.match(ui, /Fuente más reciente/);
+  assert.match(ui, /sourceFile/);
+  assert.match(ui, /reportedDate/);
+});
+
 test('availability UI does not invent performance thresholds before an approved target exists', () => {
   assert.doesNotMatch(ui, /value >= 95/);
   assert.doesNotMatch(ui, /value >= 90/);
