@@ -39,6 +39,12 @@ export async function GET(request:NextRequest){
       geologyHoles,
       geologyHypotheses,
       geologyImages,
+      rrhhPeople,
+      rrhhActive,
+      rrhhWithoutProfile,
+      rrhhOpenCases,
+      hseOpenNonconformances,
+      legalOpenCases,
     ]=await Promise.all([
       db.from('production_source_documents').select('source_file,period_end')
         .eq('organization_id',context.organizationId).eq('canonical_role','canonical')
@@ -55,6 +61,12 @@ export async function GET(request:NextRequest){
       count(db.from('production_drill_holes').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId)),
       count(db.from('production_geology_hypotheses').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId)),
       count(db.from('production_geology_core_images').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId)),
+      count(db.from('people').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId)),
+      count(db.from('people').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId).eq('employment_status','active')),
+      count(db.from('people').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId).is('profile_id',null)),
+      count(db.from('people_case_events').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId).neq('review_status','closed')),
+      count(db.from('sostenibilidad_nonconformances').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId).in('status',['abierta','open'])),
+      count(db.from('legal_cases').select('id',{count:'exact',head:true}).eq('organization_id',context.organizationId).neq('status','closed')),
     ]);
 
     if(productionSource.error)throw productionSource.error;
@@ -102,6 +114,24 @@ export async function GET(request:NextRequest){
         facts:[`${geologyHoles} sondajes cargados`,`${geologyHypotheses} hipótesis · ${geologyImages} imágenes de testigo`],
         nextAction:geologyHypotheses===0&&geologyImages===0?'Levantar workflow operativo y evidencia de campo':'Revisar hipótesis y evidencia',
         href:'/dashboard/produccion/geologia',
+      },
+      {
+        key:'rrhh',name:'RRHH',status:rrhhPeople>0&&rrhhWithoutProfile===0?'ready_for_review':rrhhPeople>0?'review_required':'awaiting_source',cutoff:null,
+        facts:[`${rrhhPeople} personas canónicas · ${rrhhActive} activas`,`${rrhhWithoutProfile} sin acceso vinculado · ${rrhhOpenCases} casos abiertos`],
+        nextAction:rrhhWithoutProfile>0?'Conciliar identidades antes de atribuir evidencia':'Revisar fichas, cargos y evidencia operacional',
+        href:'/dashboard/rrhh',
+      },
+      {
+        key:'sustainability',name:'Sostenibilidad / HSE',status:hseOpenNonconformances>0?'review_required':'ready_for_review',cutoff:null,
+        facts:[`${hseOpenNonconformances} no conformidades abiertas`,'Cumplimiento sólo se interpreta desde evidencia confirmada'],
+        nextAction:hseOpenNonconformances>0?'Revisar no conformidades y acciones asociadas':'Validar cobertura de inspecciones, EPP y documentación HSE',
+        href:'/dashboard/sostenibilidad',
+      },
+      {
+        key:'legal',name:'Legal',status:legalOpenCases>0?'review_required':'ready_for_review',cutoff:null,
+        facts:[`${legalOpenCases} casos legales abiertos`,'La evidencia candidata no acredita aplicabilidad ni cumplimiento'],
+        nextAction:legalOpenCases>0?'Priorizar casos abiertos y evidencia pendiente':'Revisar vencimientos y cobertura contractual',
+        href:'/dashboard/legal',
       },
     ];
 
