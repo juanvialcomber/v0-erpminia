@@ -11,6 +11,7 @@ import {
   RefreshCw,
   ServerCog,
   ShieldAlert,
+  ChevronDown,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -153,22 +154,25 @@ export default function LaudusDataQualityPage() {
   const [query, setQuery] = useState('');
   const [issueType, setIssueType] = useState('all');
 
-  const laudusIssues = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+  const allLaudusIssues = useMemo(() => {
     return (reconciliation.data?.issues || [])
       .filter(isLaudusIssue)
-      .filter((issue) => issue.active || issue.review?.status === 'open' || !issue.review)
-      .filter((issue) => {
+      .filter((issue) => issue.active || issue.review?.status === 'open' || !issue.review);
+  }, [reconciliation.data?.issues]);
+
+  const laudusIssues = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return allLaudusIssues.filter((issue) => {
         if (issueType === 'critical' && issue.severity !== 'critical') return false;
         if (issueType === 'conflict' && issue.issue_type !== 'source_conflict') return false;
         if (issueType === 'candidate' && issue.issue_type !== 'new_external_candidate') return false;
         if (needle && !`${issue.label} ${issue.detail}`.toLowerCase().includes(needle)) return false;
         return true;
       });
-  }, [reconciliation.data?.issues, issueType, query]);
+  }, [allLaudusIssues, issueType, query]);
 
   const brokenSyncs = (coverage.data?.health || []).filter((row) => row.health_status !== 'healthy');
-  const criticalIssues = laudusIssues.filter((row) => row.severity === 'critical').length;
+  const criticalIssues = allLaudusIssues.filter((row) => row.severity === 'critical').length;
   const loading = coverage.isLoading || discovery.isLoading || reconciliation.isLoading;
   const hasError = coverage.error || discovery.error || reconciliation.error;
 
@@ -180,10 +184,10 @@ export default function LaudusDataQualityPage() {
     <div className="space-y-6">
       <section className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Gobierno de datos · Laudus</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Cobertura e inconsistencias</h1>
-          <p className="mt-2 max-w-4xl text-sm text-muted-foreground">
-            Qué información de Laudus ya está alojada en MOTIL, qué capacidades adicionales expone la API y qué diferencias requieren revisión humana antes de usarse como verdad operacional.
+          <p className="text-sm font-medium text-muted-foreground">Fuente Laudus</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Datos y revisiones</h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            Cobertura disponible en MOTIL, estado de actualización y diferencias que requieren revisión.
           </p>
         </div>
         <Button variant="outline" onClick={() => void refreshAll()}>
@@ -205,10 +209,10 @@ export default function LaudusDataQualityPage() {
         <>
           <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
             {[
-              ['Registros alojados', coverage.data.summary.totalRecords],
-              ['Conjuntos con datos', `${coverage.data.summary.integratedDatasets}/${coverage.data.summary.datasets}`],
-              ['Syncs por revisar', brokenSyncs.length],
-              ['Inconsistencias críticas', criticalIssues],
+              ['Registros', coverage.data.summary.totalRecords],
+              ['Cobertura', `${coverage.data.summary.integratedDatasets}/${coverage.data.summary.datasets}`],
+              ['Actualización', brokenSyncs.length ? `${brokenSyncs.length} por revisar` : 'Al día'],
+              ['Críticas', criticalIssues],
             ].map(([label, value]) => (
               <div key={String(label)} className="bg-card p-4">
                 <p className="text-2xl font-semibold">{typeof value === 'number' ? value.toLocaleString('es-CL') : value}</p>
@@ -219,7 +223,7 @@ export default function LaudusDataQualityPage() {
 
           <Card className="shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4"/>Datos Laudus ya alojados en MOTIL</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base"><Database className="h-4 w-4"/>Cobertura</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-2 xl:grid-cols-3">
               {coverage.data.datasets.map((dataset) => (
@@ -240,7 +244,7 @@ export default function LaudusDataQualityPage() {
 
           <Card className="shadow-none">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><ServerCog className="h-4 w-4"/>Salud de sincronización</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base"><ServerCog className="h-4 w-4"/>Actualización</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {coverage.data.health.map((row) => (
@@ -267,43 +271,44 @@ export default function LaudusDataQualityPage() {
       ) : null}
 
       {discovery.data?.status === 'ok' ? (
-        <Card className="shadow-none">
-          <CardHeader>
-            <CardTitle className="text-base">Información adicional disponible en Laudus</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Catálogo leído desde la especificación pública vigente. “Disponible” significa que Laudus expone la capacidad; no significa que MOTIL ya la almacene ni que exista permiso para escribir.
-            </p>
+        <details className="group rounded-lg border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium">
+            <span>Detalle técnico de la integración</span>
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              {discovery.data.capabilityCount.toLocaleString('es-CL')} capacidades
+              <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="border-t px-4 py-4">
             <div className="grid gap-3 lg:grid-cols-2">
               {Object.entries(discovery.data.domains)
                 .filter(([, domain]) => domain.count > 0)
                 .map(([key, domain]) => (
-                  <div key={key} className="rounded-lg border p-4">
+                  <div key={key} className="rounded-md bg-muted/30 p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium">{domainLabels[key] || key}</p>
-                      <Badge variant="outline">{domain.count} endpoint{domain.count === 1 ? '' : 's'}</Badge>
+                      <p className="text-sm font-medium">{domainLabels[key] || key}</p>
+                      <span className="text-xs text-muted-foreground">{domain.count}</span>
                     </div>
-                    <div className="mt-3 space-y-1">
-                      {domain.endpoints.slice(0, 8).map((endpoint) => (
+                    <div className="mt-2 space-y-1">
+                      {domain.endpoints.slice(0, 5).map((endpoint) => (
                         <p key={endpoint.path} className="truncate font-mono text-[11px] text-muted-foreground">
                           {endpoint.methods.join('/').toUpperCase()} {endpoint.path}
                         </p>
                       ))}
-                      {domain.endpoints.length > 8 ? (
-                        <p className="text-xs text-muted-foreground">+{domain.endpoints.length - 8} capacidades adicionales</p>
+                      {domain.endpoints.length > 5 ? (
+                        <p className="text-xs text-muted-foreground">+{domain.endpoints.length - 5} más</p>
                       ) : null}
                     </div>
                   </div>
                 ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </details>
       ) : null}
 
       <Card className="border-amber-500/30 shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><ShieldAlert className="h-4 w-4"/>Inconsistencias Laudus</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base"><ShieldAlert className="h-4 w-4"/>Revisiones</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[1fr_220px]">
@@ -336,7 +341,7 @@ export default function LaudusDataQualityPage() {
           ) : null}
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Conciliación de datos · {laudusIssues.length.toLocaleString('es-CL')}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Datos · {laudusIssues.length.toLocaleString('es-CL')}</p>
             {reconciliation.isLoading ? (
               <p className="text-sm text-muted-foreground">Evaluando inconsistencias…</p>
             ) : laudusIssues.length === 0 ? (
@@ -353,7 +358,7 @@ export default function LaudusDataQualityPage() {
                           <Badge variant={issue.severity === 'critical' ? 'destructive' : 'outline'}>
                             {issue.severity === 'critical' ? 'Crítico' : 'Revisar'}
                           </Badge>
-                          <Badge variant="secondary">{issue.issue_type.replaceAll('_', ' ')}</Badge>
+                          
                         </div>
                         <p className="mt-2 font-medium">{issue.label}</p>
                         <p className="mt-1 text-sm text-muted-foreground">{issue.detail}</p>
@@ -370,8 +375,8 @@ export default function LaudusDataQualityPage() {
           </div>
 
           <div className="flex flex-col gap-3 rounded-lg bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm">Las diferencias se revisan con evidencia. Esta sección no modifica Laudus ni los maestros canónicos automáticamente.</p>
-            <Button asChild variant="outline" size="sm"><Link href="/dashboard/calidad-datos">Abrir conciliación completa</Link></Button>
+            <p className="text-sm">Las diferencias se resuelven desde la conciliación con evidencia.</p>
+            <Button asChild variant="outline" size="sm"><Link href="/dashboard/calidad-datos">Abrir conciliación</Link></Button>
           </div>
         </CardContent>
       </Card>
