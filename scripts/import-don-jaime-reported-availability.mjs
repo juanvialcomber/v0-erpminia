@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import process from 'node:process';
+import { basename } from 'node:path';
 import pg from 'pg';
 import * as XLSX from 'xlsx';
 
@@ -222,7 +223,7 @@ async function main() {
 
   const dryRun = {
     mode: args.commit ? 'commit' : 'dry-run',
-    file: args.file,
+    file: basename(args.file),
     mine: args.mine,
     reportedDate: parsed.reportedDate,
     sheet: parsed.sheetName,
@@ -261,14 +262,40 @@ async function main() {
                      received_at=coalesce(excluded.received_at,maintenance_reported_availability_sources.received_at),
                      is_current=true,status='official_source'
        returning id`,
-      [args.organizationId,args.mine,parsed.reportedDate,args.file,sourceSha,parsed.sheetName,args.gmailMessageId || null,args.receivedAt || null,args.sourceOwner || null],
+      [args.organizationId,args.mine,parsed.reportedDate,basename(args.file),sourceSha,parsed.sheetName,args.gmailMessageId || null,args.receivedAt || null,args.sourceOwner || 'Ariel López'],
     );
     const sourceId = source.rows[0].id;
 
+    const resolvedRows = parsed.rows.map((row) => ({ row, resolution: resolveAsset(row, maps) }));
+    const matchedAssetCounts = new Map();
+    for (const item of resolvedRows) {
+      if (item.resolution.status !== 'matched' || !item.resolution.canonicalAssetId) continue;
+      matchedAssetCounts.set(
+        item.resolution.canonicalAssetId,
+        (matchedAssetCounts.get(item.resolution.canonicalAssetId) || 0) + 1,
+      );
+    }
+    const duplicateCanonicalIds = new Set(
+      [...matchedAssetCounts.entries()].filter(([, count]) => count > 1).map(([id]) => id),
+    );
+
     let matched = 0;
     let unresolved = 0;
-    for (const row of parsed.rows) {
-      const resolution = resolveAsset(row, maps);
+    let duplicateRows = 0;
+    for (const item of resolvedRows) {
+      const { row } = item;
+      let resolution = item.resolution;
+      let classification = row.classification;
+      if (resolution.canonicalAssetId && duplicateCanonicalIds.has(resolution.canonicalAssetId)) {
+        duplicateRows += 1;
+        classification = 'review_required';
+        resolution = {
+          ...resolution,
+          status: 'ambiguous',
+          reviewReason: 'Activo canónico repetido dentro del mismo reporte diario; excluido del denominador hasta revisión.',
+        };
+      }
+
       if (resolution.status === 'matched') matched += 1;
       else unresolved += 1;
       const rowHash = sha(sourceSha, parsed.sheetName, row.sourceRow, row.rawAssetName, row.rawStatus, row.meterValue);
@@ -291,12 +318,12 @@ async function main() {
                        reconciliation_method=excluded.reconciliation_method,
                        review_reason=excluded.review_reason,
                        updated_at=now()`,
-        [args.organizationId,sourceId,row.sourceRow,row.rawAssetName,resolution.canonicalAssetId,row.rawStatus,row.normalizedState,row.classification,row.downtimeKind,row.meterUnit,row.meterValue,row.detail,row.workPerformed,row.partRequired,row.responsible,row.planningObservation,row.costCenterRaw,JSON.stringify(row),rowHash,resolution.status,resolution.method,resolution.reviewReason || null],
+        [args.organizationId,sourceId,row.sourceRow,row.rawAssetName,resolution.canonicalAssetId,row.rawStatus,row.normalizedState,classification,row.downtimeKind,row.meterUnit,row.meterValue,row.detail,row.workPerformed,row.partRequired,row.responsible,row.planningObservation,row.costCenterRaw,JSON.stringify(row),rowHash,resolution.status,resolution.method,resolution.reviewReason || null],
       );
     }
 
     await client.query('commit');
-    console.log(JSON.stringify({ ...dryRun, committed: true, matched, unresolved }, null, 2));
+    console.log(JSON.stringify({ ...dryRun, committed: true, matched, unresolved, duplicateRows }, null, 2));
   } catch (error) {
     await client.query('rollback');
     throw error;
