@@ -68,10 +68,15 @@ test('wallboard remains operationally read-only while allowing presentation cont
   assert.doesNotMatch(page, /<form/);
 });
 
-test('wallboard preserves missing KPI truth instead of inventing availability', () => {
-  assert.match(api, /availabilityPct: null/);
-  assert.match(api, /Sin base canónica de disponibilidad diaria/);
+test('wallboard publishes availability only from the reported snapshot denominator', () => {
+  assert.match(api, /maintenance_reported_availability_daily_v1/);
+  assert.match(api, /reportedAvailabilityClassified/);
+  assert.match(api, /availabilityMethod: reportedAvailabilityPct == null \? null : 'reported_snapshot_v1'/);
+  assert.match(api, /no equivale a disponibilidad horaria/);
+  assert.match(page, /Don Jaime · disponibilidad reportada/);
+  assert.match(page, /Sin % derivado de este snapshot/);
   assert.doesNotMatch(page, /Disponibilidad operacional/);
+  assert.doesNotMatch(page, /site\.operational \/ classified \* 100/);
   assert.match(page, /Sólo cifras calculadas desde órdenes registradas/);
 });
 
