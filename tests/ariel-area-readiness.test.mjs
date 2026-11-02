@@ -44,3 +44,12 @@ test('Ariel readiness separates plant transport drilling and topography instead 
   assert.match(route,/production_monthly_plans/);
   assert.match(route,/No existe todavía fuente canónica de levantamientos/);
 });
+
+test('Ariel readiness includes Peumo and Don Jaime from the latest normalized production source',()=>{
+  assert.match(route,/production_source_normalized_records/);
+  assert.match(route,/extraction_actual_peumo/);
+  assert.match(route,/extraction_actual_don_jaime/);
+  assert.match(route,/name:'Mina Peumo'/);
+  assert.match(route,/name:'Mina Don Jaime'/);
+  assert.match(route,/Validar extracción, sectores y trabajos del corte con Jefatura de Mina/);
+});
