@@ -45,6 +45,10 @@ type EvidenceResponse = {
     file_name: string;
     created_at: string;
     signed_url?: string | null;
+    preview_url?: string | null;
+    thumbnail_url?: string | null;
+    original_url?: string | null;
+    preview_transformed?: boolean;
   }>;
 };
 
@@ -104,7 +108,12 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const { data: evidenceData, mutate: mutateEvidence } = useSWR<EvidenceResponse>(
     current ? `/api/maintenance/work-orders/${current.work_order_id}/evidence` : null,
     fetcher,
-    { revalidateOnFocus: false },
+    {
+      refreshInterval: 10 * 60 * 1000,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 15_000,
+    },
   );
   const evidence = evidenceData?.evidence || [];
   const evidenceCount = evidence.length;
@@ -451,27 +460,31 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
 
               {evidenceCount > 0 ? (
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {evidence.map((photo) => (
-                    <a
-                      key={photo.id}
-                      href={photo.signed_url || '#'}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-20 shrink-0"
-                      title={photo.file_name}
-                    >
-                      <div className="h-16 overflow-hidden rounded-md border bg-muted">
-                      {photo.signed_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photo.signed_url} alt={photo.file_name || 'Evidencia'} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <Camera className="h-4 w-4 text-muted-foreground" />
+                  {evidence.map((photo) => {
+                    const thumbnail = photo.thumbnail_url || photo.preview_url || photo.signed_url || null;
+                    const preview = photo.preview_url || photo.signed_url || null;
+                    return (
+                      <a
+                        key={photo.id}
+                        href={preview || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-20 shrink-0"
+                        title={photo.preview_transformed ? `${photo.file_name} · vista web HEIC` : photo.file_name}
+                      >
+                        <div className="h-16 overflow-hidden rounded-md border bg-muted">
+                        {thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={thumbnail} alt={photo.file_name || 'Evidencia'} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <Camera className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
                         </div>
-                      )}
-                      </div>
-                    </a>
-                  ))}
+                      </a>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
