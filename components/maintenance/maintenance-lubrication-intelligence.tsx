@@ -141,8 +141,7 @@ export function MaintenanceLubricationIntelligence() {
                     <div><p className="text-xs text-muted-foreground">Consumo/h</p><p>{decimal(row.litersPerHour,' L/h')}</p></div>
                     <div><p className="text-xs text-muted-foreground">Costo</p><p>{money(row.costClp)}</p>{row.reviewState === 'review_required' ? <Badge variant="destructive">Revisar diferencia</Badge> : null}</div>
                   </div>
-                  );
-                })}
+                ))}
               </div>
             )}
           </div>
@@ -162,7 +161,8 @@ export function MaintenanceLubricationIntelligence() {
                     <div><p className="text-xs text-muted-foreground">Necesidad 30d</p><p>{decimal(row.demand30Liters,' L')}</p>{low !== null && high !== null ? <p className="text-xs text-muted-foreground">Rango {decimal(low,' L')}–{decimal(high,' L')}</p> : <p className="text-xs text-muted-foreground">Rango N/D · falta historia</p>}</div>
                     <div><p className="text-xs text-muted-foreground">Brecha</p><p>{decimal(row.gap30Liters,' L')}</p><Badge variant={row.state === 'shortage_risk' ? 'destructive' : 'outline'}>{row.state === 'needs_conversion' ? 'Falta conversión' : row.state === 'shortage_risk' ? 'Riesgo stock' : 'Cubierto'}</Badge></div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
