@@ -258,8 +258,14 @@ export default function LaudusDataQualityPage() {
                       {row.conflicts > 0 ? <Badge variant="outline">{row.conflicts.toLocaleString('es-CL')} conflicto{row.conflicts === 1 ? '' : 's'}</Badge> : null}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Último éxito: {formatDate(row.last_success_at)} · Procesados: {Number(row.records_processed || 0).toLocaleString('es-CL')} · Llamadas API: {Number(row.api_calls || 0).toLocaleString('es-CL')}
+                      Última actualización: {formatDate(row.last_success_at)}
                     </p>
+                    <details className="mt-2 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer select-none">Detalle técnico</summary>
+                      <p className="mt-1">
+                        Procesados {Number(row.records_processed || 0).toLocaleString('es-CL')} · Cambios {Number(row.records_changed || 0).toLocaleString('es-CL')} · API {Number(row.api_calls || 0).toLocaleString('es-CL')}
+                      </p>
+                    </details>
                     {row.last_error ? <p className="mt-2 text-sm text-destructive">{row.last_error}</p> : null}
                   </div>
                   {row.open_incidents > 0 ? <Badge variant="destructive">{row.open_incidents} incidente{row.open_incidents === 1 ? '' : 's'} abierto{row.open_incidents === 1 ? '' : 's'}</Badge> : null}
@@ -306,7 +312,7 @@ export default function LaudusDataQualityPage() {
         </details>
       ) : null}
 
-      <Card className="border-amber-500/30 shadow-none">
+      <Card className={criticalIssues > 0 ? 'border-destructive/30 shadow-none' : 'shadow-none'}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base"><ShieldAlert className="h-4 w-4"/>Revisiones</CardTitle>
         </CardHeader>
@@ -354,12 +360,9 @@ export default function LaudusDataQualityPage() {
                   <div key={issue.issue_key} className="p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={issue.severity === 'critical' ? 'destructive' : 'outline'}>
-                            {issue.severity === 'critical' ? 'Crítico' : 'Revisar'}
-                          </Badge>
-                          
-                        </div>
+                        <Badge variant={issue.severity === 'critical' ? 'destructive' : 'outline'}>
+                          {issue.severity === 'critical' ? 'Crítico' : 'Revisar'}
+                        </Badge>
                         <p className="mt-2 font-medium">{issue.label}</p>
                         <p className="mt-1 text-sm text-muted-foreground">{issue.detail}</p>
                         {issue.review?.resolution_note ? <p className="mt-2 text-sm">Decisión registrada: {issue.review.resolution_note}</p> : null}
