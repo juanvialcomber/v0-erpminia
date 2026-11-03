@@ -47,8 +47,16 @@ test('incident reconciliation RPC is service-role only',()=>{
   assert.match(migration,/to service_role/);
 });
 
+test('Data Health summary RPC is authenticated and tenant scoped',()=>{
+  assert.match(migration,/motil_get_laudus_data_quality_incident_summary/);
+  assert.match(migration,/auth\.uid\(\)/);
+  assert.match(migration,/auth_profile_identity_links/);
+  assert.match(migration,/p\.organization_id=p_organization_id/);
+  assert.match(migration,/to authenticated, service_role/);
+});
+
 test('Data Health surfaces Laudus source incidents for procurement',()=>{
-  assert.match(health,/laudus_sync_health_service_v1/);
+  assert.match(health,/motil_get_laudus_data_quality_incident_summary/);
   assert.match(health,/Incidentes Laudus fuente/);
   assert.match(health,/laudusSourceIncidents/);
   assert.match(health,/antes de usar fechas en KPIs o timelines/);
