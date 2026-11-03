@@ -36,6 +36,8 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/laudus-bank-statements-daily',
   '/api/cron/laudus-accounting-entries-daily',
   '/api/cron/laudus-waybills-daily',
+  // Temporary branch-only smoke route. Handler returns 404 outside the exact preview branch.
+  '/api/integrations/laudus/preview-contract-smoke',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
@@ -288,12 +290,7 @@ async function proxyRequest(request: NextRequest) {
     return withSecurityHeaders(NextResponse.json({ error: 'Debug endpoints disabled in production' }, { status: 404 }));
   }
 
-  const isBoundedLaudusPreviewSmoke =
-    pathname === '/api/integrations/laudus/preview-contract-smoke' &&
-    process.env.VERCEL_ENV === 'preview' &&
-    process.env.VERCEL_GIT_COMMIT_REF === 'optimize/laudus-session-budget-20261102';
-
-  if (pathname.startsWith('/api/') && (isPublicApiRoute(pathname) || isBoundedLaudusPreviewSmoke)) {
+  if (pathname.startsWith('/api/') && isPublicApiRoute(pathname)) {
     return withSecurityHeaders(response);
   }
 
