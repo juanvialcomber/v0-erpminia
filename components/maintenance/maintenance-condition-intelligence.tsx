@@ -95,8 +95,9 @@ export function MaintenanceConditionIntelligence({ shared }: { shared?: { data: 
 
       {!isLoading && !error ? (
         <>
-          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
+          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-5">
             {[
+              ['Con evidencia', summary?.assetsWithEvidence || 0],
               ['Evidencia alta', summary?.highEvidence || 0],
               ['Evidencia media', summary?.mediumEvidence || 0],
               ['Evidencia baja', summary?.lowEvidence || 0],
@@ -108,6 +109,8 @@ export function MaintenanceConditionIntelligence({ shared }: { shared?: { data: 
               </div>
             ))}
           </div>
+
+          <p className="text-xs text-muted-foreground">Sin base suficiente: {summary?.noEvidence || 0} de {summary?.assets || 0} activos. No se clasifican como evidencia baja.</p>
 
           {signals.length === 0 ? (
             <div className="rounded-lg border p-4">
