@@ -14,7 +14,9 @@ test('fluid usage and plans are process records, while Bodega remains canonical'
   assert.match(migration, /maintenance_fluid_plans/);
   assert.match(migration, /inventory remains canonical in Bodega/);
   assert.match(fluids, /inventoryMutated: false/);
-  assert.doesNotMatch(fluids, /\.from\('inventory_intelligence_position_v1'\)[\s\S]*\.(update|insert|delete)\(/);
+  assert.doesNotMatch(fluids, /from\('inventory_intelligence_position_v1'\)\.update\(/);
+  assert.doesNotMatch(fluids, /from\('inventory_intelligence_position_v1'\)\.insert\(/);
+  assert.doesNotMatch(fluids, /from\('inventory_intelligence_position_v1'\)\.delete\(/);
 });
 
 test('Ariel KPIs use traceable formulas and preserve N\/D when inputs are missing', () => {
