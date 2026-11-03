@@ -398,22 +398,74 @@ export async function runLaudusReadOnlySmokeTest() {
   await getLaudusAccessToken();
 
   const targets = [
-    ['products', '/production/products/list'],
-    ['suppliers', '/purchases/suppliers/list'],
-    ['warehouses', '/production/warehouses/list'],
-    ['costCenters', '/purchases/costcenters/list'],
+    {
+      key: 'products',
+      path: '/production/products/list',
+      fields: ['productId', 'SKU', 'description', 'unitOfMeasure'],
+      orderBy: [{ field: 'productId', direction: 'DESC' as const }],
+    },
+    {
+      key: 'suppliers',
+      path: '/purchases/suppliers/list',
+      fields: ['supplierId', 'VATId', 'name', 'legalName', 'address', 'city', 'phone', 'email', 'modifiedAt', 'term.termId', 'term.name'],
+      orderBy: [{ field: 'supplierId', direction: 'DESC' as const }],
+    },
+    {
+      key: 'warehouses',
+      path: '/production/warehouses/list',
+      fields: ['warehouseId', 'name', 'address', 'county', 'city', 'state'],
+      orderBy: [{ field: 'warehouseId', direction: 'ASC' as const }],
+    },
+    {
+      key: 'costCenters',
+      path: '/purchases/costcenters/list',
+      fields: ['costCenterId', 'code', 'name', 'fullPath', 'parentId', 'discontinued'],
+      orderBy: [{ field: 'costCenterId', direction: 'ASC' as const }],
+    },
   ] as const;
 
-  const results: Record<string, { rows: number | null; shape: string }> = {};
+  const results: Record<string, {
+    status: 'ok' | 'failed';
+    rows: number | null;
+    shape: string;
+    upstreamStatus?: number;
+  }> = {};
+  let successfulTargets = 0;
+  let failedTargets = 0;
+  let listCalls = 0;
 
-  for (const [key, path] of targets) {
-    const payload = await listLaudus(path, { options: { offset: 0, limit: 5 } });
-    results[key] = summarizePayload(payload);
+  for (const target of targets) {
+    try {
+      const listed = await listLaudusWithOrderFallback(target.path, {
+        options: { offset: 0, limit: 5 },
+        fields: [...target.fields],
+        orderBy: [...target.orderBy],
+      });
+      listCalls += listed.apiCalls;
+      results[target.key] = {
+        status: 'ok',
+        ...summarizePayload(listed.payload),
+      };
+      successfulTargets += 1;
+    } catch (error) {
+      if (!(error instanceof LaudusApiError)) throw error;
+      results[target.key] = {
+        status: 'failed',
+        rows: null,
+        shape: 'unavailable',
+        upstreamStatus: error.status,
+      };
+      failedTargets += 1;
+    }
   }
 
   return {
+    status: failedTargets > 0 ? 'degraded' as const : 'ok' as const,
     authenticated: true,
-    calls: 5,
+    requestedTargets: targets.length,
+    successfulTargets,
+    failedTargets,
+    listCalls,
     persisted: false,
     results,
   };
