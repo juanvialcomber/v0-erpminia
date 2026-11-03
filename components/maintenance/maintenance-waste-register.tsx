@@ -40,7 +40,7 @@ function labelStatus(status: WasteRow['status']) {
 }
 
 export function MaintenanceWasteRegister() {
-  const [tab, setTab] = useState<(typeof tabs)[number][0]>('open');
+  const [tab, setTab] = useState<(typeof tabs)[number][0]>('generated');
   const { data, error, isLoading } = useSWR('/api/maintenance/waste', fetcher, { revalidateOnFocus: false });
   const rows = (data?.rows || []) as WasteRow[];
   const visible = rows.filter((row) => {
