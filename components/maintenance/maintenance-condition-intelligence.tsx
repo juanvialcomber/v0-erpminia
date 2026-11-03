@@ -28,8 +28,12 @@ function evidenceLabel(band: string) {
   return 'Baja';
 }
 
-export function MaintenanceConditionIntelligence() {
-  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/condition-intelligence', fetcher, { revalidateOnFocus: false });
+export function MaintenanceConditionIntelligence({ shared }: { shared?: { data: any; error: any; isLoading: boolean; mutate: () => Promise<any> } }) {
+  const own = useSWR(shared ? null : '/api/maintenance/condition-intelligence', fetcher, { revalidateOnFocus: false });
+  const data = shared?.data ?? own.data;
+  const error = shared?.error ?? own.error;
+  const isLoading = shared?.isLoading ?? own.isLoading;
+  const mutate = shared?.mutate ?? own.mutate;
   const [saving, setSaving] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
