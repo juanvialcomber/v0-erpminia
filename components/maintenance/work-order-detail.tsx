@@ -26,6 +26,7 @@ import { MaintenanceTerrainPrepare } from '@/components/maintenance/maintenance-
 import { MobileWorkOrderFlow } from '@/components/maintenance/mobile-work-order-flow';
 import { WorkOrderEvidenceAndApproval } from '@/components/maintenance/work-order-evidence-and-approval';
 import { WorkOrderWastePanel } from '@/components/maintenance/work-order-waste-panel';
+import { WorkOrderFluidUsagePanel } from '@/components/maintenance/work-order-fluid-usage-panel';
 import { EntityTimeline } from '@/components/shared/entity-timeline';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import { formatAssetIdentity, formatWorkOrderNumber } from '@/lib/maintenance/work-order-display';
@@ -186,6 +187,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           </div>
         </header>
         <WorkOrderExecutionPanel workOrderId={id} readOnly />
+        <WorkOrderFluidUsagePanel workOrderId={id} readOnly />
         <WorkOrderWastePanel workOrderId={id} readOnly />
         <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
       </div>
@@ -213,7 +215,8 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           onWorkOrderChange={mutate}
         />
         <div className="mx-auto w-full max-w-xl space-y-4">
-          <WorkOrderWastePanel workOrderId={id} />
+          <WorkOrderFluidUsagePanel workOrderId={id} />
+        <WorkOrderWastePanel workOrderId={id} />
           <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
           {workOrder.status === 'completed' ? (
             <details className="rounded-lg border bg-card">
@@ -367,7 +370,8 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         </CardContent>
       </Card>
 
-      <WorkOrderWastePanel workOrderId={id} />
+      <WorkOrderFluidUsagePanel workOrderId={id} />
+        <WorkOrderWastePanel workOrderId={id} />
       <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
 
       <details className="group rounded-lg border bg-card">
@@ -402,6 +406,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           </div>
         </section>
 
+        <WorkOrderFluidUsagePanel workOrderId={id} readOnly />
         <WorkOrderWastePanel workOrderId={id} readOnly />
         <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
 
@@ -475,7 +480,8 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       <WorkOrderPurchasingFlow workOrderId={id} />
       <WorkOrderExecutionPanel workOrderId={id} />
     </> : null}
-    {!isHistorical ? <><WorkOrderWastePanel workOrderId={id} /><WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} /></> : null}
+    {!isHistorical ? <><WorkOrderFluidUsagePanel workOrderId={id} />
+        <WorkOrderWastePanel workOrderId={id} /><WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} /></> : null}
     <details data-testid="ot-detail-history" className="rounded-lg border bg-card">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Ver más · Historial de la OT</summary>
       <div className="border-t p-4"><EntityTimeline entity="work_order" id={id} limit={50} /></div>
