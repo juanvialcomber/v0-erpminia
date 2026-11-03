@@ -51,3 +51,11 @@ test('condition UI exposes review actions without automatic escalation', () => {
   assert.match(ui, /Confirmar señal/);
   assert.doesNotMatch(ui, /Crear OT automáticamente|auto.*OT/i);
 });
+
+
+test('UI never coerces missing quantitative evidence to zero', () => {
+  assert.match(lubrication, /value === null \|\| value === undefined \|\| value === ''/);
+  assert.match(ui, /value === null \|\| value === undefined \|\| value === ''/);
+  assert.match(lubrication, /n === null \? 'N\/D'/);
+  assert.match(ui, /n === null \? 'N\/D'/);
+});
