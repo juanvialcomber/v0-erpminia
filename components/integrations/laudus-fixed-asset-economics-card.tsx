@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Calculator, Database } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
@@ -46,9 +45,17 @@ const fetcher = async (url: string): Promise<Payload> => {
   return payload as Payload;
 };
 
-const money = (value: number | null | undefined) => value == null
-  ? 'Sin dato'
-  : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+const money = (value: number | null | undefined) => value != null && Number(value) > 0
+  ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value)
+  : 'Sin costo positivo';
+
+const depreciationMoney = (row: EconomicsRow) => {
+  if (!(Number(row.acquisitionCost) > 0)) return 'Sin base de costo';
+  const value = row.depreciationSummary?.accumulatedMax ?? row.depreciationSummary?.accumulatedWithInflationCorrectionMax;
+  return value == null
+    ? 'Sin dato'
+    : new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+};
 
 export function LaudusFixedAssetEconomicsCard() {
   const [enabled, setEnabled] = useState(false);
@@ -60,7 +67,7 @@ export function LaudusFixedAssetEconomicsCard() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact /><CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía del activo</CardTitle></div>
-            <CardDescription>Costo de adquisición, vida útil y depreciación para activos con vínculo confiable.</CardDescription>
+            <CardDescription>Vida útil y depreciación documental. El costo se muestra sólo cuando Laudus informa un valor positivo.</CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>{enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar economía'}</Button>
         </div>
@@ -74,7 +81,7 @@ export function LaudusFixedAssetEconomicsCard() {
             <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
               <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Candidatos consultados</p><p className="mt-1 text-2xl font-semibold">{data.requested}</p></div>
               <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Detalle recuperado</p><p className="mt-1 text-2xl font-semibold">{data.available}</p></div>
-              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Con costo adquisición</p><p className="mt-1 text-2xl font-semibold">{data.withAcquisitionCost}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Con costo positivo</p><p className="mt-1 text-2xl font-semibold">{data.withAcquisitionCost}</p></div>
             </div>
             <div className="divide-y overflow-hidden rounded-lg border">
               {data.results.filter((row) => row.status === 'available').map((row, index) => (
@@ -84,13 +91,13 @@ export function LaudusFixedAssetEconomicsCard() {
                     <p className="mt-1 text-xs text-muted-foreground">Adquirido {row.acquisitionDate || 'sin fecha'} · factura {row.invoiceNumber || 'sin referencia'}</p>
                   </div>
                   <div><p className="text-xs text-muted-foreground">Costo adquisición</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(row.acquisitionCost)}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Vida útil</p><p className="mt-1 text-sm font-medium">{row.usefulLife == null ? 'Sin dato' : row.usefulLife}</p></div>
-                  <div><p className="text-xs text-muted-foreground">Depreciación acumulada</p><p className="mt-1 text-sm font-semibold tabular-nums">{money(row.depreciationSummary?.accumulatedMax ?? row.depreciationSummary?.accumulatedWithInflationCorrectionMax)}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Vida útil</p><p className="mt-1 text-sm font-medium">{row.usefulLife == null ? 'Sin dato' : `${row.usefulLife} años`}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Depreciación acumulada</p><p className="mt-1 text-sm font-semibold tabular-nums">{depreciationMoney(row)}</p></div>
                 </div>
               ))}
               {!data.results.some((row) => row.status === 'available') ? <p className="p-6 text-center text-sm text-muted-foreground">No hay candidatos fuertes con detalle económico disponible.</p> : null}
             </div>
-            <p className="text-xs text-muted-foreground">Fuente: Laudus · la evidencia económica no confirma identidad por sí sola.</p>
+            <p className="text-xs text-muted-foreground">Fuente: Laudus · un valor fuente igual a 0 no se publica como costo económico disponible.</p>
           </>
         ) : null}
       </CardContent>
