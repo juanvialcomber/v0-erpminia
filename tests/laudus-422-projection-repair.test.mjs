@@ -6,6 +6,10 @@ const procurement = readFileSync(new URL('../lib/integrations/laudus/procurement
 const journalWaybill = readFileSync(new URL('../lib/integrations/laudus/journal-waybill-sync.ts', import.meta.url), 'utf8');
 
 test('procurement lists request explicit documented projections instead of empty fields', () => {
+  assert.match(procurement, /const SUPPLIER_FIELDS = \[/);
+  assert.match(procurement, /'supplierId'/);
+  assert.match(procurement, /'term\.termId'/);
+  assert.match(procurement, /fields: \[\.\.\.SUPPLIER_FIELDS\]/);
   assert.match(procurement, /const ORDER_FIELDS = \[/);
   assert.match(procurement, /'purchaseOrderId'/);
   assert.match(procurement, /'supplier\.supplierId'/);
