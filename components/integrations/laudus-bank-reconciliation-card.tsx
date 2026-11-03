@@ -25,6 +25,12 @@ const fetcher = async (url: string): Promise<Payload> => {
 };
 
 const money = (value: number) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(Number(value || 0));
+const date = (value: unknown) => {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium' }).format(parsed);
+};
 
 export function LaudusBankReconciliationCard() {
   const [enabled, setEnabled] = useState(false);
@@ -45,7 +51,10 @@ export function LaudusBankReconciliationCard() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudieron actualizar cartolas Laudus');
-      setRefreshMessage(`Cartolas actualizadas · ${Number(payload?.processed || 0).toLocaleString('es-CL')} registros`);
+      const latestReceived = date(payload?.latestStatementDate);
+      setRefreshMessage(
+        `${Number(payload?.processed || 0).toLocaleString('es-CL')} cartolas leídas${latestReceived ? ` · fecha más reciente recibida ${latestReceived}` : ''}`,
+      );
       setEnabled(true);
       await mutate();
     } catch (cause) {
