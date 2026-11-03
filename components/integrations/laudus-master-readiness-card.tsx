@@ -60,13 +60,13 @@ export function LaudusMasterReadinessCard() {
           />
           <div className="flex flex-wrap items-center gap-2">
             <Database className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Preparación para migración Laudus</h2>
+            <h2 className="text-sm font-semibold">Preparación de maestros</h2>
             <Badge variant={data?.source.enabled ? 'secondary' : 'outline'}>
-              {data?.source.enabled ? 'Conector habilitado' : 'Preparación'}
+              {data?.source.enabled ? 'Conectado' : 'Preparación'}
             </Badge>
           </div>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-            Mide si los maestros de MOTIL tienen identidad suficiente para reconciliarse con Laudus cuando la API quede disponible.
+            Cobertura de identidad y vínculos entre maestros MOTIL y la fuente Laudus.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => void mutate()} disabled={isLoading}>
@@ -122,7 +122,7 @@ export function LaudusMasterReadinessCard() {
         ) : null}
 
         {error && !error.message?.includes('permisos de administración') ? (
-          <div className="p-5 text-sm text-muted-foreground">No se pudo calcular la preparación para Laudus.</div>
+          <div className="p-5 text-sm text-muted-foreground">No se pudo calcular la preparación de maestros.</div>
         ) : null}
       </div>
     </section>
