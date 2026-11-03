@@ -8,6 +8,9 @@ import {
   runLaudusReadOnlySmokeTest,
 } from '@/lib/integrations/laudus/client';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
+
+const SMOKE_MAX_API_REQUESTS = 19;
 
 export async function POST(request: NextRequest) {
   const access = await resolveDataHealthAccess(request);
@@ -37,6 +40,42 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const supabase = getSupabaseServerClient();
+    const { data: budget, error: budgetError } = await supabase
+      .from('laudus_api_budget_service_v1')
+      .select('tracked_remaining,monthly_remaining_exact,tracking_status')
+      .eq('organization_id', access.organizationId)
+      .maybeSingle();
+
+    if (budgetError || !budget || budget.monthly_remaining_exact !== true || budget.tracked_remaining == null) {
+      return NextResponse.json(
+        {
+          status: 'budget_unknown',
+          configured: true,
+          calls: 0,
+          persisted: false,
+          requiredHeadroom: SMOKE_MAX_API_REQUESTS,
+          error: 'No fue posible verificar el margen mensual de llamadas Laudus.',
+        },
+        { status: 503 },
+      );
+    }
+
+    if (Number(budget.tracked_remaining) < SMOKE_MAX_API_REQUESTS) {
+      return NextResponse.json(
+        {
+          status: 'budget_hold',
+          configured: true,
+          calls: 0,
+          persisted: false,
+          requiredHeadroom: SMOKE_MAX_API_REQUESTS,
+          trackedRemaining: Number(budget.tracked_remaining),
+          error: 'La prueba fue bloqueada para preservar el presupuesto mensual Laudus.',
+        },
+        { status: 429 },
+      );
+    }
+
     const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusReadOnlySmokeTest());
     return NextResponse.json({
       configured: true,
