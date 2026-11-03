@@ -6,10 +6,7 @@ import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage'
 import { syncLaudusProducts } from '@/lib/integrations/laudus/product-sync';
 import { syncLaudusProcurement } from '@/lib/integrations/laudus/procurement-sync';
 import { syncLaudusBankStatements } from '@/lib/integrations/laudus/bank-statement-sync';
-import {
-  syncLaudusAccountingEntries,
-  syncLaudusPurchaseWaybills,
-} from '@/lib/integrations/laudus/journal-waybill-sync';
+import { syncLaudusAccountingEntries } from '@/lib/integrations/laudus/journal-waybill-sync';
 
 type DomainResult = {
   domain: string;
@@ -72,7 +69,6 @@ export async function GET(request: NextRequest) {
       await run('procurement', () => syncLaudusProcurement(organizationId, db));
       await run('bank_statements', () => syncLaudusBankStatements(organizationId, db));
       await run('accounting_entries', () => syncLaudusAccountingEntries(organizationId, db));
-      await run('purchase_waybills', () => syncLaudusPurchaseWaybills(organizationId, db));
 
       return results;
     });
