@@ -18,6 +18,7 @@ test('historical Laudus purchase documents remain bounded and read-only', () => 
   assert.doesNotMatch(purchaseRoute, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
   assert.match(invoicePage, /LaudusPurchaseDocuments/);
   assert.match(purchaseCard, /Facturas y guías/);
+  assert.match(purchaseCard, /aria-pressed/);
 });
 
 test('cost center accounting view is bounded and does not claim current balances', () => {
@@ -30,14 +31,15 @@ test('cost center accounting view is bounded and does not claim current balances
 
 test('asset economics are visible in Finance without changing identity authority', () => {
   assert.match(assetsPage, /LaudusFixedAssetEconomicsCard/);
-  assert.match(assetEconomics, /Sólo lectura/);
-  assert.match(assetEconomics, /no modifica ni Laudus ni Ficha 360/i);
+  assert.match(assetEconomics, /Economía del activo/);
+  assert.match(assetEconomics, /Fuente: Laudus/);
+  assert.match(assetEconomics, /no confirma identidad por sí sola/i);
 });
 
 
 test('live fixed-asset economics are opt-in to protect the Laudus API budget', () => {
   assert.match(assetEconomics, /enabled \? '\/api\/integrations\/laudus\/fixed-asset-economics' : null/);
-  assert.match(assetEconomics, /Consulta bajo demanda/);
+  assert.match(assetEconomics, /Consulta disponible bajo demanda/);
 });
 
 test('accounting cost-center UI refuses false attribution when line-level center data is absent', () => {
