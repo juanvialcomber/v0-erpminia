@@ -25,9 +25,9 @@ test('accounting backfill is bounded and deduplicates before staging',()=>{
   assert.match(backfill,/duplicatesRemoved/);
 });
 
-test('accounting backfill checkpoints each successful page',()=>{
-  assert.match(backfill,/motil_get_laudus_accounting_backfill_state/);
-  assert.match(backfill,/motil_update_laudus_accounting_backfill_state/);
+test('accounting backfill checkpoints each successful page under a lease',()=>{
+  assert.match(backfill,/motil_acquire_laudus_accounting_backfill_lease/);
+  assert.match(backfill,/motil_checkpoint_laudus_accounting_backfill_v2/);
   assert.match(backfill,/await checkpoint\(db,/);
 });
 
