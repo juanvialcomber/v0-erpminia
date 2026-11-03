@@ -55,6 +55,16 @@ export async function GET() {
         (line.debit === null || Number.isFinite(line.debit)) &&
         (line.credit === null || Number.isFinite(line.credit))
       ),
+      sample: journals.map((row) => ({
+        journalEntryId: row.journalEntryId ?? null,
+        journalEntryNumber: row.journalEntryNumber ?? null,
+        date: row.date ?? null,
+        type: row.type ?? null,
+        lines: Array.isArray(row.lines) ? row.lines.map((line: any) => ({
+          debit: normalizeNumberish(line?.debit),
+          credit: normalizeNumberish(line?.credit),
+        })) : [],
+      })),
     },
   });
 }
