@@ -1,6 +1,6 @@
 import 'server-only';
 
-const DEFAULT_TAX_CORE_URL = 'https://n3uralia-tax-core.vercel.app';
+const DEFAULT_TAX_CORE_URL = 'https://n3uralia-tax-core-recovery-lab.vercel.app';
 
 type TaxCoreRequestInit = RequestInit & { timeoutMs?: number };
 
