@@ -422,6 +422,66 @@ export async function runLaudusReadOnlySmokeTest() {
       fields: ['costCenterId', 'code', 'name', 'fullPath', 'parentId', 'discontinued'],
       orderBy: [{ field: 'costCenterId', direction: 'ASC' as const }],
     },
+    {
+      key: 'purchaseOrders',
+      path: '/purchases/orders/list',
+      fields: [
+        'purchaseOrderId','issuedDate','dueDate','status','notes','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity','items.unitCost',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchaseInvoices',
+      path: '/purchases/invoices/list',
+      fields: [
+        'purchaseInvoiceId','docNumber','issuedDate','dueDate','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'totals.net','totals.VAT','totals.total','totals.currencyCode',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity','items.unitCost',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchasePayments',
+      path: '/purchases/payments/list',
+      fields: [
+        'paymentId','issuedDate','dueDate','document','deposited','notes','modifiedAt',
+        'paymentType.code','paymentType.description','bank.bankId','bank.name',
+        'purchaseInvoices.itemId','purchaseInvoices.purchaseInvoiceId','purchaseInvoices.docNumber',
+        'purchaseInvoices.supplier.supplierId','purchaseInvoices.supplier.name','purchaseInvoices.supplier.legalName',
+        'purchaseInvoices.originalAmount','purchaseInvoices.currencyCode',
+        'purchaseInvoices.parityToMainCurrency','purchaseInvoices.amount',
+        'purchaseInvoices.costCenter.costCenterId',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'accountingEntries',
+      path: '/accounting/journal/entries/list',
+      fields: [
+        'journalEntryId','journalEntryNumber','date','type','typeNumber','approved',
+        'generated','generatedBy','bookId','notes','createdAt','modifiedAt',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchaseWaybills',
+      path: '/purchases/waybills/list',
+      fields: [
+        'purchaseWaybillId','docNumber','issuedDate','notes','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
   ] as const;
 
   const results: Record<string, {
@@ -429,6 +489,8 @@ export async function runLaudusReadOnlySmokeTest() {
     rows: number | null;
     shape: string;
     upstreamStatus?: number;
+    upstreamCode?: string | null;
+    orderFallbackUsed?: boolean;
   }> = {};
   let successfulTargets = 0;
   let failedTargets = 0;
@@ -445,6 +507,7 @@ export async function runLaudusReadOnlySmokeTest() {
       results[target.key] = {
         status: 'ok',
         ...summarizePayload(listed.payload),
+        orderFallbackUsed: listed.fallbackUsed,
       };
       successfulTargets += 1;
     } catch (error) {
@@ -454,6 +517,7 @@ export async function runLaudusReadOnlySmokeTest() {
         rows: null,
         shape: 'unavailable',
         upstreamStatus: error.status,
+        upstreamCode: error.upstreamCode,
       };
       failedTargets += 1;
     }
