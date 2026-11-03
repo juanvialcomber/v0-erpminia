@@ -41,47 +41,6 @@ function supplierRow(row: JsonRow) {
   };
 }
 
-function paymentRows(row: JsonRow): JsonRow[] {
-  const invoices = Array.isArray(row.purchaseInvoices) ? row.purchaseInvoices : [];
-  if (invoices.length === 0) {
-    return [{
-      paymentId: row.paymentId ?? row.id ?? null,
-      issuedDate: row.issuedDate ?? null,
-      dueDate: row.dueDate ?? null,
-      document: row.document ?? null,
-      deposited: row.deposited ?? null,
-      paymentType_code: row.paymentType?.code ?? row.paymentType_code ?? null,
-      paymentType_description: row.paymentType?.description ?? row.paymentType_description ?? null,
-      bank_bankId: row.bank?.bankId ?? row.bank_bankId ?? null,
-      bank_name: row.bank?.name ?? row.bank_name ?? null,
-      notes: row.notes ?? null,
-    }];
-  }
-
-  return invoices.map((invoice: JsonRow) => ({
-    paymentId: row.paymentId ?? row.id ?? null,
-    issuedDate: row.issuedDate ?? null,
-    dueDate: row.dueDate ?? null,
-    document: row.document ?? null,
-    deposited: row.deposited ?? null,
-    paymentType_code: row.paymentType?.code ?? row.paymentType_code ?? null,
-    paymentType_description: row.paymentType?.description ?? row.paymentType_description ?? null,
-    bank_bankId: row.bank?.bankId ?? row.bank_bankId ?? null,
-    bank_name: row.bank?.name ?? row.bank_name ?? null,
-    notes: row.notes ?? null,
-    purchaseInvoices_itemId: invoice.itemId ?? invoice.purchaseInvoiceId ?? null,
-    purchaseInvoices_purchaseInvoiceId: invoice.purchaseInvoiceId ?? null,
-    purchaseInvoices_docNumber: invoice.docNumber ?? null,
-    purchaseInvoices_supplier_supplierId: invoice.supplier?.supplierId ?? invoice.supplierId ?? null,
-    purchaseInvoices_supplier_name: invoice.supplier?.name ?? invoice.supplier?.legalName ?? invoice.supplierName ?? null,
-    purchaseInvoices_originalAmount: invoice.originalAmount ?? null,
-    purchaseInvoices_currencyCode: invoice.currencyCode ?? null,
-    purchaseInvoices_parityToMainCurrency: invoice.parityToMainCurrency ?? null,
-    purchaseInvoices_amount: invoice.amount ?? null,
-    purchaseInvoices_costCenter_costCenterId: invoice.costCenter?.costCenterId ?? invoice.costCenterId ?? null,
-  }));
-}
-
 async function listRecent(path: string, orderField: string, fields: readonly string[], maxPages = 2) {
   const rows: JsonRow[] = [];
   let calls = 0;
@@ -190,7 +149,6 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
     // The current public Laudus API catalogue does not expose a verified
     // purchase-payments list endpoint. Do not probe guessed endpoints: it
     // wastes the monthly call budget and can overstate accounts payable.
-    const flattenedPayments: JsonRow[] = [];
 
     const ordersProcessed = await ingestChunks(
       db,
