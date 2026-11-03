@@ -38,14 +38,13 @@ test('sales sync is bounded and covers six commercial entities', () => {
   assert.match(sync, /laudusMutated: false/);
 });
 
-test('commercial sync remains admin or cron controlled and usage tracked', () => {
+test('commercial sync remains admin controlled and the dormant cron stays usage-tracked but unscheduled', () => {
   assert.match(api, /resolveDataHealthAccess/);
   assert.match(api, /access\.admin/);
   assert.match(api, /withLaudusApiUsageTracking/);
   assert.match(cron, /CRON_SECRET/);
   assert.match(cron, /withLaudusApiUsageTracking/);
-  assert.match(vercel, /\/api\/cron\/laudus-sales-daily/);
-  assert.match(vercel, /10 9 \* \* \*/);
+  assert.doesNotMatch(vercel, /\/api\/cron\/laudus-sales-daily/);
 });
 
 test('coverage keeps private sales staging unavailable until a public service view exists', () => {
