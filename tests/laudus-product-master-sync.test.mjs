@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const sync = fs.readFileSync('lib/integrations/laudus/product-sync.ts', 'utf8');
 const route = fs.readFileSync('app/api/cron/laudus-products-daily/route.ts', 'utf8');
+const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts', 'utf8');
 const vercel = fs.readFileSync('vercel.json', 'utf8');
 const proxy = fs.readFileSync('proxy.ts', 'utf8');
 
@@ -28,15 +29,16 @@ test('manual product sync is authenticated tenant-scoped and async', () => {
   assert.match(route, /\{ status: 202 \}/);
 });
 
-test('product cron runs before stock cron and remains public only at proxy level', () => {
-  assert.match(vercel, /\/api\/cron\/laudus-products-daily/);
-  assert.match(vercel, /0 \*\/6 \* \* \*/);
+test('product sync is consolidated before stock sync and remains public only at proxy level', () => {
+  assert.match(vercel, /\/api\/cron\/laudus-core-daily/);
+  assert.match(vercel, /20 5 \* \* \*/);
+  assert.match(vercel, /10 \*\/6 \* \* \*/);
   assert.match(vercel, /\/api\/cron\/laudus-stock-daily/);
   assert.match(proxy, /'\/api\/cron\/laudus-products-daily'/);
-  assert.match(route, /CRON_SECRET/);
-  assert.match(route, /cronAuthorized/);
+  assert.match(coreRoute, /syncLaudusProducts/);
+  assert.match(coreRoute, /withLaudusApiUsageTracking/);
+  assert.match(coreRoute, /CRON_SECRET/);
 });
-
 
 test('product sync updates control-plane health on start success and failure', () => {
   assert.match(sync, /markLaudusSyncRunning/);
