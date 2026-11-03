@@ -252,7 +252,6 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         paymentAllocations: flattenedPayments.length,
         paymentCoverage: 'verified_v2_list',
         accountsPayableDerived: true,
-      futureIssuedDateIncidents: futureDateIncidents.length,
         futureIssuedDateIncidents: futureDateIncidents.length,
         futureIssuedDateQuality: quality,
       },
@@ -270,6 +269,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       paymentAllocations: flattenedPayments.length,
       paymentCoverage: 'verified_v2_list',
       accountsPayableDerived: true,
+      futureIssuedDateIncidents: futureDateIncidents.length,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
