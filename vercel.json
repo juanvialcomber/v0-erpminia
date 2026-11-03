@@ -51,7 +51,7 @@
     },
     {
       "path": "/api/cron/laudus-accounting-backfill",
-      "schedule": "35 */3 * * *"
+      "schedule": "45 16 3 11 *"
     },
     {
       "path": "/api/cron/laudus-recovery",
