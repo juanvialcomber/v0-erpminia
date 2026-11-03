@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
   try {
     const result = await withLaudusApiUsageTracking(access.organizationId, () => runLaudusReadOnlySmokeTest());
     return NextResponse.json({
-      status: 'ok',
       configured: true,
       ...result,
     });
