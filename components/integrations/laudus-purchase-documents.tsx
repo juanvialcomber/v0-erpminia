@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { FileText, Search, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
@@ -87,24 +88,25 @@ export function LaudusPurchaseDocuments() {
       <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : activeFreshness?.healthStatus === 'healthy' ? 'connected' : 'review'} compact /><CardTitle>Facturas y guías</CardTitle></div>
-              {activeFreshness ? (
-                <Badge variant={activeFreshness.healthStatus === 'healthy' ? 'secondary' : activeFreshness.healthStatus === 'broken' ? 'destructive' : 'outline'}>
-                  {activeFreshness.healthStatus === 'healthy' ? 'Actualizado' : activeFreshness.healthStatus === 'broken' ? 'Sync interrumpido' : 'Revisar sync'}
-                </Badge>
-              ) : null}
+            <div className="flex items-center gap-2">
+              <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : activeFreshness?.healthStatus === 'healthy' ? 'connected' : 'review'} compact />
+              <CardTitle>Facturas y guías</CardTitle>
             </div>
-            <CardDescription>Documentos ERP ya disponibles en MOTIL.</CardDescription>
-            {activeFreshness?.latestSync ? <p className="mt-1 text-xs text-muted-foreground">Última copia disponible: {new Date(activeFreshness.latestSync).toLocaleString('es-CL')}</p> : null}
+            <CardDescription>Documentos ERP disponibles dentro de MOTIL.</CardDescription>
+            {activeFreshness ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activeFreshness.healthStatus === 'healthy' ? 'Actualizado' : 'Actualización por revisar'}
+                {activeFreshness.latestSync ? ` · ${new Date(activeFreshness.latestSync).toLocaleString('es-CL')}` : ''}
+              </p>
+            ) : null}
           </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setMode('invoices')} className={`rounded-md border px-3 py-1.5 text-xs font-medium ${mode === 'invoices' ? 'bg-foreground text-background' : 'bg-background'}`}>
+          <div className="flex gap-2" role="group" aria-label="Tipo de documento">
+            <Button type="button" size="sm" variant={mode === 'invoices' ? 'default' : 'outline'} aria-pressed={mode === 'invoices'} onClick={() => setMode('invoices')}>
               Facturas {data ? `(${data.summary.invoices.toLocaleString('es-CL')})` : ''}
-            </button>
-            <button type="button" onClick={() => setMode('waybills')} className={`rounded-md border px-3 py-1.5 text-xs font-medium ${mode === 'waybills' ? 'bg-foreground text-background' : 'bg-background'}`}>
+            </Button>
+            <Button type="button" size="sm" variant={mode === 'waybills' ? 'default' : 'outline'} aria-pressed={mode === 'waybills'} onClick={() => setMode('waybills')}>
               Guías {data ? `(${data.summary.waybills.toLocaleString('es-CL')})` : ''}
-            </button>
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -120,7 +122,7 @@ export function LaudusPurchaseDocuments() {
             Los documentos siguen disponibles, pero la actualización requiere revisión.{activeFreshness.lastError ? ` ${activeFreshness.lastError}` : ''}
           </p>
         ) : null}
-        {isLoading ? <p className="text-sm text-muted-foreground">Cargando histórico Laudus…</p> : null}
+        {isLoading ? <p className="text-sm text-muted-foreground">Cargando documentos…</p> : null}
 
         {!isLoading && !error && mode === 'invoices' ? (
           <div className="divide-y overflow-hidden rounded-lg border">
@@ -154,7 +156,7 @@ export function LaudusPurchaseDocuments() {
           </div>
         ) : null}
 
-        <p className="text-xs text-muted-foreground">Se muestran hasta 100 documentos recientes por tipo · Fuente: Laudus.</p>
+        <p className="text-xs text-muted-foreground">Hasta 100 documentos recientes por tipo · Fuente: Laudus.</p>
       </CardContent>
     </Card>
   );
