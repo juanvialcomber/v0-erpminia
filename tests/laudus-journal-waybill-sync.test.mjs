@@ -7,31 +7,32 @@ const migration = fs.readFileSync('supabase/migrations/20261029221000_laudus_jou
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
-test('journal and waybill sync use exact Swagger v2 list paths',()=>{
+test('journal sync uses the verified current list contract',()=>{
   assert.match(sync,/\/accounting\/journal\/entries\/list/);
-  assert.match(sync,/\/purchases\/waybills\/list/);
+  assert.match(sync,/JOURNAL_FIELDS/);
+  assert.match(sync,/journalEntryId/);
+  assert.match(sync,/journalEntryNumber/);
+  assert.match(sync,/lines\.account\.accountNumber/);
 });
 
-test('both deltas are bounded to latest 200 and remain staging-only',()=>{
-  assert.match(sync,/listRecent\('\/accounting\/journal\/entries\/list', 'modifiedAt', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/waybills\/list', 'issuedDate', 2\)/);
+test('journal delta is bounded ordered by date and remains staging-only',()=>{
+  assert.match(sync,/listRecent\('\/accounting\/journal\/entries\/list', 'date', JOURNAL_FIELDS, 2\)/);
   assert.match(sync,/motil_ingest_laudus_extended_finance/);
-  assert.match(sync,/motil_ingest_laudus_waybill_rows/);
   assert.doesNotMatch(sync,/\.insert\(|\.update\(|\.delete\(/);
   assert.match(sync,/canonicalMutated: false/);
 });
 
-test('waybills preserve supplier warehouse and item evidence',()=>{
-  for (const field of ['purchaseWaybillId','supplier_supplierId','supplier_VATId','warehouse_warehouseId','items_product_sku','items_quantity']) {
-    assert.match(sync,new RegExp(field));
-  }
+test('unverified waybill polling is disabled without consuming Laudus calls',()=>{
+  assert.match(sync,/status: 'unsupported'/);
+  assert.match(sync,/apiCalls: 0/);
+  assert.match(sync,/waybill list endpoint is not verified/);
 });
 
-test('sync control includes daily domains and the consolidated cron executes both',()=>{
+test('sync control keeps historical waybill domain but consolidated cron executes verified journal only',()=>{
   assert.match(migration,/accounting_entries/);
   assert.match(migration,/waybills/);
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
   assert.equal(byPath.get('/api/cron/laudus-core-daily'),'20 5 * * *');
   assert.match(coreRoute,/syncLaudusAccountingEntries/);
-  assert.match(coreRoute,/syncLaudusPurchaseWaybills/);
+  assert.doesNotMatch(coreRoute,/syncLaudusPurchaseWaybills/);
 });
