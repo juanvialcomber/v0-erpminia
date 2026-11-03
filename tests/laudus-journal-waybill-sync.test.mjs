@@ -7,12 +7,11 @@ const migration = fs.readFileSync('supabase/migrations/20261029221000_laudus_jou
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
-test('journal sync uses the verified current list contract',()=>{
+test('journal and waybill sync use verified Swagger v2 list paths',()=>{
   assert.match(sync,/\/accounting\/journal\/entries\/list/);
+  assert.match(sync,/\/purchases\/waybills\/list/);
   assert.match(sync,/JOURNAL_FIELDS/);
-  assert.match(sync,/journalEntryId/);
-  assert.match(sync,/journalEntryNumber/);
-  assert.match(sync,/lines\.account\.accountNumber/);
+  assert.match(sync,/PURCHASE_WAYBILL_FIELDS/);
 });
 
 test('journal delta is bounded ordered by date and remains staging-only',()=>{
@@ -22,17 +21,19 @@ test('journal delta is bounded ordered by date and remains staging-only',()=>{
   assert.match(sync,/canonicalMutated: false/);
 });
 
-test('unverified waybill polling is disabled without consuming Laudus calls',()=>{
-  assert.match(sync,/status: 'unsupported'/);
-  assert.match(sync,/apiCalls: 0/);
-  assert.match(sync,/waybill list endpoint is not verified/);
+test('waybills preserve supplier warehouse and product evidence from v2',()=>{
+  for (const field of ['purchaseWaybillId','supplier_supplierId','supplier_VATId','warehouse_warehouseId','items_product_sku','items_quantity']) {
+    assert.match(sync,new RegExp(field));
+  }
+  assert.match(sync,/motil_ingest_laudus_waybill_rows/);
+  assert.match(sync,/contract: 'swagger_v2'/);
 });
 
-test('sync control keeps historical waybill domain but consolidated cron executes verified journal only',()=>{
+test('consolidated cron executes verified journal and waybill domains',()=>{
   assert.match(migration,/accounting_entries/);
   assert.match(migration,/waybills/);
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
   assert.equal(byPath.get('/api/cron/laudus-core-daily'),'20 5 * * *');
   assert.match(coreRoute,/syncLaudusAccountingEntries/);
-  assert.doesNotMatch(coreRoute,/syncLaudusPurchaseWaybills/);
+  assert.match(coreRoute,/syncLaudusPurchaseWaybills/);
 });
