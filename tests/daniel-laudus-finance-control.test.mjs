@@ -11,7 +11,7 @@ test('Daniel Laudus control is finance scoped and read only', () => {
   assert.match(route, /MODULE_KEYS\.FIN_FINANZAS/);
   assert.match(loader, /readOnly: true/);
   assert.match(loader, /motilDoesNotWriteLaudus: true/);
-  assert.match(card, /Solo lectura/);
+  assert.match(card, /Fuente financiera: Laudus/);
 });
 
 test('finance control separates current operational data from historical accounting', () => {

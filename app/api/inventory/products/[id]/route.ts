@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     const canonical = context.supabase.schema('canonical');
     const intelligence = context.supabase.schema('intelligence');
 
-    const [productResult, traceResult, positionResult, purchaseLinesResult, receiptLinesResult, movementResult, workOrderPartsResult] = await Promise.all([
+    const [productResult, traceResult, positionResult, laudusLinkResult, purchaseLinesResult, receiptLinesResult, movementResult, workOrderPartsResult] = await Promise.all([
       canonical
         .from('products')
         .select('id, product_code, name, description, family, subfamily, unit, standard_cost, minimum_stock, maximum_stock, is_active, validation_status, validation_notes')
@@ -33,6 +33,14 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         .select('*')
         .eq('organization_id', organizationId)
         .eq('product_id', id)
+        .maybeSingle(),
+      context.supabase
+        .schema('integration')
+        .from('laudus_products')
+        .select('external_id,laudus_product_id,sku,description,unit_of_measure,reconciliation_status,synced_at')
+        .eq('organization_id', organizationId)
+        .eq('canonical_product_id', id)
+        .eq('reconciliation_status', 'matched')
         .maybeSingle(),
       canonical
         .from('purchase_order_lines')
@@ -64,7 +72,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         .limit(100),
     ]);
 
-    const baseError = productResult.error || traceResult.error || positionResult.error || purchaseLinesResult.error || receiptLinesResult.error || movementResult.error || workOrderPartsResult.error;
+    const baseError = productResult.error || traceResult.error || positionResult.error || laudusLinkResult.error || purchaseLinesResult.error || receiptLinesResult.error || movementResult.error || workOrderPartsResult.error;
     if (baseError) throw baseError;
     if (!productResult.data) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
 
@@ -160,6 +168,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       maintenanceUsage,
       suppliers,
       assets,
+      laudusLink: laudusLinkResult.data || null,
       source: 'canonical_product_traceability',
       canonical: true,
     });

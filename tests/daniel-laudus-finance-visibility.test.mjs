@@ -9,7 +9,7 @@ const home = fs.readFileSync('components/dashboard/dashboard-home.tsx','utf8');
 test('finance exposes Laudus as the financial source above the cockpit', () => {
   assert.match(finance, /LaudusFinanceStatusStrip/);
   assert.match(strip, /Laudus · fuente financiera/);
-  assert.match(strip, /solo lectura/);
+  assert.doesNotMatch(strip, /solo lectura/);
   assert.match(strip, /CxP/);
   assert.match(strip, /Pagos/);
   assert.match(strip, /Centros de costo/);
@@ -25,5 +25,6 @@ test('finance source status uses live finance-control evidence and freshness', (
   assert.match(strip, /\/api\/integrations\/laudus\/finance-control/);
   assert.match(strip, /latestOperationalSync/);
   assert.match(strip, /operationalSyncAgeDays/);
-  assert.match(strip, /Laudus sigue siendo autoridad financiera/);
+  assert.match(strip, /Autoridad financiera: Laudus/);
+  assert.match(strip, /operación y análisis: MOTIL/);
 });

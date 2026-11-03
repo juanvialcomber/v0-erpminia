@@ -1,4 +1,5 @@
 import { SuppliersList } from '@/components/compras/suppliers-list';
+import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
 
 export const metadata = {
   title: 'Proveedores | Finanzas',
@@ -13,6 +14,7 @@ export default function FinanceSuppliersPage() {
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">Proveedores</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">Identidad, compras, productos, montos y actividad reciente en una sola vista.</p>
       </section>
+      <LaudusSupplierResolutionQueueCard />
       <SuppliersList />
     </div>
   );

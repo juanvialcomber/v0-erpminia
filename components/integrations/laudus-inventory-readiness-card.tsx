@@ -156,8 +156,8 @@ export function LaudusInventoryReadinessCard() {
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div>
-            <p className="text-sm font-medium">Laudus · inventario no disponible</p>
-            <p className="mt-1 text-xs text-muted-foreground">MOTIL no pudo verificar la evidencia ERP. No se oculta el error ni se asume que el stock está sincronizado.</p>
+            <p className="text-sm font-medium">Inventario ERP no disponible</p>
+            <p className="mt-1 text-xs text-muted-foreground">No fue posible verificar la evidencia ERP de stock.</p>
           </div>
         </div>
       </section>
@@ -178,12 +178,12 @@ export function LaudusInventoryReadinessCard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Boxes className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Laudus · inventario ERP</h2>
+            <h2 className="text-sm font-semibold">Inventario ERP</h2>
           </div>
           <LaudusSourceMark state={sourceState} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus es la fuente primaria de stock cuando está fresco y no existe evidencia oficial contradictoria. Correo y WhatsApp actúan como contraste y abren conciliación antes de aceptar una cifra como vigente.
+          Stock ERP contrastado con correo y WhatsApp antes de aceptarlo como vigente.
         </p>
       </div>
 
@@ -191,10 +191,10 @@ export function LaudusInventoryReadinessCard() {
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-medium">
             {isLoading || !data
-              ? 'Verificando autoridad de stock.'
+              ? 'Verificando fuente de stock.'
               : data.authority.laudusIsPrimary
                 ? 'Fuente primaria: Laudus'
-                : 'Fuente en revisión · Laudus no se usa como verdad única'}
+                : 'Fuente en revisión'}
           </p>
           {!isLoading && data?.authority.latestEmailStockCutoff ? (
             <p className="text-muted-foreground">
@@ -203,7 +203,7 @@ export function LaudusInventoryReadinessCard() {
           ) : null}
         </div>
         <p className="mt-1 text-muted-foreground">
-          {isLoading || !data ? 'Comparando Laudus con correo y WhatsApp.' : data.authority.reason}
+          {isLoading || !data ? 'Comparando fuentes disponibles.' : data.authority.reason}
         </p>
       </div>
 

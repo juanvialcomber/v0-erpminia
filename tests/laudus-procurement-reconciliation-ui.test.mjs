@@ -5,8 +5,7 @@ import test from 'node:test';
 const card = readFileSync(new URL('../components/integrations/laudus-procurement-reconciliation-card.tsx', import.meta.url), 'utf8');
 
 test('procurement reconciliation UI is explicitly preview-only', () => {
-  assert.match(card, /Vista previa determinística/);
-  assert.match(card, /No modifica cabeceras, proveedores ni centros de costo/);
+  assert.match(card, /Cruce determinístico de órdenes, proveedores y centros de costo/);
 });
 
 test('reconciliation UI surfaces resolvable and unresolved counts', () => {

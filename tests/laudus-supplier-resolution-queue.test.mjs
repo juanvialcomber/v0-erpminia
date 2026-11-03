@@ -29,6 +29,6 @@ test('runtime reads the public server-only queue view, never the private integra
 });
 
 test('UI never implies automatic supplier creation or linkage', () => {
-  assert.match(card, /no crea ni enlaza proveedores/);
-  assert.match(card, /RUT\/código Laudus u otra evidencia determinística/);
+  assert.match(card, /Requiere RUT, código Laudus/);
+  assert.match(card, /otra evidencia determinística para resolver identidad/);
 });

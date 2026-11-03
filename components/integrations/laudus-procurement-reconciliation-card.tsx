@@ -65,7 +65,7 @@ export function LaudusProcurementReconciliationCard() {
           <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Vista previa determinística. No modifica cabeceras, proveedores ni centros de costo.
+          Cruce determinístico de órdenes, proveedores y centros de costo.
         </p>
       </div>
 

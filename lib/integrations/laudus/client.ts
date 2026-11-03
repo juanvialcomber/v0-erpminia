@@ -172,7 +172,7 @@ export async function getLaudusAccessToken() {
   return tokenCache.token;
 }
 
-type LaudusListQuery = {
+export type LaudusListQuery = {
   options?: {
     offset?: number;
     limit?: number;
@@ -183,7 +183,7 @@ type LaudusListQuery = {
 };
 
 export async function getLaudusReadOnly(path: string) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/') && !path.startsWith('/DTE/')) {
     throw new Error('Ruta Laudus read-only fuera del alcance permitido.');
   }
   const token = await getLaudusAccessToken();
@@ -214,11 +214,35 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
   });
 }
 
+export async function listLaudusWithOrderFallback(path: string, query: LaudusListQuery = {}) {
+  try {
+    return {
+      payload: await listLaudus(path, query),
+      apiCalls: 1,
+      fallbackUsed: false,
+    };
+  } catch (error) {
+    const canRetryWithoutOrder =
+      error instanceof LaudusApiError &&
+      error.status === 422 &&
+      Array.isArray(query.orderBy) &&
+      query.orderBy.length > 0;
+
+    if (!canRetryWithoutOrder) throw error;
+
+    return {
+      payload: await listLaudus(path, { ...query, orderBy: [] }),
+      apiCalls: 2,
+      fallbackUsed: true,
+    };
+  }
+}
+
 
 type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
 
 export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/') && !path.startsWith('/DTE/')) {
     throw new Error('Ruta Laudus GET fuera del alcance read-only permitido.');
   }
 
@@ -374,22 +398,138 @@ export async function runLaudusReadOnlySmokeTest() {
   await getLaudusAccessToken();
 
   const targets = [
-    ['products', '/production/products/list'],
-    ['suppliers', '/purchases/suppliers/list'],
-    ['warehouses', '/production/warehouses/list'],
-    ['costCenters', '/purchases/costcenters/list'],
+    {
+      key: 'products',
+      path: '/production/products/list',
+      fields: ['productId', 'SKU', 'description', 'unitOfMeasure'],
+      orderBy: [{ field: 'productId', direction: 'DESC' as const }],
+    },
+    {
+      key: 'suppliers',
+      path: '/purchases/suppliers/list',
+      fields: ['supplierId', 'VATId', 'name', 'legalName', 'address', 'city', 'phone', 'email', 'modifiedAt', 'term.termId', 'term.name'],
+      orderBy: [{ field: 'supplierId', direction: 'DESC' as const }],
+    },
+    {
+      key: 'warehouses',
+      path: '/production/warehouses/list',
+      fields: ['warehouseId', 'name', 'address', 'county', 'city', 'state'],
+      orderBy: [{ field: 'warehouseId', direction: 'ASC' as const }],
+    },
+    {
+      key: 'costCenters',
+      path: '/purchases/costcenters/list',
+      fields: ['costCenterId', 'code', 'name', 'fullPath', 'parentId', 'discontinued'],
+      orderBy: [{ field: 'costCenterId', direction: 'ASC' as const }],
+    },
+    {
+      key: 'purchaseOrders',
+      path: '/purchases/orders/list',
+      fields: [
+        'purchaseOrderId','issuedDate','dueDate','status','notes','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity','items.unitCost',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchaseInvoices',
+      path: '/purchases/invoices/list',
+      fields: [
+        'purchaseInvoiceId','docNumber','issuedDate','dueDate','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'totals.net','totals.VAT','totals.total','totals.currencyCode',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity','items.unitCost',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchasePayments',
+      path: '/purchases/payments/list',
+      fields: [
+        'paymentId','issuedDate','dueDate','document','deposited','notes','modifiedAt',
+        'paymentType.code','paymentType.description','bank.bankId','bank.name',
+        'purchaseInvoices.itemId','purchaseInvoices.purchaseInvoiceId','purchaseInvoices.docNumber',
+        'purchaseInvoices.supplier.supplierId','purchaseInvoices.supplier.name','purchaseInvoices.supplier.legalName',
+        'purchaseInvoices.originalAmount','purchaseInvoices.currencyCode',
+        'purchaseInvoices.parityToMainCurrency','purchaseInvoices.amount',
+        'purchaseInvoices.costCenter.costCenterId',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'accountingEntries',
+      path: '/accounting/journal/entries/list',
+      fields: [
+        'journalEntryId','journalEntryNumber','date','type','typeNumber','approved',
+        'generated','generatedBy','bookId','notes','createdAt','modifiedAt',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
+    {
+      key: 'purchaseWaybills',
+      path: '/purchases/waybills/list',
+      fields: [
+        'purchaseWaybillId','docNumber','issuedDate','notes','modifiedAt',
+        'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+        'warehouse.warehouseId','warehouse.name',
+        'items.itemId','items.product.productId','items.product.sku',
+        'items.product.description','items.product.unitOfMeasure','items.quantity',
+      ],
+      orderBy: [{ field: 'modifiedAt', direction: 'DESC' as const }],
+    },
   ] as const;
 
-  const results: Record<string, { rows: number | null; shape: string }> = {};
+  const results: Record<string, {
+    status: 'ok' | 'failed';
+    rows: number | null;
+    shape: string;
+    upstreamStatus?: number;
+    upstreamCode?: string | null;
+    orderFallbackUsed?: boolean;
+  }> = {};
+  let successfulTargets = 0;
+  let failedTargets = 0;
+  let listCalls = 0;
 
-  for (const [key, path] of targets) {
-    const payload = await listLaudus(path, { options: { offset: 0, limit: 5 } });
-    results[key] = summarizePayload(payload);
+  for (const target of targets) {
+    try {
+      const listed = await listLaudusWithOrderFallback(target.path, {
+        options: { offset: 0, limit: 5 },
+        fields: [...target.fields],
+        orderBy: [...target.orderBy],
+      });
+      listCalls += listed.apiCalls;
+      results[target.key] = {
+        status: 'ok',
+        ...summarizePayload(listed.payload),
+        orderFallbackUsed: listed.fallbackUsed,
+      };
+      successfulTargets += 1;
+    } catch (error) {
+      if (!(error instanceof LaudusApiError)) throw error;
+      results[target.key] = {
+        status: 'failed',
+        rows: null,
+        shape: 'unavailable',
+        upstreamStatus: error.status,
+        upstreamCode: error.upstreamCode,
+      };
+      failedTargets += 1;
+    }
   }
 
   return {
+    status: failedTargets > 0 ? 'degraded' as const : 'ok' as const,
     authenticated: true,
-    calls: 5,
+    requestedTargets: targets.length,
+    successfulTargets,
+    failedTargets,
+    listCalls,
     persisted: false,
     results,
   };

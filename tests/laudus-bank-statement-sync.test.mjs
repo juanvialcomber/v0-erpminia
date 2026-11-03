@@ -16,6 +16,7 @@ test('bank statement sync uses the existing verified Laudus bank statement list 
 
 test('bank statement sync stays bounded read-only and usage tracked',()=>{
   assert.match(sync,/limit: 25/);
+  assert.match(sync,/latestStatementDate/);
   assert.match(sync,/canonicalMutated: false/);
   assert.match(sync,/laudusMutated: false/);
   assert.match(route,/withLaudusApiUsageTracking/);

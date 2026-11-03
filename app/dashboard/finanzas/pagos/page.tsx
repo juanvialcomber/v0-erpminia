@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { LaudusBankReconciliationCard } from '@/components/integrations/laudus-bank-reconciliation-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -34,6 +35,7 @@ type DialogMode = 'due' | 'pay' | 'reconcile' | null;
 
 export default function PayablesPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/finance/payables', fetcher);
+  const { data: laudusFinance, error: laudusError, isLoading: laudusLoading } = useSWR('/api/integrations/laudus/finance-control', fetcher);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
@@ -145,7 +147,7 @@ export default function PayablesPage() {
   }
 
   return <div className="space-y-6">
-    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Factura aprobada → vencimiento → pago → conciliación</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola acción principal por vez. El costo ya fue reconocido por la recepción aceptada; Tesorería administra obligación, salida de caja y conciliación.</p></section>
+    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Tesorería</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Factura aprobada → vencimiento → pago → conciliación. Una acción principal por vez.</p></section>
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
@@ -193,11 +195,50 @@ export default function PayablesPage() {
       </Card>
     ) : null}
 
+    <Card className="shadow-none">
+      <CardHeader>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fuente Laudus</p>
+            <CardTitle className="mt-1">CxP ERP</CardTitle>
+            <CardDescription>Obligaciones ERP disponibles para contraste y seguimiento.</CardDescription>
+          </div>
+          {laudusFinance?.accountsPayable?.latestSync ? <Badge variant="outline">Actualizado {new Date(laudusFinance.accountsPayable.latestSync).toLocaleString('es-CL')}</Badge> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {laudusError ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">No fue posible consultar la exposición ERP.</p> : null}
+        {laudusLoading ? <p className="text-sm text-muted-foreground">Cargando exposición ERP…</p> : null}
+        {!laudusLoading && !laudusError && laudusFinance?.accountsPayable ? (
+          <>
+            <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">CxP abiertas</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.openItems || 0).toLocaleString('es-CL')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Saldo abierto CLP</p><p className="mt-1 text-xl font-semibold">{money(laudusFinance.accountsPayable.openAmountClp || 0, 'CLP')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.overdueItems || 0).toLocaleString('es-CL')}</p><p className="mt-1 text-xs text-muted-foreground">{money(laudusFinance.accountsPayable.overdueAmountClp || 0, 'CLP')}</p></div>
+              <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Próximos 7 días</p><p className="mt-1 text-2xl font-semibold">{Number(laudusFinance.accountsPayable.dueWithin7Days || 0).toLocaleString('es-CL')}</p><p className="mt-1 text-xs text-muted-foreground">{money(laudusFinance.accountsPayable.dueSoonAmountClp || 0, 'CLP')}</p></div>
+            </div>
+            <div className="divide-y overflow-hidden rounded-lg border">
+              {(laudusFinance.accountsPayable.oldestOpenItems || []).map((row: any) => (
+                <div key={row.externalId} className="grid gap-2 p-4 sm:grid-cols-[minmax(0,1fr)_120px_140px] sm:items-center">
+                  <div className="min-w-0"><p className="truncate text-sm font-medium">{row.supplierName}</p><p className="mt-0.5 text-xs text-muted-foreground">{row.documentNumber || 'Sin número'} · vence {row.dueDate || 'sin fecha'}</p></div>
+                  <div className="text-xs text-muted-foreground sm:text-right">{row.status || 'Abierta'}</div>
+                  <div className="text-sm font-semibold tabular-nums sm:text-right">{money(row.outstandingAmount, row.currency || 'CLP')}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">Fuente: Laudus · contraste financiero dentro de MOTIL.</p>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
+
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
       {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que Laudus no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
+
+    <LaudusBankReconciliationCard />
 
     <Card className="shadow-none"><CardHeader><CardTitle>Pagos y conciliación</CardTitle><CardDescription>La conciliación no reconoce gasto; confirma la salida de caja con referencia trazable.</CardDescription></CardHeader><CardContent className="space-y-3">
       {!payments.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay pagos registrados.</p> : null}

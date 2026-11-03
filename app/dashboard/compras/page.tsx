@@ -89,7 +89,7 @@ export default function ComprasPage() {
         sources={[
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
           sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'ERP conectado como fuente reconciliable de compras, proveedores, stock y finanzas.' }),
           { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
         ]}
       />
@@ -100,7 +100,7 @@ export default function ComprasPage() {
           { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
           { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
           { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
-          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Laudus está conectado; faltan cerrar dominios e inconsistencias pendientes antes de usar toda su información como operación confiable.' },
         ]}
       />
 

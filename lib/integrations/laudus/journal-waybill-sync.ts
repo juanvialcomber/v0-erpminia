@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudus } from '@/lib/integrations/laudus/client';
+import { LaudusApiError, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -7,6 +7,19 @@ import {
 } from '@/lib/integrations/laudus/sync-policy';
 
 type JsonRow = Record<string, any>;
+
+const ACCOUNTING_ENTRY_FIELDS = [
+  'journalEntryId','journalEntryNumber','date','type','typeNumber','approved',
+  'generated','generatedBy','bookId','notes','createdAt','modifiedAt',
+] as const;
+
+const WAYBILL_FIELDS = [
+  'purchaseWaybillId','docNumber','issuedDate','notes','modifiedAt',
+  'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
+  'warehouse.warehouseId','warehouse.name',
+  'items.itemId','items.product.productId','items.product.sku',
+  'items.product.description','items.product.unitOfMeasure','items.quantity',
+] as const;
 
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) {
@@ -22,18 +35,32 @@ function rowsFrom(payload: unknown): JsonRow[] {
   return [];
 }
 
-async function listRecent(path: string, orderField: string, maxPages = 2) {
+function readField(row: JsonRow, dotted: string) {
+  const flat = dotted.replace(/\./g, '_');
+  if (row[flat] !== undefined) return row[flat];
+  if (row[dotted] !== undefined) return row[dotted];
+
+  let current: any = row;
+  for (const key of dotted.split('.')) {
+    if (!current || typeof current !== 'object') return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+async function listRecent(path: string, fields: readonly string[], orderField: string, maxPages = 2) {
   const rows: JsonRow[] = [];
   let apiCalls = 0;
   let partial = false;
 
   for (let page = 0; page < maxPages; page += 1) {
-    const payload = await listLaudus(path, {
+    const listed = await listLaudusWithOrderFallback(path, {
       options: { offset: page * 100, limit: 100 },
+      fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
-    apiCalls += 1;
-    const pageRows = rowsFrom(payload);
+    apiCalls += listed.apiCalls;
+    const pageRows = rowsFrom(listed.payload);
     rows.push(...pageRows);
     if (pageRows.length < 100) return { rows, apiCalls, partial: false };
     if (page === maxPages - 1) partial = true;
@@ -43,43 +70,57 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
 }
 
 function flattenWaybill(row: JsonRow): JsonRow[] {
-  const supplier = row.supplier && typeof row.supplier === 'object' ? row.supplier : {};
-  const warehouse = row.warehouse && typeof row.warehouse === 'object' ? row.warehouse : {};
-  const items = Array.isArray(row.items) ? row.items : [];
-
   const base = {
-    purchaseWaybillId: row.purchaseWaybillId ?? row.id ?? null,
-    docNumber: row.docNumber ?? null,
-    issuedDate: row.issuedDate ?? null,
-    supplier_supplierId: supplier.supplierId ?? row.supplierId ?? null,
-    supplier_name: supplier.name ?? row.supplierName ?? null,
-    supplier_legalName: supplier.legalName ?? row.supplierLegalName ?? null,
-    supplier_VATId: supplier.VATId ?? supplier.vatId ?? row.supplierVATId ?? null,
-    warehouse_warehouseId: warehouse.warehouseId ?? row.warehouseId ?? null,
-    warehouse_name: warehouse.name ?? row.warehouseName ?? null,
+    purchaseWaybillId: readField(row, 'purchaseWaybillId') ?? row.id ?? null,
+    docNumber: readField(row, 'docNumber') ?? null,
+    issuedDate: readField(row, 'issuedDate') ?? null,
+    supplier_supplierId: readField(row, 'supplier.supplierId') ?? null,
+    supplier_name: readField(row, 'supplier.name') ?? null,
+    supplier_legalName: readField(row, 'supplier.legalName') ?? null,
+    supplier_VATId: readField(row, 'supplier.VATId') ?? null,
+    warehouse_warehouseId: readField(row, 'warehouse.warehouseId') ?? null,
+    warehouse_name: readField(row, 'warehouse.name') ?? null,
   };
 
-  if (items.length === 0) return [base];
+  const items = Array.isArray(row.items) ? row.items : [];
+  if (items.length) {
+    return items.map((item: JsonRow) => {
+      const product = item.product && typeof item.product === 'object' ? item.product : {};
+      return {
+        ...base,
+        items_itemId: item.itemId ?? null,
+        items_product_productId: product.productId ?? item.productId ?? null,
+        items_product_sku: product.sku ?? product.SKU ?? item.sku ?? item.SKU ?? null,
+        items_product_description: product.description ?? item.description ?? null,
+        items_product_unitOfMeasure: product.unitOfMeasure ?? item.unitOfMeasure ?? null,
+        items_quantity: item.quantity ?? null,
+      };
+    });
+  }
 
-  return items.map((item: JsonRow) => {
-    const product = item.product && typeof item.product === 'object' ? item.product : {};
-    return {
+  const itemId = readField(row, 'items.itemId');
+  const productId = readField(row, 'items.product.productId');
+  const sku = readField(row, 'items.product.sku');
+  if (itemId != null || productId != null || sku != null) {
+    return [{
       ...base,
-      items_itemId: item.itemId ?? null,
-      items_product_productId: product.productId ?? item.productId ?? null,
-      items_product_sku: product.sku ?? item.sku ?? null,
-      items_product_description: product.description ?? item.description ?? null,
-      items_product_unitOfMeasure: product.unitOfMeasure ?? item.unitOfMeasure ?? null,
-      items_quantity: item.quantity ?? null,
-    };
-  });
+      items_itemId: itemId ?? null,
+      items_product_productId: productId ?? null,
+      items_product_sku: sku ?? null,
+      items_product_description: readField(row, 'items.product.description') ?? null,
+      items_product_unitOfMeasure: readField(row, 'items.product.unitOfMeasure') ?? null,
+      items_quantity: readField(row, 'items.quantity') ?? null,
+    }];
+  }
+
+  return [base];
 }
 
 export async function syncLaudusAccountingEntries(organizationId: string, db: SupabaseClient) {
   await markLaudusSyncRunning(db, organizationId, 'accounting_entries');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/accounting/journal/entries/list', 'modifiedAt', 2);
+    const listed = await listRecent('/accounting/journal/entries/list', ACCOUNTING_ENTRY_FIELDS, 'modifiedAt', 2);
     apiCalls += listed.apiCalls;
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
@@ -101,7 +142,12 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, apiCalls, partial: listed.partial };
   } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'accounting_entries', error, { apiCalls });
+    await markLaudusSyncFailure(db, organizationId, 'accounting_entries', error, {
+      apiCalls,
+      metadata: error instanceof LaudusApiError
+        ? { path: error.path, status: error.status, upstreamCode: error.upstreamCode, readOnly: true }
+        : { readOnly: true },
+    });
     throw error;
   }
 }
@@ -110,7 +156,7 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
   await markLaudusSyncRunning(db, organizationId, 'waybills');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/purchases/waybills/list', 'issuedDate', 2);
+    const listed = await listRecent('/purchases/waybills/list', WAYBILL_FIELDS, 'modifiedAt', 2);
     apiCalls += listed.apiCalls;
     const flattened = listed.rows.flatMap(flattenWaybill).filter((row) => row.purchaseWaybillId != null);
 
@@ -144,7 +190,12 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, lines, apiCalls, partial: listed.partial };
   } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'waybills', error, { apiCalls });
+    await markLaudusSyncFailure(db, organizationId, 'waybills', error, {
+      apiCalls,
+      metadata: error instanceof LaudusApiError
+        ? { path: error.path, status: error.status, upstreamCode: error.upstreamCode, readOnly: true }
+        : { readOnly: true },
+    });
     throw error;
   }
 }

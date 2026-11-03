@@ -19,13 +19,30 @@ test('Laudus login uses the current v2 contract and caches the token', () => {
   assert.match(client, /tokenCache/);
 });
 
-test('smoke test is bounded to five low-cost read-only calls', () => {
+test('smoke test is bounded, projection-safe and isolates domain failures', () => {
   assert.match(client, /limit: 5/);
-  assert.match(client, /calls: 5/);
-  assert.match(client, /production\/products\/list/);
-  assert.match(client, /purchases\/suppliers\/list/);
-  assert.match(client, /production\/warehouses\/list/);
-  assert.match(client, /purchases\/costcenters\/list/);
+  assert.match(client, /productId.*SKU.*description.*unitOfMeasure/s);
+  assert.match(client, /supplierId.*VATId.*term\.termId.*term\.name/s);
+  assert.match(client, /warehouseId.*county.*state/s);
+  assert.match(client, /costCenterId.*fullPath.*discontinued/s);
+  for (const path of [
+    '/purchases/orders/list',
+    '/purchases/invoices/list',
+    '/purchases/payments/list',
+    '/accounting/journal/entries/list',
+    '/purchases/waybills/list',
+  ]) {
+    assert.match(client, new RegExp(path.replaceAll('/', '\\/')));
+  }
+  assert.match(client, /orderFallbackUsed: listed\.fallbackUsed/);
+  assert.match(client, /upstreamCode: error\.upstreamCode/);
+  assert.match(client, /requestedTargets: targets\.length/);
+  assert.match(client, /listLaudusWithOrderFallback/);
+  assert.match(client, /successfulTargets/);
+  assert.match(client, /failedTargets/);
+  assert.match(client, /status: 'failed'/);
+  assert.match(client, /status: failedTargets > 0 \? 'degraded'/);
+  assert.doesNotMatch(client, /calls: 5/);
   assert.doesNotMatch(client, /method: 'PUT'|method: 'DELETE'|method: 'PATCH'/);
 });
 
@@ -57,4 +74,32 @@ test('Laudus errors expose only safe diagnostic stage and status metadata', () =
   assert.match(route, /stage: laudusError\?\.path/);
   assert.match(route, /upstreamStatus: laudusError\?\.status/);
   assert.doesNotMatch(route, /password|tokenFromPayload|Authorization: Bearer/);
+});
+
+
+test('Laudus list reads retry once without orderBy on upstream 422 only', () => {
+  assert.match(client, /listLaudusWithOrderFallback/);
+  assert.match(client, /error instanceof LaudusApiError/);
+  assert.match(client, /error\.status === 422/);
+  assert.match(client, /query\.orderBy\.length > 0/);
+  assert.match(client, /orderBy: \[\]/);
+  assert.match(client, /apiCalls: 2/);
+});
+
+
+test('smoke validation is POST-only so navigation cannot consume Laudus quota', () => {
+  assert.match(route, /export async function POST/);
+  assert.doesNotMatch(route, /export const GET\s*=\s*POST/);
+});
+
+
+test('smoke refuses to start unless the exact monthly Laudus budget can cover its worst case', () => {
+  assert.match(route, /const SMOKE_MAX_API_REQUESTS = 19/);
+  assert.match(route, /laudus_api_budget_service_v1/);
+  assert.match(route, /monthly_remaining_exact/);
+  assert.match(route, /budget_unknown/);
+  assert.match(route, /budget_hold/);
+  assert.match(route, /tracked_remaining/);
+  assert.match(route, /tracked_remaining\) < SMOKE_MAX_API_REQUESTS/);
+  assert.match(route, /calls: 0/);
 });

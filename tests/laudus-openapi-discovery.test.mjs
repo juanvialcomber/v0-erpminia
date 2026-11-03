@@ -31,3 +31,8 @@ test('live spec discovery is bounded to public Swagger candidates and never auth
   assert.match(source, /loadLaudusOpenApiDocument/);
   assert.doesNotMatch(source, /getLaudusAccessToken|Authorization|LAUDUS_PASSWORD/);
 });
+
+
+test('live Laudus discovery prefers the current v2 Swagger specification', () => {
+  assert.match(source, /swagger\/v2\/swagger\.json/);
+});

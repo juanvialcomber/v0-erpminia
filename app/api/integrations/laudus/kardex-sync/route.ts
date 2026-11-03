@@ -31,18 +31,46 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const productId = String(body?.productId || '').trim();
+  const warehouseId = String(body?.warehouseId || '').trim();
+  const requestedDateTo = String(body?.dateTo || '').trim();
   if (!/^[0-9]{1,18}$/.test(productId)) {
     return NextResponse.json({ error: 'productId Laudus inválido.' }, { status: 400 });
+  }
+  if (warehouseId && !/^[A-Za-z0-9_-]{1,3}$/.test(warehouseId)) {
+    return NextResponse.json({ error: 'warehouseId Laudus inválido.' }, { status: 400 });
+  }
+  if (requestedDateTo && !/^\d{4}-\d{2}-\d{2}$/.test(requestedDateTo)) {
+    return NextResponse.json({ error: 'dateTo inválido.' }, { status: 400 });
   }
 
   try {
     const payload = await withLaudusApiUsageTracking(context.organizationId, () =>
-      getLaudus(`/production/products/${encodeURIComponent(productId)}/kardex`),
+      getLaudus(`/production/products/${encodeURIComponent(productId)}/kardex`, {
+        ...(warehouseId ? { warehouseId } : {}),
+        ...(requestedDateTo ? { dateTo: requestedDateTo } : {}),
+        calculateTransformations: false,
+      }),
     );
     const rows = rowsFrom(payload);
     if (rows.length > 500) {
       return NextResponse.json({ error: 'El kardex excede el límite seguro de 500 movimientos.' }, { status: 409 });
     }
+
+    const recentRows = rows
+      .map((row, index) => ({
+        row,
+        index,
+        time: typeof row.date === 'string' ? Date.parse(row.date) : Number.NaN,
+      }))
+      .sort((a, b) => {
+        const aValid = Number.isFinite(a.time);
+        const bValid = Number.isFinite(b.time);
+        if (aValid && bValid && a.time !== b.time) return b.time - a.time;
+        if (aValid !== bValid) return aValid ? -1 : 1;
+        return a.index - b.index;
+      })
+      .slice(0, 50)
+      .map(({ row }) => row);
 
     const db = getSupabaseServerClient();
     const { data, error } = await db.rpc('motil_ingest_laudus_product_kardex', {
@@ -55,7 +83,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       productId,
+      warehouseId: warehouseId || null,
+      dateTo: requestedDateTo || null,
       movements: rows.length,
+      rows: recentRows,
       persisted: true,
       stagingOnly: true,
       canonicalMutated: false,

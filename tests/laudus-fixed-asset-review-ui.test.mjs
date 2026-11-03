@@ -27,11 +27,11 @@ test('fixed asset review API reuses canonical review queue and remains read-only
 test('fixed asset review UI exposes evidence and human authority', async () => {
   const component = await readFile(componentPath, 'utf8');
 
-  assert.match(component, /Revisión de activos Laudus/);
+  assert.match(component, /Revisión de activos/);
   assert.match(component, /Revisión humana requerida/);
   assert.match(component, /Patente exacta/);
   assert.match(component, /Serie exacta/);
-  assert.match(component, /no se modifica el activo canónico ni Laudus/i);
+  assert.match(component, /no confirma identidad por sí sola/i);
   assert.match(component, /\/api\/integrations\/laudus\/fixed-asset-review/);
 });
 

@@ -37,10 +37,10 @@ test('runtime readiness uses public service views instead of private canonical s
 });
 
 test('UI communicates gaps without inventing data', () => {
-  assert.match(card, /Preparación histórica para Laudus/);
+  assert.match(card, /Preparación de compras/);
   assert.match(card, /Proveedor enlazado/);
   assert.match(card, /Unidad de compra/);
   assert.match(card, /Flujo recepción → factura → pago/);
   assert.match(card, /DTE importados/);
-  assert.match(card, /no completa proveedores, centros de costo ni unidades por inferencia/);
+  assert.match(card, /Los campos faltantes quedan para conciliación determinística o revisión/);
 });

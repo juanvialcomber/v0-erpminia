@@ -863,7 +863,7 @@ export function LaudusFinanceControlCard() {
         </section>
 
         <p className="text-xs text-muted-foreground">
-          Solo lectura. Laudus sigue siendo fuente financiera; MOTIL organiza evidencia y decisiones sin escribir pagos, asientos ni documentos en el ERP.
+          Fuente financiera: Laudus. MOTIL organiza evidencia, prioridades y decisiones.
         </p>
       </CardContent>
     </Card>

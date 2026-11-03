@@ -7,6 +7,7 @@ import { ArrowLeft, Boxes, Building2, CalendarClock, CircleDollarSign, Factory, 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { LaudusProductKardexCard } from '@/components/integrations/laudus-product-kardex-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -42,6 +43,7 @@ export default function ProductTraceabilityPage() {
   const usage: Usage[] = data.maintenanceUsage || [];
   const suppliers: PurchaseOrder[] = data.suppliers || [];
   const assets = data.assets || [];
+  const laudusLink = data.laudusLink || null;
 
   return (
     <div className="space-y-6">
@@ -146,6 +148,8 @@ export default function ProductTraceabilityPage() {
               ))}
             </CardContent>
           </Card>
+
+          <LaudusProductKardexCard laudusLink={laudusLink} />
 
           <Card className="shadow-none">
             <CardHeader><CardTitle>Últimos movimientos</CardTitle><CardDescription>Kardex operativo generado por recepciones y consumos.</CardDescription></CardHeader>

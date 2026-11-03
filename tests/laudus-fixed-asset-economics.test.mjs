@@ -5,6 +5,7 @@ import test from 'node:test';
 const helper = readFileSync(new URL('../lib/integrations/laudus/fixed-asset-economics.ts', import.meta.url), 'utf8');
 const route = readFileSync(new URL('../app/api/integrations/laudus/fixed-asset-economics/route.ts', import.meta.url), 'utf8');
 const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8');
+const card = readFileSync(new URL('../components/integrations/laudus-fixed-asset-economics-card.tsx', import.meta.url), 'utf8');
 
 test('fixed-asset economics is bounded and read only', () => {
   assert.match(helper, /candidates\.slice\(0, 6\)/);
@@ -37,4 +38,13 @@ test('route selects only strong review candidates and stays tenant scoped', () =
   assert.match(route, /strong_candidate/);
   assert.match(route, /context\.organizationId/);
   assert.match(proxy, /\/api\/integrations\/laudus\/fixed-asset-economics/);
+});
+
+
+test('fixed-asset economics usage is tracked and source zero is not published as usable cost', () => {
+  assert.match(route, /withLaudusApiUsageTracking/);
+  assert.match(card, /Sin costo positivo/);
+  assert.match(card, /Sin base de costo/);
+  assert.match(card, /un valor fuente igual a 0 no se publica como costo económico disponible/);
+  assert.match(card, /Con costo positivo/);
 });

@@ -35,7 +35,7 @@ test('migration readiness endpoint is admin-only', () => {
 });
 
 test('UI exposes business readiness without integration internals', () => {
-  assert.match(card, /Preparación para migración Laudus/);
+  assert.match(card, /Preparación de maestros/);
   assert.match(card, /Identidad preparada/);
   assert.match(card, /Vínculos Laudus/);
   assert.doesNotMatch(card, /external_id|payload_hash|raw_records|reconciliation_items/);

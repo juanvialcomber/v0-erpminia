@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { ArrowRight, CircleDollarSign, Gauge, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
+import { LaudusFixedAssetEconomicsCard } from '@/components/integrations/laudus-fixed-asset-economics-card';
 
 type QueueRow = {
   assetId: string;
@@ -151,6 +152,8 @@ export default function FinanceAssetsPage(){
       <Metric icon={Gauge} label="Con medidor" value={number(data.summary.withRuntimeEvidence)} detail={`${data.summary.withUsableRuntime} con secuencia utilizable para tasas`} />
       <Metric icon={CircleDollarSign} label="Valor libro conciliado" value={number(data.summary.withBookValue)} detail={data.summary.depreciationConflicts > 0 ? `${data.summary.depreciationConflicts} activo(s) con doble registro para Daniel` : 'Depreciación canónica vinculada 1:1'} />
     </section>
+
+    <LaudusFixedAssetEconomicsCard />
 
     <section className="rounded-lg border bg-card">
       <div className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-end sm:justify-between">

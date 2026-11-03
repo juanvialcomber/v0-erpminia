@@ -63,12 +63,12 @@ export function LaudusFinanceReadinessCard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
           <Landmark className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Preparación financiera para Laudus</h2>
+          <h2 className="text-sm font-semibold">Preparación financiera</h2>
           </div>
           <LaudusSourceMark state={isLoading ? 'syncing' : data?.reconciliation.state === 'waiting_laudus' ? 'pending' : 'connected'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus podrá aportar CxP, pagos y evidencia contable. MOTIL conserva aprobación humana y conciliación trazable.
+          Cobertura de CxP, pagos y conciliación con fuente Laudus.
         </p>
       </div>
 
@@ -101,10 +101,10 @@ export function LaudusFinanceReadinessCard() {
             Integración financiera: {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Laudus puede informar hechos financieros; no puede aprobar, crear ni conciliar pagos automáticamente.
+            Los hechos financieros se revisan y concilian dentro del flujo MOTIL.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">Aprobación humana obligatoria</p>
+        <p className="text-xs text-muted-foreground">Revisión humana requerida</p>
       </div>
     </section>
   );

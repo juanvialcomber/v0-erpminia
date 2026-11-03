@@ -5,11 +5,29 @@ import test from 'node:test';
 const migration = fs.readFileSync('supabase/migrations/20261029204000_laudus_api_usage_ledger.sql','utf8');
 const usage = fs.readFileSync('lib/integrations/laudus/api-usage.ts','utf8');
 const client = fs.readFileSync('lib/integrations/laudus/client.ts','utf8');
-const products = fs.readFileSync('app/api/cron/laudus-products-daily/route.ts','utf8');
-const stock = fs.readFileSync('app/api/cron/laudus-stock-daily/route.ts','utf8');
-const finance = fs.readFileSync('app/api/cron/laudus-financial-masters-daily/route.ts','utf8');
 const smoke = fs.readFileSync('app/api/integrations/laudus/smoke/route.ts','utf8');
 const bank = fs.readFileSync('app/api/integrations/laudus/bank-reconciliation/route.ts','utf8');
+
+function routeFiles(root) {
+  const files = [];
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const fullPath = `${root}/${entry.name}`;
+    if (entry.isDirectory()) {
+      files.push(...routeFiles(fullPath));
+    } else if (entry.isFile() && entry.name === 'route.ts') {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+const laudusRoutePaths = [
+  ...routeFiles('app/api/cron').filter((file) => file.includes('/laudus-')),
+  ...routeFiles('app/api/integrations/laudus'),
+];
+
+const laudusExecutionMarker =
+  /\b(?:getLaudus(?:ReadOnly)?|listLaudus(?:WithOrderFallback)?|syncLaudus\w*|runLaudus\w*|readLaudusFixedAssetEconomics)\s*\(/;
 
 test('usage ledger is private, daily and service-role only',()=>{
   assert.match(migration,/integration\.laudus_api_usage_daily/);
@@ -36,9 +54,19 @@ test('tracking persists through service-role RPC without breaking the business o
   assert.match(usage,/persistence unavailable/);
 });
 
-test('all current Laudus execution entrypoints are usage-tracked',()=>{
-  for (const source of [products,stock,finance,smoke,bank]) {
-    assert.match(source,/withLaudusApiUsageTracking/);
+test('every Laudus route that can execute an outbound read participates in usage tracking',()=>{
+  const executionRoutes = laudusRoutePaths
+    .map((file) => ({ file, source: fs.readFileSync(file, 'utf8') }))
+    .filter(({ source }) => laudusExecutionMarker.test(source));
+
+  assert.ok(executionRoutes.length >= 15, 'expected the current Laudus execution surface to be discovered');
+
+  for (const { file, source } of executionRoutes) {
+    assert.match(
+      source,
+      /withLaudusApiUsageTracking/,
+      `${file} can execute Laudus reads but is missing usage tracking`,
+    );
   }
 });
 
