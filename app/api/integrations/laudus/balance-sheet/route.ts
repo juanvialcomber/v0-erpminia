@@ -60,21 +60,9 @@ export async function GET(request: NextRequest) {
         laudusMutated: false,
       }, { status: 409 });
     }
-    const rows = allRows.slice(0, 200).map((row) => ({
-      accountNumber: row.accountNumber ?? null,
-      accountName: row.accountName ?? null,
-      debitBalance: Number(row.debitBalance || 0),
-      creditBalance: Number(row.creditBalance || 0),
-      assets: Number(row.assets || 0),
-      liabilities: Number(row.liabilities || 0),
-      expenses: Number(row.expenses || 0),
-      incomes: Number(row.incomes || 0),
-    }));
-
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
       dateTo,
-      rows,
       records: allRows.length,
       persisted: false,
       source: 'Laudus',
