@@ -36,8 +36,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/laudus-bank-statements-daily',
   '/api/cron/laudus-accounting-entries-daily',
   '/api/cron/laudus-waybills-daily',
-  // Temporary branch-only smoke route. Handler returns 404 outside the exact preview branch.
-  '/api/integrations/laudus/preview-contract-smoke',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
