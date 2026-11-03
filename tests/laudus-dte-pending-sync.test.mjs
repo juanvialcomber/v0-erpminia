@@ -45,3 +45,9 @@ test('DTE sync policy is daily, read-only and explicitly non-historical',()=>{
   assert.match(migration,/'historical_complete', false/);
   assert.match(migration,/'executed_in', 'laudus-core-daily'/);
 });
+
+
+test('sync control accepts DTE and gives it the same daily due policy',()=>{
+  assert.match(migration,/accounting_entries','waybills','dtes'/);
+  assert.match(migration,/accounting_entries','waybills','dtes'\) then v_now \+ interval '24 hours'/);
+});
