@@ -36,7 +36,6 @@ export async function loadLaudusAccountingReadiness(
     financeCostCenters,
     canonicalAssets,
     financeAssets,
-    exactFinanceAssets,
     assetsWithAcquisitionDate,
     assetsWithAcquisitionCost,
     assetsWithExpectedLifespan,
@@ -55,11 +54,26 @@ export async function loadLaudusAccountingReadiness(
     count('finance_cost_centers', db.from('canonical_finance_cost_centers').select('cost_center_code', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count('canonical_assets', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count('finance_assets', db.from('canonical_finance_assets').select('asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count('exact_finance_assets', db.from('finance_asset_reconciliation_v1').select('finance_asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact')),
     count('asset_acquisition_date', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
     count('asset_acquisition_cost', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null)),
     count('asset_expected_lifespan', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null)),
   ]);
+
+  let exactFinanceAssets: number | null = null;
+  try {
+    exactFinanceAssets = await count(
+      'exact_finance_assets',
+      db
+        .from('finance_asset_reconciliation_v1')
+        .select('finance_asset_id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('reconciliation_status', 'resolved_exact'),
+    );
+  } catch (error) {
+    console.warn('[laudus/accounting-readiness] exact asset reconciliation unavailable', {
+      message: error instanceof Error ? error.message : 'unknown',
+    });
+  }
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
 
@@ -113,7 +127,7 @@ export async function loadLaudusAccountingReadiness(
       canonical: canonicalAssets,
       finance: financeAssets,
       exactFinanceMatches: exactFinanceAssets,
-      exactFinanceMatchCoverage: pct(exactFinanceAssets, financeAssets),
+      exactFinanceMatchCoverage: exactFinanceAssets == null ? null : pct(exactFinanceAssets, financeAssets),
       acquisitionDateCoverage: pct(assetsWithAcquisitionDate, canonicalAssets),
       acquisitionCostCoverage: pct(assetsWithAcquisitionCost, canonicalAssets),
       expectedLifespanCoverage: pct(assetsWithExpectedLifespan, canonicalAssets),
