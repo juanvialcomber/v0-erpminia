@@ -10,6 +10,7 @@ const stock = fs.readFileSync('app/api/cron/laudus-stock-daily/route.ts','utf8')
 const finance = fs.readFileSync('app/api/cron/laudus-financial-masters-daily/route.ts','utf8');
 const smoke = fs.readFileSync('app/api/integrations/laudus/smoke/route.ts','utf8');
 const bank = fs.readFileSync('app/api/integrations/laudus/bank-reconciliation/route.ts','utf8');
+const fixedAssets = fs.readFileSync('app/api/integrations/laudus/fixed-asset-economics/route.ts','utf8');
 
 test('usage ledger is private, daily and service-role only',()=>{
   assert.match(migration,/integration\.laudus_api_usage_daily/);
@@ -37,7 +38,7 @@ test('tracking persists through service-role RPC without breaking the business o
 });
 
 test('all current Laudus execution entrypoints are usage-tracked',()=>{
-  for (const source of [products,stock,finance,smoke,bank]) {
+  for (const source of [products,stock,finance,smoke,bank,fixedAssets]) {
     assert.match(source,/withLaudusApiUsageTracking/);
   }
 });
