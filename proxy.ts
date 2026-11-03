@@ -28,6 +28,7 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/whatsapp-media',
   '/api/cron/whatsapp-vision',
   '/api/cron/laudus-financial-masters-daily',
+  '/api/cron/laudus-core-daily',
   '/api/cron/laudus-products-daily',
   '/api/cron/laudus-stock-daily',
   '/api/cron/laudus-procurement-daily',

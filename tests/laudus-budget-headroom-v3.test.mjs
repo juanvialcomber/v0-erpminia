@@ -4,13 +4,15 @@ import test from 'node:test';
 
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const migration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
+const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 
-test('Laudus product and financial-master cadence preserve monthly budget headroom',()=>{
+test('Laudus consolidated core and financial-master cadence preserve monthly budget headroom',()=>{
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-products-daily'),'0 3 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'),'20 5 * * *');
   assert.equal(byPath.get('/api/cron/laudus-financial-masters-daily'),'20 4 */2 * *');
   assert.equal(byPath.get('/api/cron/laudus-stock-daily'),'10 */6 * * *');
-  assert.equal(byPath.get('/api/cron/laudus-procurement-daily'),'40 5 * * *');
+  assert.match(coreRoute,/syncLaudusProducts/);
+  assert.match(coreRoute,/syncLaudusProcurement/);
 });
 
 test('control-plane freshness follows the reduced call cadence',()=>{
@@ -26,4 +28,15 @@ test('newer finance and procurement domains remain accepted by sync control',()=
   for (const domain of ['bank_statements','accounting_entries','waybills','warehouses','suppliers','procurement']) {
     assert.match(migration,new RegExp(domain));
   }
+});
+
+
+test('consolidated core preserves a monthly API reserve before calling Laudus',()=>{
+  assert.match(coreRoute,/CORE_CALL_BUDGET = 20/);
+  assert.match(coreRoute,/MONTHLY_RESERVE_FRACTION = 0\.10/);
+  assert.match(coreRoute,/laudus_api_budget_service_v1/);
+  assert.match(coreRoute,/monthly_remaining_exact/);
+  assert.match(coreRoute,/remaining - CORE_CALL_BUDGET >= reserve/);
+  assert.match(coreRoute,/status: 'skipped'/);
+  assert.match(coreRoute,/reason: budget\.reason/);
 });

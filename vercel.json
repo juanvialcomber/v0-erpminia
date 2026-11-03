@@ -34,16 +34,12 @@
       "schedule": "20 4 */2 * *"
     },
     {
-      "path": "/api/cron/laudus-products-daily",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/laudus-core-daily",
+      "schedule": "20 5 * * *"
     },
     {
       "path": "/api/cron/laudus-stock-daily",
       "schedule": "10 */6 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-procurement-daily",
-      "schedule": "40 5 * * *"
     },
     {
       "path": "/api/cron/laudus-suppliers-weekly",
@@ -52,18 +48,6 @@
     {
       "path": "/api/cron/laudus-warehouses-weekly",
       "schedule": "50 6 * * 0"
-    },
-    {
-      "path": "/api/cron/laudus-bank-statements-daily",
-      "schedule": "10 7 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-accounting-entries-daily",
-      "schedule": "40 7 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-waybills-daily",
-      "schedule": "10 8 * * *"
     }
   ]
 }

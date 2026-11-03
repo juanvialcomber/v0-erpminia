@@ -1,4 +1,5 @@
 import { type LaudusEntityType } from './model';
+import { LaudusApiError } from './client';
 
 export type SyncPriority = 'master' | 'transactional' | 'financial_heavy';
 
@@ -79,6 +80,14 @@ async function recordLaudusSyncControl(
       ? null
       : String(syncError);
 
+  const safeErrorMetadata = syncError instanceof LaudusApiError
+    ? {
+        laudusHttpStatus: syncError.status,
+        laudusPath: syncError.path,
+        laudusUpstreamCode: syncError.upstreamCode,
+      }
+    : {};
+
   const { error } = await supabase.rpc('motil_record_laudus_sync_control', {
     p_organization_id: organizationId,
     p_domain: domain,
@@ -89,7 +98,7 @@ async function recordLaudusSyncControl(
     p_conflicts: Math.max(0, Math.trunc(metrics.conflicts || 0)),
     p_api_calls: Math.max(0, Math.trunc(metrics.apiCalls || 0)),
     p_error: message?.slice(0, 1000) || null,
-    p_metadata: metrics.metadata || {},
+    p_metadata: { ...(metrics.metadata || {}), ...safeErrorMetadata },
   });
 
   if (error) throw new Error('Laudus sync control update failed');

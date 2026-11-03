@@ -22,6 +22,10 @@ test('accounting readiness measures canonical identity coverage', () => {
 
 test('fixed asset readiness uses exact finance reconciliation and preserves MOTIL operational authority', () => {
   assert.match(helper, /finance_asset_reconciliation_v1/);
+  assert.match(helper, /canonical_finance_assets'\)\.select\('asset_id'/);
+  assert.match(helper, /canonical_assets_service_v1/);
+  assert.match(helper, /canonical_cost_centers_service_v1/);
+  assert.doesNotMatch(helper, /schema\('canonical'\)/);
   assert.match(helper, /resolved_exact/);
   assert.match(helper, /exactFinanceMatchCoverage/);
   assert.match(helper, /acquisitionCostCoverage/);
