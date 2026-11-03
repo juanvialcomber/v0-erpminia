@@ -70,3 +70,11 @@ test('procurement extension preserves the budget-aware product cadence inside th
   assert.match(coreRoute,/syncLaudusProducts/);
   assert.match(budgetMigration,/when p_domain='products' then v_now \+ interval '24 hours'/);
 });
+
+
+test('supplier full scan avoids unsupported supplierId ordering while staying bounded',()=>{
+  const block = sync.slice(sync.indexOf('async function listAllSuppliers()'), sync.indexOf('async function ingestChunks('));
+  assert.doesNotMatch(block,/orderBy/);
+  assert.match(block,/for \(let page = 0; page < 25; page \+= 1\)/);
+  assert.match(block,/limit: 100/);
+});

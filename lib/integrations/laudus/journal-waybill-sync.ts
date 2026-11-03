@@ -60,6 +60,33 @@ async function listRecent(path: string, orderField: string, fields: readonly str
   return { rows, apiCalls, partial };
 }
 
+function normalizeNumberish(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeJournalRow(row: JsonRow): JsonRow {
+  const lines = Array.isArray(row.lines)
+    ? row.lines.map((line: JsonRow) => ({
+        ...line,
+        debit: normalizeNumberish(line?.debit),
+        credit: normalizeNumberish(line?.credit),
+      }))
+    : [];
+  return { ...row, lines };
+}
+
+function dedupeJournalRows(rows: JsonRow[]) {
+  const byId = new Map<string, JsonRow>();
+  for (const row of rows) {
+    const id = String(row.journalEntryId ?? row.id ?? '').trim();
+    if (!id) continue;
+    byId.set(id, normalizeJournalRow(row));
+  }
+  return [...byId.values()];
+}
+
 function flattenWaybill(row: JsonRow): JsonRow[] {
   const supplier = row.supplier && typeof row.supplier === 'object' ? row.supplier : {};
   const warehouse = row.warehouse && typeof row.warehouse === 'object' ? row.warehouse : {};
@@ -109,20 +136,29 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
-      p_accounting_entries: listed.rows,
+      p_accounting_entries: dedupeJournalRows(listed.rows),
       p_bank_statements: [],
       p_dtes: [],
     });
     if (error) throw new Error('Laudus accounting entry staging failed');
 
     const result = (data || {}) as Record<string, unknown>;
-    const processed = Number(result.accounting_entries_upserted || listed.rows.length || 0);
+    const uniqueRows = dedupeJournalRows(listed.rows);
+    const processed = Number(result.accounting_entries_upserted || uniqueRows.length || 0);
     await markLaudusSyncSuccess(db, organizationId, 'accounting_entries', {
       processed,
       changed: 0,
       conflicts: 0,
       apiCalls,
-      metadata: { partial: listed.partial, readOnly: true, latestLimit: 200, canonicalMutated: false },
+      metadata: {
+        partial: listed.partial,
+        readOnly: true,
+        latestLimit: 200,
+        rowsRead: listed.rows.length,
+        uniqueEntries: uniqueRows.length,
+        duplicatesRemoved: Math.max(listed.rows.length - uniqueRows.length, 0),
+        canonicalMutated: false,
+      },
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, apiCalls, partial: listed.partial };
   } catch (error) {

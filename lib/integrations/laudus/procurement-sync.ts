@@ -126,7 +126,6 @@ async function listAllSuppliers() {
     const payload = await listLaudus('/purchases/suppliers/list', {
       options: { offset: page * 100, limit: 100 },
       fields: [...SUPPLIER_FIELDS],
-      orderBy: [{ field: 'supplierId', direction: 'DESC' }],
     });
     calls += 1;
     const pageRows = rowsFrom(payload);
