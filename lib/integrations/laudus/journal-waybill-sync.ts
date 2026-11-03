@@ -45,39 +45,6 @@ async function listRecent(path: string, orderField: string, fields: readonly str
   return { rows, apiCalls, partial };
 }
 
-function flattenWaybill(row: JsonRow): JsonRow[] {
-  const supplier = row.supplier && typeof row.supplier === 'object' ? row.supplier : {};
-  const warehouse = row.warehouse && typeof row.warehouse === 'object' ? row.warehouse : {};
-  const items = Array.isArray(row.items) ? row.items : [];
-
-  const base = {
-    purchaseWaybillId: row.purchaseWaybillId ?? row.id ?? null,
-    docNumber: row.docNumber ?? null,
-    issuedDate: row.issuedDate ?? null,
-    supplier_supplierId: supplier.supplierId ?? row.supplierId ?? null,
-    supplier_name: supplier.name ?? row.supplierName ?? null,
-    supplier_legalName: supplier.legalName ?? row.supplierLegalName ?? null,
-    supplier_VATId: supplier.VATId ?? supplier.vatId ?? row.supplierVATId ?? null,
-    warehouse_warehouseId: warehouse.warehouseId ?? row.warehouseId ?? null,
-    warehouse_name: warehouse.name ?? row.warehouseName ?? null,
-  };
-
-  if (items.length === 0) return [base];
-
-  return items.map((item: JsonRow) => {
-    const product = item.product && typeof item.product === 'object' ? item.product : {};
-    return {
-      ...base,
-      items_itemId: item.itemId ?? null,
-      items_product_productId: product.productId ?? item.productId ?? null,
-      items_product_sku: product.sku ?? item.sku ?? null,
-      items_product_description: product.description ?? item.description ?? null,
-      items_product_unitOfMeasure: product.unitOfMeasure ?? item.unitOfMeasure ?? null,
-      items_quantity: item.quantity ?? null,
-    };
-  });
-}
-
 export async function syncLaudusAccountingEntries(organizationId: string, db: SupabaseClient) {
   await markLaudusSyncRunning(db, organizationId, 'accounting_entries');
   let apiCalls = 0;
@@ -109,46 +76,14 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
   }
 }
 
-export async function syncLaudusPurchaseWaybills(organizationId: string, db: SupabaseClient) {
-  await markLaudusSyncRunning(db, organizationId, 'waybills');
-  let apiCalls = 0;
-  try {
-    throw new Error('Laudus waybill list endpoint is not verified in the current public API catalogue.');
-    const listed = await listRecent('/purchases/waybills/list', 'issuedDate', [], 2);
-    apiCalls += listed.apiCalls;
-    const flattened = listed.rows.flatMap(flattenWaybill).filter((row) => row.purchaseWaybillId != null);
-
-    let processed = 0;
-    let lines = 0;
-    for (let i = 0; i < flattened.length; i += 500) {
-      const chunk = flattened.slice(i, i + 500);
-      const { data, error } = await db.rpc('motil_ingest_laudus_waybill_rows', {
-        p_organization_id: organizationId,
-        p_rows: chunk,
-      });
-      if (error) throw new Error('Laudus waybill staging failed');
-      const result = (data || {}) as Record<string, unknown>;
-      processed += Number(result.rows || chunk.length || 0);
-      lines += Number(result.lines || 0);
-    }
-
-    await markLaudusSyncSuccess(db, organizationId, 'waybills', {
-      processed,
-      changed: 0,
-      conflicts: 0,
-      apiCalls,
-      metadata: {
-        partial: listed.partial,
-        readOnly: true,
-        documents: listed.rows.length,
-        flattenedRows: flattened.length,
-        lines,
-        canonicalMutated: false,
-      },
-    });
-    return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, lines, apiCalls, partial: listed.partial };
-  } catch (error) {
-    await markLaudusSyncFailure(db, organizationId, 'waybills', error, { apiCalls });
-    throw error;
-  }
+export async function syncLaudusPurchaseWaybills(organizationId: string, _db: SupabaseClient) {
+  return {
+    organizationId,
+    status: 'unsupported' as const,
+    processed: 0,
+    lines: 0,
+    apiCalls: 0,
+    partial: false,
+    reason: 'Laudus waybill list endpoint is not verified in the current public API catalogue.',
+  };
 }
