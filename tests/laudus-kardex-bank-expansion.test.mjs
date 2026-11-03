@@ -42,14 +42,13 @@ test('bank statements use one recent list and normalize nested or flattened bank
   assert.match(bankSync, /laudusMutated: false/);
 });
 
-test('Treasury bank refresh is admin controlled and keeps Laudus read-only', () => {
+test('Treasury bank refresh stays admin-only and finance cockpit exposes no forbidden refresh action', () => {
   assert.match(bankApi, /resolveDataHealthAccess/);
   assert.match(bankApi, /access\.admin/);
   assert.match(bankApi, /withLaudusApiUsageTracking/);
   assert.match(bankApi, /stagingOnly: true/);
   assert.match(bankApi, /laudusMutated: false/);
-  assert.match(bankCard, /Actualizar cartolas/);
-  assert.match(bankCard, /cartolas leídas/);
-  assert.match(bankCard, /fecha más reciente recibida/);
-  assert.match(bankCard, /bank-statements-sync/);
+  assert.doesNotMatch(bankCard, /Actualizar cartolas/);
+  assert.doesNotMatch(bankCard, /bank-statements-sync/);
+  assert.match(bankCard, /La actualización de cartolas se gestiona automáticamente/);
 });
