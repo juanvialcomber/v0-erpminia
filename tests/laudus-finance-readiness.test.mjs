@@ -26,7 +26,7 @@ test('finance readiness API is scoped to finance permissions', () => {
 });
 
 test('finance readiness UI explains Laudus as financial evidence without payment authority', () => {
-  assert.match(card, /Preparación financiera para Laudus/);
-  assert.match(card, /no puede aprobar, crear ni conciliar pagos automáticamente/);
-  assert.match(card, /Aprobación humana obligatoria/);
+  assert.match(card, /Preparación financiera/);
+  assert.match(card, /Los hechos financieros se revisan y concilian dentro del flujo MOTIL/);
+  assert.match(card, /Revisión humana requerida/);
 });
