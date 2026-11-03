@@ -45,5 +45,7 @@ test('Treasury bank refresh is admin controlled and keeps Laudus read-only', () 
   assert.match(bankApi, /stagingOnly: true/);
   assert.match(bankApi, /laudusMutated: false/);
   assert.match(bankCard, /Actualizar cartolas/);
+  assert.match(bankCard, /cartolas leídas/);
+  assert.match(bankCard, /fecha más reciente recibida/);
   assert.match(bankCard, /bank-statements-sync/);
 });
