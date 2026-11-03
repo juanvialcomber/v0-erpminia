@@ -49,8 +49,11 @@ type CoverageResponse = {
   generatedAt: string;
   summary: {
     totalRecords: number;
+    verifiedRecords?: number;
     datasets: number;
+    verifiedDatasets?: number;
     integratedDatasets: number;
+    unavailableDatasets?: number;
     healthyDomains: number;
     unhealthyDomains: number;
     openIncidents: number;
@@ -198,8 +201,8 @@ export default function LaudusDataQualityPage() {
       {hasError ? (
         <StatePanel
           tone="error"
-          title="Cobertura parcial"
-          description="Algunos dominios no pudieron verificarse. Los datos confirmados siguen disponibles."
+          title="Información parcial"
+          description="Una de las fuentes de esta vista no respondió. Los datos confirmados siguen disponibles."
           className="min-h-0 items-start px-4 py-3 text-left [&>div:first-child]:mb-2"
         />
       ) : null}
@@ -210,8 +213,8 @@ export default function LaudusDataQualityPage() {
         <>
           <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
             {[
-              ['Registros', coverage.data.summary.totalRecords],
-              ['Cobertura', `${coverage.data.summary.integratedDatasets}/${coverage.data.summary.datasets}`],
+              ['Registros verificados', coverage.data.summary.verifiedRecords ?? coverage.data.summary.totalRecords],
+              ['Cobertura verificable', `${coverage.data.summary.verifiedDatasets ?? coverage.data.summary.integratedDatasets}/${coverage.data.summary.datasets}`],
               ['Actualización', brokenSyncs.length ? `${brokenSyncs.length} por revisar` : 'Al día'],
               ['Críticas', criticalIssues],
             ].map(([label, value]) => (
