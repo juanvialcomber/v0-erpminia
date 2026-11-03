@@ -44,7 +44,7 @@ export function LaudusSupplierResolutionQueueCard() {
           <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} className="mb-2" />
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Proveedores históricos por resolver</h2>
+            <h2 className="text-sm font-semibold">Proveedores por resolver</h2>
           </div>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             Nombres presentes en OC que todavía no tienen una identidad canónica verificable.
@@ -71,7 +71,7 @@ export function LaudusSupplierResolutionQueueCard() {
       </div>
 
       <div className="border-t px-4 py-3 text-xs text-muted-foreground">
-        MOTIL no crea ni enlaza proveedores desde esta lista. Requiere RUT/código Laudus u otra evidencia determinística.
+        Requiere RUT, código Laudus u otra evidencia determinística para resolver identidad.
       </div>
     </section>
   );
