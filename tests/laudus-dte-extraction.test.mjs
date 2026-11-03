@@ -33,8 +33,9 @@ test('DTE sync has admin and cron entrypoints with API usage tracking', () => {
   assert.match(vercel, /40 8 \* \* \*/);
 });
 
-test('Laudus coverage includes DTE, credit notes and on-demand kardex', () => {
-  assert.match(coverage, /laudus_dtes/);
-  assert.match(coverage, /laudus_credit_notes/);
-  assert.match(coverage, /laudus_product_kardex/);
+test('Laudus coverage uses public DTE and credit-note views while private Kardex stays unverifiable', () => {
+  assert.match(coverage, /laudus_dtes_service_v1/);
+  assert.match(coverage, /laudus_credit_notes_service_v1/);
+  assert.match(coverage, /\['product_kardex', 'Kardex consultado', null\]/);
+  assert.doesNotMatch(coverage, /laudus_product_kardex/);
 });
