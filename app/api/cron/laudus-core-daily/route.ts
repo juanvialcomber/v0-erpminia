@@ -17,6 +17,50 @@ type DomainResult = {
   result?: unknown;
 };
 
+const CORE_CALL_BUDGET = 20;
+const MONTHLY_RESERVE_FRACTION = 0.10;
+
+async function readBudgetGuard(db: any, organizationId: string) {
+  const { data, error } = await db
+    .from('laudus_api_budget_service_v1')
+    .select('monthly_limit, tracked_remaining, monthly_remaining_exact')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      allowed: false,
+      reason: 'budget_unavailable',
+      monthlyLimit: null,
+      remaining: null,
+      reserve: null,
+    };
+  }
+
+  const monthlyLimit = Number(data.monthly_limit || 0);
+  const remaining = Number(data.tracked_remaining || 0);
+  const exact = data.monthly_remaining_exact === true;
+  const reserve = Math.max(100, Math.ceil(monthlyLimit * MONTHLY_RESERVE_FRACTION));
+
+  if (!exact || monthlyLimit <= 0) {
+    return {
+      allowed: false,
+      reason: 'budget_not_exact',
+      monthlyLimit,
+      remaining,
+      reserve,
+    };
+  }
+
+  return {
+    allowed: remaining - CORE_CALL_BUDGET >= reserve,
+    reason: remaining - CORE_CALL_BUDGET >= reserve ? null : 'monthly_reserve',
+    monthlyLimit,
+    remaining,
+    reserve,
+  };
+}
+
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const authorized = Boolean(
@@ -51,6 +95,22 @@ export async function GET(request: NextRequest) {
   const organizations: Array<Record<string, unknown>> = [];
 
   for (const organizationId of organizationIds) {
+    const budget = await readBudgetGuard(db, organizationId);
+    if (!budget.allowed) {
+      organizations.push({
+        organizationId,
+        status: 'skipped',
+        reason: budget.reason,
+        budget: {
+          monthlyLimit: budget.monthlyLimit,
+          remaining: budget.remaining,
+          reserve: budget.reserve,
+          plannedMaxCalls: CORE_CALL_BUDGET,
+        },
+      });
+      continue;
+    }
+
     const domainResults = await withLaudusApiUsageTracking(organizationId, async () => {
       const results: DomainResult[] = [];
 
