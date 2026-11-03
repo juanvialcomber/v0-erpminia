@@ -52,6 +52,22 @@
     {
       "path": "/api/cron/laudus-dtes-daily",
       "schedule": "40 8 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-procurement-daily",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-suppliers-weekly",
+      "schedule": "20 6 * * 0"
+    },
+    {
+      "path": "/api/cron/laudus-accounting-entries-daily",
+      "schedule": "40 7 * * *"
+    },
+    {
+      "path": "/api/cron/laudus-waybills-daily",
+      "schedule": "10 8 * * *"
     }
   ]
 }
