@@ -60,6 +60,23 @@ async function listRecent(path: string, orderField: string, fields: readonly str
   return { rows, apiCalls, partial };
 }
 
+function normalizeNumberish(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeJournalRow(row: JsonRow): JsonRow {
+  const lines = Array.isArray(row.lines)
+    ? row.lines.map((line: JsonRow) => ({
+        ...line,
+        debit: normalizeNumberish(line?.debit),
+        credit: normalizeNumberish(line?.credit),
+      }))
+    : [];
+  return { ...row, lines };
+}
+
 function flattenWaybill(row: JsonRow): JsonRow[] {
   const supplier = row.supplier && typeof row.supplier === 'object' ? row.supplier : {};
   const warehouse = row.warehouse && typeof row.warehouse === 'object' ? row.warehouse : {};
@@ -109,7 +126,7 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
-      p_accounting_entries: listed.rows,
+      p_accounting_entries: listed.rows.map(normalizeJournalRow),
       p_bank_statements: [],
       p_dtes: [],
     });
