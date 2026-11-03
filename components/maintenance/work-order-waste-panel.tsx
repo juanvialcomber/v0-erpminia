@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -75,7 +75,7 @@ export function WorkOrderWastePanel({ workOrderId, readOnly = false }: { workOrd
   const [message, setMessage] = useState('');
   const openCount = useMemo(() => rows.filter((row) => row.status !== 'closed').length, [rows]);
 
-  async function createWaste(event: React.FormEvent<HTMLFormElement>) {
+  async function createWaste(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const code = String(form.get('waste_code') || '');
