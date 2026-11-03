@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { TaxReconciliationCard } from '@/components/finance/tax-reconciliation-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -159,6 +160,8 @@ export default function FinanceTraceabilityPage() {
           Origen, evidencia y revisión humana. Laudus conserva su moneda de origen; MOTIL no completa datos faltantes.
         </p>
       </section>
+
+      <TaxReconciliationCard />
 
       <section className="overflow-hidden rounded-lg border bg-card" aria-label="Evidencia de factura Laudus">
         <div className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
