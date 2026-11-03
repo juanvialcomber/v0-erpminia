@@ -59,3 +59,11 @@ test('UI never coerces missing quantitative evidence to zero', () => {
   assert.match(lubrication, /n === null \? 'N\/D'/);
   assert.match(ui, /n === null \? 'N\/D'/);
 });
+
+
+test('assets without evidence are not mislabeled as low evidence', () => {
+  assert.match(api, /assetsWithEvidence: equipment\.filter\(\(row\) => row\.evidence\.total > 0\)/);
+  assert.match(api, /noEvidence: equipment\.filter\(\(row\) => row\.evidence\.total === 0\)/);
+  assert.match(api, /lowEvidence: equipment\.filter\(\(row\) => row\.evidence\.total > 0 && row\.evidence\.band === 'low'\)/);
+  assert.match(ui, /No se clasifican como evidencia baja/);
+});
