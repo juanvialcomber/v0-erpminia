@@ -139,9 +139,9 @@ export function LaudusFixedAssetReview() {
           </Link>
         </Button>
         <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : 'connected'} className="mb-2" />
-        <h1 className="text-2xl font-semibold tracking-tight">Revisión de activos Laudus</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Revisión de activos</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Prioriza candidatos por evidencia de identidad. Esta vista no enlaza activos automáticamente ni modifica Laudus o el maestro MOTIL.
+          Prioriza candidatos usando evidencia de identidad entre Laudus y el maestro MOTIL.
         </p>
       </section>
 
@@ -289,7 +289,7 @@ export function LaudusFixedAssetReview() {
               ) : null}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              La evidencia ayuda a priorizar la revisión, pero no confirma identidad por sí sola. No se modifica el activo canónico ni Laudus desde esta pantalla.
+              La evidencia prioriza la revisión; no confirma identidad por sí sola.
             </p>
           </div>
         </section>
