@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listLaudus } from '@/lib/integrations/laudus/client';
+import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -158,6 +159,8 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
         uniqueEntries: uniqueRows.length,
         duplicatesRemoved: Math.max(listed.rows.length - uniqueRows.length, 0),
         canonicalMutated: false,
+        futureIssuedDateIncidents: futureDateIncidents.length,
+        futureIssuedDateQuality: quality,
       },
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, apiCalls, partial: listed.partial };
@@ -179,6 +182,14 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
       2,
     );
     apiCalls += listed.apiCalls;
+
+    const futureDateIncidents = futureIssuedDateIncidents(listed.rows, 'waybill');
+    const quality = await reconcileFutureIssuedDateIncidents(
+      db,
+      organizationId,
+      'waybills',
+      futureDateIncidents,
+    );
 
     const flattened = listed.rows
       .flatMap(flattenWaybill)
@@ -223,6 +234,7 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
       apiCalls,
       partial: listed.partial,
       contract: 'swagger_v2' as const,
+      futureIssuedDateIncidents: futureDateIncidents.length,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'waybills', error, { apiCalls });
