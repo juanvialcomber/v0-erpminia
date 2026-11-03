@@ -5,22 +5,22 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 
 const DATASETS = [
-  ['products', 'Productos', 'laudus_products'],
-  ['suppliers', 'Proveedores', 'laudus_suppliers'],
-  ['warehouses', 'Bodegas', 'laudus_warehouses'],
-  ['cost_centers', 'Centros de costo', 'laudus_cost_centers'],
-  ['fixed_assets', 'Activos fijos', 'laudus_fixed_assets'],
-  ['stock', 'Stock por bodega', 'laudus_product_stock'],
-  ['purchase_orders', 'Órdenes de compra', 'laudus_purchase_orders'],
-  ['purchase_invoices', 'Facturas de compra', 'laudus_purchase_invoices'],
-  ['purchase_payments', 'Pagos de compras', 'laudus_purchase_payments'],
-  ['accounts_payable', 'Cuentas por pagar', 'laudus_accounts_payable'],
-  ['bank_statements', 'Cartolas bancarias', 'laudus_bank_statements'],
-  ['accounting_entries', 'Asientos contables', 'laudus_accounting_entries'],
-  ['waybills', 'Guías de compra', 'laudus_waybills'],
-  ['credit_notes', 'Notas de crédito', 'laudus_credit_notes'],
-  ['dtes', 'DTE pendientes', 'laudus_dtes'],
-  ['product_kardex', 'Kardex consultado', 'laudus_product_kardex'],
+  ['products', 'Productos', null],
+  ['suppliers', 'Proveedores', 'laudus_suppliers_service_v1'],
+  ['warehouses', 'Bodegas', 'laudus_warehouses_service_v1'],
+  ['cost_centers', 'Centros de costo', 'laudus_cost_centers_service_v1'],
+  ['fixed_assets', 'Activos fijos', 'laudus_fixed_assets_service_v1'],
+  ['stock', 'Stock por bodega', null],
+  ['purchase_orders', 'Órdenes de compra', null],
+  ['purchase_invoices', 'Facturas de compra', 'laudus_purchase_invoices_service_v1'],
+  ['purchase_payments', 'Pagos de compras', 'laudus_purchase_payments_service_v1'],
+  ['accounts_payable', 'Cuentas por pagar', 'laudus_accounts_payable_service_v1'],
+  ['bank_statements', 'Cartolas bancarias', 'laudus_bank_statements_service_v1'],
+  ['accounting_entries', 'Asientos contables', 'laudus_accounting_entries_service_v1'],
+  ['waybills', 'Guías de compra', null],
+  ['credit_notes', 'Notas de crédito', 'laudus_credit_notes_service_v1'],
+  ['dtes', 'DTE pendientes', 'laudus_dtes_service_v1'],
+  ['product_kardex', 'Kardex consultado', null],
 ] as const;
 
 type DatasetStatus = 'integrated' | 'empty' | 'unavailable';
@@ -35,20 +35,29 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const integration = context.supabase.schema('integration');
-
-  const datasets = await Promise.all(DATASETS.map(async ([key, label, table]) => {
-    try {
-      const { count, error } = await integration
-        .from(table)
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', context.organizationId);
-      if (error) throw error;
-      const records = Number(count || 0);
+  const datasets = await Promise.all(DATASETS.map(async ([key, label, serviceView]) => {
+    if (!serviceView) {
       return {
         key,
         label,
-        table,
+        table: null,
+        records: null,
+        status: 'unavailable' as DatasetStatus,
+      };
+    }
+
+    try {
+      const { count, error } = await context.supabase
+        .from(serviceView)
+        .select('organization_id', { count: 'exact', head: true })
+        .eq('organization_id', context.organizationId);
+      if (error) throw error;
+      const records = count == null ? null : Number(count);
+      if (records == null) throw new Error('count unavailable');
+      return {
+        key,
+        label,
+        table: serviceView,
         records,
         status: (records > 0 ? 'integrated' : 'empty') as DatasetStatus,
       };
@@ -56,7 +65,7 @@ export async function GET(request: NextRequest) {
       return {
         key,
         label,
-        table,
+        table: serviceView,
         records: null,
         status: 'unavailable' as DatasetStatus,
       };
@@ -72,34 +81,13 @@ export async function GET(request: NextRequest) {
     ['sales_receipts', 'Cobranzas', 'sales_receipt'],
   ] as const;
 
-  const salesDatasets = await Promise.all(SALES_DATASETS.map(async ([key, label, entityType]) => {
-    try {
-      const { count, error } = await integration
-        .from('raw_records')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', context.organizationId)
-        .eq('entity_type', entityType)
-        .eq('is_current', true);
-      if (error) throw error;
-      const records = Number(count || 0);
-      return {
-        key,
-        label,
-        table: 'raw_records',
-        entityType,
-        records,
-        status: (records > 0 ? 'integrated' : 'empty') as DatasetStatus,
-      };
-    } catch {
-      return {
-        key,
-        label,
-        table: 'raw_records',
-        entityType,
-        records: null,
-        status: 'unavailable' as DatasetStatus,
-      };
-    }
+  const salesDatasets = SALES_DATASETS.map(([key, label, entityType]) => ({
+    key,
+    label,
+    table: null,
+    entityType,
+    records: null,
+    status: 'unavailable' as DatasetStatus,
   }));
 
   const allDatasets = [...datasets, ...salesDatasets];
@@ -117,8 +105,10 @@ export async function GET(request: NextRequest) {
     health = [];
   }
 
-  const totalRecords = allDatasets.reduce((sum, row) => sum + (row.records || 0), 0);
+  const verifiedDatasets = allDatasets.filter((row) => row.status !== 'unavailable');
+  const verifiedRecords = verifiedDatasets.reduce((sum, row) => sum + Number(row.records ?? 0), 0);
   const integratedDatasets = allDatasets.filter((row) => row.status === 'integrated').length;
+  const unavailableDatasets = allDatasets.filter((row) => row.status === 'unavailable').length;
   const healthyDomains = health.filter((row) => row.health_status === 'healthy').length;
   const unhealthyDomains = health.filter((row) => row.health_status !== 'healthy').length;
   const openIncidents = health.reduce((sum, row) => sum + Number(row.open_incidents || 0), 0);
@@ -126,9 +116,12 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     summary: {
-      totalRecords,
+      totalRecords: verifiedRecords,
+      verifiedRecords,
       datasets: allDatasets.length,
+      verifiedDatasets: verifiedDatasets.length,
       integratedDatasets,
+      unavailableDatasets,
       healthyDomains,
       unhealthyDomains,
       openIncidents,
