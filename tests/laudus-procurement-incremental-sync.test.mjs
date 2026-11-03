@@ -11,27 +11,27 @@ const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const supplierRoute = fs.readFileSync('app/api/cron/laudus-suppliers-weekly/route.ts','utf8');
 
-test('procurement sync uses current Laudus list endpoints',()=>{
+test('procurement sync uses verified Laudus list endpoints only',()=>{
   assert.match(sync,/\/purchases\/suppliers\/list/);
   assert.match(sync,/\/purchases\/orders\/list/);
   assert.match(sync,/\/purchases\/invoices\/list/);
-  assert.match(sync,/\/purchases\/payments\/list/);
+  assert.doesNotMatch(sync,/\/purchases\/payments\/list/);
 });
 
-test('transaction sync is bounded and supplier scan is weekly-bounded',()=>{
-  assert.match(sync,/listRecent\('\/purchases\/orders\/list', 'issuedDate', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/invoices\/list', 'issuedDate', 2\)/);
-  assert.match(sync,/listRecent\('\/purchases\/payments\/list', 'issuedDate', 2\)/);
+test('transaction sync is bounded projected and supplier scan is weekly-bounded',()=>{
+  assert.match(sync,/PURCHASE_ORDER_FIELDS/);
+  assert.match(sync,/PURCHASE_INVOICE_FIELDS/);
+  assert.match(sync,/SUPPLIER_FIELDS/);
   assert.match(sync,/for \(let page = 0; page < 25; page \+= 1\)/);
   assert.match(sync,/limit: 100/);
 });
 
-test('Laudus procurement remains staging-only and derives accounts payable locally',()=>{
+test('Laudus procurement remains staging-only and does not overstate payment coverage',()=>{
   assert.match(sync,/motil_ingest_laudus_suppliers/);
   assert.match(sync,/motil_ingest_laudus_procurement_documents/);
-  assert.match(sync,/motil_ingest_laudus_purchase_payments/);
   assert.match(sync,/motil_refresh_laudus_financial_staging/);
-  assert.match(sync,/accountsPayableDerived: true/);
+  assert.match(sync,/paymentCoverage: 'not_verified'/);
+  assert.match(sync,/accountsPayableDerived: false/);
   assert.doesNotMatch(sync,/\.from\('canonical_/);
   assert.doesNotMatch(sync,/insert\(|update\(|delete\(/);
 });
