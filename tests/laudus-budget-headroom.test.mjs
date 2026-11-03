@@ -5,9 +5,9 @@ import test from 'node:test';
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const migration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
 
-test('product sync runs daily while stock remains every 6 hours',()=>{
+test('consolidated Laudus core runs daily while stock remains every 6 hours',()=>{
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-products-daily'), '0 3 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'), '20 5 * * *');
   assert.equal(byPath.get('/api/cron/laudus-stock-daily'), '10 */6 * * *');
 });
 
