@@ -49,3 +49,11 @@ test('accounting backfill runs hourly',()=>{
   assert.ok(job);
   assert.equal(job.schedule,'35 * * * *');
 });
+
+
+test('accounting backfill initializes from the first historical gap even if recent rows already exist',()=>{
+  assert.match(migration,/lag\(d\) over\(order by d\)/);
+  assert.match(migration,/gap_days > 31/);
+  assert.match(migration,/select g\.prev_d \+ 1/);
+  assert.match(migration,/select max\(d\) \+ 1/);
+});
