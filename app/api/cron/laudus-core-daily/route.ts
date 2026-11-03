@@ -6,6 +6,7 @@ import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage'
 import { syncLaudusProducts } from '@/lib/integrations/laudus/product-sync';
 import { syncLaudusProcurement } from '@/lib/integrations/laudus/procurement-sync';
 import { syncLaudusBankStatements } from '@/lib/integrations/laudus/bank-statement-sync';
+import { syncLaudusDtePending } from '@/lib/integrations/laudus/dte-sync';
 import {
   syncLaudusAccountingEntries,
   syncLaudusPurchaseWaybills,
@@ -133,6 +134,7 @@ export async function GET(request: NextRequest) {
       await run('bank_statements', () => syncLaudusBankStatements(organizationId, db));
       await run('accounting_entries', () => syncLaudusAccountingEntries(organizationId, db));
       await run('purchase_waybills', () => syncLaudusPurchaseWaybills(organizationId, db));
+      await run('dtes', () => syncLaudusDtePending(organizationId, db));
 
       return results;
     });
