@@ -37,7 +37,7 @@ const roleNavigation: Record<ViewerMode, { flow: string[]; support: string[] }> 
   },
   planning: {
     flow: ['Planificar', 'Órdenes'],
-    support: ['Resumen', 'Torre de control', 'Activos', 'Residuos', 'Fuentes'],
+    support: ['Resumen', 'Torre de control', 'Activos', 'Fuentes'],
   },
   execution: {
     flow: ['Órdenes', 'Cierre'],
