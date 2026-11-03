@@ -25,6 +25,18 @@ test('smoke test is bounded, projection-safe and isolates domain failures', () =
   assert.match(client, /supplierId.*VATId.*term\.termId.*term\.name/s);
   assert.match(client, /warehouseId.*county.*state/s);
   assert.match(client, /costCenterId.*fullPath.*discontinued/s);
+  for (const path of [
+    '/purchases/orders/list',
+    '/purchases/invoices/list',
+    '/purchases/payments/list',
+    '/accounting/journal/entries/list',
+    '/purchases/waybills/list',
+  ]) {
+    assert.match(client, new RegExp(path.replaceAll('/', '\\/')));
+  }
+  assert.match(client, /orderFallbackUsed: listed\.fallbackUsed/);
+  assert.match(client, /upstreamCode: error\.upstreamCode/);
+  assert.match(client, /requestedTargets: targets\.length/);
   assert.match(client, /listLaudusWithOrderFallback/);
   assert.match(client, /successfulTargets/);
   assert.match(client, /failedTargets/);
