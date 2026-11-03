@@ -1,10 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-type CountResult = { count: number | null; error: { message: string } | null };
+type CountResult = { count: number | null; error: { message?: string; code?: string; details?: string } | null };
 
-async function count(query: PromiseLike<CountResult>) {
+async function count(label: string, query: PromiseLike<CountResult>) {
   const result = await query;
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) {
+    const code = String(result.error.code || 'SUPABASE_QUERY_ERROR');
+    const detail = String(result.error.message || result.error.details || 'count query failed');
+    throw new Error(`${label}: ${code}: ${detail}`);
+  }
   return result.count ?? 0;
 }
 
@@ -37,24 +41,24 @@ export async function loadLaudusAccountingReadiness(
     assetsWithAcquisitionCost,
     assetsWithExpectedLifespan,
   ] = await Promise.all([
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('event_type', 'purchase_commitment')),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('event_type', 'actual_cost')),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', '')),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_asset_id', 'is', null)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('supplier_id', 'is', null)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('work_order_id', 'is', null)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('amount', 'is', null)),
-    count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('currency', 'CLP')),
-    count(db.from('canonical_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.from('canonical_finance_cost_centers').select('cost_center_code', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.from('canonical_finance_assets').select('asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.from('finance_asset_reconciliation_v1').select('finance_asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact')),
-    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
-    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null)),
-    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null)),
+    count('ledger_total', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId))),
+    count('ledger_committed', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('event_type', 'purchase_commitment'))),
+    count('ledger_actual', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('event_type', 'actual_cost'))),
+    count('ledger_cost_center', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('cost_center_code', 'is', null).neq('cost_center_code', ''))),
+    count('ledger_product', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_product_id', 'is', null))),
+    count('ledger_asset', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('canonical_asset_id', 'is', null))),
+    count('ledger_supplier', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('supplier_id', 'is', null))),
+    count('ledger_work_order', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('work_order_id', 'is', null))),
+    count('ledger_amount', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('amount', 'is', null))),
+    count('ledger_clp', db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('currency', 'CLP'))),
+    count('canonical_cost_centers', db.from('canonical_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId))),
+    count('finance_cost_centers', db.from('canonical_finance_cost_centers').select('cost_center_code', { count: 'exact', head: true }).eq('organization_id', organizationId))),
+    count('canonical_assets', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId))),
+    count('finance_assets', db.from('canonical_finance_assets').select('asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId))),
+    count('exact_finance_assets', db.from('finance_asset_reconciliation_v1').select('finance_asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact'))),
+    count('asset_acquisition_date', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null))),
+    count('asset_acquisition_cost', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null))),
+    count('asset_expected_lifespan', db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null))),
   ]);
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
