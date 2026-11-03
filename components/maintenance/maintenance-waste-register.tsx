@@ -24,6 +24,7 @@ type WasteRow = {
   storage_location: string | null;
   destination_name: string | null;
   work_order: { id: string; work_order_number: string; title: string; workshop_site: string | null } | null;
+  asset: { id: string; asset_code: string | null; name: string | null; asset_type: string | null; category: string | null; manufacturer: string | null; model: string | null; license_plate: string | null; cost_center_code: string | null; validation_status: string | null } | null;
 };
 
 const tabs = [
@@ -43,9 +44,15 @@ export function MaintenanceWasteRegister() {
   const [tab, setTab] = useState<(typeof tabs)[number][0]>('generated');
   const { data, error, isLoading } = useSWR('/api/maintenance/waste', fetcher, { revalidateOnFocus: false });
   const rows = (data?.rows || []) as WasteRow[];
+  const [search, setSearch] = useState('');
+  const [site, setSite] = useState('all');
+  const sites = Array.from(new Set(rows.map((row) => row.work_order?.workshop_site).filter(Boolean))).sort() as string[];
   const visible = rows.filter((row) => {
-    if (tab === 'history') return row.status === 'removed' || row.status === 'closed';
-    return row.status === tab;
+    const statusMatch = tab === 'history' ? row.status === 'removed' || row.status === 'closed' : row.status === tab;
+    if (!statusMatch) return false;
+    if (site !== 'all' && row.work_order?.workshop_site !== site) return false;
+    const haystack = [row.waste_name,row.work_order?.work_order_number,row.asset?.asset_code,row.asset?.name,row.asset?.manufacturer,row.asset?.model,row.asset?.license_plate].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(search.trim().toLowerCase());
   });
   const summary = data?.summary;
 
@@ -73,6 +80,14 @@ export function MaintenanceWasteRegister() {
         ))}
       </div>
 
+      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar equipo, OT o residuo" className="h-10 rounded-md border border-input bg-background px-3 text-sm" />
+        <select value={site} onChange={(event) => setSite(event.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+          <option value="all">Todas las ubicaciones</option>
+          {sites.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {tabs.map(([value, label]) => (
           <Button key={value} type="button" size="sm" variant={tab === value ? 'default' : 'outline'} onClick={() => setTab(value)}>
@@ -89,10 +104,11 @@ export function MaintenanceWasteRegister() {
         {visible.map((row) => (
           <div key={row.id} className="grid gap-3 border-b p-4 last:border-b-0 md:grid-cols-[1.4fr_0.8fr_0.8fr_1fr_auto] md:items-center">
             <div>
-              <p className="font-medium">{row.waste_name}</p>
+              <p className="font-medium">{row.asset?.name || row.asset?.asset_code || 'Equipo sin identificar'}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {row.work_order?.work_order_number || 'OT'}{row.work_order?.workshop_site ? ' · ' + row.work_order.workshop_site : ''}
+                {[row.asset?.asset_code,[row.asset?.manufacturer,row.asset?.model].filter(Boolean).join(' '),row.work_order?.workshop_site,row.work_order?.work_order_number].filter(Boolean).join(' · ')}
               </p>
+              <p className="mt-1 text-sm text-foreground">{row.waste_name}</p>
             </div>
             <p className="text-sm tabular-nums">{Number(row.quantity).toLocaleString('es-CL')} {row.unit === 'unit' ? 'un' : row.unit}</p>
             <Badge variant={row.classification === 'hazardous' ? 'destructive' : 'outline'}>
