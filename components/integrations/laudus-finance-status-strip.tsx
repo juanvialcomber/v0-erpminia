@@ -55,10 +55,7 @@ export function LaudusFinanceStatusStrip({ compact = false }: { compact?: boolea
         <div className="flex min-w-0 items-center gap-3">
           <LaudusSourceMark state={state} />
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold">Laudus · fuente financiera</p>
-              <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">solo lectura</span>
-            </div>
+            <p className="text-sm font-semibold">Laudus · fuente financiera</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {error
                 ? 'No fue posible confirmar el estado de la conexión.'
@@ -71,7 +68,7 @@ export function LaudusFinanceStatusStrip({ compact = false }: { compact?: boolea
         {!compact ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Landmark className="h-4 w-4" />
-            <span>Laudus sigue siendo autoridad financiera; MOTIL organiza y concilia.</span>
+            <span>Autoridad financiera: Laudus · operación y análisis: MOTIL.</span>
           </div>
         ) : null}
       </div>
