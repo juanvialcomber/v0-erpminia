@@ -13,47 +13,47 @@ function rowsFrom(payload: unknown): Record<string, unknown>[] {
   return [];
 }
 
-function safeSample(rows: Record<string, unknown>[]) {
-  return rows.slice(0,3).map((row) => {
-    const out: Record<string, unknown> = { keys: Object.keys(row).slice(0,80) };
-    for (const key of [
-      'salesInvoiceId','salesWaybillId','receiptId','salesReceiptId',
-      'docNumber','docTypeId','docTypeName','issuedDate','dueDate',
-      'total','documentStatus','trackId'
-    ]) {
-      const value = row[key];
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) out[key]=value;
-    }
-    return out;
-  });
-}
-
 export async function GET() {
   const allowed =
     process.env.VERCEL_ENV === 'preview' &&
     process.env.VERCEL_GIT_COMMIT_REF === 'probe/laudus-sales-documents-20261103';
   if (!allowed) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const targets = [
-    ['invoices','/sales/invoices/list'],
-    ['waybills','/sales/waybills/list'],
-    ['receipts','/sales/receipts/list'],
-  ] as const;
+  const candidates = [
+    'salesInvoiceId','invoiceId','docNumber','issuedDate','dueDate',
+    'docTypeId','docTypeName','total','totals.total',
+    'customerId','customer.customerId','customer.VATId',
+    'documentStatus','trackId',
+  ];
 
-  const results: Record<string, unknown> = {};
-  for (const [key,path] of targets) {
+  const fields: Record<string, unknown> = {};
+  for (const field of candidates) {
     try {
-      const payload = await listLaudus(path,{options:{offset:0,limit:3}});
+      const payload = await listLaudus('/sales/invoices/list',{
+        options:{offset:0,limit:1},
+        fields:[field],
+      });
       const rows=rowsFrom(payload);
-      results[key]={status:'ok',rows:rows.length,sample:safeSample(rows)};
+      const value=rows[0]?.[field];
+      fields[field]={
+        status:'ok',
+        rows:rows.length,
+        valueType:value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value,
+        returnedKeys:rows[0] ? Object.keys(rows[0]).slice(0,12) : [],
+      };
     } catch (error) {
-      results[key]={
+      fields[field]={
         status:'failed',
-        message:error instanceof Error ? error.message : 'unknown',
-        upstreamStatus: typeof (error as any)?.status === 'number' ? (error as any).status : null,
+        upstreamStatus:typeof (error as any)?.status === 'number' ? (error as any).status : null,
       };
     }
   }
 
-  return NextResponse.json({ok:true,persisted:false,calls:3,results});
+  return NextResponse.json({
+    ok:true,
+    persisted:false,
+    endpoint:'/sales/invoices/list',
+    candidateCalls:candidates.length,
+    fields,
+  });
 }
