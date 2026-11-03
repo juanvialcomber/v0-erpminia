@@ -12,14 +12,20 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-function pct(value: unknown) {
+function numeric(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
-  return Number.isFinite(n) ? new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(n) : 'N/D';
+  return Number.isFinite(n) ? n : null;
+}
+
+function pct(value: unknown) {
+  const n = numeric(value);
+  return n === null ? 'N/D' : new Intl.NumberFormat('es-CL', { style: 'percent', maximumFractionDigits: 0 }).format(n);
 }
 
 function decimal(value: unknown, suffix = '') {
-  const n = Number(value);
-  return Number.isFinite(n) ? new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n) + suffix : 'N/D';
+  const n = numeric(value);
+  return n === null ? 'N/D' : new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(n) + suffix;
 }
 
 function evidenceLabel(band: string) {
