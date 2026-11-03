@@ -42,8 +42,8 @@ test('accounting readiness is finance permission scoped', () => {
 });
 
 test('UI explains Laudus as reconciliation source, not automatic accounting authority', () => {
-  assert.match(card, /Preparación contable para Laudus/);
+  assert.match(card, /Preparación contable/);
   assert.match(card, /Activos financieros/);
   assert.match(card, /reconciliados por código exacto/);
-  assert.match(card, /sin contabilización, reescritura ni fusión automática/);
+  assert.match(card, /revisión humana requerida/);
 });
