@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       maintenanceAllowed ? context.supabase.from('maintenance_work_orders').select('status, canonical_asset_id').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('purchase_order_quality').select('quality_status').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('procurement_match_exceptions').select('status').eq('organization_id', org) : emptyRows(),
-      procurementAllowed ? context.supabase.rpc('motil_get_laudus_data_quality_incident_summary', { p_organization_id: org }) : emptyRows(),
+      procurementAllowed ? context.supabase.rpc('motil_get_laudus_data_quality_incident_summary_v2', { p_organization_id: org }) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('operational_exception_center_summary_v1').select('*').eq('organization_id', org).maybeSingle() : emptyOne(),
       maintenanceAllowed ? context.supabase.from('canonical_assets_current').select('id', { count: 'exact', head: true }).eq('organization_id', org).eq('is_active', true) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('maintenance_asset_reconciliation_v1').select('canonical_asset_id', { count: 'exact', head: true }).eq('organization_id', org).eq('reconciliation_status', 'deterministic_candidate') : emptyRows(),
@@ -242,7 +242,9 @@ export async function GET(request: NextRequest) {
       const laudusHealthRows = laudusProcurementHealth.data || [];
       const laudusSourceIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.open_incidents || 0), 0);
       const laudusCriticalIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.critical_incidents || 0), 0);
-      const procurementStatus: HealthStatus = openProcurementExceptions > 0 || laudusCriticalIncidents > 0
+      const laudusErrorIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.error_incidents || 0), 0);
+      const laudusWarningIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.warning_incidents || 0), 0);
+      const procurementStatus: HealthStatus = openProcurementExceptions > 0 || laudusCriticalIncidents > 0 || laudusErrorIncidents > 0
         ? 'critical'
         : poWarnings > 0 || laudusSourceIncidents > 0
           ? 'watch'
@@ -269,6 +271,8 @@ export async function GET(request: NextRequest) {
           { label: 'OC con warning', value: poRows.length === 0 ? null : poWarnings },
           { label: 'Excepciones de matching abiertas', value: openProcurementExceptions },
           { label: 'Incidentes Laudus fuente', value: laudusSourceIncidents },
+          { label: 'Errores Laudus', value: laudusCriticalIncidents + laudusErrorIncidents },
+          { label: 'Advertencias Laudus', value: laudusWarningIncidents },
         ],
         action: openProcurementExceptions > 0
           ? 'Resolver excepciones de matching antes del cierre de compra.'

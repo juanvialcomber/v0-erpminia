@@ -7,6 +7,7 @@ const procurement = fs.readFileSync('lib/integrations/laudus/procurement-sync.ts
 const journalWaybill = fs.readFileSync('lib/integrations/laudus/journal-waybill-sync.ts','utf8');
 const health = fs.readFileSync('app/api/data-quality/health/route.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261103133500_laudus_future_date_incidents.sql','utf8');
+const summaryV2 = fs.readFileSync('supabase/migrations/20261103132200_laudus_data_quality_summary_v2.sql','utf8');
 
 test('future issued-date detector preserves source truth and tolerates timezone drift',()=>{
   assert.match(quality,/24 \* 60 \* 60 \* 1000/);
@@ -60,4 +61,23 @@ test('Data Health surfaces Laudus source incidents for procurement',()=>{
   assert.match(health,/Incidentes Laudus fuente/);
   assert.match(health,/laudusSourceIncidents/);
   assert.match(health,/antes de usar fechas en KPIs o timelines/);
+});
+
+
+test('Data Health severity summary v2 keeps tenant checks and exposes error versus warning counts',()=>{
+  assert.match(summaryV2,/motil_get_laudus_data_quality_incident_summary_v2/);
+  assert.match(summaryV2,/auth\.uid\(\)/);
+  assert.match(summaryV2,/auth_profile_identity_links/);
+  assert.match(summaryV2,/error_incidents bigint/);
+  assert.match(summaryV2,/warning_incidents bigint/);
+  assert.match(summaryV2,/to authenticated, service_role/);
+});
+
+test('Data Health treats Laudus error incidents as critical and keeps warnings visible',()=>{
+  assert.match(health,/motil_get_laudus_data_quality_incident_summary_v2/);
+  assert.match(health,/laudusErrorIncidents/);
+  assert.match(health,/laudusWarningIncidents/);
+  assert.match(health,/laudusCriticalIncidents > 0 \|\| laudusErrorIncidents > 0/);
+  assert.match(health,/Errores Laudus/);
+  assert.match(health,/Advertencias Laudus/);
 });
