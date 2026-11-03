@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MaintenanceConditionIntelligence } from '@/components/maintenance/maintenance-condition-intelligence';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
@@ -33,6 +34,7 @@ export function MaintenanceLubricationIntelligence() {
   const { data, error, isLoading, mutate } = useSWR('/api/maintenance/lubrication/intelligence', fetcher, { revalidateOnFocus: false });
   const { data: planData, mutate: mutatePlans } = useSWR('/api/maintenance/lubrication/plans', fetcher, { revalidateOnFocus: false });
   const { data: productsData } = useSWR('/api/maintenance/lubrication/products', fetcher, { revalidateOnFocus: false });
+  const condition = useSWR('/api/maintenance/condition-intelligence', fetcher, { revalidateOnFocus: false });
   const [showPlan, setShowPlan] = useState(false);
   const [message, setMessage] = useState('');
   const summary = data?.summary;
@@ -40,6 +42,7 @@ export function MaintenanceLubricationIntelligence() {
   const warehouse = data?.warehousePlanning || [];
   const schedules = planData?.schedules || [];
   const products = productsData?.rows || [];
+  const forecastRangeByProduct = new Map((condition.data?.forecastEvidence || []).map((row:any) => [row.productId, row]));
 
   async function savePlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,6 +127,8 @@ export function MaintenanceLubricationIntelligence() {
             {(summary?.preventiveSchedules || 0) === 0 ? <p className="mt-2 text-muted-foreground">Proyección por mantención: N/D hasta contar con planes preventivos canónicos.</p> : null}
           </div>
 
+          <MaintenanceConditionIntelligence shared={{ data: condition.data, error: condition.error, isLoading: condition.isLoading, mutate: condition.mutate }} />
+
           <div>
             <h3 className="text-sm font-semibold">Por equipo</h3>
             {equipment.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Aún no hay uso de fluidos ni residuos suficientes para comparar por equipo.</p> : (
@@ -136,7 +141,8 @@ export function MaintenanceLubricationIntelligence() {
                     <div><p className="text-xs text-muted-foreground">Consumo/h</p><p>{decimal(row.litersPerHour,' L/h')}</p></div>
                     <div><p className="text-xs text-muted-foreground">Costo</p><p>{money(row.costClp)}</p>{row.reviewState === 'review_required' ? <Badge variant="destructive">Revisar diferencia</Badge> : null}</div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -145,11 +151,15 @@ export function MaintenanceLubricationIntelligence() {
             <h3 className="text-sm font-semibold">Bodega</h3>
             {warehouse.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Sin demanda proyectable todavía. La existencia de lubricantes sí está conectada; falta parametrizar planes preventivos/fluidos.</p> : (
               <div className="mt-2 overflow-hidden rounded-lg border">
-                {warehouse.map((row:any) => (
-                  <div key={row.productId} className="grid gap-2 border-b p-3 last:border-0 md:grid-cols-[1.5fr_0.7fr_0.7fr_0.7fr]">
+                {warehouse.map((row:any) => {
+                  const range:any = forecastRangeByProduct.get(row.productId);
+                  const low = range?.empiricalRangeReady ? row.demand30Liters * range.lowFactor : null;
+                  const high = range?.empiricalRangeReady ? row.demand30Liters * range.highFactor : null;
+                  return (
+                  <div key={row.productId} className="grid gap-2 border-b p-3 last:border-0 md:grid-cols-[1.5fr_0.7fr_0.9fr_0.7fr]">
                     <div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground">{row.warehouses?.join(', ') || 'Bodega'}</p></div>
                     <div><p className="text-xs text-muted-foreground">Disponible</p><p>{decimal(row.stockLiters,' L')}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Necesidad 30d</p><p>{decimal(row.demand30Liters,' L')}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Necesidad 30d</p><p>{decimal(row.demand30Liters,' L')}</p>{low !== null && high !== null ? <p className="text-xs text-muted-foreground">Rango {decimal(low,' L')}–{decimal(high,' L')}</p> : <p className="text-xs text-muted-foreground">Rango N/D · falta historia</p>}</div>
                     <div><p className="text-xs text-muted-foreground">Brecha</p><p>{decimal(row.gap30Liters,' L')}</p><Badge variant={row.state === 'shortage_risk' ? 'destructive' : 'outline'}>{row.state === 'needs_conversion' ? 'Falta conversión' : row.state === 'shortage_risk' ? 'Riesgo stock' : 'Cubierto'}</Badge></div>
                   </div>
                 ))}
