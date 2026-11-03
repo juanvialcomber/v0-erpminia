@@ -11,7 +11,7 @@ const JOURNAL_FIELDS = [
 ] as const;
 
 const PAGE_SIZE = 100;
-const WINDOW_DAYS = 7;
+const WINDOW_DAYS = 31;
 
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) {
