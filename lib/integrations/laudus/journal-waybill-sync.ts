@@ -159,8 +159,6 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
         uniqueEntries: uniqueRows.length,
         duplicatesRemoved: Math.max(listed.rows.length - uniqueRows.length, 0),
         canonicalMutated: false,
-        futureIssuedDateIncidents: futureDateIncidents.length,
-        futureIssuedDateQuality: quality,
       },
     });
     return { organizationId, status: listed.partial ? 'partial' : 'completed', processed, apiCalls, partial: listed.partial };
@@ -223,6 +221,8 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
         lines,
         contract: 'swagger_v2',
         canonicalMutated: false,
+        futureIssuedDateIncidents: futureDateIncidents.length,
+        futureIssuedDateQuality: quality,
       },
     });
 
