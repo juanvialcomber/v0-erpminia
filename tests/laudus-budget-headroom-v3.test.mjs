@@ -29,3 +29,14 @@ test('newer finance and procurement domains remain accepted by sync control',()=
     assert.match(migration,new RegExp(domain));
   }
 });
+
+
+test('consolidated core preserves a monthly API reserve before calling Laudus',()=>{
+  assert.match(coreRoute,/CORE_CALL_BUDGET = 20/);
+  assert.match(coreRoute,/MONTHLY_RESERVE_FRACTION = 0\.10/);
+  assert.match(coreRoute,/laudus_api_budget_service_v1/);
+  assert.match(coreRoute,/monthly_remaining_exact/);
+  assert.match(coreRoute,/remaining - CORE_CALL_BUDGET >= reserve/);
+  assert.match(coreRoute,/status: 'skipped'/);
+  assert.match(coreRoute,/reason: budget\.reason/);
+});
