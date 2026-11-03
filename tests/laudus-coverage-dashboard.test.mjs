@@ -35,9 +35,12 @@ test('Laudus quality page combines coverage, public capability discovery and rec
   assert.match(page, /Revisiones/);
   assert.match(page, /Detalle técnico de la integración/);
   assert.match(page, /Las diferencias se resuelven desde la conciliación con evidencia/);
+  assert.match(page, /title="Cobertura parcial"/);
+  assert.match(page, /className="min-h-0 items-start px-4 py-3 text-left/);
 });
 
 test('Data quality navigation exposes the Laudus section', () => {
   assert.match(layout, /\/dashboard\/calidad-datos\/laudus/);
   assert.match(layout, />Laudus</);
+  assert.doesNotMatch(layout, /\\\\n/);
 });
