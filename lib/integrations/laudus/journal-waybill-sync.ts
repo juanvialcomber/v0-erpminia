@@ -8,6 +8,8 @@ import {
 
 type JsonRow = Record<string, any>;
 
+const JOURNAL_FIELDS = ['journalEntryId','journalEntryNumber','date','lines.account.accountNumber','lines.debit','lines.credit'] as const;
+
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) {
     return payload.filter((row): row is JsonRow => Boolean(row && typeof row === 'object' && !Array.isArray(row)));
@@ -22,7 +24,7 @@ function rowsFrom(payload: unknown): JsonRow[] {
   return [];
 }
 
-async function listRecent(path: string, orderField: string, maxPages = 2) {
+async function listRecent(path: string, orderField: string, fields: readonly string[], maxPages = 2) {
   const rows: JsonRow[] = [];
   let apiCalls = 0;
   let partial = false;
@@ -30,6 +32,7 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
   for (let page = 0; page < maxPages; page += 1) {
     const payload = await listLaudus(path, {
       options: { offset: page * 100, limit: 100 },
+      fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
     apiCalls += 1;
@@ -79,7 +82,7 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
   await markLaudusSyncRunning(db, organizationId, 'accounting_entries');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/accounting/journal/entries/list', 'modifiedAt', 2);
+    const listed = await listRecent('/accounting/journal/entries/list', 'date', JOURNAL_FIELDS, 2);
     apiCalls += listed.apiCalls;
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
@@ -110,7 +113,8 @@ export async function syncLaudusPurchaseWaybills(organizationId: string, db: Sup
   await markLaudusSyncRunning(db, organizationId, 'waybills');
   let apiCalls = 0;
   try {
-    const listed = await listRecent('/purchases/waybills/list', 'issuedDate', 2);
+    throw new Error('Laudus waybill list endpoint is not verified in the current public API catalogue.');
+    const listed = await listRecent('/purchases/waybills/list', 'issuedDate', [], 2);
     apiCalls += listed.apiCalls;
     const flattened = listed.rows.flatMap(flattenWaybill).filter((row) => row.purchaseWaybillId != null);
 
