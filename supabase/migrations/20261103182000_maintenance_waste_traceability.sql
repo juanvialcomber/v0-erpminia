@@ -53,12 +53,24 @@ using (
     from public.user_roles ur
     where ur.user_id = (select public.current_application_user_id())
   )
+  and exists (
+    select 1
+    from public.maintenance_work_orders wo
+    where wo.id = work_order_id
+      and wo.organization_id = maintenance_waste_records.organization_id
+  )
 )
 with check (
   organization_id in (
     select ur.organization_id
     from public.user_roles ur
     where ur.user_id = (select public.current_application_user_id())
+  )
+  and exists (
+    select 1
+    from public.maintenance_work_orders wo
+    where wo.id = work_order_id
+      and wo.organization_id = maintenance_waste_records.organization_id
   )
 );
 
