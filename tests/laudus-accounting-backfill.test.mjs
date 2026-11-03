@@ -7,8 +7,8 @@ const route = fs.readFileSync('app/api/cron/laudus-accounting-backfill/route.ts'
 const migration = fs.readFileSync('supabase/migrations/20261103115000_laudus_accounting_backfill_state.sql','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
-test('accounting backfill uses date windows and stable pagination',()=>{
-  assert.match(backfill,/WINDOW_DAYS = 7/);
+test('accounting backfill uses wider date windows and stable pagination',()=>{
+  assert.match(backfill,/WINDOW_DAYS = 31/);
   assert.match(backfill,/field: 'date', operator: '>='/);
   assert.match(backfill,/field: 'date', operator: '<='/);
   assert.match(backfill,/field: 'date', direction: 'ASC'/);
