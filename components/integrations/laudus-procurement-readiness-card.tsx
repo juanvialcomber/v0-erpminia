@@ -67,12 +67,12 @@ export function LaudusProcurementReadinessCard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Preparación histórica para Laudus</h2>
+          <h2 className="text-sm font-semibold">Preparación de compras</h2>
           </div>
           <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Mide qué tan reconciliable está el histórico de compras de MOTIL antes de conectar el ERP.
+          Cobertura del histórico de compras para conciliación con el ERP.
         </p>
       </div>
 
@@ -136,7 +136,7 @@ export function LaudusProcurementReadinessCard() {
       </div>
 
       <div className="border-t px-4 py-3 text-xs text-muted-foreground">
-        MOTIL no completa proveedores, centros de costo ni unidades por inferencia. Los campos faltantes quedan para conciliación determinística o revisión.
+        Los campos faltantes quedan para conciliación determinística o revisión.
       </div>
     </section>
   );
