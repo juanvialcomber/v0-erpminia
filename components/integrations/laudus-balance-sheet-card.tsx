@@ -41,7 +41,7 @@ export function LaudusBalanceSheetCard() {
               <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact />
               <CardTitle className="flex items-center gap-2"><Scale className="h-4 w-4" />Balance</CardTitle>
             </div>
-            <CardDescription>Vista contable de 8 columnas con fuente Laudus.</CardDescription>
+            <CardDescription>Saldos contables por cuenta con fuente Laudus.</CardDescription>
           </div>
           <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>
             {enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar balance'}
@@ -56,7 +56,7 @@ export function LaudusBalanceSheetCard() {
             <div className="rounded-lg border p-4">
               <p className="text-sm font-medium">{data.records.toLocaleString('es-CL')} cuentas con actividad</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Corte {data.dateTo}. La vista evita sumar Activos, Pasivos, Gastos e Ingresos hasta validar oficialmente la jerarquía contable devuelta por Laudus.
+                Corte {data.dateTo}. Laudus entrega saldos por cuenta; MOTIL no inventa totales de Activos, Pasivos, Gastos e Ingresos sin una clasificación oficial.
               </p>
             </div>
             <p className="text-xs text-muted-foreground">Fuente: Laudus.</p>
