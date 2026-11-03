@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const sync = fs.readFileSync('lib/integrations/laudus/journal-waybill-sync.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261029221000_laudus_journal_waybill_sync_domains.sql','utf8');
+const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
 test('journal and waybill sync use exact Swagger v2 list paths',()=>{
@@ -26,10 +27,11 @@ test('waybills preserve supplier warehouse and item evidence',()=>{
   }
 });
 
-test('sync control and cron schedules include new daily domains',()=>{
+test('sync control includes daily domains and the consolidated cron executes both',()=>{
   assert.match(migration,/accounting_entries/);
   assert.match(migration,/waybills/);
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-accounting-entries-daily'),'40 7 * * *');
-  assert.equal(byPath.get('/api/cron/laudus-waybills-daily'),'10 8 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'),'20 5 * * *');
+  assert.match(coreRoute,/syncLaudusAccountingEntries/);
+  assert.match(coreRoute,/syncLaudusPurchaseWaybills/);
 });
