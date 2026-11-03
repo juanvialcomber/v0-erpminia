@@ -16,7 +16,9 @@ test('Laudus client permits DTE only inside the existing read-only allowlist', (
 
 test('pending DTE extraction is bounded, stages through existing finance RPC, and never mutates Laudus', () => {
   assert.match(sync, /getLaudus\('\/DTE\/pending'\)/);
-  assert.match(sync, /slice\(0, 1000\)/);
+  assert.match(sync, /rows\.length > 1000/);
+  assert.match(sync, /exceeds safe staging limit/);
+  assert.doesNotMatch(sync, /slice\(0, 1000\)/);
   assert.match(sync, /motil_ingest_laudus_extended_finance/);
   assert.match(sync, /p_dtes: rows/);
   assert.match(sync, /stagingOnly: true/);
