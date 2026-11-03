@@ -91,3 +91,15 @@ test('smoke validation is POST-only so navigation cannot consume Laudus quota', 
   assert.match(route, /export async function POST/);
   assert.doesNotMatch(route, /export const GET\s*=\s*POST/);
 });
+
+
+test('smoke refuses to start unless the exact monthly Laudus budget can cover its worst case', () => {
+  assert.match(route, /const SMOKE_MAX_API_REQUESTS = 19/);
+  assert.match(route, /laudus_api_budget_service_v1/);
+  assert.match(route, /monthly_remaining_exact/);
+  assert.match(route, /budget_unknown/);
+  assert.match(route, /budget_hold/);
+  assert.match(route, /tracked_remaining/);
+  assert.match(route, /tracked_remaining\) < SMOKE_MAX_API_REQUESTS/);
+  assert.match(route, /calls: 0/);
+});
