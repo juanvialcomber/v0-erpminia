@@ -25,8 +25,8 @@ type Payload = {
   assets: {
     canonical: number;
     finance: number;
-    exactFinanceMatches: number;
-    exactFinanceMatchCoverage: number;
+    exactFinanceMatches: number | null;
+    exactFinanceMatchCoverage: number | null;
     acquisitionDateCoverage: number;
     acquisitionCostCoverage: number;
     expectedLifespanCoverage: number;
@@ -118,7 +118,7 @@ export function LaudusAccountingReadinessCard() {
         <div className="bg-card p-4">
           <p className="text-sm font-medium">Activos financieros</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {isLoading || !data ? '—' : data.assets.exactFinanceMatches.toLocaleString('es-CL')} de {isLoading || !data ? '—' : data.assets.finance.toLocaleString('es-CL')} reconciliados por código exacto.
+            {isLoading || !data || data.assets.exactFinanceMatches == null ? '—' : data.assets.exactFinanceMatches.toLocaleString('es-CL')} de {isLoading || !data ? '—' : data.assets.finance.toLocaleString('es-CL')} reconciliados por código exacto.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Fecha/costo/vida útil disponibles en {isLoading || !data ? '—' : pct(data.assets.acquisitionCostCoverage)} de los activos canónicos.
