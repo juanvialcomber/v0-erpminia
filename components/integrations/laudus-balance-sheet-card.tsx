@@ -7,24 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
-type Row = {
-  accountId?: number;
-  accountNumber?: string | null;
-  accountName?: string | null;
-  debit?: number | null;
-  credit?: number | null;
-  debitBalance?: number;
-  creditBalance?: number;
-  assets?: number;
-  liabilities?: number;
-  expenses?: number;
-  incomes?: number;
-};
-
 type Payload = {
   generatedAt: string;
   dateTo: string;
-  rows: Row[];
   records: number;
   persisted: false;
   source: 'Laudus';
