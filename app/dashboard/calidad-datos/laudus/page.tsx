@@ -198,8 +198,9 @@ export default function LaudusDataQualityPage() {
       {hasError ? (
         <StatePanel
           tone="error"
-          title="Parte de la cobertura Laudus no pudo verificarse"
-          description="La vista mantiene separados los datos confirmados de los dominios sin evidencia."
+          title="Cobertura parcial"
+          description="Algunos dominios no pudieron verificarse. Los datos confirmados siguen disponibles."
+          className="min-h-0 items-start px-4 py-3 text-left [&>div:first-child]:mb-2"
         />
       ) : null}
 
