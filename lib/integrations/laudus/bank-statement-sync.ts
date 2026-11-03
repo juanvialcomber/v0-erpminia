@@ -69,6 +69,22 @@ export async function syncLaudusBankStatements(
     apiCalls += 1;
 
     const rows = rowsFromPayload(payload).map(normalizeStatement);
+    const latestStatementDate = rows.reduce<string | null>((latest, row) => {
+      const candidate =
+        typeof row.dateTo === 'string'
+          ? row.dateTo
+          : typeof row.dateFrom === 'string'
+            ? row.dateFrom
+            : null;
+      if (!candidate) return latest;
+      if (!latest) return candidate;
+      const candidateTime = Date.parse(candidate);
+      const latestTime = Date.parse(latest);
+      if (!Number.isFinite(candidateTime)) return latest;
+      if (!Number.isFinite(latestTime)) return candidate;
+      return candidateTime > latestTime ? candidate : latest;
+    }, null);
+
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
       p_accounting_entries: [],
@@ -89,6 +105,7 @@ export async function syncLaudusBankStatements(
       metadata: {
         readOnly: true,
         recentLimit: 25,
+        latestStatementDate,
         canonicalMutated: false,
       },
     });
@@ -98,6 +115,7 @@ export async function syncLaudusBankStatements(
       status: 'completed' as const,
       processed,
       apiCalls,
+      latestStatementDate,
       canonicalMutated: false,
       laudusMutated: false,
     };
