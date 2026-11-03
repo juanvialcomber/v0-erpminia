@@ -49,7 +49,7 @@ test('accounting backfill state remains service-only',()=>{
 test('accounting backfill one-shot ops schedule is explicit',()=>{
   const job=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-accounting-backfill');
   assert.ok(job);
-  assert.equal(job.schedule,'45 16 3 11 *');
+  assert.equal(job.schedule,'50 16 3 11 *');
 });
 
 
