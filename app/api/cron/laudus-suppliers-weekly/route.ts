@@ -1,30 +1,71 @@
 export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getOrganizationContext } from '@/lib/api/organization-context';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 import { syncLaudusSuppliers } from '@/lib/integrations/laudus/procurement-sync';
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  const authorized = Boolean(
+  const cronAuthorized = Boolean(
     secret &&
     secret.length >= 24 &&
     request.headers.get('authorization') === `Bearer ${secret}`,
   );
-
-  if (!authorized) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const manualRequested = request.nextUrl.searchParams.get('manual') === '1';
 
   const db = await createClient();
-  const { data: sources, error } = await db
-    .from('laudus_source_status_service_v1')
-    .select('organization_id')
-    .eq('enabled', true)
-    .limit(10);
+  let organizationIds: string[] = [];
 
-  if (error) return NextResponse.json({ error: 'No se pudo leer el estado Laudus.' }, { status: 503 });
+  if (cronAuthorized) {
+    const { data: sources, error } = await db
+      .from('laudus_source_status_service_v1')
+      .select('organization_id')
+      .eq('enabled', true)
+      .limit(10);
+    if (error) return NextResponse.json({ error: 'No se pudo leer el estado Laudus.' }, { status: 503 });
+    organizationIds = [...new Set((sources || []).map((row: any) => String(row.organization_id || '')).filter(Boolean))];
+  } else if (manualRequested) {
+    const context = await getOrganizationContext(request);
+    if (!context.ok) return context.response;
 
-  const organizationIds = [...new Set((sources || []).map((row: any) => String(row.organization_id || '')).filter(Boolean))];
+    const allowedRoles = new Set(['superadmin', 'admin', 'operaciones-supervisor', 'jefe_mantencion']);
+    const role = String(context.role || '').trim().toLowerCase();
+    if (!allowedRoles.has(role)) {
+      return NextResponse.json({ error: 'No autorizado para sincronizar proveedores Laudus.' }, { status: 403 });
+    }
+
+    const organizationId = context.organizationId;
+    after(async () => {
+      try {
+        const manualDb = await createClient();
+        const result = await withLaudusApiUsageTracking(
+          organizationId,
+          () => syncLaudusSuppliers(organizationId, manualDb),
+        );
+        console.info('[laudus-suppliers-weekly] manual sync completed', {
+          organizationId,
+          status: result.status,
+          processed: result.processed || 0,
+        });
+      } catch (error) {
+        console.error('[laudus-suppliers-weekly] manual sync failed', {
+          organizationId,
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    });
+
+    return NextResponse.json({
+      accepted: true,
+      organizationId,
+      status: 'accepted',
+      generatedAt: new Date().toISOString(),
+    }, { status: 202 });
+  } else {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
   const results: Array<Record<string, unknown>> = [];
 
   for (const organizationId of organizationIds) {
