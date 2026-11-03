@@ -68,10 +68,6 @@
     {
       "path": "/api/cron/laudus-dtes-daily",
       "schedule": "40 8 * * *"
-    },
-    {
-      "path": "/api/cron/laudus-sales-daily",
-      "schedule": "10 9 * * *"
     }
   ]
 }
