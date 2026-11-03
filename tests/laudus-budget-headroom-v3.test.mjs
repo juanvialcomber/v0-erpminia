@@ -4,13 +4,15 @@ import test from 'node:test';
 
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const migration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
+const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 
-test('Laudus product and financial-master cadence preserve monthly budget headroom',()=>{
+test('Laudus consolidated core and financial-master cadence preserve monthly budget headroom',()=>{
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-products-daily'),'0 3 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'),'20 5 * * *');
   assert.equal(byPath.get('/api/cron/laudus-financial-masters-daily'),'20 4 */2 * *');
   assert.equal(byPath.get('/api/cron/laudus-stock-daily'),'10 */6 * * *');
-  assert.equal(byPath.get('/api/cron/laudus-procurement-daily'),'40 5 * * *');
+  assert.match(coreRoute,/syncLaudusProducts/);
+  assert.match(coreRoute,/syncLaudusProcurement/);
 });
 
 test('control-plane freshness follows the reduced call cadence',()=>{
