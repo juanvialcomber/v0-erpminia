@@ -37,7 +37,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/laudus-bank-statements-daily',
   '/api/cron/laudus-accounting-entries-daily',
   '/api/cron/laudus-waybills-daily',
-  '/api/integrations/laudus/preview-accounting-probe',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
