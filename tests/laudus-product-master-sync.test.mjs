@@ -35,6 +35,7 @@ test('product sync is consolidated before stock sync and remains public only at 
   assert.match(vercel, /10 \*\/6 \* \* \*/);
   assert.match(vercel, /\/api\/cron\/laudus-stock-daily/);
   assert.match(proxy, /'\/api\/cron\/laudus-products-daily'/);
+  assert.match(proxy, /'\/api\/cron\/laudus-core-daily'/);
   assert.match(coreRoute, /syncLaudusProducts/);
   assert.match(coreRoute, /withLaudusApiUsageTracking/);
   assert.match(coreRoute, /CRON_SECRET/);
