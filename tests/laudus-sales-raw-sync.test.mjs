@@ -48,10 +48,12 @@ test('commercial sync remains admin or cron controlled and usage tracked', () =>
   assert.match(vercel, /10 9 \* \* \*/);
 });
 
-test('coverage surfaces current sales evidence without inventing canonical sales tables', () => {
+test('coverage keeps private sales staging unavailable until a public service view exists', () => {
   assert.match(coverage, /sales_customer/);
   assert.match(coverage, /sales_invoice/);
   assert.match(coverage, /sales_receipt/);
-  assert.match(coverage, /\.from\('raw_records'\)/);
-  assert.match(coverage, /\.eq\('is_current', true\)/);
+  assert.match(coverage, /records: null/);
+  assert.match(coverage, /status: 'unavailable'/);
+  assert.doesNotMatch(coverage, /\.from\('raw_records'\)/);
+  assert.doesNotMatch(coverage, /schema\('integration'\)/);
 });
