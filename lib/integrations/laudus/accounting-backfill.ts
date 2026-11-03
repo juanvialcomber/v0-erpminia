@@ -67,6 +67,21 @@ function minDay(a: string, b: string) {
   return a <= b ? a : b;
 }
 
+async function releaseLease(
+  db: SupabaseClient,
+  organizationId: string,
+  leaseToken: string,
+) {
+  try {
+    await db.rpc('motil_release_laudus_accounting_backfill_lease', {
+      p_organization_id: organizationId,
+      p_lease_token: leaseToken,
+    });
+  } catch {
+    // Lease expiration is the fail-safe if release cannot be confirmed.
+  }
+}
+
 async function checkpoint(
   db: SupabaseClient,
   args: {
@@ -129,10 +144,7 @@ export async function runLaudusAccountingBackfill(
   const state = (lease.state || {}) as Record<string, any>;
   if (!leaseToken || !state.next_date_from) {
     if (leaseToken) {
-      await db.rpc('motil_release_laudus_accounting_backfill_lease', {
-        p_organization_id: organizationId,
-        p_lease_token: leaseToken,
-      }).catch(() => null);
+      await releaseLease(db, organizationId, leaseToken);
     }
     throw new Error('Laudus accounting backfill lease state invalid');
   }
@@ -245,9 +257,6 @@ export async function runLaudusAccountingBackfill(
       targetDate,
     };
   } finally {
-    await db.rpc('motil_release_laudus_accounting_backfill_lease', {
-      p_organization_id: organizationId,
-      p_lease_token: leaseToken,
-    }).catch(() => null);
+    await releaseLease(db, organizationId, leaseToken);
   }
 }
