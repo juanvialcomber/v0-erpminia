@@ -27,9 +27,9 @@ type WasteRow = {
 };
 
 const tabs = [
-  ['open','En taller'],
-  ['removed','Por retirar'],
-  ['closed','Historial'],
+  ['generated','Generados'],
+  ['stored','Por retirar'],
+  ['history','Historial'],
 ] as const;
 
 function labelStatus(status: WasteRow['status']) {
@@ -44,7 +44,7 @@ export function MaintenanceWasteRegister() {
   const { data, error, isLoading } = useSWR('/api/maintenance/waste', fetcher, { revalidateOnFocus: false });
   const rows = (data?.rows || []) as WasteRow[];
   const visible = rows.filter((row) => {
-    if (tab === 'open') return row.status === 'generated' || row.status === 'stored';
+    if (tab === 'history') return row.status === 'removed' || row.status === 'closed';
     return row.status === tab;
   });
   const summary = data?.summary;
@@ -61,8 +61,8 @@ export function MaintenanceWasteRegister() {
 
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
         {[
-          ['Abiertos', (summary?.generated || 0) + (summary?.stored || 0)],
-          ['Por retirar', summary?.removed || 0],
+          ['Generados', summary?.generated || 0],
+          ['Por retirar', summary?.stored || 0],
           ['Peligrosos abiertos', summary?.hazardousOpen || 0],
           ['Por clasificar', summary?.toClassify || 0],
         ].map(([label, value]) => (
