@@ -34,7 +34,8 @@ export async function GET() {
       canonicalAssets: result.assets.canonical,
       reconciliationState: result.reconciliation.state,
     });
-  } catch {
-    return NextResponse.json({ ok: false, stage: 'accounting-readiness' }, { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 300) : 'unknown';
+    return NextResponse.json({ ok: false, stage: 'accounting-readiness', message }, { status: 500 });
   }
 }
