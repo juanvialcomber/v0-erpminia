@@ -172,7 +172,7 @@ export async function getLaudusAccessToken() {
   return tokenCache.token;
 }
 
-type LaudusListQuery = {
+export type LaudusListQuery = {
   options?: {
     offset?: number;
     limit?: number;
@@ -212,6 +212,24 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
       orderBy: query.orderBy ?? [],
     }),
   });
+}
+
+export async function listLaudusWithOrderFallback(path: string, query: LaudusListQuery = {}) {
+  try {
+    return { payload: await listLaudus(path, query), apiCalls: 1, fallbackUsed: false };
+  } catch (error) {
+    const retryWithoutOrder =
+      error instanceof LaudusApiError &&
+      error.status === 422 &&
+      Array.isArray(query.orderBy) &&
+      query.orderBy.length > 0;
+    if (!retryWithoutOrder) throw error;
+    return {
+      payload: await listLaudus(path, { ...query, orderBy: [] }),
+      apiCalls: 2,
+      fallbackUsed: true,
+    };
+  }
 }
 
 
