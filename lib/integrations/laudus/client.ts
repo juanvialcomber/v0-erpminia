@@ -373,7 +373,7 @@ export async function runLaudusBankReconciliationSummary() {
 export async function runLaudusReadOnlySmokeTest() {
   await getLaudusAccessToken();
 
-  const targets = [
+  const targets: Array<{ key: string; path: string; query: LaudusListQuery }> = [
     {
       key: 'products',
       path: '/production/products/list',
@@ -446,7 +446,7 @@ export async function runLaudusReadOnlySmokeTest() {
         orderBy: [{ field: 'date', direction: 'DESC' }],
       },
     },
-  ] as const;
+  ];
 
   const results: Record<string, { rows: number | null; shape: string }> = {};
 
