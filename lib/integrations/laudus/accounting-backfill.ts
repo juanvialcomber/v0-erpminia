@@ -103,9 +103,9 @@ async function checkpoint(
 export async function runLaudusAccountingBackfill(
   organizationId: string,
   db: SupabaseClient,
-  maxCalls = 10,
+  maxCalls = 30,
 ) {
-  const boundedMaxCalls = Math.min(Math.max(Math.trunc(maxCalls), 1), 10);
+  const boundedMaxCalls = Math.min(Math.max(Math.trunc(maxCalls), 1), 30);
   const { data: initial, error: initialError } = await db.rpc(
     'motil_get_laudus_accounting_backfill_state',
     { p_organization_id: organizationId },

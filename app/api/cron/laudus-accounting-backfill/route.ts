@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 import { runLaudusAccountingBackfill } from '@/lib/integrations/laudus/accounting-backfill';
 
-const MAX_CALLS_PER_RUN = 10;
+const MAX_CALLS_PER_RUN = 30;
 const MINIMUM_RESERVE = 200;
 
 export async function GET(request: NextRequest) {

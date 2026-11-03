@@ -17,7 +17,7 @@ test('accounting backfill uses wider date windows and stable pagination',()=>{
 });
 
 test('accounting backfill is bounded and deduplicates before staging',()=>{
-  assert.match(backfill,/Math\.min\(Math\.max\(Math\.trunc\(maxCalls\), 1\), 10\)/);
+  assert.match(backfill,/Math\.min\(Math\.max\(Math\.trunc\(maxCalls\), 1\), 30\)/);
   assert.match(backfill,/normalizeAndDedupe/);
   assert.match(backfill,/motil_ingest_laudus_extended_finance/);
   assert.match(backfill,/duplicatesRemoved/);
@@ -31,7 +31,7 @@ test('accounting backfill checkpoints each successful page',()=>{
 
 test('accounting backfill cron preserves secret and monthly reserve',()=>{
   assert.match(route,/CRON_SECRET/);
-  assert.match(route,/MAX_CALLS_PER_RUN = 10/);
+  assert.match(route,/MAX_CALLS_PER_RUN = 30/);
   assert.match(route,/MINIMUM_RESERVE = 200/);
   assert.match(route,/monthly_remaining_exact/);
   assert.match(route,/withLaudusApiUsageTracking/);
@@ -44,10 +44,10 @@ test('accounting backfill state remains service-only',()=>{
   assert.match(migration,/grant execute on function public\.motil_update_laudus_accounting_backfill_state/);
 });
 
-test('accounting backfill runs hourly',()=>{
+test('accounting backfill runs every three hours',()=>{
   const job=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-accounting-backfill');
   assert.ok(job);
-  assert.equal(job.schedule,'35 * * * *');
+  assert.equal(job.schedule,'35 */3 * * *');
 });
 
 
