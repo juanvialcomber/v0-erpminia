@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
+import { listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import {
   markLaudusSyncFailure,
