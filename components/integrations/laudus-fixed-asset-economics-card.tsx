@@ -59,16 +59,16 @@ export function LaudusFixedAssetEconomicsCard() {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact /><CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía Laudus</CardTitle></div>
-            <CardDescription>Costo de adquisición, vida útil y depreciación recuperados en lectura para candidatos de identidad fuerte.</CardDescription>
+            <div className="flex items-center gap-2"><LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : data ? 'connected' : 'pending'} compact /><CardTitle className="flex items-center gap-2"><Calculator className="h-4 w-4"/>Economía del activo</CardTitle></div>
+            <CardDescription>Costo de adquisición, vida útil y depreciación para activos con vínculo confiable.</CardDescription>
           </div>
-          <div className="flex items-center gap-2"><Badge variant="outline">Sólo lectura</Badge><Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>{enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar Laudus'}</Button></div>
+          <Button size="sm" variant="outline" onClick={() => setEnabled(true)} disabled={enabled && isLoading}>{enabled ? isLoading ? 'Consultando…' : 'Consultado' : 'Consultar economía'}</Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!enabled ? <p className="text-sm text-muted-foreground">Consulta bajo demanda para evitar llamadas innecesarias a la API de Laudus.</p> : null}
+        {!enabled ? <p className="text-sm text-muted-foreground">Consulta disponible bajo demanda.</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
-        {isLoading ? <p className="text-sm text-muted-foreground">Consultando economía de activos Laudus…</p> : null}
+        {isLoading ? <p className="text-sm text-muted-foreground">Consultando economía del activo…</p> : null}
         {!isLoading && !error && data ? (
           <>
             <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
@@ -90,7 +90,7 @@ export function LaudusFixedAssetEconomicsCard() {
               ))}
               {!data.results.some((row) => row.status === 'available') ? <p className="p-6 text-center text-sm text-muted-foreground">No hay candidatos fuertes con detalle económico disponible.</p> : null}
             </div>
-            <p className="text-xs text-muted-foreground">Esta evidencia no confirma identidad del activo por sí sola y no modifica ni Laudus ni Ficha 360.</p>
+            <p className="text-xs text-muted-foreground">Fuente: Laudus · la evidencia económica no confirma identidad por sí sola.</p>
           </>
         ) : null}
       </CardContent>
