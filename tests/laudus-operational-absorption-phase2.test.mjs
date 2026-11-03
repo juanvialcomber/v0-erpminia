@@ -33,7 +33,7 @@ test('asset economics are visible in Finance without changing identity authority
   assert.match(assetsPage, /LaudusFixedAssetEconomicsCard/);
   assert.match(assetEconomics, /Economía del activo/);
   assert.match(assetEconomics, /Fuente: Laudus/);
-  assert.match(assetEconomics, /no confirma identidad por sí sola/i);
+  assert.match(assetEconomics, /un valor fuente igual a 0 no se publica como costo económico disponible/i);
 });
 
 
