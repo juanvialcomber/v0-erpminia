@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { readLaudusFixedAssetEconomics } from '@/lib/integrations/laudus/fixed-asset-economics';
+import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
@@ -34,7 +35,10 @@ export async function GET(request: NextRequest) {
         exactSerialSupport: Boolean(row.exact_serial_support),
       }));
 
-    const economics = await readLaudusFixedAssetEconomics(strong);
+    const economics = await withLaudusApiUsageTracking(
+      context.organizationId,
+      () => readLaudusFixedAssetEconomics(strong),
+    );
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
