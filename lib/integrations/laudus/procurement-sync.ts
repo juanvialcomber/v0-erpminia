@@ -8,6 +8,11 @@ import {
 
 type JsonRow = Record<string, any>;
 
+const SUPPLIER_FIELDS = [
+  'supplierId','VATId','name','legalName','address','city','phone','email','modifiedAt',
+  'term.termId','term.name',
+] as const;
+
 const ORDER_FIELDS = [
   'purchaseOrderId','issuedDate','dueDate','status','notes','modifiedAt',
   'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
@@ -145,7 +150,13 @@ function normalizePurchaseRows(rows: JsonRow[], kind: 'order' | 'invoice') {
 }
 
 function supplierRow(row: JsonRow) {
-  const term = row.term ?? row.paymentTerm ?? null;
+  const termId = readField(row, 'term.termId');
+  const termName = readField(row, 'term.name');
+  const term = row.term ?? row.paymentTerm ?? (
+    termId != null || termName != null
+      ? { termId: termId ?? null, name: termName ?? null }
+      : null
+  );
   return {
     supplierId: row.supplierId ?? row.id ?? null,
     VATId: row.VATId ?? row.vatId ?? row.taxId ?? null,
@@ -243,6 +254,7 @@ async function listAllSuppliers() {
   for (let page = 0; page < 25; page += 1) {
     const listed = await listLaudusWithOrderFallback('/purchases/suppliers/list', {
       options: { offset: page * 100, limit: 100 },
+      fields: [...SUPPLIER_FIELDS],
       orderBy: [{ field: 'supplierId', direction: 'DESC' }],
     });
     calls += listed.apiCalls;
