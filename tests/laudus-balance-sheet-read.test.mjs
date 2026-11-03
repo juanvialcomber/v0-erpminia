@@ -10,13 +10,15 @@ test('Laudus balance sheet is finance-scoped, bounded and read-only', () => {
   assert.match(route, /MODULE_KEYS\.FIN_FINANZAS/);
   assert.match(route, /\/accounting\/balanceSheet\/8Columns/);
   assert.match(route, /allRows\.length > 5000/);
-  assert.match(route, /slice\(0, 200\)/);
+  assert.doesNotMatch(route, /slice\(0, 200\)/);
+  assert.doesNotMatch(route, /accountNumber: row\.accountNumber/);
   assert.match(route, /persisted: false/);
   assert.match(route, /laudusMutated: false/);
   assert.match(route, /Cache-Control/);
 });
 
-test('Finance only queries Laudus balance on explicit user action', () => {
+test('Laudus balance response stays summary-only and finance queries it on explicit user action', () => {
+  assert.doesNotMatch(card, /rows: Row\[\]/);
   assert.match(card, /enabled \? '\/api\/integrations\/laudus\/balance-sheet' : null/);
   assert.match(card, /Consultar balance/);
   assert.match(card, /evita sumar Activos, Pasivos, Gastos e Ingresos/);
