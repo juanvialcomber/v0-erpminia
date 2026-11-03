@@ -45,12 +45,33 @@ begin
 
   if v_source_id is null then raise exception 'laudus source unavailable'; end if;
 
-  select (max(e.entry_date)::date + 1)
-    into v_start
-  from integration.laudus_accounting_entries e
-  where e.organization_id=p_organization_id;
-
-  v_start := coalesce(v_start, date '2019-01-01');
+  with days as (
+    select distinct e.entry_date::date as d
+    from integration.laudus_accounting_entries e
+    where e.organization_id=p_organization_id
+  ),
+  gaps as (
+    select
+      d,
+      lag(d) over(order by d) as prev_d,
+      d - lag(d) over(order by d) as gap_days
+    from days
+  )
+  select coalesce(
+    (
+      select g.prev_d + 1
+      from gaps g
+      where g.gap_days > 31
+      order by g.prev_d
+      limit 1
+    ),
+    (
+      select max(d) + 1
+      from days
+    ),
+    date '2019-01-01'
+  )
+  into v_start;
 
   insert into integration.laudus_accounting_backfill_state (
     organization_id, source_id, next_date_from, next_offset, target_date, status
