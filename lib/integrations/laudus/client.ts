@@ -183,7 +183,7 @@ export type LaudusListQuery = {
 };
 
 export async function getLaudusReadOnly(path: string) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/') && !path.startsWith('/DTE/')) {
     throw new Error('Ruta Laudus read-only fuera del alcance permitido.');
   }
   const token = await getLaudusAccessToken();
