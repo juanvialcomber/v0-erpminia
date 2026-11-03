@@ -147,7 +147,7 @@ export default function PayablesPage() {
   }
 
   return <div className="space-y-6">
-    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Factura aprobada → vencimiento → pago → conciliación</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola acción principal por vez. El costo ya fue reconocido por la recepción aceptada; Tesorería administra obligación, salida de caja y conciliación.</p></section>
+    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Tesorería</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Factura aprobada → vencimiento → pago → conciliación. Una acción principal por vez.</p></section>
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
@@ -199,16 +199,16 @@ export default function PayablesPage() {
       <CardHeader>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Laudus · lectura</p>
-            <CardTitle className="mt-1">Exposición histórica de cuentas por pagar</CardTitle>
-            <CardDescription>Vista read-only desde Laudus para consultar obligaciones sin salir de MOTIL. No registra pagos ni modifica el ERP.</CardDescription>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Fuente Laudus</p>
+            <CardTitle className="mt-1">CxP ERP</CardTitle>
+            <CardDescription>Obligaciones ERP disponibles para contraste y seguimiento.</CardDescription>
           </div>
           {laudusFinance?.accountsPayable?.latestSync ? <Badge variant="outline">Actualizado {new Date(laudusFinance.accountsPayable.latestSync).toLocaleString('es-CL')}</Badge> : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {laudusError ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">No fue posible consultar la exposición Laudus.</p> : null}
-        {laudusLoading ? <p className="text-sm text-muted-foreground">Cargando exposición Laudus…</p> : null}
+        {laudusError ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">No fue posible consultar la exposición ERP.</p> : null}
+        {laudusLoading ? <p className="text-sm text-muted-foreground">Cargando exposición ERP…</p> : null}
         {!laudusLoading && !laudusError && laudusFinance?.accountsPayable ? (
           <>
             <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
@@ -226,7 +226,7 @@ export default function PayablesPage() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground">Laudus sigue siendo autoridad financiera para estos registros. MOTIL los muestra para análisis y seguimiento; cualquier acción financiera requiere el flujo operacional y revisión humana correspondiente.</p>
+            <p className="text-xs text-muted-foreground">Fuente: Laudus · contraste financiero dentro de MOTIL.</p>
           </>
         ) : null}
       </CardContent>
