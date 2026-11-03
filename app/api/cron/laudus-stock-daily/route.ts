@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { syncLaudusStockDaily } from '@/lib/integrations/laudus/stock-sync';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
+import { runLaudusAccountingBackfill } from '@/lib/integrations/laudus/accounting-backfill';
+
+const BACKFILL_FALLBACK_CALLS = 30;
+const BACKFILL_MONTHLY_RESERVE = 200;
 
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -80,6 +84,55 @@ export async function GET(request: NextRequest) {
         message: error instanceof Error ? error.message : 'unknown',
       });
       results.push({ organizationId, status: 'failed' });
+    }
+  }
+
+  if (cronAuthorized) {
+    for (const organizationId of organizationIds) {
+      after(async () => {
+        try {
+          const fallbackDb = await createClient();
+          const { data: budget, error: budgetError } = await fallbackDb
+            .from('laudus_api_budget_service_v1')
+            .select('tracked_remaining, monthly_remaining_exact')
+            .eq('organization_id', organizationId)
+            .maybeSingle();
+
+          const remaining = Number(budget?.tracked_remaining || 0);
+          if (
+            budgetError ||
+            budget?.monthly_remaining_exact !== true ||
+            remaining - BACKFILL_FALLBACK_CALLS < BACKFILL_MONTHLY_RESERVE
+          ) {
+            console.info('[laudus-stock-daily] accounting backfill fallback skipped', {
+              organizationId,
+              reason: budgetError
+                ? 'budget_unavailable'
+                : budget?.monthly_remaining_exact !== true
+                  ? 'budget_not_exact'
+                  : 'monthly_reserve',
+              remaining,
+            });
+            return;
+          }
+
+          const backfill = await withLaudusApiUsageTracking(
+            organizationId,
+            () => runLaudusAccountingBackfill(organizationId, fallbackDb, BACKFILL_FALLBACK_CALLS),
+          );
+          console.info('[laudus-stock-daily] accounting backfill fallback completed', {
+            organizationId,
+            status: backfill.status,
+            apiCalls: backfill.apiCalls,
+            rowsStaged: backfill.rowsStaged,
+          });
+        } catch (error) {
+          console.error('[laudus-stock-daily] accounting backfill fallback failed', {
+            organizationId,
+            message: error instanceof Error ? error.message : 'unknown',
+          });
+        }
+      });
     }
   }
 
