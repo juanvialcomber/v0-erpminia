@@ -43,46 +43,12 @@ export async function GET(request: NextRequest) {
   const dateTo = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : santiagoDate();
 
   try {
-    if (request.nextUrl.searchParams.get('probe') === 'totals') {
-      const totalsPayload = await withLaudusApiUsageTracking(
-        context.organizationId,
-        () => getLaudus('/accounting/balanceSheet/totals', {
-          dateTo,
-          showAccountsWithZeroBalance: false,
-          showOnlyAccountsWithActivity: true,
-        }),
-      );
-      const shape = (value: unknown): unknown => {
-        if (Array.isArray(value)) {
-          return { kind: 'array', length: value.length, item: value.length ? shape(value[0]) : null };
-        }
-        if (value && typeof value === 'object') {
-          return {
-            kind: 'object',
-            fields: Object.fromEntries(
-              Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, shape(entry)]),
-            ),
-          };
-        }
-        return { kind: value === null ? 'null' : typeof value };
-      };
-      return NextResponse.json({
-        generatedAt: new Date().toISOString(),
-        dateTo,
-        endpoint: '/accounting/balanceSheet/totals',
-        shape: shape(totalsPayload),
-        persisted: false,
-        laudusMutated: false,
-      }, { headers: { 'Cache-Control': 'no-store' } });
-    }
-
     const payload = await withLaudusApiUsageTracking(
       context.organizationId,
-      () => getLaudus('/accounting/balanceSheet/8Columns', {
+      () => getLaudus('/accounting/balanceSheet/totals', {
         dateTo,
         showAccountsWithZeroBalance: false,
         showOnlyAccountsWithActivity: true,
-        showLevels: true,
       }),
     );
     const allRows = rowsFrom(payload);
@@ -99,7 +65,7 @@ export async function GET(request: NextRequest) {
       records: allRows.length,
       persisted: false,
       source: 'Laudus',
-      semantics: 'snapshot contable read-only; no se agregan clasificaciones jerárquicas sin semántica oficial verificada',
+      semantics: 'saldos contables por cuenta; Laudus totals no entrega totales directos por Activos, Pasivos, Gastos e Ingresos',
       laudusMutated: false,
     }, { headers: { 'Cache-Control': 'private, max-age=300' } });
   } catch (error) {
