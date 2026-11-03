@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       workOrders,
       poQuality,
       procurementExceptions,
+      laudusProcurementHealth,
       exceptionCenter,
       activeMaintenanceAssets,
       deterministicReconciliation,
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
       maintenanceAllowed ? context.supabase.from('maintenance_work_orders').select('status, canonical_asset_id').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('purchase_order_quality').select('quality_status').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('procurement_match_exceptions').select('status').eq('organization_id', org) : emptyRows(),
+      procurementAllowed ? context.supabase.rpc('motil_get_laudus_data_quality_incident_summary', { p_organization_id: org }) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('operational_exception_center_summary_v1').select('*').eq('organization_id', org).maybeSingle() : emptyOne(),
       maintenanceAllowed ? context.supabase.from('canonical_assets_current').select('id', { count: 'exact', head: true }).eq('organization_id', org).eq('is_active', true) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('maintenance_asset_reconciliation_v1').select('canonical_asset_id', { count: 'exact', head: true }).eq('organization_id', org).eq('reconciliation_status', 'deterministic_candidate') : emptyRows(),
@@ -90,7 +92,7 @@ export async function GET(request: NextRequest) {
       financeAllowed ? context.supabase.from('procurement_accounts_payable').select('id,status,due_date,invoice_id,supplier_id').eq('organization_id', org) : emptyRows(),
     ] as Promise<QueryResult>[]);
 
-    const failures = [productionChecks, transportLatest, metallurgyLatest, drillingLatest, drillingQueue, inventoryOverview, inventorySnapshot, workOrders, poQuality, procurementExceptions, exceptionCenter, activeMaintenanceAssets, deterministicReconciliation, reviewRequiredReconciliation, rawMeterRows, meterObservations, hseDocuments, hseCommitments, hseInternalInspections, hseExternalInspections, legalCases, financePayables]
+    const failures = [productionChecks, transportLatest, metallurgyLatest, drillingLatest, drillingQueue, inventoryOverview, inventorySnapshot, workOrders, poQuality, procurementExceptions, laudusProcurementHealth, exceptionCenter, activeMaintenanceAssets, deterministicReconciliation, reviewRequiredReconciliation, rawMeterRows, meterObservations, hseDocuments, hseCommitments, hseInternalInspections, hseExternalInspections, legalCases, financePayables]
       .map((result: QueryResult) => result.error)
       .filter(Boolean);
     if (failures.length) throw failures[0];
@@ -237,7 +239,16 @@ export async function GET(request: NextRequest) {
       const poRows = poQuality.data || [];
       const poWarnings = poRows.filter((row: any) => String(row.quality_status).toLowerCase() !== 'valid').length;
       const openProcurementExceptions = (procurementExceptions.data || []).filter((row: any) => !['resolved', 'closed', 'ignored'].includes(String(row.status || '').toLowerCase())).length;
-      const procurementStatus: HealthStatus = openProcurementExceptions > 0 ? 'critical' : poWarnings > 0 ? 'watch' : poRows.length === 0 ? 'unknown' : 'healthy';
+      const laudusHealthRows = laudusProcurementHealth.data || [];
+      const laudusSourceIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.open_incidents || 0), 0);
+      const laudusCriticalIncidents = laudusHealthRows.reduce((sum: number, row: any) => sum + Number(row.critical_incidents || 0), 0);
+      const procurementStatus: HealthStatus = openProcurementExceptions > 0 || laudusCriticalIncidents > 0
+        ? 'critical'
+        : poWarnings > 0 || laudusSourceIncidents > 0
+          ? 'watch'
+          : poRows.length === 0
+            ? 'unknown'
+            : 'healthy';
 
       domains.push({
         key: 'procurement',
@@ -245,24 +256,29 @@ export async function GET(request: NextRequest) {
         status: procurementStatus,
         headline: openProcurementExceptions > 0
           ? `${openProcurementExceptions} excepción(es) de matching abiertas`
-          : poWarnings > 0
-            ? `${poWarnings} OC con warning de calidad`
-            : poRows.length === 0
-              ? 'Sin OC evaluables para acreditar calidad de Compras'
-              : 'OC evaluadas sin warnings de calidad abiertos',
+          : laudusSourceIncidents > 0
+            ? `${laudusSourceIncidents} incidente(s) de calidad en datos fuente Laudus`
+            : poWarnings > 0
+              ? `${poWarnings} OC con warning de calidad`
+              : poRows.length === 0
+                ? 'Sin OC evaluables para acreditar calidad de Compras'
+                : 'OC evaluadas sin warnings de calidad abiertos',
         metrics: [
           { label: 'OC evaluadas', value: poRows.length === 0 ? null : poRows.length },
           { label: 'OC válidas', value: poRows.length === 0 ? null : poRows.length - poWarnings },
           { label: 'OC con warning', value: poRows.length === 0 ? null : poWarnings },
           { label: 'Excepciones de matching abiertas', value: openProcurementExceptions },
+          { label: 'Incidentes Laudus fuente', value: laudusSourceIncidents },
         ],
         action: openProcurementExceptions > 0
           ? 'Resolver excepciones de matching antes del cierre de compra.'
-          : poWarnings > 0
-            ? 'Revisar las OC con warning; no implican bloqueo automático.'
-            : poRows.length === 0
-              ? 'Recuperar evidencia de OC antes de declarar Compras confiable.'
-              : 'Sin acción de calidad prioritaria.',
+          : laudusSourceIncidents > 0
+            ? 'Revisar los incidentes de fuente Laudus antes de usar fechas en KPIs o timelines.'
+            : poWarnings > 0
+              ? 'Revisar las OC con warning; no implican bloqueo automático.'
+              : poRows.length === 0
+                ? 'Recuperar evidencia de OC antes de declarar Compras confiable.'
+                : 'Sin acción de calidad prioritaria.',
         href: '/dashboard/compras',
       });
     }

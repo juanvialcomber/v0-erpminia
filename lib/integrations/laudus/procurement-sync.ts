@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listLaudus } from '@/lib/integrations/laudus/client';
+import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -199,6 +200,13 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
     apiCalls += orders.calls + invoices.calls + payments.calls;
 
     const orderRows = orders.rows;
+    const futureDateIncidents = futureIssuedDateIncidents(orderRows, 'purchase_order');
+    const quality = await reconcileFutureIssuedDateIncidents(
+      db,
+      organizationId,
+      'procurement',
+      futureDateIncidents,
+    );
     const invoiceRows = invoices.rows;
     const flattenedPayments = payments.rows.flatMap(paymentRows).filter((row) => row.paymentId != null);
 
@@ -244,6 +252,8 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         paymentAllocations: flattenedPayments.length,
         paymentCoverage: 'verified_v2_list',
         accountsPayableDerived: true,
+        futureIssuedDateIncidents: futureDateIncidents.length,
+        futureIssuedDateQuality: quality,
       },
     });
 
@@ -259,6 +269,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       paymentAllocations: flattenedPayments.length,
       paymentCoverage: 'verified_v2_list',
       accountsPayableDerived: true,
+      futureIssuedDateIncidents: futureDateIncidents.length,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
