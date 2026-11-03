@@ -399,7 +399,7 @@ export async function runLaudusReadOnlySmokeTest() {
       path: '/purchases/orders/list',
       query: {
         options: { offset: 0, limit: 1 },
-        fields: ['purchaseOrderId','issuedDate','supplier.name','status','items.product.SKU','items.quantity'],
+        fields: ['purchaseOrderId','issuedDate','supplier.name','status','items.product.sku','items.quantity'],
         orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
       },
     },
@@ -409,6 +409,31 @@ export async function runLaudusReadOnlySmokeTest() {
       query: {
         options: { offset: 0, limit: 1 },
         fields: ['purchaseInvoiceId','docNumber','issuedDate','dueDate','supplier.name','totals.total'],
+        orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
+      },
+    },
+    {
+      key: 'purchasePayments',
+      path: '/purchases/payments/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: [
+          'paymentId','issuedDate','dueDate','document','deposited',
+          'paymentType.code','bank.bankId','purchaseInvoices.purchaseInvoiceId',
+          'purchaseInvoices.amount',
+        ],
+        orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
+      },
+    },
+    {
+      key: 'purchaseWaybills',
+      path: '/purchases/waybills/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: [
+          'purchaseWaybillId','docNumber','issuedDate','supplier.name',
+          'warehouse.name','items.product.sku','items.quantity',
+        ],
         orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
       },
     },
@@ -432,7 +457,7 @@ export async function runLaudusReadOnlySmokeTest() {
 
   return {
     authenticated: true,
-    calls: 8,
+    calls: 10,
     persisted: false,
     results,
   };
