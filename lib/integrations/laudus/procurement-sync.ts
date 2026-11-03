@@ -8,6 +8,10 @@ import {
 
 type JsonRow = Record<string, any>;
 
+const SUPPLIER_FIELDS = ['supplierId','name','legalName','VATId','email','phone','city'] as const;
+const PURCHASE_ORDER_FIELDS = ['purchaseOrderId','issuedDate','supplier.name','status','items.product.sku','items.quantity'] as const;
+const PURCHASE_INVOICE_FIELDS = ['purchaseInvoiceId','docNumber','issuedDate','dueDate','supplier.name','totals.total'] as const;
+
 function rowsFrom(payload: unknown): JsonRow[] {
   if (Array.isArray(payload)) return payload.filter((row): row is JsonRow => Boolean(row && typeof row === 'object' && !Array.isArray(row)));
   if (!payload || typeof payload !== 'object') return [];
@@ -78,7 +82,7 @@ function paymentRows(row: JsonRow): JsonRow[] {
   }));
 }
 
-async function listRecent(path: string, orderField: string, maxPages = 2) {
+async function listRecent(path: string, orderField: string, fields: readonly string[], maxPages = 2) {
   const rows: JsonRow[] = [];
   let calls = 0;
   let partial = false;
@@ -86,6 +90,7 @@ async function listRecent(path: string, orderField: string, maxPages = 2) {
   for (let page = 0; page < maxPages; page += 1) {
     const payload = await listLaudus(path, {
       options: { offset: page * 100, limit: 100 },
+      fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
     calls += 1;
@@ -107,6 +112,7 @@ async function listAllSuppliers() {
   for (let page = 0; page < 25; page += 1) {
     const payload = await listLaudus('/purchases/suppliers/list', {
       options: { offset: page * 100, limit: 100 },
+      fields: [...SUPPLIER_FIELDS],
       orderBy: [{ field: 'supplierId', direction: 'DESC' }],
     });
     calls += 1;
@@ -172,17 +178,19 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
   let apiCalls = 0;
 
   try {
-    const [orders, invoices, payments] = await Promise.all([
-      listRecent('/purchases/orders/list', 'issuedDate', 2),
-      listRecent('/purchases/invoices/list', 'issuedDate', 2),
-      listRecent('/purchases/payments/list', 'issuedDate', 2),
+    const [orders, invoices] = await Promise.all([
+      listRecent('/purchases/orders/list', 'issuedDate', PURCHASE_ORDER_FIELDS, 2),
+      listRecent('/purchases/invoices/list', 'issuedDate', PURCHASE_INVOICE_FIELDS, 2),
     ]);
 
-    apiCalls += orders.calls + invoices.calls + payments.calls;
+    apiCalls += orders.calls + invoices.calls;
 
     const orderRows = orders.rows;
     const invoiceRows = invoices.rows;
-    const flattenedPayments = payments.rows.flatMap(paymentRows).filter((row) => row.paymentId != null);
+    // The current public Laudus API catalogue does not expose a verified
+    // purchase-payments list endpoint. Do not probe guessed endpoints: it
+    // wastes the monthly call budget and can overstate accounts payable.
+    const flattenedPayments: JsonRow[] = [];
 
     const ordersProcessed = await ingestChunks(
       db,
@@ -198,19 +206,14 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       invoiceRows,
     );
 
-    const paymentsProcessed = await ingestChunks(
-      db,
-      'motil_ingest_laudus_purchase_payments',
-      (chunk) => ({ p_organization_id: organizationId, p_payments: chunk }),
-      flattenedPayments,
-    );
+    const paymentsProcessed = 0;
 
     const refresh = await db.rpc('motil_refresh_laudus_financial_staging', {
       p_organization_id: organizationId,
     });
     if (refresh.error) throw new Error('motil_refresh_laudus_financial_staging failed');
 
-    const partial = orders.partial || invoices.partial || payments.partial;
+    const partial = orders.partial || invoices.partial;
     const processed = ordersProcessed + invoicesProcessed + paymentsProcessed;
 
     await markLaudusSyncSuccess(db, organizationId, 'procurement', {
@@ -222,9 +225,10 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         readOnly: true,
         orders: orderRows.length,
         invoices: invoiceRows.length,
-        payments: payments.rows.length,
-        paymentAllocations: flattenedPayments.length,
-        accountsPayableDerived: true,
+        payments: 0,
+        paymentAllocations: 0,
+        paymentCoverage: 'not_verified',
+        accountsPayableDerived: false,
       },
     });
 
@@ -236,9 +240,10 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       partial,
       orders: orderRows.length,
       invoices: invoiceRows.length,
-      payments: payments.rows.length,
-      paymentAllocations: flattenedPayments.length,
-      accountsPayableDerived: true,
+      payments: 0,
+      paymentAllocations: 0,
+      paymentCoverage: 'not_verified',
+      accountsPayableDerived: false,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
