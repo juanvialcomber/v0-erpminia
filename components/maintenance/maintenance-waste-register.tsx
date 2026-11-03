@@ -5,6 +5,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { MaintenanceLubricationIntelligence } from '@/components/maintenance/maintenance-lubrication-intelligence';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
@@ -65,6 +66,8 @@ export function MaintenanceWasteRegister() {
           Seguimiento desde la OT hasta almacenamiento, retiro y cierre. El registro apoya trazabilidad; no certifica cumplimiento regulatorio.
         </p>
       </header>
+
+      <MaintenanceLubricationIntelligence />
 
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
         {[
