@@ -34,7 +34,14 @@ begin
   returning * into v_state;
 
   if v_state.organization_id is null then
-    return jsonb_build_object('acquired', false);
+    select * into v_state
+    from integration.laudus_accounting_backfill_state
+    where organization_id = p_organization_id;
+
+    return jsonb_build_object(
+      'acquired', false,
+      'completed', coalesce(v_state.status = 'completed', false)
+    );
   end if;
 
   return jsonb_build_object(
