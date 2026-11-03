@@ -183,7 +183,7 @@ export type LaudusListQuery = {
 };
 
 export async function getLaudusReadOnly(path: string) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/') && !path.startsWith('/DTE/')) {
     throw new Error('Ruta Laudus read-only fuera del alcance permitido.');
   }
   const token = await getLaudusAccessToken();
@@ -236,7 +236,7 @@ export async function listLaudusWithOrderFallback(path: string, query: LaudusLis
 type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
 
 export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/') && !path.startsWith('/DTE/')) {
     throw new Error('Ruta Laudus GET fuera del alcance read-only permitido.');
   }
 
