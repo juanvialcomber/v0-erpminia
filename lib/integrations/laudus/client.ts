@@ -218,7 +218,12 @@ export async function listLaudus(path: string, query: LaudusListQuery = {}) {
 type LaudusGetQuery = Record<string, string | number | boolean | null | undefined>;
 
 export async function getLaudus(path: string, query: LaudusGetQuery = {}) {
-  if (!path.startsWith('/purchases/') && !path.startsWith('/production/') && !path.startsWith('/accounting/')) {
+  if (
+    path !== '/DTE/pending' &&
+    !path.startsWith('/purchases/') &&
+    !path.startsWith('/production/') &&
+    !path.startsWith('/accounting/')
+  ) {
     throw new Error('Ruta Laudus GET fuera del alcance read-only permitido.');
   }
 
