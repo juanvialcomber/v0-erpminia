@@ -8,6 +8,7 @@ const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_pro
 const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
+const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const supplierRoute = fs.readFileSync('app/api/cron/laudus-suppliers-weekly/route.ts','utf8');
 
 test('procurement sync uses current Laudus list endpoints',()=>{
@@ -43,9 +44,9 @@ test('sync control knows supplier and procurement domains',()=>{
   assert.match(migration,/latest_200_per_entity/);
 });
 
-test('crons are staggered to avoid Laudus overlap',()=>{
+test('core and weekly crons are staggered to avoid Laudus overlap',()=>{
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-procurement-daily'), '40 5 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'), '20 5 * * *');
   assert.equal(byPath.get('/api/cron/laudus-suppliers-weekly'), '20 6 * * 0');
 });
 
@@ -55,14 +56,16 @@ test('changed rows are not overstated when RPCs only report staged rows',()=>{
   assert.ok(changedClaims.every((value) => value === '0'));
 });
 
-
-test('new Laudus cron entrypoints participate in exact API usage tracking',()=>{
+test('Laudus cron entrypoints participate in exact API usage tracking',()=>{
   assert.match(procurementRoute,/withLaudusApiUsageTracking/);
+  assert.match(coreRoute,/withLaudusApiUsageTracking/);
+  assert.match(coreRoute,/syncLaudusProcurement/);
   assert.match(supplierRoute,/withLaudusApiUsageTracking/);
 });
 
-test('procurement extension preserves the current budget-aware product cadence',()=>{
+test('procurement extension preserves the budget-aware product cadence inside the consolidated daily run',()=>{
   const byPath = new Map(vercel.crons.map((cron) => [cron.path, cron.schedule]));
-  assert.equal(byPath.get('/api/cron/laudus-products-daily'), '0 3 * * *');
+  assert.equal(byPath.get('/api/cron/laudus-core-daily'), '20 5 * * *');
+  assert.match(coreRoute,/syncLaudusProducts/);
   assert.match(budgetMigration,/when p_domain='products' then v_now \+ interval '24 hours'/);
 });
