@@ -19,13 +19,18 @@ test('Laudus login uses the current v2 contract and caches the token', () => {
   assert.match(client, /tokenCache/);
 });
 
-test('smoke test is bounded to five low-cost read-only calls', () => {
+test('smoke test is bounded, projection-safe and isolates domain failures', () => {
   assert.match(client, /limit: 5/);
-  assert.match(client, /calls: 5/);
-  assert.match(client, /production\/products\/list/);
-  assert.match(client, /purchases\/suppliers\/list/);
-  assert.match(client, /production\/warehouses\/list/);
-  assert.match(client, /purchases\/costcenters\/list/);
+  assert.match(client, /productId.*SKU.*description.*unitOfMeasure/s);
+  assert.match(client, /supplierId.*VATId.*term\.termId.*term\.name/s);
+  assert.match(client, /warehouseId.*county.*state/s);
+  assert.match(client, /costCenterId.*fullPath.*discontinued/s);
+  assert.match(client, /listLaudusWithOrderFallback/);
+  assert.match(client, /successfulTargets/);
+  assert.match(client, /failedTargets/);
+  assert.match(client, /status: 'failed'/);
+  assert.match(client, /status: failedTargets > 0 \? 'degraded'/);
+  assert.doesNotMatch(client, /calls: 5/);
   assert.doesNotMatch(client, /method: 'PUT'|method: 'DELETE'|method: 'PATCH'/);
 });
 
