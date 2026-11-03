@@ -20,7 +20,11 @@ test('product traceability exposes only matched Laudus product identity', () => 
 test('contextual kardex is explicit, bounded and staging-only', () => {
   assert.match(kardexApi, /\/production\/products\/\$\{encodeURIComponent\(productId\)\}\/kardex/);
   assert.match(kardexApi, /rows\.length > 500/);
-  assert.match(kardexApi, /rows: rows\.slice\(-50\)/);
+  assert.match(kardexApi, /const recentRows = rows/);
+  assert.match(kardexApi, /Date\.parse\(row\.date\)/);
+  assert.match(kardexApi, /return b\.time - a\.time/);
+  assert.match(kardexApi, /rows: recentRows/);
+  assert.doesNotMatch(kardexApi, /rows: rows\.slice\(-50\)/);
   assert.match(kardexApi, /stagingOnly: true/);
   assert.match(kardexApi, /canonicalMutated: false/);
   assert.match(kardexApi, /laudusMutated: false/);
