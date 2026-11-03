@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       quantity: 0,
       value: 0,
       unitCost: nullableNumber(row.unit_cost),
-      warehouses: [],
+      warehouses: [] as string[],
     };
     current.quantity += n(row.quantity_available);
     current.value += n(row.stock_value);
