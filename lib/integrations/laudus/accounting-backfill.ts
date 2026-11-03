@@ -71,6 +71,7 @@ async function checkpoint(
   db: SupabaseClient,
   args: {
     organizationId: string;
+    leaseToken: string;
     windowFrom: string;
     windowTo: string;
     nextDateFrom: string;
@@ -83,8 +84,9 @@ async function checkpoint(
     error?: string | null;
   },
 ) {
-  const { data, error } = await db.rpc('motil_update_laudus_accounting_backfill_state', {
+  const { data, error } = await db.rpc('motil_checkpoint_laudus_accounting_backfill_v2', {
     p_organization_id: args.organizationId,
+    p_lease_token: args.leaseToken,
     p_window_from: args.windowFrom,
     p_window_to: args.windowTo,
     p_next_date_from: args.nextDateFrom,
@@ -106,15 +108,27 @@ export async function runLaudusAccountingBackfill(
   maxCalls = 30,
 ) {
   const boundedMaxCalls = Math.min(Math.max(Math.trunc(maxCalls), 1), 30);
-  const { data: initial, error: initialError } = await db.rpc(
-    'motil_get_laudus_accounting_backfill_state',
-    { p_organization_id: organizationId },
+  const { data: leaseData, error: leaseError } = await db.rpc(
+    'motil_acquire_laudus_accounting_backfill_lease',
+    { p_organization_id: organizationId, p_lease_minutes: 30 },
   );
-  if (initialError || !initial) throw new Error('Laudus accounting backfill state unavailable');
+  if (leaseError || !leaseData) throw new Error('Laudus accounting backfill lease unavailable');
 
-  const state = initial as Record<string, any>;
-  if (state.status === 'completed') {
-    return { organizationId, status: 'completed' as const, apiCalls: 0, rowsRead: 0, rowsStaged: 0 };
+  const lease = leaseData as Record<string, any>;
+  if (!lease.acquired) {
+    return {
+      organizationId,
+      status: 'skipped_locked' as const,
+      apiCalls: 0,
+      rowsRead: 0,
+      rowsStaged: 0,
+    };
+  }
+
+  const leaseToken = String(lease.lease_token || '');
+  const state = (lease.state || {}) as Record<string, any>;
+  if (!leaseToken || !state.next_date_from) {
+    throw new Error('Laudus accounting backfill lease state invalid');
   }
 
   let windowFrom = isoDay(String(state.next_date_from));
@@ -174,6 +188,7 @@ export async function runLaudusAccountingBackfill(
 
       await checkpoint(db, {
         organizationId,
+        leaseToken,
         windowFrom,
         windowTo,
         nextDateFrom,
@@ -199,6 +214,7 @@ export async function runLaudusAccountingBackfill(
     } catch (error) {
       await checkpoint(db, {
         organizationId,
+        leaseToken,
         windowFrom,
         windowTo,
         nextDateFrom: windowFrom,
@@ -210,15 +226,22 @@ export async function runLaudusAccountingBackfill(
     }
   }
 
-  return {
-    organizationId,
-    status: 'pending' as const,
-    apiCalls,
-    rowsRead,
-    rowsStaged,
-    duplicatesRemoved,
-    nextDateFrom: windowFrom,
-    nextOffset: offset,
-    targetDate,
-  };
+  try {
+    return {
+      organizationId,
+      status: 'pending' as const,
+      apiCalls,
+      rowsRead,
+      rowsStaged,
+      duplicatesRemoved,
+      nextDateFrom: windowFrom,
+      nextOffset: offset,
+      targetDate,
+    };
+  } finally {
+    await db.rpc('motil_release_laudus_accounting_backfill_lease', {
+      p_organization_id: organizationId,
+      p_lease_token: leaseToken,
+    }).catch(() => null);
+  }
 }
