@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const ids = Array.from(new Set((waste || []).map((row) => row.work_order_id).filter(Boolean)));
+    const assetIds = Array.from(new Set((waste || []).map((row) => row.canonical_asset_id).filter(Boolean)));
     const orders = ids.length
       ? await context.supabase
           .from('maintenance_work_orders')
@@ -36,8 +37,22 @@ export async function GET(request: NextRequest) {
       : { data: [], error: null };
     if (orders.error) throw orders.error;
 
+    const assets = assetIds.length
+      ? await context.supabase
+          .from('maintenance_canonical_assets_v1')
+          .select('id,asset_code,name,asset_type,category,manufacturer,model,license_plate,cost_center_code,validation_status')
+          .eq('organization_id', context.organizationId)
+          .in('id', assetIds.slice(0, 250))
+      : { data: [], error: null };
+    if (assets.error) throw assets.error;
+
     const orderMap = new Map((orders.data || []).map((row) => [row.id, row]));
-    const rows = (waste || []).map((row) => ({ ...row, work_order: orderMap.get(row.work_order_id) || null }));
+    const assetMap = new Map((assets.data || []).map((row) => [row.id, row]));
+    const rows = (waste || []).map((row) => ({
+      ...row,
+      work_order: orderMap.get(row.work_order_id) || null,
+      asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
+    }));
     const summary = {
       total: rows.length,
       generated: rows.filter((row) => row.status === 'generated').length,
