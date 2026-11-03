@@ -43,5 +43,13 @@ test('journal staging normalizes blank or non-numeric debit and credit values be
   assert.match(sync,/normalizeNumberish/);
   assert.match(sync,/debit:\s*normalizeNumberish\(line\?\.debit\)/);
   assert.match(sync,/credit:\s*normalizeNumberish\(line\?\.credit\)/);
-  assert.match(sync,/listed\.rows\.map\(normalizeJournalRow\)/);
+  assert.match(sync,/dedupeJournalRows\(listed\.rows\)/);
+});
+
+
+test('journal staging deduplicates repeated Laudus journalEntryId values before RPC',()=>{
+  assert.match(sync,/function dedupeJournalRows/);
+  assert.match(sync,/new Map<string, JsonRow>/);
+  assert.match(sync,/byId\.set\(id, normalizeJournalRow\(row\)\)/);
+  assert.match(sync,/duplicatesRemoved/);
 });
