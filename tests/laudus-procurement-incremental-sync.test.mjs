@@ -17,11 +17,15 @@ test('procurement sync uses current Laudus list endpoints',()=>{
   assert.match(sync,/\/purchases\/payments\/list/);
 });
 
-test('transaction sync is bounded and supplier scan is weekly-bounded',()=>{
+test('transaction sync is bounded and supplier scan is weekly-bounded with an explicit safe projection',()=>{
   assert.match(sync,/listRecent\('\/purchases\/orders\/list', ORDER_FIELDS, 'modifiedAt', 2\)/);
   assert.match(sync,/listRecent\('\/purchases\/invoices\/list', INVOICE_FIELDS, 'modifiedAt', 2\)/);
   assert.match(sync,/listRecent\('\/purchases\/payments\/list', PAYMENT_FIELDS, 'modifiedAt', 2\)/);
   assert.match(sync,/for \(let page = 0; page < 25; page \+= 1\)/);
+  assert.match(sync,/const SUPPLIER_FIELDS = \[/);
+  assert.match(sync,/'supplierId','VATId','name','legalName','address','city','phone','email','modifiedAt'/);
+  assert.match(sync,/'term\.termId','term\.name'/);
+  assert.match(sync,/fields: \[\.\.\.SUPPLIER_FIELDS\]/);
   assert.match(sync,/limit: 100/);
 });
 
