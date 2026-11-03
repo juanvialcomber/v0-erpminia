@@ -374,22 +374,65 @@ export async function runLaudusReadOnlySmokeTest() {
   await getLaudusAccessToken();
 
   const targets = [
-    ['products', '/production/products/list'],
-    ['suppliers', '/purchases/suppliers/list'],
-    ['warehouses', '/production/warehouses/list'],
-    ['costCenters', '/purchases/costcenters/list'],
+    {
+      key: 'products',
+      path: '/production/products/list',
+      query: { options: { offset: 0, limit: 1 }, fields: ['productId','SKU','description','unitOfMeasure'] },
+    },
+    {
+      key: 'suppliers',
+      path: '/purchases/suppliers/list',
+      query: { options: { offset: 0, limit: 1 }, fields: ['supplierId','name','legalName','VATId','email','phone','city'] },
+    },
+    {
+      key: 'warehouses',
+      path: '/production/warehouses/list',
+      query: { options: { offset: 0, limit: 1 }, fields: ['warehouseId','name'] },
+    },
+    {
+      key: 'costCenters',
+      path: '/purchases/costcenters/list',
+      query: { options: { offset: 0, limit: 1 }, fields: ['costCenterId','code','name'] },
+    },
+    {
+      key: 'purchaseOrders',
+      path: '/purchases/orders/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: ['purchaseOrderId','issuedDate','supplier.name','status','items.product.SKU','items.quantity'],
+        orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
+      },
+    },
+    {
+      key: 'purchaseInvoices',
+      path: '/purchases/invoices/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: ['purchaseInvoiceId','docNumber','issuedDate','dueDate','supplier.name','totals.total'],
+        orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
+      },
+    },
+    {
+      key: 'journalEntries',
+      path: '/accounting/journal/entries/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: ['journalEntryId','journalEntryNumber','date','lines.account.accountNumber','lines.debit','lines.credit'],
+        orderBy: [{ field: 'date', direction: 'DESC' }],
+      },
+    },
   ] as const;
 
   const results: Record<string, { rows: number | null; shape: string }> = {};
 
-  for (const [key, path] of targets) {
-    const payload = await listLaudus(path, { options: { offset: 0, limit: 5 } });
-    results[key] = summarizePayload(payload);
+  for (const target of targets) {
+    const payload = await listLaudus(target.path, target.query);
+    results[target.key] = summarizePayload(payload);
   }
 
   return {
     authenticated: true,
-    calls: 5,
+    calls: 8,
     persisted: false,
     results,
   };
