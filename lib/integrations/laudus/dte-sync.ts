@@ -23,7 +23,10 @@ export async function syncLaudusPendingDtes(organizationId: string, db: Supabase
   try {
     apiCalls += 1;
     const payload = await getLaudus('/DTE/pending');
-    const rows = rowsFrom(payload).slice(0, 1000);
+    const rows = rowsFrom(payload);
+    if (rows.length > 1000) {
+      throw new Error(`Laudus DTE pending exceeds safe staging limit: ${rows.length} documents`);
+    }
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
