@@ -118,7 +118,7 @@ export async function runLaudusAccountingBackfill(
   if (!lease.acquired) {
     return {
       organizationId,
-      status: 'skipped_locked' as const,
+      status: lease.completed ? 'completed' as const : 'skipped_locked' as const,
       apiCalls: 0,
       rowsRead: 0,
       rowsStaged: 0,
@@ -128,6 +128,12 @@ export async function runLaudusAccountingBackfill(
   const leaseToken = String(lease.lease_token || '');
   const state = (lease.state || {}) as Record<string, any>;
   if (!leaseToken || !state.next_date_from) {
+    if (leaseToken) {
+      await db.rpc('motil_release_laudus_accounting_backfill_lease', {
+        p_organization_id: organizationId,
+        p_lease_token: leaseToken,
+      }).catch(() => null);
+    }
     throw new Error('Laudus accounting backfill lease state invalid');
   }
 
