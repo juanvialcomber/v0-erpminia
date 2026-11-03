@@ -38,7 +38,7 @@ test('Laudus recovery uses tracked domain operations and isolates failures',()=>
 test('Laudus recovery is staggered away from stock and backfill crons',()=>{
   const recovery=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-recovery');
   assert.ok(recovery);
-  assert.equal(recovery.schedule,'50 */6 * * *');
+  assert.equal(recovery.schedule,'50 * * * *');
   const stock=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-stock-daily');
   const backfill=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-accounting-backfill');
   assert.notEqual(recovery.schedule,stock?.schedule);

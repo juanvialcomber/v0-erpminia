@@ -55,7 +55,7 @@
     },
     {
       "path": "/api/cron/laudus-recovery",
-      "schedule": "50 */6 * * *"
+      "schedule": "50 * * * *"
     }
   ]
 }
