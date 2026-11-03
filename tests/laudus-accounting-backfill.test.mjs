@@ -44,8 +44,8 @@ test('accounting backfill state remains service-only',()=>{
   assert.match(migration,/grant execute on function public\.motil_update_laudus_accounting_backfill_state/);
 });
 
-test('accounting backfill runs every two hours',()=>{
+test('accounting backfill runs hourly',()=>{
   const job=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-accounting-backfill');
   assert.ok(job);
-  assert.equal(job.schedule,'35 */2 * * *');
+  assert.equal(job.schedule,'35 * * * *');
 });
