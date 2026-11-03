@@ -70,12 +70,12 @@ export function LaudusAccountingReadinessCard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
           <BookOpenCheck className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Preparación contable para Laudus</h2>
+          <h2 className="text-sm font-semibold">Preparación contable</h2>
           </div>
           <LaudusSourceMark state={isLoading ? 'syncing' : data?.reconciliation.state === 'waiting_laudus' ? 'pending' : 'connected'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          El ledger MOTIL ya separa compromiso de costo reconocido. Laudus se usará para reconciliar y completar evidencia contable, no para reescribir historia operacional.
+          Cobertura de evidencia para conciliación contable dentro de MOTIL.
         </p>
       </div>
 
@@ -127,7 +127,7 @@ export function LaudusAccountingReadinessCard() {
         <div className="bg-card p-4">
           <p className="text-sm font-medium">Conciliación</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]} · sin contabilización, reescritura ni fusión automática.
+            {isLoading || !data ? '—' : stateLabel[data.reconciliation.state]} · revisión humana requerida.
           </p>
         </div>
       </div>
