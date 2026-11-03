@@ -19,13 +19,16 @@ test('Laudus login uses the current v2 contract and caches the token', () => {
   assert.match(client, /tokenCache/);
 });
 
-test('smoke test is bounded to five low-cost read-only calls', () => {
-  assert.match(client, /limit: 5/);
-  assert.match(client, /calls: 5/);
+test('smoke test is bounded to eight low-cost read-only calls', () => {
+  assert.match(client, /limit: 1/);
+  assert.match(client, /calls: 8/);
   assert.match(client, /production\/products\/list/);
   assert.match(client, /purchases\/suppliers\/list/);
   assert.match(client, /production\/warehouses\/list/);
   assert.match(client, /purchases\/costcenters\/list/);
+  assert.match(client, /purchases\/orders\/list/);
+  assert.match(client, /purchases\/invoices\/list/);
+  assert.match(client, /accounting\/journal\/entries\/list/);
   assert.doesNotMatch(client, /method: 'PUT'|method: 'DELETE'|method: 'PATCH'/);
 });
 
