@@ -73,3 +73,9 @@ test('Laudus list reads retry once without orderBy on upstream 422 only', () => 
   assert.match(client, /orderBy: \[\]/);
   assert.match(client, /apiCalls: 2/);
 });
+
+
+test('smoke validation is POST-only so navigation cannot consume Laudus quota', () => {
+  assert.match(route, /export async function POST/);
+  assert.doesNotMatch(route, /export const GET\s*=\s*POST/);
+});
