@@ -37,3 +37,11 @@ test('consolidated cron executes verified journal and waybill domains',()=>{
   assert.match(coreRoute,/syncLaudusAccountingEntries/);
   assert.match(coreRoute,/syncLaudusPurchaseWaybills/);
 });
+
+
+test('journal staging normalizes blank or non-numeric debit and credit values before RPC',()=>{
+  assert.match(sync,/normalizeNumberish/);
+  assert.match(sync,/debit:\s*normalizeNumberish\(line\?\.debit\)/);
+  assert.match(sync,/credit:\s*normalizeNumberish\(line\?\.credit\)/);
+  assert.match(sync,/listed\.rows\.map\(normalizeJournalRow\)/);
+});
