@@ -34,35 +34,10 @@ const date = (value: unknown) => {
 
 export function LaudusBankReconciliationCard() {
   const [enabled, setEnabled] = useState(false);
-  const { data, error, isLoading, mutate } = useSWR<Payload>(enabled ? '/api/integrations/laudus/bank-reconciliation' : null, fetcher, {
+  const { data, error, isLoading } = useSWR<Payload>(enabled ? '/api/integrations/laudus/bank-reconciliation' : null, fetcher, {
     revalidateOnFocus: false,
     revalidateIfStale: false,
   });
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState('');
-
-  const refreshStatements = async () => {
-    setRefreshing(true);
-    setRefreshMessage('');
-    try {
-      const response = await fetch('/api/integrations/laudus/bank-statements-sync', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudieron actualizar cartolas Laudus');
-      const latestReceived = date(payload?.latestStatementDate);
-      setRefreshMessage(
-        `${Number(payload?.processed || 0).toLocaleString('es-CL')} cartolas leídas${latestReceived ? ` · fecha más reciente recibida ${latestReceived}` : ''}`,
-      );
-      setEnabled(true);
-      await mutate();
-    } catch (cause) {
-      setRefreshMessage(cause instanceof Error ? cause.message : 'No se pudieron actualizar cartolas Laudus');
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   return (
     <Card className="shadow-none">
@@ -84,14 +59,7 @@ export function LaudusBankReconciliationCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {!enabled ? <p className="text-sm text-muted-foreground">Consulta disponible bajo demanda.</p> : null}
-        {enabled ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">{refreshMessage || 'Consulta cargada desde Laudus.'}</p>
-            <Button size="sm" variant="ghost" onClick={() => void refreshStatements()} disabled={refreshing}>
-              {refreshing ? 'Actualizando…' : 'Actualizar cartolas'}
-            </Button>
-          </div>
-        ) : null}
+        {enabled ? <p className="text-xs text-muted-foreground">Consulta cargada desde Laudus. La actualización de cartolas se gestiona automáticamente.</p> : null}
         {error ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</p> : null}
         {data?.status === 'empty' ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">Laudus no devolvió una cartola bancaria disponible para conciliar.</p> : null}
         {data?.status === 'available' ? (
