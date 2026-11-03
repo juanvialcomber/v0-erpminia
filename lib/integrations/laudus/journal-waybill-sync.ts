@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudus } from '@/lib/integrations/laudus/client';
+import { listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import {
   markLaudusSyncFailure,
@@ -46,13 +46,13 @@ async function listRecent(path: string, orderField: string, fields: readonly str
   let partial = false;
 
   for (let page = 0; page < maxPages; page += 1) {
-    const payload = await listLaudus(path, {
+    const listed = await listLaudusWithOrderFallback(path, {
       options: { offset: page * 100, limit: 100 },
       fields: [...fields],
       orderBy: [{ field: orderField, direction: 'DESC' }],
     });
-    apiCalls += 1;
-    const pageRows = rowsFrom(payload);
+    apiCalls += listed.apiCalls;
+    const pageRows = rowsFrom(listed.payload);
     rows.push(...pageRows);
     if (pageRows.length < 100) return { rows, apiCalls, partial: false };
     if (page === maxPages - 1) partial = true;
