@@ -175,7 +175,7 @@ begin
     'consecutive_failures', case when p_event='failure' then v_failures else 0 end
   );
 end;
-$function$
+$function$;
 
 
 -- Laudus pending DTE domain policy.
