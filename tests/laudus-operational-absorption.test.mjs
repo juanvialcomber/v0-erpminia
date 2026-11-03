@@ -13,9 +13,9 @@ test('Compras no claims Laudus API is still awaiting commercial enablement', () 
 
 test('Tesoreria exposes read-only Laudus accounts payable inside MOTIL', () => {
   assert.match(pagos, /\/api\/integrations\/laudus\/finance-control/);
-  assert.match(pagos, /Exposición histórica de cuentas por pagar/);
-  assert.match(pagos, /No registra pagos ni modifica el ERP/);
-  assert.match(pagos, /Laudus sigue siendo autoridad financiera/);
+  assert.match(pagos, /CxP ERP/);
+  assert.match(pagos, /Obligaciones ERP disponibles para contraste y seguimiento/);
+  assert.match(pagos, /Fuente: Laudus · contraste financiero dentro de MOTIL/);
 });
 
 
