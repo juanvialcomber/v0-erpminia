@@ -47,14 +47,14 @@ export async function loadLaudusAccountingReadiness(
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('work_order_id', 'is', null)),
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('amount', 'is', null)),
     count(db.from('canonical_clp_cost_ledger').select('event_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('currency', 'CLP')),
-    count(db.schema('canonical').from('cost_centers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_cost_centers_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_finance_cost_centers').select('cost_center_code', { count: 'exact', head: true }).eq('organization_id', organizationId)),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('canonical_finance_assets').select('asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
     count(db.from('finance_asset_reconciliation_v1').select('finance_asset_id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reconciliation_status', 'resolved_exact')),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null)),
-    count(db.schema('canonical').from('assets').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null)),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_date', 'is', null)),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('acquisition_cost', 'is', null)),
+    count(db.from('canonical_assets_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).not('expected_lifespan_years', 'is', null)),
   ]);
 
   let laudusState: 'waiting_laudus' | 'ready_to_compare' | 'review' = 'waiting_laudus';
