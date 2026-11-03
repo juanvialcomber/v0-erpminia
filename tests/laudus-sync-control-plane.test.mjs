@@ -36,3 +36,9 @@ test('runtime sync control writes through the public RPC instead of private sche
   assert.match(syncPolicy,/p_event: event/);
   assert.match(syncPolicy,/p_api_calls/);
 });
+
+
+test('sync-control runtime domain type matches the SQL control-plane contract',()=>{
+  assert.match(syncPolicy,/export type LaudusSyncDomain = 'products'.*'waybills';/);
+  assert.doesNotMatch(syncPolicy,/LaudusSyncDomain[^\n]*'dtes'/);
+});
