@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
       maintenanceAllowed ? context.supabase.from('maintenance_work_orders').select('status, canonical_asset_id').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('purchase_order_quality').select('quality_status').eq('organization_id', org) : emptyRows(),
       procurementAllowed ? context.supabase.from('procurement_match_exceptions').select('status').eq('organization_id', org) : emptyRows(),
-      procurementAllowed ? context.supabase.from('laudus_sync_health_service_v1').select('domain,open_incidents,critical_incidents').eq('organization_id', org).in('domain', ['procurement', 'waybills']) : emptyRows(),
+      procurementAllowed ? context.supabase.rpc('motil_get_laudus_data_quality_incident_summary', { p_organization_id: org }) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('operational_exception_center_summary_v1').select('*').eq('organization_id', org).maybeSingle() : emptyOne(),
       maintenanceAllowed ? context.supabase.from('canonical_assets_current').select('id', { count: 'exact', head: true }).eq('organization_id', org).eq('is_active', true) : emptyRows(),
       maintenanceAllowed ? context.supabase.from('maintenance_asset_reconciliation_v1').select('canonical_asset_id', { count: 'exact', head: true }).eq('organization_id', org).eq('reconciliation_status', 'deterministic_candidate') : emptyRows(),
