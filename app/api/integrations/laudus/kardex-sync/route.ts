@@ -56,6 +56,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El kardex excede el límite seguro de 500 movimientos.' }, { status: 409 });
     }
 
+    const recentRows = rows
+      .map((row, index) => ({
+        row,
+        index,
+        time: typeof row.date === 'string' ? Date.parse(row.date) : Number.NaN,
+      }))
+      .sort((a, b) => {
+        const aValid = Number.isFinite(a.time);
+        const bValid = Number.isFinite(b.time);
+        if (aValid && bValid && a.time !== b.time) return b.time - a.time;
+        if (aValid !== bValid) return aValid ? -1 : 1;
+        return a.index - b.index;
+      })
+      .slice(0, 50)
+      .map(({ row }) => row);
+
     const db = getSupabaseServerClient();
     const { data, error } = await db.rpc('motil_ingest_laudus_product_kardex', {
       p_organization_id: context.organizationId,
@@ -70,7 +86,7 @@ export async function POST(request: NextRequest) {
       warehouseId: warehouseId || null,
       dateTo: requestedDateTo || null,
       movements: rows.length,
-      rows: rows.slice(-50),
+      rows: recentRows,
       persisted: true,
       stagingOnly: true,
       canonicalMutated: false,
