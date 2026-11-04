@@ -60,3 +60,23 @@ test('Laudus payment states are translated to product language', () => {
   assert.match(page,/partially_paid: 'Pago parcial'/);
   assert.match(page,/credit_adjustment: 'Ajuste de crédito'/);
 });
+
+
+test('supplier 360 is MOTIL-finance first and keeps Laudus secondary', () => {
+  assert.match(api,/procurement_accounts_payable_v1/);
+  assert.match(api,/procurement_supplier_payments/);
+  assert.match(api,/operational_procurement_pipeline/);
+  assert.match(api,/validPipelineRows/);
+  assert.match(api,/\^UAT-/);
+  assert.match(page,/Finanzas · MOTIL/);
+  assert.match(page,/Caja y obligación operacional/);
+  assert.match(page,/Fuente Laudus · evidencia financiera de contraste/);
+  assert.ok(page.indexOf('Finanzas · MOTIL') < page.indexOf('Finanzas · Laudus'));
+});
+
+test('supplier 360 does not infer maintenance linkage', () => {
+  assert.match(api,/linkedWorkOrders/);
+  assert.match(api,/linkedAssets/);
+  assert.match(api,/unlinkedOrders/);
+  assert.match(page,/MOTIL no infiere destino por nombre de proveedor, producto ni centro de costo/);
+});
