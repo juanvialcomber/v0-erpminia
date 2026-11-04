@@ -39,7 +39,8 @@ test('finance assistant remains available without duplicating a second copilot i
   assert.doesNotMatch(finance,/Qué revisar/);
   assert.doesNotMatch(finance,/Qué viene/);
   assert.doesNotMatch(finance,/Fuera de patrón/);
-  assert.match(finance,/LaudusFinanceControlCard/);
+  assert.match(finance,/MotilFinanceOperatingCockpit/);
+  assert.match(finance,/Fuente Laudus/);
   assert.doesNotMatch(proxy,/path === '\/api\/intelligence\/executive-assistant'/);
 });
 
