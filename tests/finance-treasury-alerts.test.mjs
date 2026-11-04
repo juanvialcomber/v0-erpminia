@@ -34,6 +34,7 @@ test('finance executive preserves treasury and aging data while the cockpit stay
   assert.match(executiveRoute,/treasuryAging/);
   assert.match(payablesPage,/const money = \(value: unknown, currency = ['\"]CLP['\"]\)/);
   assert.match(payablesPage,/CxP MOTIL pendientes/);
-  assert.match(financePage,/LaudusFinanceControlCard/);
+  assert.match(financePage,/MotilFinanceOperatingCockpit/);
+  assert.match(financePage,/Fuente Laudus/);
   assert.doesNotMatch(financePage,/Aging por proveedor/);
 });
