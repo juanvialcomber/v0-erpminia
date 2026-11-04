@@ -118,7 +118,7 @@ test('maintenance value cockpit publishes evidence coverage with explicit numera
   assert.match(api, /meterCoverage/);
   assert.match(api, /attribution: 'NO_MEDIBLE_AUN'/);
   assert.match(api, /pricingReadiness: 'MARKET_ANCHORED'/);
-  assert.match(api, /Minutos administrativos por OT antes de MOTIL versus con MOTIL/);
+  assert.match(api, /Completar 3 muestras manuales comparables y madurar la cohorte pre\/post Maintenance Pro/);
   assert.match(api, /\.not\('created_by', 'is', null\)/);
   assert.match(page, /Cobertura · calidad de evidencia/);
   assert.match(page, /Numerador y universo real/);
@@ -187,4 +187,20 @@ test('value dashboard separates operational award evidence from UAT', () => {
   assert.match(page, /Pruebas UAT excluidas/);
   assert.match(page, /no cuentan como adopción, outcome ni valor económico/);
   assert.match(page, /primera adjudicación operacional real/);
+});
+
+
+test('Maintenance Pro value evidence compares bounded pre/post cohorts without claiming causality', () => {
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+
+  assert.match(api, /maintenanceProReleaseAt = '2026-11-04T15:56:10Z'/);
+  assert.match(api, /maintenanceProWindowMs = 7 \* 86400000/);
+  assert.match(api, /cohortMetrics/);
+  assert.match(api, /medianCloseToApprovalSeconds/);
+  assert.match(api, /COMPARABLE_SAMPLE/);
+  assert.match(api, /differences are not causal impact/);
+  assert.match(page, /Maintenance Pro · pre\/post/);
+  assert.match(page, /Medir el cambio sin inventar impacto/);
+  assert.match(page, /Una diferencia pre\/post no se declara causal/);
 });

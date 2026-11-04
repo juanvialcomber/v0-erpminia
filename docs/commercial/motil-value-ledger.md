@@ -298,3 +298,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel: L4 habilitado como control de proceso; evidencia E2 hasta observar reducción de backlog, tiempo de preparación, bloqueos o ciclo.
 - Métricas siguientes: tiempo Backlog→Preparado, porcentaje de OT preparadas sin bloqueo, cumplimiento de programación, tiempo Cierre→Aprobación, reincidencia 7/30d y costo final por activo.
 - Impacto económico: todavía no atribuido. El valor inmediato es control de proceso y reducción de reconstrucción manual; E3 requiere comparar outcomes antes/después.
+
+
+## 2026-11-04 — Mantenimiento: cohorte Maintenance Pro pre/post
+
+- Release de referencia exacto: `faa04ebd21d6b7f36a966531bfe21ba9b752e26c`, 2026-11-04 15:56:10 UTC.
+- Objetivo: medir si la nueva capa EAM + cockpit de Ariel cambia outcomes operacionales sin confundir adopción con impacto.
+- Diseño: cohortes de OT creadas durante 7 días antes y 7 días después del release.
+- Métricas observadas por cohorte: cobertura de cronómetro, causa raíz, acción preventiva y horómetro; OT cerradas; muestra y mediana de cierre → aprobación humana.
+- Gate de muestra: `MEASURING` hasta tener al menos 10 OT antes y 10 después; luego `COMPARABLE_SAMPLE`.
+- Regla causal: una diferencia pre/post no se declara impacto E3 por sí sola. Se debe revisar volumen, mezcla de activos, tipo de OT, emergencias y cambios operacionales concurrentes.
+- Evidencia administrativa actual en producción al momento de instrumentar: 20 aperturas de OT asistidas por MOTIL, mediana 133,5 segundos por apertura/asignación; 0 muestras manuales comparables.
+- Gate administrativo pendiente: mínimo 3 muestras manuales del mismo alcance antes de calcular reducción observada de tiempo.
+- Clasificación actual: L4 / E2 / V4. El release habilita medición hacia E3/V5; no cambia la clasificación por sí solo.
+- Impacto económico: no medido. No se monetizan porcentajes de cobertura ni diferencias de cohorte.
