@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { loadLaudusFinanceControl } from '@/lib/integrations/laudus/finance-control';
+import { financePriorityObservation, type FinancePriorityKey } from '@/lib/value/finance-priority-outcomes';
 
 const decisions = new Set(['accepted', 'deferred', 'rejected']);
 const priorityKeys = new Set([
@@ -119,6 +121,14 @@ export async function POST(request: NextRequest) {
   }
 
   const businessDate = chileBusinessDate();
+  let observation = null;
+  try {
+    const control = await loadLaudusFinanceControl(context.supabase, context.organizationId);
+    observation = financePriorityObservation(priorityKey as FinancePriorityKey, control);
+  } catch (observationError) {
+    console.warn('[value/finance-priority-decision:observation]', observationError);
+  }
+
   const result = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
     user_id: context.userId,
@@ -131,7 +141,8 @@ export async function POST(request: NextRequest) {
       reason: reason || null,
       decision_latency_ms: Math.round(decisionLatencyMs),
       business_date: businessDate,
-      metric_version: 'finance-priority-decision-v2',
+      observation_at_decision: observation,
+      metric_version: 'finance-priority-decision-v3',
       semantics: 'time from Daniel finance cockpit load to explicit human decision on a MOTIL-prioritized finance action; no Laudus or canonical mutation',
     },
     user_agent: request.headers.get('user-agent'),
@@ -148,6 +159,7 @@ export async function POST(request: NextRequest) {
     priorityKey,
     decision,
     decisionLatencyMs: Math.round(decisionLatencyMs),
+    observationCaptured: Boolean(observation),
     canonicalMutationExecuted: false,
     laudusMutationExecuted: false,
   });
