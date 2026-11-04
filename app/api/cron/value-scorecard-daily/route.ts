@@ -171,7 +171,10 @@ async function capture(request: NextRequest) {
     const weeklyExecutionTrend = Array.from(executionByWeek.entries())
       .map(([week, values]) => ({ week, samples: values.length, medianSeconds: median(values) }))
       .sort((a, b) => a.week.localeCompare(b.week));
-    const comparableWeeks = weeklyExecutionTrend.filter((row) => row.samples >= 5);
+    const currentWeekStart = weekStartUtc(new Date().toISOString());
+    const comparableWeeks = weeklyExecutionTrend.filter(
+      (row) => row.samples >= 5 && row.week !== currentWeekStart,
+    );
     const previousComparableWeek = comparableWeeks.length >= 2 ? comparableWeeks[comparableWeeks.length - 2] : null;
     const latestComparableWeek = comparableWeeks.length >= 1 ? comparableWeeks[comparableWeeks.length - 1] : null;
     const weeklyExecutionChangePct =
