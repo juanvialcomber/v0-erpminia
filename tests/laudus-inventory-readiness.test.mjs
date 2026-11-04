@@ -61,3 +61,18 @@ test('inventory readiness avoids the timed-out negative count on canonical_inven
   assert.match(helper, /negative_stock_products/);
   assert.doesNotMatch(helper, /canonical_inventory_current'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('organization_id', organizationId\)\.lt\('quantity', 0\)/);
 });
+
+
+test('inventory comparison is freshness-aware and does not overstate stale MOTIL deltas', () => {
+  assert.match(helper, /motilLagHours/);
+  assert.match(helper, /comparisonFreshness/);
+  assert.match(helper, /motil_stale/);
+  assert.match(helper, /motilLagHours > 24/);
+  assert.match(helper, /comparisonIsComparable/);
+  assert.match(helper, /stale_comparison_evidence/);
+  assert.match(helper, /criticalConsumables: comparisonIsComparable \? criticalConsumables : \[\]/);
+  assert.match(card, /Comparación MOTIL ↔ Laudus no concluyente por frescura/);
+  assert.match(card, /evidencia observada, no como error confirmado/);
+  assert.match(card, /comparación stale/);
+  assert.match(card, /Se conservan .* diferencias observadas para revisar después del refresco/);
+});
