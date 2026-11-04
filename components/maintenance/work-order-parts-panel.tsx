@@ -30,6 +30,7 @@ type StockItem = {
 
 type DeliveredPart = {
   id: string;
+  canonical_product_id?: string | null;
   quantity: number;
   quantity_reserved?: number;
   quantity_issued?: number;
