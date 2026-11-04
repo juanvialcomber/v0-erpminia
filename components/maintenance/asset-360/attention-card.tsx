@@ -60,7 +60,7 @@ export function Asset360AttentionCard({
     <Card className={`shadow-none ${attention.tone}`}>
       <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Atención</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Conclusión operacional</p>
           <p className="mt-1 text-lg font-semibold">{attention.title}</p>
           {attention.detail ? <p className="mt-1 text-sm text-muted-foreground">{attention.detail}</p> : null}
         </div>
