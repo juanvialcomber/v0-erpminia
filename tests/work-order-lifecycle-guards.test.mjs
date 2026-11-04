@@ -39,12 +39,12 @@ test('timer mutation accepts module writers or the canonical assigned executor',
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
-test('legacy close endpoint delegates terminal transition to canonical RPC', async () => {
+test('legacy close endpoint reserves close to assigned executor and delegates terminal transition to canonical RPC', async () => {
   const route = await readFile(closeRouteUrl, 'utf8');
 
-  assert.match(route, /getModuleAccessLevel/);
   assert.match(route, /requireAssignedMaintenanceExecution/);
-  assert.match(route, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(route, /accessLevel !== 'ED'/);
   assert.match(route, /rpc\('close_work_order_safely'/);
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
