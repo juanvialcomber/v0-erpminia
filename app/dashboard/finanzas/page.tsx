@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
 import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
+import { AccountingReplacementReadinessCard } from '@/components/finance/accounting-replacement-readiness-card';
 
 const primarySections = [
   ['/dashboard/finanzas/pagos', 'Pagos', 'Vencimientos, pagos y conciliación'],
@@ -37,6 +38,7 @@ export default function FinancePage() {
       <LaudusFinanceStatusStrip />
       <LaudusFinanceControlCard />
       <AssetCandidateReviewSignal />
+      <AccountingReplacementReadinessCard />
 
       <section className="space-y-3" aria-label="Secciones de Finanzas">
         <div className="flex items-end justify-between gap-3 border-t pt-5">
