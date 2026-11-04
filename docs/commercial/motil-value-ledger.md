@@ -314,3 +314,14 @@ Estos umbrales habilitan escala inicial, no E4.
 - Interpretación: demuestra que el gate humano está siendo usado y permite medir disciplina/latencia de cierre. No demuestra calidad mecánica, ausencia de fallas ni ahorro.
 - Clasificación: L4 / E2 / V4 para autoridad humana del workflow.
 - Gate V5: relacionar revisión/corrección con un outcome operacional posterior (reincidencia, tiempo de respuesta, disponibilidad o retrabajo) sobre cohortes comparables.
+
+
+## 2026-11-04 — Finanzas: decisiones priorizadas sin inflación de adopción
+
+- Hallazgo: el cockpit financiero ya permite aceptar, posponer o rechazar prioridades de MOTIL, pero el conteo histórico podía crecer por clics repetidos sobre la misma prioridad.
+- Cambio: las decisiones se consolidan por `priority_key + business_date` en horario `America/Santiago`; sólo la última decisión de cada prioridad/día cuenta para adopción y calibración.
+- Persistencia: nuevos eventos guardan `business_date` y `metric_version=finance-priority-decision-v2`; eventos v1 siguen siendo legibles mediante fecha derivada.
+- Scorecard: incorpora total único, aceptadas, pospuestas, rechazadas, latencia mediana, eventos brutos y gate de calibración.
+- Snapshot diario: conserva esta evidencia junto con Mantención para construir historia LECV transversal.
+- Estado observado antes de adopción real: 0 decisiones financieras priorizadas persistidas; el sistema queda preparado pero no se eleva evidencia por implementación.
+- Gate E2: ≥20 decisiones prioridad/día únicas con latencia válida suficiente para calibrar el flujo. E3 requiere además baseline comparable y outcome posterior; una decisión por sí sola no es ahorro.
