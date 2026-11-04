@@ -162,3 +162,112 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+type ReviewDecision = 'confirm_candidate' | 'reject_candidate' | 'defer';
+
+export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (!access.authorized) return access.response;
+  if (!access.canWrite) return NextResponse.json({ error: 'No tienes permiso para registrar esta revisión.' }, { status: 403 });
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const body = await request.json().catch(() => null) as {
+    externalId?: string;
+    candidateAssetId?: string | null;
+    decision?: ReviewDecision;
+    rationale?: string | null;
+  } | null;
+
+  const externalId = String(body?.externalId || '').trim();
+  const candidateAssetId = body?.candidateAssetId ? String(body.candidateAssetId) : null;
+  const decision = body?.decision;
+  const rationale = String(body?.rationale || '').trim().slice(0, 1000) || null;
+
+  if (!externalId || !decision || !['confirm_candidate', 'reject_candidate', 'defer'].includes(decision)) {
+    return NextResponse.json({ error: 'Revisión inválida.' }, { status: 400 });
+  }
+  if (decision === 'confirm_candidate' && !candidateAssetId) {
+    return NextResponse.json({ error: 'La confirmación requiere un candidato MOTIL.' }, { status: 400 });
+  }
+
+  try {
+    const { data: reviewPayload, error: reviewError } = await context.supabase.rpc('motil_laudus_fixed_asset_review_queue', {
+      p_organization_id: context.organizationId,
+      p_limit: 500,
+    });
+    if (reviewError) throw reviewError;
+
+    const payload = (reviewPayload || {}) as { queue?: ReviewRow[] };
+    const current = (payload.queue || []).find((row) => String(row.laudus_external_id || '') === externalId);
+    if (!current) return NextResponse.json({ error: 'El caso ya no está disponible para revisión.' }, { status: 409 });
+
+    const currentCandidateId = current.canonical_asset_id ? String(current.canonical_asset_id) : null;
+    if (decision === 'confirm_candidate' && currentCandidateId !== candidateAssetId) {
+      return NextResponse.json({ error: 'El candidato cambió. Recarga la revisión antes de confirmar.' }, { status: 409 });
+    }
+
+    const candidateSnapshot = {
+      laudus: {
+        externalId,
+        name: current.laudus_name || null,
+        manufacturer: current.laudus_manufacturer || null,
+        model: current.laudus_model || null,
+        serialNumber: current.laudus_serial_number || null,
+        acquisitionDate: current.acquisition_date || null,
+        supplierName: current.supplier_name || null,
+        invoiceNumber: current.invoice_number || null,
+      },
+      candidate: {
+        assetId: currentCandidateId,
+        code: current.canonical_asset_code || null,
+        name: current.canonical_asset_name || null,
+        manufacturer: current.canonical_manufacturer || null,
+        model: current.canonical_model || null,
+        serialNumber: current.canonical_serial_number || null,
+        licensePlate: current.canonical_license_plate || null,
+        location: current.canonical_location || null,
+      },
+      evidence: {
+        level: current.evidence_level || 'insufficient_evidence',
+        exactPlate: Boolean(current.exact_plate_support),
+        exactSerial: Boolean(current.exact_serial_support),
+        manufacturer: Boolean(current.manufacturer_support),
+        nameSimilarity: n(current.best_name_similarity),
+        scoreGap: n(current.best_name_similarity) - n(current.second_name_similarity),
+      },
+    };
+
+    const { error: decisionError } = await context.supabase
+      .from('laudus_fixed_asset_review_decisions')
+      .upsert({
+        organization_id: context.organizationId,
+        laudus_external_id: externalId,
+        candidate_asset_id: currentCandidateId,
+        decision,
+        evidence_level: String(current.evidence_level || 'insufficient_evidence'),
+        name_similarity: n(current.best_name_similarity),
+        score_gap: n(current.best_name_similarity) - n(current.second_name_similarity),
+        rationale,
+        reviewer_user_id: context.userId,
+        decided_at: new Date().toISOString(),
+        candidate_snapshot: candidateSnapshot,
+      }, { onConflict: 'organization_id,laudus_external_id' });
+
+    if (decisionError) throw decisionError;
+
+    return NextResponse.json({
+      ok: true,
+      decision,
+      externalId,
+      candidateAssetId: currentCandidateId,
+      appliedToCanonical: false,
+      policy: 'review_record_only',
+    });
+  } catch (error) {
+    console.error('[laudus/fixed-asset-review:decision]', error);
+    return NextResponse.json({ error: 'No fue posible registrar la revisión.' }, { status: 500 });
+  }
+}
