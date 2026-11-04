@@ -25,6 +25,7 @@ type MaterialRow = {
   reserved?: number | string | null;
   issued?: number | string | null;
   in_procurement?: number | string | null;
+  purchase_received?: number | string | null;
   shortage?: number | string | null;
   status?: string | null;
   id?: string | null;
@@ -48,6 +49,7 @@ type SupplyStatus = {
   procurement_request_id?: string | null;
   supply_status?: string | null;
   materials?: MaterialRow[] | null;
+  purchase_received_units?: number | string | null;
 };
 
 const required = (row: MaterialRow) => Number(row.required ?? row.quantity_required ?? 0);
@@ -55,6 +57,7 @@ const available = (row: MaterialRow) => Number(row.available ?? row.quantity_ava
 const issued = (row: MaterialRow) => Number(row.issued ?? 0);
 const reserved = (row: MaterialRow) => Number(row.reserved ?? Math.max(available(row) - issued(row), 0));
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
+const purchaseReceived = (row: MaterialRow) => Number(row.purchase_received ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
 
@@ -78,6 +81,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const requiredTotal = rows.reduce((sum, row) => sum + required(row), 0);
   const shortageTotal = rows.reduce((sum, row) => sum + shortage(row), 0);
   const procurementTotal = rows.reduce((sum, row) => sum + inProcurement(row), 0);
+  const purchaseReceivedTotal = Number(status.purchase_received_units ?? rows.reduce((sum, row) => sum + purchaseReceived(row), 0));
   const alreadySent = Boolean(status.procurement_request_id) || ['sent_to_procurement', 'partially_covered', 'covered'].includes(status.supply_status || '');
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
   const { data: catalogData, isLoading: catalogLoading } = useSWR<{ rows: CatalogRow[] }>(catalogKey, fetcher, { revalidateOnFocus: false });
@@ -158,7 +162,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const primaryAction = rows.length === 0
     ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
     : reservedTotal > 0
-      ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
+      ? { title: 'Hay material reservado para entregar', detail: purchaseReceivedTotal > 0 ? `${reservedTotal} unidad(es) reservadas; ${purchaseReceivedTotal} unidad(es) tienen evidencia de recepción de compra vinculada a esta OT.` : `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
       : shortageTotal > 0 && !alreadySent
         ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
         : shortageTotal > 0
@@ -219,8 +223,9 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           const reservedQty = reserved(row);
           const issuedQty = issued(row);
           const purchasingQty = inProcurement(row);
+          const purchasedQty = purchaseReceived(row);
           return <div key={String(rowKey(row))} className="p-4">
-            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{row.product_name || 'Producto'}</p><p className="text-xs text-muted-foreground">{row.product_code || 'Sin código'}</p></div>{missing > 0 ? <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-destructive" /> : <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}</div>
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-medium">{row.product_name || 'Producto'}</p>{purchasedQty > 0 ? <Badge variant="outline">Compra recibida {purchasedQty}</Badge> : null}</div><p className="text-xs text-muted-foreground">{row.product_code || 'Sin código'}</p></div>{missing > 0 ? <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-destructive" /> : <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />}</div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
               <div><p className="text-xs text-muted-foreground">Requerido</p><p className="font-medium tabular-nums">{required(row)}</p></div>
               <div><p className="text-xs text-muted-foreground">Reservado</p><p className="font-medium tabular-nums">{reservedQty}</p></div>
