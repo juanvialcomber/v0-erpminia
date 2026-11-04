@@ -46,3 +46,25 @@ test('control center separates execution blockers from closeout evidence', () =>
   assert.match(control, /scheduledToday/);
   assert.match(control, /scheduledThisWeek/);
 });
+
+
+test('Ariel pro cockpit exposes one priority, timestamped changes and a weekly exception plan', () => {
+  assert.match(home, /Decisión del día/);
+  assert.match(home, /Qué cambió desde ayer/);
+  assert.match(home, /Plan semanal/);
+  assert.match(home, /Resolver ahora/);
+  assert.match(home, /waitingAge/);
+  assert.match(control, /decisionOfDay/);
+  assert.match(control, /recentChanges/);
+  assert.match(control, /weeklyPlan/);
+  assert.match(control, /changedSince/);
+  assert.match(control, /No infiere cuándo comenzó un bloqueo/);
+});
+
+test('weekly maintenance plan reuses scheduled work and readiness instead of creating another planner', () => {
+  assert.match(control, /scheduledThisWeek\.map/);
+  assert.match(control, /closeByWorkOrder/);
+  assert.match(control, /bucket = blocked \? 'blocked'/);
+  assert.doesNotMatch(control, /insert\(/);
+  assert.doesNotMatch(control, /upsert\(/);
+});
