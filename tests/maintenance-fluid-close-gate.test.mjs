@@ -74,3 +74,16 @@ test('only assigned mechanic can enter fluid usage while supervisors remain read
   assert.match(fluidRoute, /canEdit: execution\.ok/);
   assert.doesNotMatch(fluidRoute, /if \(level === 'ED'\) return true/);
 });
+
+test('already completed OT can receive an explicit late assigned-mechanic declaration without reopening', () => {
+  assert.match(reviewUi, /fluidClosureEvidence\.data\?\.canDeclare/);
+  assert.match(reviewUi, /Esta OT ya está cerrada/);
+  assert.match(reviewUi, /Confirmar sin uso de aceites/);
+  assert.match(reviewUi, /fluidUsedChoice === 'yes' \? \(/);
+  assert.match(reviewUi, /<WorkOrderFluidUsagePanel/);
+  assert.match(reviewUi, /review\.mutate\(\)/);
+  assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
+  assert.match(closureRoute, /declaration_post_close: isPostClose/);
+  assert.match(closureRoute, /Mecánico declaró que no utilizó aceites\/fluidos posteriormente al cierre/);
+  assert.doesNotMatch(closureRoute, /\.update\(\{\s*status:/);
+});
