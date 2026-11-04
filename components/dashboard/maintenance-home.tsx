@@ -43,6 +43,16 @@ function fill(template: string, vars: Record<string, string | number>) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? ''));
 }
 
+function waitingAge(value?: string | null, locale: Locale = 'es') {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  const hours = Math.max(0, Math.floor((Date.now() - timestamp) / 3600000));
+  if (hours < 24) return locale === 'en' ? `${hours}h waiting` : `esperando ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return locale === 'en' ? `${days}d waiting` : `esperando ${days}d`;
+}
+
 type KindKey = 'approval_needed' | 'operational_review' | 'preventive_overdue' | 'assignment_needed' | 'meter_review' | 'operational_blocker' | 'plan_step' | 'ready_to_close' | 'closure_evidence' | 'reliability';
 
 const kindMeta: Record<KindKey, { icon: typeof AlertTriangle; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
