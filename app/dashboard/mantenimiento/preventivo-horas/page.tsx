@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { AlertTriangle, ArchiveRestore, CheckCircle2, ClipboardCheck, Gauge, RefreshCw, Wrench } from 'lucide-react';
+import { AlertTriangle, ArchiveRestore, CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Gauge, MoreHorizontal, Pencil, RefreshCw, Search, Wrench, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -28,25 +29,73 @@ export default function PreventiveHoursPage() {
   const focusRow = focusedTasks[0];
   const [planningId, setPlanningId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [restoringArchiveId, setRestoringArchiveId] = useState<string | null>(null);
+  const [historyActionId, setHistoryActionId] = useState<string | null>(null);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyStatus, setHistoryStatus] = useState<'pending' | 'validated' | 'dismissed' | 'all'>('pending');
+  const [expandedAssets, setExpandedAssets] = useState<string[]>([]);
+  const [selectedArchiveIds, setSelectedArchiveIds] = useState<string[]>([]);
+  const [editingArchiveId, setEditingArchiveId] = useState<string | null>(null);
+  const [editTaskName, setEditTaskName] = useState('');
+  const [editFrequencyHours, setEditFrequencyHours] = useState('');
+  const [editFrequencyDays, setEditFrequencyDays] = useState('');
+  const [historyMessage, setHistoryMessage] = useState<string | null>(null);
+  const [batchValidating, setBatchValidating] = useState(false);
 
-  async function restoreHistoricalSchedule(archiveId: string) {
-    setRestoringArchiveId(archiveId); setActionError(null);
+  async function reviewHistoricalSchedule(row: any, action: 'validate' | 'dismiss', overrides?: { taskName?: string; frequencyHours?: number | null; frequencyDays?: number | null }) {
+    setHistoryActionId(row.archiveId); setActionError(null); setHistoryMessage(null);
     try {
       const response = await fetch('/api/maintenance/preventive-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ archiveId }),
+        body: JSON.stringify({ archiveId: row.archiveId, action, ...overrides }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudo restaurar la pauta histórica');
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar la decisión');
+      setSelectedArchiveIds((current) => current.filter((id) => id !== row.archiveId));
+      if (editingArchiveId === row.archiveId) setEditingArchiveId(null);
+      setHistoryMessage(action === 'validate' ? 'Pauta validada y activada con trazabilidad.' : 'Pauta descartada de la cola; el archivo histórico se conserva.');
       await Promise.all([mutate(), mutateHistory()]);
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : 'No se pudo restaurar la pauta histórica');
+      setActionError(cause instanceof Error ? cause.message : 'No se pudo guardar la decisión');
     } finally {
-      setRestoringArchiveId(null);
+      setHistoryActionId(null);
     }
+  }
+
+  function startEditHistorical(row: any) {
+    setEditingArchiveId(row.archiveId);
+    setEditTaskName(row.taskName || '');
+    setEditFrequencyHours(row.frequencyHours == null ? '' : String(row.frequencyHours));
+    setEditFrequencyDays(row.frequencyDays == null ? '' : String(row.frequencyDays));
+  }
+
+  async function validateSelected() {
+    const rows = (historyData?.candidates || []).filter((row:any) => selectedArchiveIds.includes(row.archiveId) && row.decision === 'pending' && row.assetExists && !row.alreadyActive);
+    if (!rows.length) return;
+    setBatchValidating(true); setActionError(null); setHistoryMessage(null);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const row of rows) {
+      try {
+        const response = await fetch('/api/maintenance/preventive-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ archiveId: row.archiveId, action: 'validate' }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(payload?.error || 'Error de validación');
+        ok += 1;
+      } catch (cause) {
+        failures.push(cause instanceof Error ? cause.message : 'Error de validación');
+      }
+    }
+    setSelectedArchiveIds([]);
+    await Promise.all([mutate(), mutateHistory()]);
+    setHistoryMessage(failures.length ? `${ok} pauta(s) validadas; ${failures.length} requieren revisión.` : `${ok} pauta(s) validadas y activadas.`);
+    if (failures.length) setActionError(failures[0]);
+    setBatchValidating(false);
   }
 
   async function planSchedule(scheduleId: string) {
@@ -60,6 +109,28 @@ export default function PreventiveHoursPage() {
     } catch (cause) { setActionError(cause instanceof Error ? cause.message : 'No se pudo generar la OT preventiva'); }
     finally { setPlanningId(null); }
   }
+
+  const historyCandidates = Array.isArray(historyData?.candidates) ? historyData.candidates : [];
+  const normalizedHistorySearch = historySearch.trim().toLowerCase();
+  const filteredHistory = historyCandidates.filter((row:any) => {
+    if (!row.assetExists) return false;
+    if (historyStatus !== 'all' && row.decision !== historyStatus) return false;
+    if (!normalizedHistorySearch) return true;
+    const haystack = [row.asset?.asset_code, row.asset?.name, row.taskName, row.sourceReference].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(normalizedHistorySearch);
+  });
+  const historyGroups = Array.from(filteredHistory.reduce((map: Map<string, any>, row:any) => {
+    const key = row.assetId || 'unknown';
+    const current = map.get(key) || { assetId: key, asset: row.asset, rows: [], pending: 0, currentMeter: row.currentMeter, currentMeterAt: row.currentMeterAt };
+    current.rows.push(row);
+    if (row.decision === 'pending') current.pending += 1;
+    if (current.currentMeter == null && row.currentMeter != null) {
+      current.currentMeter = row.currentMeter;
+      current.currentMeterAt = row.currentMeterAt;
+    }
+    map.set(key, current);
+    return map;
+  }, new Map<string, any>()).values());
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
     <PageHeader>
