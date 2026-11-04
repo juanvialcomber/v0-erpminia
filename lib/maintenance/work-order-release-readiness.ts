@@ -26,11 +26,8 @@ export type WorkOrderReleaseReadiness = {
     assignee: boolean;
     schedule: boolean;
     procurement: boolean;
-    parts: boolean;
     materials: boolean;
     externalServices: boolean;
-    labor: boolean;
-    costConflict: boolean;
   };
 };
 
@@ -66,11 +63,8 @@ export async function getWorkOrderReleaseReadiness(
     assignee: Boolean(typedOrder.assigned_person_id),
     schedule: Boolean(typedOrder.scheduled_date),
     procurement: Number(typedReadiness.open_procurement_orders || 0) === 0,
-    parts: Number(typedReadiness.pending_parts || 0) === 0,
     materials: Number(typedReadiness.unmet_material_requirements || 0) === 0,
     externalServices: Number(typedReadiness.pending_external_services || 0) === 0,
-    labor: Number(typedReadiness.open_labor_entries || 0) === 0,
-    costConflict: !Boolean(typedReadiness.external_cost_conflict),
   };
 
   const blockers: WorkOrderReleaseReadiness['blockers'] = [];
@@ -81,15 +75,12 @@ export async function getWorkOrderReleaseReadiness(
     if (!checks.schedule) blockers.push({ code: 'schedule', label: 'Programar fecha de ejecución' });
     const operational = [
       ['procurement', 'Cerrar compras abiertas', Number(typedReadiness.open_procurement_orders || 0)],
-      ['parts', 'Resolver repuestos pendientes', Number(typedReadiness.pending_parts || 0)],
       ['materials', 'Resolver faltantes de materiales', Number(typedReadiness.unmet_material_requirements || 0)],
       ['external_services', 'Resolver servicios externos pendientes', Number(typedReadiness.pending_external_services || 0)],
-      ['labor', 'Cerrar registros de trabajo abiertos', Number(typedReadiness.open_labor_entries || 0)],
     ] as const;
     for (const [code, label, count] of operational) {
       if (count > 0) blockers.push({ code, label, count });
     }
-    if (!checks.costConflict) blockers.push({ code: 'cost_conflict', label: 'Resolver conflicto de costo externo' });
   }
 
   return { ready: blockers.length === 0, emergencyBypass, blockers, checks };
