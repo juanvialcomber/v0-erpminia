@@ -60,3 +60,11 @@ test('preventive plans keep direct navigation to the canonical asset 360', () =>
   assert.match(preventive,/\/dashboard\/mantenimiento\/equipos\//);
   assert.match(preventive,/canonical_asset_id \|\| schedule\.asset_id/);
 });
+
+
+test('audited reliability routes human review back into preventive planning', () => {
+  const reliability = fs.readFileSync('app/dashboard/mantenimiento/confiabilidad/page.tsx','utf8');
+  assert.match(reliability,/Revisar preventivo/);
+  assert.match(reliability,/preventivo-horas\?assetId=/);
+  assert.match(reliability,/priorityAssetId/);
+});
