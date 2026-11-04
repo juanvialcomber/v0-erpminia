@@ -108,6 +108,9 @@ select
   cc.cost_center_code as proposed_cost_center_code,
   coalesce(plc.distinct_cost_centers, 0) as distinct_line_cost_centers,
   case
+    when upper(regexp_replace(coalesce(nullif(trim(po.supplier_name),''),''),'\s+',' ','g')) = 'NULA'
+      and coalesce(plc.distinct_cost_centers,0) = 0
+      then 'source_placeholder'
     when nullif(trim(po.cost_center_code),'') is not null then 'already_linked'
     when plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is not null then 'line_consensus'
     when plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is null then 'unknown_code'
@@ -129,12 +132,17 @@ select
     )
     and
     (
-      nullif(trim(po.cost_center_code),'') is not null
-      or (plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is not null)
-      or (
-        plc.distinct_cost_centers > 1
-        and coalesce(plc.unparsed_line_cost_centers,0) = 0
-        and coalesce(plc.unknown_line_cost_centers,0) = 0
+      (
+        upper(regexp_replace(coalesce(nullif(trim(po.supplier_name),''),''),'\s+',' ','g')) <> 'NULA'
+        and (
+          nullif(trim(po.cost_center_code),'') is not null
+          or (plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is not null)
+          or (
+            plc.distinct_cost_centers > 1
+            and coalesce(plc.unparsed_line_cost_centers,0) = 0
+            and coalesce(plc.unknown_line_cost_centers,0) = 0
+          )
+        )
       )
     )
   ) as fully_resolvable,
