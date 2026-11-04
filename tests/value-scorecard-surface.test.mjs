@@ -188,3 +188,15 @@ test('value dashboard separates operational award evidence from UAT', () => {
   assert.match(page, /no cuentan como adopción, outcome ni valor económico/);
   assert.match(page, /primera adjudicación operacional real/);
 });
+
+
+test('value scorecard captures one idempotent daily snapshot in Chile time', () => {
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const vercel = fs.readFileSync('vercel.json', 'utf8');
+
+  assert.match(cron, /America\/Santiago/);
+  assert.match(cron, /motil_capture_value_scorecard_snapshot/);
+  assert.match(cron, /CRON_SECRET/);
+  assert.match(cron, /daily evidence snapshot; not audited savings or economic ROI/);
+  assert.match(vercel, /\/api\/cron\/value-scorecard-daily/);
+});
