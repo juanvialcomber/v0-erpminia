@@ -215,3 +215,20 @@ test('daily value snapshot persists maintenance LECV from operational evidence w
   assert.match(cron, /eventCoveragePct/);
   assert.match(cron, /supervisorReviewCoveragePct/);
 });
+
+
+test('maintenance weekly cohort trend excludes the incomplete current week and never promotes causality', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /currentWeekStart/);
+  assert.match(api, /row\.samples >= 5 && row\.week !== currentWeekStart/);
+  assert.match(api, /TREND_ONLY/);
+  assert.match(api, /HOLD_E3/);
+  assert.match(api, /not causal attribution to MOTIL/);
+  assert.match(cron, /row\.samples >= 5 && row\.week !== currentWeekStart/);
+  assert.match(page, /Ciclo semanal observado/);
+  assert.match(page, /La tendencia no se atribuye causalmente a MOTIL/);
+  assert.match(page, /No equivale a downtime evitado/);
+});
