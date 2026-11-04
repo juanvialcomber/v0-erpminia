@@ -37,6 +37,7 @@ type Response = {
     workOrders: number;
     open: number;
     blocked: number;
+    closeoutPending: number;
     assigned: number;
     scheduled: number;
     pendingApproval: number;
@@ -63,13 +64,17 @@ const meta: Record<PhaseKey, { step: string; label: string; description: string 
   history: { step: '07', label: 'Aprender', description: 'Historial trazable para confiabilidad, costos y recurrencia.' },
 };
 
-function blockerCount(row: EamRow) {
+function executionBlockerCount(row: EamRow) {
   return row.blockers.procurement
-    + row.blockers.parts
     + row.blockers.materials
-    + row.blockers.externalServices
+    + row.blockers.externalServices;
+}
+
+function closeoutPendingCount(row: EamRow) {
+  return row.blockers.parts
     + row.blockers.labor
-    + (row.blockers.costConflict ? 1 : 0);
+    + (row.blockers.costConflict ? 1 : 0)
+    + row.pendingPlanSteps;
 }
 
 export function MaintenanceEamPhaseModel() {
@@ -83,10 +88,11 @@ export function MaintenanceEamPhaseModel() {
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumen EAM">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Resumen EAM">
         {[
           ['OT abiertas', summary?.open ?? '—', 'Trabajo operativo vigente'],
-          ['Bloqueadas', summary?.blocked ?? '—', 'Materiales, servicios o costos'],
+          ['Bloqueadas', summary?.blocked ?? '—', 'Impiden iniciar ejecución'],
+          ['Cierre pendiente', summary?.closeoutPending ?? '—', 'Horas, pasos, partes o costo'],
           ['Asignación', summary?.assignmentCoveragePct == null ? '—' : `${summary.assignmentCoveragePct}%`, 'Cobertura de responsable'],
           ['Programación', summary?.schedulingCoveragePct == null ? '—' : `${summary.schedulingCoveragePct}%`, 'Cobertura de fecha'],
         ].map(([label, value, detail]) => (
@@ -132,14 +138,15 @@ export function MaintenanceEamPhaseModel() {
               </CardHeader>
               <CardContent className="divide-y p-0">
                 {phase.rows.map((row) => {
-                  const blockers = blockerCount(row);
+                  const executionBlockers = executionBlockerCount(row);
+                  const closeoutPending = closeoutPendingCount(row);
                   return (
                     <Link key={row.id} href={row.href} className="grid gap-3 px-5 py-4 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[1fr_auto] sm:items-center">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs text-muted-foreground">{row.workOrderNumber || 'OT'}</span>
-                          {blockers > 0 ? <Badge variant="destructive">{blockers} bloqueo{blockers === 1 ? '' : 's'}</Badge> : null}
-                          {row.pendingPlanSteps > 0 ? <Badge variant="outline">{row.pendingPlanSteps} paso{row.pendingPlanSteps === 1 ? '' : 's'}</Badge> : null}
+                          {executionBlockers > 0 ? <Badge variant="destructive">{executionBlockers} bloqueo{executionBlockers === 1 ? '' : 's'} de inicio</Badge> : null}
+                          {closeoutPending > 0 && ['execution','closeout'].includes(phase.phase) ? <Badge variant="outline">{closeoutPending} pendiente{closeoutPending === 1 ? '' : 's'} de cierre</Badge> : null}
                         </div>
                         <p className="mt-1 truncate font-medium">{row.title || 'Orden de trabajo'}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -147,7 +154,7 @@ export function MaintenanceEamPhaseModel() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        {phase.phase === 'approval' ? <CheckCircle2 className="h-4 w-4" /> : blockers > 0 ? <ShieldAlert className="h-4 w-4" /> : phase.phase === 'execution' ? <Wrench className="h-4 w-4" /> : phase.phase === 'prepared' ? <Clock3 className="h-4 w-4" /> : <CircleDot className="h-4 w-4" />}
+                        {phase.phase === 'approval' ? <CheckCircle2 className="h-4 w-4" /> : executionBlockers > 0 ? <ShieldAlert className="h-4 w-4" /> : phase.phase === 'execution' ? <Wrench className="h-4 w-4" /> : phase.phase === 'prepared' ? <Clock3 className="h-4 w-4" /> : <CircleDot className="h-4 w-4" />}
                         <span>{row.nextAction}</span>
                         <ArrowRight className="h-4 w-4 text-muted-foreground" />
                       </div>
