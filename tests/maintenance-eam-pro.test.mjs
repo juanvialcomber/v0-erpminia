@@ -45,3 +45,10 @@ test('maintenance home exposes one EAM entry and page mounts canonical model', (
   assert.match(page,/MaintenanceEamPhaseModel/);
   assert.match(page,/Flujo profesional/);
 });
+
+
+test('EAM learning phase links approved history to audited reliability', () => {
+  assert.match(ui,/Aprender de cierres aprobados/);
+  assert.match(ui,/\/dashboard\/mantenimiento\/confiabilidad/);
+  assert.match(ui,/no crea trabajo automáticamente/i);
+});
