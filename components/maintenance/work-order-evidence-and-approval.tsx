@@ -31,6 +31,15 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const materialLines = review.data?.materialRequirementsCount ?? 0;
+  const fluidClosure = review.data?.fluidClosure || null;
+  const fluidClosurePayload = (fluidClosure?.payload || {}) as {
+    fluids_used?: boolean;
+    waste_status?: string;
+    fluid_usage_count?: number;
+    linked_waste_count?: number;
+    note?: string | null;
+  };
+  const fluidUsage = Array.isArray(review.data?.fluidUsage) ? review.data.fluidUsage : [];
 
   const approve = async () => {
     setApproving(true);
@@ -92,6 +101,42 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
       {status === 'completed' ? (
         <Card className="shadow-none">
           <CardHeader className="pb-3">
+            <CardTitle className="text-base">Aceites y residuos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {fluidClosure ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Registrado por mecánico</Badge>
+                  <span className="text-sm text-muted-foreground">{fluidClosure.actor_name || 'Mecánico asignado'} · {formatDate(fluidClosure.event_at)}</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div><p className="text-xs text-muted-foreground">Fluidos usados</p><p className="mt-1 text-sm font-medium">{fluidClosurePayload.fluids_used ? 'Sí' : 'No'}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Registros</p><p className="mt-1 text-sm font-medium">{fluidUsage.length}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Residuo</p><p className="mt-1 text-sm font-medium">{fluidClosurePayload.waste_status === 'linked' ? 'Recuperado y registrado' : fluidClosurePayload.waste_status === 'none_recovered' ? 'No se recuperó' : 'No aplica'}</p></div>
+                </div>
+                {fluidUsage.length ? (
+                  <div className="space-y-2">
+                    {fluidUsage.map((row: any) => (
+                      <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                        <span>{row.fluid_name}</span>
+                        <span className="tabular-nums">{Number(row.quantity_liters || 0).toLocaleString('es-CL')} L</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {fluidClosurePayload.note ? <p className="text-sm text-muted-foreground">Nota: {fluidClosurePayload.note}</p> : null}
+              </>
+            ) : (
+              <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {status === 'completed' ? (
+        <Card className="shadow-none">
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Aprobación</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -105,7 +150,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
               ) : (
                 <>
                   <p className="text-sm font-medium">Pendiente de aprobación</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Ariel López o Mauricio Astudillo revisan la evidencia y aprueban la OT.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Ariel López revisa la evidencia, los aceites/fluidos y el residuo declarado por el mecánico antes de aprobar la OT.</p>
                 </>
               )}
             </div>
