@@ -7,7 +7,7 @@ const componentPath = new URL('../components/integrations/laudus-fixed-asset-rev
 const pagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
 const financeCardPath = new URL('../components/integrations/laudus-finance-control-card.tsx', import.meta.url);
 
-test('fixed asset review API reuses canonical review queue and remains read-only', async () => {
+test('fixed asset review GET reuses canonical review queue and remains read-only', async () => {
   const route = await readFile(routePath, 'utf8');
 
   assert.match(route, /motil_laudus_fixed_asset_review_queue/);
@@ -18,10 +18,11 @@ test('fixed asset review API reuses canonical review queue and remains read-only
   assert.match(route, /noLaudusMutation: true/);
   assert.match(route, /filter\(\(row\) => !row\.decision\)/);
   assert.match(route, /slice\(0, 50\)/);
-  assert.doesNotMatch(route, /\.insert\(/);
-  assert.doesNotMatch(route, /\.update\(/);
-  assert.doesNotMatch(route, /\.upsert\(/);
-  assert.doesNotMatch(route, /\.delete\(/);
+  const getBlock = route.slice(route.indexOf('export async function GET'), route.indexOf('type ReviewDecision'));
+  assert.doesNotMatch(getBlock, /\.insert\(/);
+  assert.doesNotMatch(getBlock, /\.update\(/);
+  assert.doesNotMatch(getBlock, /\.upsert\(/);
+  assert.doesNotMatch(getBlock, /\.delete\(/);
 });
 
 test('fixed asset review UI exposes evidence and human authority', async () => {
