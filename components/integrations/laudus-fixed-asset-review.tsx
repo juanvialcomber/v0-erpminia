@@ -97,13 +97,15 @@ function date(value: string | null) {
 }
 
 export function LaudusFixedAssetReview() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/fixed-asset-review',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const [search, setSearch] = useState('');
   const [index, setIndex] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -128,6 +130,44 @@ export function LaudusFixedAssetReview() {
 
   const safeIndex = rows.length ? Math.min(index, rows.length - 1) : 0;
   const current = rows[safeIndex] || null;
+
+  async function recordDecision(decision: 'confirm_candidate' | 'reject_candidate' | 'defer') {
+    if (!current) return;
+    const defaultRationale = decision === 'confirm_candidate'
+      ? 'Identidad confirmada por revisión humana sobre la evidencia visible.'
+      : decision === 'reject_candidate'
+        ? 'El candidato visible no corresponde al activo Laudus revisado.'
+        : 'Evidencia insuficiente o ambigua; mantener pendiente hasta contar con una segunda evidencia verificable.';
+
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/fixed-asset-review', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          externalId: current.externalId,
+          candidateAssetId: current.candidate.assetId,
+          decision,
+          evidenceLevel: current.evidence.level,
+          nameSimilarity: current.evidence.nameSimilarity,
+          scoreGap: current.evidence.nameSimilarity - current.evidence.secondNameSimilarity,
+          rationale: defaultRationale,
+          candidateSnapshot: current.candidate,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar la decisión.');
+      setMessage(payload?.message || 'Decisión registrada.');
+      await mutate();
+      setIndex(0);
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo registrar la decisión.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -272,6 +312,32 @@ export function LaudusFixedAssetReview() {
           </div>
 
           <div className="border-t px-4 py-4">
+            <div className="mb-4 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={saving || !current.candidate.assetId}
+                onClick={() => void recordDecision('confirm_candidate')}
+              >
+                Confirmar candidato
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => void recordDecision('reject_candidate')}
+              >
+                Rechazar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={saving}
+                onClick={() => void recordDecision('defer')}
+              >
+                Diferir
+              </Button>
+            </div>
+            {message ? <p className="mb-4 text-sm text-muted-foreground">{message}</p> : null}
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Evidencia</p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge variant={current.evidence.exactPlate ? 'secondary' : 'outline'}>
