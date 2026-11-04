@@ -15,6 +15,19 @@ const priorityKeys = new Set([
   'accounting',
 ]);
 
+function chileBusinessDate(value: string | Date = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function median(values: number[]) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -45,12 +58,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No fue posible cargar las decisiones financieras.' }, { status: 500 });
   }
 
-  const rows = (result.data || []).map((row: any) => ({
+  const rawRows = (result.data || []).map((row: any) => ({
     decision: String(row.new_values?.decision || ''),
     priorityKey: String(row.new_values?.priority_key || ''),
     latencyMs: Number(row.new_values?.decision_latency_ms),
+    businessDate: String(row.new_values?.business_date || '') || chileBusinessDate(row.created_at),
     createdAt: row.created_at,
   })).filter((row: any) => decisions.has(row.decision) && priorityKeys.has(row.priorityKey));
+
+  const latestByPriorityDay = new Map<string, any>();
+  for (const row of rawRows) {
+    const key = `${row.businessDate || 'unknown'}:${row.priorityKey}`;
+    if (!latestByPriorityDay.has(key)) latestByPriorityDay.set(key, row);
+  }
+  const rows = Array.from(latestByPriorityDay.values());
 
   const latencies = rows
     .map((row: any) => row.latencyMs)
@@ -64,7 +85,9 @@ export async function GET(request: NextRequest) {
     timedDecisions: latencies.length,
     medianDecisionSeconds: latencies.length ? Math.round((median(latencies) || 0) / 1000) : null,
     latestAt: rows[0]?.createdAt || null,
-    semantics: 'explicit human decisions on MOTIL-prioritized finance actions; no Laudus or canonical mutation',
+    rawEvents: rawRows.length,
+    uniquePriorityDays: rows.length,
+    semantics: 'latest explicit human decision per priority and Chile business day; repeated clicks do not inflate adoption; no Laudus or canonical mutation',
   });
 }
 
@@ -95,18 +118,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tiempo de decisión fuera de rango.' }, { status: 400 });
   }
 
+  const businessDate = chileBusinessDate();
   const result = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
     user_id: context.userId,
     action: 'finance_priority_decision',
     resource_type: 'finance_priority',
-    resource_identifier: `${priorityKey}-${new Date().toISOString()}`,
+    resource_identifier: `${priorityKey}-${businessDate || new Date().toISOString().slice(0, 10)}`,
     new_values: {
       priority_key: priorityKey,
       decision,
       reason: reason || null,
       decision_latency_ms: Math.round(decisionLatencyMs),
-      metric_version: 'finance-priority-decision-v1',
+      business_date: businessDate,
+      metric_version: 'finance-priority-decision-v2',
       semantics: 'time from Daniel finance cockpit load to explicit human decision on a MOTIL-prioritized finance action; no Laudus or canonical mutation',
     },
     user_agent: request.headers.get('user-agent'),
