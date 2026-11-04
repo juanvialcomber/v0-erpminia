@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { SiiLaudusReplacementCard } from '@/components/sii/sii-laudus-replacement-card';
 
 type ReadinessCheck = {
   key: string;
@@ -117,6 +118,8 @@ export default function SiiPreparationPage() {
               <Metric label="DTE 33 aceptados en certificación" value={String(data.acceptedCertificationDtes)} />
             </div>
           </section>
+
+          <SiiLaudusReplacementCard />
 
           <section className="rounded-xl border border-dashed p-5 text-sm">
             <p className="font-semibold">Qué puedes dejar para después</p>
