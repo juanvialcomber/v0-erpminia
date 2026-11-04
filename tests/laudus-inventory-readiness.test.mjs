@@ -21,7 +21,9 @@ test('inventory readiness reads safe public service projections instead of the p
   assert.doesNotMatch(helper, /schema\('integration'\)/);
   assert.match(helper, /canonicalProductCoverage/);
   assert.match(helper, /quantityMismatches/);
+  assert.match(helper, /legacySnapshotMismatches/);
   assert.match(helper, /missingInMotilNonzero/);
+  assert.match(helper, /laudusOnlyCurrent/);
   assert.match(helper, /negativeProducts/);
   assert.match(helper, /stockIsStale/);
 });
@@ -48,8 +50,9 @@ test('UI exposes Laudus authority and cross-source reconciliation without auto-o
   assert.match(card, /Fuente primaria: Laudus/);
   assert.match(card, /Fuente en revisión/);
   assert.match(card, /Productos Laudus elegibles enlazados al catálogo/);
-  assert.match(card, /Saldos distintos entre MOTIL y Laudus/);
-  assert.match(card, /SKU con saldo Laudus sin existencia MOTIL/);
+  assert.match(card, /Registros absorbidos desde una fuente más nueva/);
+  assert.match(card, /snapshot MOTIL antiguo/);
+  assert.match(card, /sólo vigentes en Laudus/);
   assert.match(card, /Bodegas físicas conciliadas con MOTIL/);
   assert.match(card, /Laudus primario · validación cruzada activa/);
   assert.match(card, /Conciliación activa · sin overwrite automático/);
