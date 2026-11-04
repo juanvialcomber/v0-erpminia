@@ -67,7 +67,7 @@ async function capture(request: NextRequest) {
     const [workOrdersResult, eventsResult, evidenceResult, reviewsResult] = await Promise.all([
       supabase
         .from('maintenance_work_orders')
-        .select('id,status,closed_at')
+        .select('id,status,closed_at,created_at')
         .eq('organization_id', organization.id)
         .not('created_by', 'is', null)
         .limit(5000),
@@ -158,7 +158,11 @@ async function capture(request: NextRequest) {
       if (!week) continue;
       const times = eventTimes.get(String(row.id)) || {};
       const startMs = times.start ? Date.parse(times.start) : NaN;
-      const closeMs = times.close ? Date.parse(times.close) : NaN;
+      const closeMs = (row as any).closed_at
+        ? Date.parse(String((row as any).closed_at))
+        : times.close
+          ? Date.parse(times.close)
+          : NaN;
       if (!Number.isFinite(startMs) || !Number.isFinite(closeMs) || closeMs < startMs) continue;
       const values = executionByWeek.get(week) || [];
       values.push(Math.round((closeMs - startMs) / 1000));
