@@ -24,7 +24,7 @@ type WasteRow = {
   generated_at: string;
   storage_location: string | null;
   destination_name: string | null;
-  source_fluid_usage_id?: string | null;
+  from_lubrication?: boolean;
   work_order: { id: string; work_order_number: string; title: string; workshop_site: string | null } | null;
   asset: { id: string; asset_code: string | null; name: string | null; asset_type: string | null; category: string | null; manufacturer: string | null; model: string | null; license_plate: string | null; cost_center_code: string | null; validation_status: string | null } | null;
 };
@@ -114,7 +114,7 @@ export function MaintenanceWasteRegister() {
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <p className="text-sm text-foreground">{row.waste_name}</p>
-                {row.source_fluid_usage_id ? <Badge variant="secondary">Desde lubricación</Badge> : null}
+                {row.from_lubrication ? <Badge variant="secondary">Desde lubricación</Badge> : null}
               </div>
             </div>
             <p className="text-sm tabular-nums">{Number(row.quantity).toLocaleString('es-CL')} {row.unit === 'unit' ? 'un' : row.unit}</p>
