@@ -42,6 +42,9 @@ test('commercial sync remains admin controlled and usage-tracked without automat
 });
 
 
-test('sales receipts paginate deterministically by receiptId', () => {
-  assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'receiptId'/);
+test('sales receipts select receipt type leaf fields and keep modifiedAt ordering', () => {
+  assert.match(sync, /'receiptType\.code'/);
+  assert.match(sync, /'receiptType\.description'/);
+  assert.doesNotMatch(sync, /'receiptId','receiptType','issuedDate'/);
+  assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'modifiedAt'/);
 });
