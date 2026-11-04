@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, procurementAwardDecisions, procurementAwardOutcomes] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, financePriorityDecisions, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, procurementAwardDecisions, procurementAwardOutcomes] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -34,6 +34,14 @@ export async function GET(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .eq('action', 'finance_review_decision')
         .eq('resource_type', 'laudus_purchase_invoice')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'finance_priority_decision')
+        .eq('resource_type', 'finance_priority')
         .order('created_at', { ascending: false })
         .limit(500),
       context.supabase
@@ -83,6 +91,7 @@ export async function GET(request: NextRequest) {
     if (history.error) throw history.error;
     if (financeReviews.error) throw financeReviews.error;
     if (financeTiming.error) throw financeTiming.error;
+    if (financePriorityDecisions.error) throw financePriorityDecisions.error;
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
@@ -158,6 +167,63 @@ export async function GET(request: NextRequest) {
       sample: timingValues.length,
       medianSeconds: medianMs === null ? null : Math.round(medianMs / 1000),
       semantics: 'time from finance cockpit load to human decision; not manual baseline',
+    };
+
+    const chileBusinessDate = (value: string) => {
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return null;
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Santiago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date);
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    };
+    const financePriorityRawRows = (financePriorityDecisions.data || [])
+      .map((row: any) => ({
+        decision: String(row.new_values?.decision || ''),
+        priorityKey: String(row.new_values?.priority_key || ''),
+        latencyMs: Number(row.new_values?.decision_latency_ms),
+        businessDate: String(row.new_values?.business_date || '') || chileBusinessDate(String(row.created_at || '')),
+        createdAt: row.created_at,
+      }))
+      .filter((row: any) =>
+        ['accepted', 'deferred', 'rejected'].includes(row.decision)
+        && ['freshness', 'overdue', 'due-soon', 'supplier-concentration', 'deposit', 'cost-centers', 'accounting'].includes(row.priorityKey),
+      );
+    const latestPriorityByDay = new Map<string, any>();
+    for (const row of financePriorityRawRows) {
+      const key = `${row.businessDate || 'unknown'}:${row.priorityKey}`;
+      if (!latestPriorityByDay.has(key)) latestPriorityByDay.set(key, row);
+    }
+    const financePriorityRows = Array.from(latestPriorityByDay.values());
+    const priorityLatencies = financePriorityRows
+      .map((row: any) => row.latencyMs)
+      .filter((value: number) => Number.isFinite(value) && value >= 0 && value <= 30 * 60 * 1000)
+      .sort((a: number, b: number) => a - b);
+    const priorityMidpoint = Math.floor(priorityLatencies.length / 2);
+    const priorityMedianMs =
+      priorityLatencies.length === 0
+        ? null
+        : priorityLatencies.length % 2 === 0
+          ? Math.round((priorityLatencies[priorityMidpoint - 1] + priorityLatencies[priorityMidpoint]) / 2)
+          : priorityLatencies[priorityMidpoint];
+    const financePriorityDecision = {
+      total: financePriorityRows.length,
+      accepted: financePriorityRows.filter((row: any) => row.decision === 'accepted').length,
+      deferred: financePriorityRows.filter((row: any) => row.decision === 'deferred').length,
+      rejected: financePriorityRows.filter((row: any) => row.decision === 'rejected').length,
+      timedDecisions: priorityLatencies.length,
+      medianDecisionSeconds: priorityMedianMs === null ? null : Math.round(priorityMedianMs / 1000),
+      rawEvents: financePriorityRawRows.length,
+      uniquePriorityDays: financePriorityRows.length,
+      latestAt: financePriorityRows[0]?.createdAt || null,
+      workflowLevel: financePriorityRows.length > 0 ? 4 : 3,
+      evidenceLevel: financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0',
+      valueGate: financePriorityRows.length >= 20 ? 'CALIBRATION_READY' : 'MEASURING',
+      semantics: 'latest human decision per finance priority and Chile business day; repeated clicks do not inflate adoption; no Laudus or canonical mutation',
     };
 
     const maintenanceRows = maintenanceWorkOrders.data || [];
@@ -565,6 +631,7 @@ export async function GET(request: NextRequest) {
       current: current.data || null,
       financeReview,
       financeReviewTiming,
+      financePriorityDecision,
       maintenanceValue,
       procurementAwardValue,
       history: history.data || null,
