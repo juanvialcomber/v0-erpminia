@@ -50,6 +50,15 @@ type LaudusConsumableMismatchRow = {
   quantity_delta: number | string | null;
 };
 
+type LaudusFreshnessSummaryRow = {
+  quantity_mismatches: number | string | null;
+  fresh_mismatches_1d: number | string | null;
+  stale_mismatches_7d: number | string | null;
+  stale_mismatches_30d: number | string | null;
+  latest_laudus_stock_sync: string | null;
+  latest_motil_stock_update: string | null;
+};
+
 type LaudusReconciliationSummaryRow = {
   compared_products: number | string | null;
   aligned_products: number | string | null;
@@ -99,6 +108,7 @@ export async function loadLaudusInventoryReadiness(
     latestSnapshot,
     readinessResult,
     reconciliationSummaryResult,
+    freshnessSummaryResult,
     negativePositionsResult,
     consumableMismatchesResult,
     authorityResult,
@@ -133,6 +143,11 @@ export async function loadLaudusInventoryReadiness(
       .eq('organization_id', organizationId)
       .maybeSingle(),
     db
+      .from('laudus_inventory_freshness_summary_service_v1')
+      .select('quantity_mismatches,fresh_mismatches_1d,stale_mismatches_7d,stale_mismatches_30d,latest_laudus_stock_sync,latest_motil_stock_update')
+      .eq('organization_id', organizationId)
+      .maybeSingle(),
+    db
       .from('laudus_negative_stock_positions_service_v1')
       .select('product_external_id,sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
       .eq('organization_id', organizationId)
@@ -155,12 +170,14 @@ export async function loadLaudusInventoryReadiness(
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
+  if (freshnessSummaryResult.error) throw new Error(freshnessSummaryResult.error.message);
   if (negativePositionsResult.error) throw new Error(negativePositionsResult.error.message);
   if (consumableMismatchesResult.error) throw new Error(consumableMismatchesResult.error.message);
   if (authorityResult.error) throw new Error(authorityResult.error.message);
 
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
+  const freshnessSummary = (freshnessSummaryResult.data || null) as LaudusFreshnessSummaryRow | null;
   const negativePositions = ((negativePositionsResult.data || []) as LaudusNegativePositionRow[]).map((row) => ({
     productId: String(row.product_external_id || ''),
     sku: String(row.sku || ''),
@@ -269,6 +286,9 @@ export async function loadLaudusInventoryReadiness(
       comparedProducts: n(reconciliationSummary?.compared_products),
       alignedProducts: n(reconciliationSummary?.aligned_products),
       quantityMismatches,
+      freshMismatches1d: n(freshnessSummary?.fresh_mismatches_1d),
+      staleMismatches7d: n(freshnessSummary?.stale_mismatches_7d),
+      staleMismatches30d: n(freshnessSummary?.stale_mismatches_30d),
       missingInMotilNonzero,
       laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
       negativeProducts: laudusNegativeProducts,
