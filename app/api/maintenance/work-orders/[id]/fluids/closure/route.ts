@@ -68,7 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const evidence = await readClosureEvidence(context, id);
-    return NextResponse.json(evidence);
+    return NextResponse.json({ ...evidence, canDeclare: assigned.ok });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'No se pudo cargar la declaración de fluidos.' },
