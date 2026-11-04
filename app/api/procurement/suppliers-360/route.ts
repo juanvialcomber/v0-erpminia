@@ -134,32 +134,39 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult] = await Promise.all([
+    const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult, pipelineResult] = await Promise.all([
       context.supabase.from('canonical_purchase_orders_v1').select('id, order_number, order_date, total_amount, currency, status, operational_status, expected_delivery_date, supplier_tax_id').eq('organization_id', context.organizationId).or(orderFilter).order('order_date', { ascending: false }).limit(100),
       context.supabase.from('canonical_supplier_quotations_v1').select('id, quotation_number, quotation_date, valid_until, total_amount, currency, lead_time_days, payment_terms, status').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('quotation_date', { ascending: false }).limit(100),
-      context.supabase.from('procurement_operational_orders').select('id, order_number, status, currency, total_amount, expected_delivery_date, actual_delivery_date, issued_at, work_order_id, canonical_asset_id, cost_center_id').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('issued_at', { ascending: false }).limit(100),
+      context.supabase.from('procurement_operational_orders').select('id, order_number, intake_request_id, status, currency, total_amount, expected_delivery_date, actual_delivery_date, issued_at, work_order_id, canonical_asset_id, cost_center_id').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('issued_at', { ascending: false }).limit(100),
       context.supabase.from('procurement_supplier_returns').select('id, return_number, reason, resolution_type, status, requested_at, resolved_at').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('requested_at', { ascending: false }).limit(100),
-      context.supabase.from('procurement_supplier_invoices').select('id, invoice_number, invoice_date, total_amount, currency, status, approval_basis, procurement_match_exceptions(id,status,exception_type,difference)').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('invoice_date', { ascending: false }).limit(100),
+      context.supabase.from('procurement_supplier_invoices').select('id, order_id, invoice_number, invoice_date, total_amount, currency, status, approval_basis, procurement_match_exceptions(id,status,exception_type,difference)').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('invoice_date', { ascending: false }).limit(100),
       context.supabase.from('supplier_operational_score_v2').select('*').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).maybeSingle(),
       context.supabase.from('supplier_performance_v1').select('*').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).maybeSingle(),
       context.supabase.from('contractors').select('id, name, rut, business_type, contact_email, contact_phone, address, city, region, registration_status').eq('rut', supplier.tax_id).maybeSingle(),
+      context.supabase.from('operational_procurement_pipeline').select('intake_request_id,request_number,order_id,work_order_id,canonical_asset_id,supplier_id').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).limit(300),
     ]);
 
-    const firstError = [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult].find((result) => result.error)?.error;
+    const firstError = [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult, pipelineResult].find((result) => result.error)?.error;
     if (firstError) throw firstError;
 
     const orderIds = (ordersResult.data || []).map((order) => order.id);
-    const operationalOrders = operationalOrdersResult.data || [];
-    const linkedWorkOrderIds = [...new Set(operationalOrders.map((row) => row.work_order_id).filter(Boolean))];
-    const linkedAssetIds = [...new Set(operationalOrders.map((row) => row.canonical_asset_id).filter(Boolean))];
+    const validPipelineRows = (pipelineResult.data || []).filter((row) => !/^UAT-/i.test(String(row.request_number || '').trim()));
+    const validOperationalOrderIds = new Set(validPipelineRows.map((row) => row.order_id).filter(Boolean));
+    const operationalOrders = (operationalOrdersResult.data || []).filter((row) => validOperationalOrderIds.has(row.id));
+    const operationalInvoices = (invoicesResult.data || []).filter((row) => validOperationalOrderIds.has(row.order_id));
+    const linkedWorkOrderIds = [...new Set(validPipelineRows.map((row) => row.work_order_id).filter(Boolean))];
+    const linkedAssetIds = [...new Set(validPipelineRows.map((row) => row.canonical_asset_id).filter(Boolean))];
+    const operationalInvoiceIds = operationalInvoices.map((row) => row.id);
 
-    const { data: motilPayables, error: motilPayablesError } = await context.supabase
-      .from('procurement_accounts_payable_v1')
-      .select('id,invoice_id,invoice_number,invoice_date,supplier_id,supplier_name,currency,approved_amount,due_date,status,paid_amount,outstanding_amount,days_to_due')
-      .eq('organization_id', context.organizationId)
-      .eq('supplier_id', supplierId)
-      .order('due_date', { ascending: true, nullsFirst: true })
-      .limit(200);
+    const { data: motilPayables, error: motilPayablesError } = operationalInvoiceIds.length
+      ? await context.supabase
+          .from('procurement_accounts_payable_v1')
+          .select('id,invoice_id,invoice_number,invoice_date,supplier_id,supplier_name,currency,approved_amount,due_date,status,paid_amount,outstanding_amount,days_to_due')
+          .eq('organization_id', context.organizationId)
+          .in('invoice_id', operationalInvoiceIds)
+          .order('due_date', { ascending: true, nullsFirst: true })
+          .limit(200)
+      : { data: [], error: null };
     if (motilPayablesError) throw motilPayablesError;
 
     const payableIds = (motilPayables || []).map((row) => row.id);
@@ -216,6 +223,7 @@ export async function GET(request: NextRequest) {
         linkedWorkOrders: linkedWorkOrderIds.length,
         linkedAssets: linkedAssetIds.length,
         unlinkedOrders: operationalOrders.filter((row) => !row.work_order_id && !row.canonical_asset_id).length,
+        excludedUatOrders: (operationalOrdersResult.data || []).length - operationalOrders.length,
       },
       semantics: {
         payable: 'Obligación aprobada en el flujo operacional MOTIL.',
@@ -259,7 +267,7 @@ export async function GET(request: NextRequest) {
       quotations: quotationsResult.data || [],
       contracts: contractsResult.data || [],
       documents: documentsResult.data || [],
-      invoices: invoicesResult.data || [],
+      invoices: operationalInvoices,
       returns: returnsResult.data || [],
       suppliedProducts: Array.from(productMap.values()).sort((a, b) => b.spend - a.spend).slice(0, 100),
       laudusFinancial,
