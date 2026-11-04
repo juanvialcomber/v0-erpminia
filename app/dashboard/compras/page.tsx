@@ -13,6 +13,7 @@ import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusProcurementReadinessCard } from '@/components/integrations/laudus-procurement-readiness-card';
 import { LaudusProcurementReconciliationCard } from '@/components/integrations/laudus-procurement-reconciliation-card';
 import { LaudusSupplierResolutionQueueCard } from '@/components/integrations/laudus-supplier-resolution-queue-card';
+import { HistoricalCostCenterReviewCard } from '@/components/integrations/historical-cost-center-review-card';
 
 type Overview = {
   canEdit: boolean;
@@ -109,6 +110,8 @@ export default function ComprasPage() {
       <LaudusProcurementReconciliationCard />
 
       <LaudusSupplierResolutionQueueCard />
+
+      <HistoricalCostCenterReviewCard />
 
       {error ? (
         <StatePanel
