@@ -13,6 +13,7 @@ test('Laudus consolidated core and financial-master cadence preserve monthly bud
   assert.equal(byPath.get('/api/cron/laudus-stock-daily'),'10 */6 * * *');
   assert.match(coreRoute,/syncLaudusProducts/);
   assert.match(coreRoute,/syncLaudusProcurement/);
+  assert.match(coreRoute,/syncLaudusInvoiceTraceEvidence/);
 });
 
 test('control-plane freshness follows the reduced call cadence',()=>{
@@ -32,7 +33,7 @@ test('newer finance and procurement domains remain accepted by sync control',()=
 
 
 test('consolidated core preserves a monthly API reserve before calling Laudus',()=>{
-  assert.match(coreRoute,/CORE_CALL_BUDGET = 20/);
+  assert.match(coreRoute,/CORE_CALL_BUDGET = 30/);
   assert.match(coreRoute,/MONTHLY_RESERVE_FRACTION = 0\.10/);
   assert.match(coreRoute,/laudus_api_budget_service_v1/);
   assert.match(coreRoute,/monthly_remaining_exact/);
