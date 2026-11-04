@@ -14,6 +14,8 @@ type Issue = {
   label: string;
   detail: string;
   href: string;
+  action_label?: string;
+  action_href?: string;
 };
 
 function text(value: unknown) { return String(value ?? '').trim(); }
@@ -273,6 +275,117 @@ export async function GET(request: NextRequest) {
       }
     } catch {
       // Warehouse staging is optional until Laudus warehouse intake exists.
+    }
+
+    try {
+      const supplierBridge = await fetchAll((from, to) => context.supabase
+        .from('laudus_supplier_bridge_candidates_service_v1')
+        .select('supplier_name_key,display_name,purchase_order_count,candidate_count,resolution_status,resolution_method')
+        .eq('organization_id', context.organizationId)
+        .in('resolution_status', ['unresolved', 'ambiguous'])
+        .range(from, to));
+
+      for (const row of supplierBridge) {
+        addIssue(issues, {
+          issue_key: `laudus_supplier_bridge:${text(row.supplier_name_key)}`,
+          entity_type: 'supplier',
+          entity_id: null,
+          issue_type: 'laudus_supplier_identity',
+          field_name: null,
+          severity: norm(row.resolution_status) === 'ambiguous' ? 'critical' : 'warning',
+          label: `${text(row.display_name) || 'Proveedor Laudus'} · identidad pendiente`,
+          detail: `${Number(row.purchase_order_count || 0).toLocaleString('es-CL')} OC afectadas. Método: ${text(row.resolution_method) || 'sin resolución'}. Acción MOTIL: resolver identidad tributaria/canónica y reutilizarla en todas las OC históricas.`,
+          href: '/dashboard/compras',
+          action_label: 'Resolver proveedor',
+          action_href: '/dashboard/compras/proveedores-360',
+        });
+      }
+    } catch {
+      // Supplier bridge is optional until deployed.
+    }
+
+    try {
+      const poCostCenterRows = await fetchAll((from, to) => context.supabase
+        .from('purchase_order_reconciliation_preview_service_v1')
+        .select('purchase_order_id,order_number,supplier_name,cost_center_resolution_status,parsed_line_cost_center_code,distinct_line_cost_centers')
+        .eq('organization_id', context.organizationId)
+        .in('cost_center_resolution_status', ['unknown_code', 'multi_line_review', 'unresolved'])
+        .range(from, to));
+
+      for (const row of poCostCenterRows) {
+        const status = text(row.cost_center_resolution_status);
+        addIssue(issues, {
+          issue_key: `laudus_po_cost_center:${row.purchase_order_id}`,
+          entity_type: 'purchase_order',
+          entity_id: row.purchase_order_id || null,
+          issue_type: 'laudus_cost_center_resolution',
+          field_name: 'cost_center',
+          severity: status === 'multi_line_review' ? 'critical' : 'warning',
+          label: `${text(row.order_number) || 'OC histórica'} · centro de costo`,
+          detail: status === 'unknown_code'
+            ? `Código ${text(row.parsed_line_cost_center_code) || 'no identificado'} no existe en el maestro canónico. Acción MOTIL: mapear o crear una referencia canónica con evidencia.`
+            : status === 'multi_line_review'
+              ? `${Number(row.distinct_line_cost_centers || 0)} centros en líneas y al menos una asignación no reconocida. Acción MOTIL: revisar sólo las líneas dudosas; preservar las válidas.`
+              : 'OC histórica sin centro de costo informado. Acción MOTIL: recuperar evidencia o dejar ausencia explícita.',
+          href: '/dashboard/compras',
+          action_label: 'Revisar centro',
+          action_href: '/dashboard/compras',
+        });
+      }
+    } catch {
+      // Historical PO reconciliation is optional until deployed.
+    }
+
+    try {
+      const [{ count: pendingAssets, error: assetError }, { count: overduePayables, error: payableError }] = await Promise.all([
+        context.supabase
+          .from('laudus_fixed_assets_service_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .eq('reconciliation_status', 'pending'),
+        context.supabase
+          .from('laudus_accounts_payable_service_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .gt('outstanding_amount', 0)
+          .lt('due_date', new Date().toISOString().slice(0, 10)),
+      ]);
+      if (assetError) throw assetError;
+      if (payableError) throw payableError;
+
+      if ((pendingAssets || 0) > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:fixed_assets_pending',
+          entity_type: 'asset',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: `${Number(pendingAssets || 0).toLocaleString('es-CL')} activos Laudus sin identidad MOTIL resuelta`,
+          detail: 'Brecha de reemplazo. Acción MOTIL: conciliar activo contable con Activo 360, separar activos operacionales/no operacionales y conservar costo, fecha, vida útil y depreciación como evidencia financiera.',
+          href: '/dashboard/mantenimiento/equipos',
+          action_label: 'Conciliar activos',
+          action_href: '/dashboard/mantenimiento/equipos',
+        });
+      }
+
+      if ((overduePayables || 0) > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:overdue_payables',
+          entity_type: 'invoice',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: 'due_date',
+          severity: 'critical',
+          label: `${Number(overduePayables || 0).toLocaleString('es-CL')} obligaciones Laudus vencidas con saldo`,
+          detail: 'Brecha financiera operativa. Acción MOTIL: llevar cada obligación a Finanzas con factura, proveedor, vencimiento, saldo, estado de pago y acción humana; no marcar pagada por inferencia.',
+          href: '/dashboard/compras/facturas',
+          action_label: 'Revisar vencidas',
+          action_href: '/dashboard/compras/facturas',
+        });
+      }
+    } catch {
+      // Finance/asset replacement coverage remains optional until source views are available.
     }
 
     try {
