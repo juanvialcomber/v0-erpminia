@@ -288,6 +288,72 @@ export async function GET(request: NextRequest) {
           ? Math.round((executionCycles[executionMidpoint - 1] + executionCycles[executionMidpoint]) / 2)
           : executionCycles[executionMidpoint];
 
+    const weekStartUtc = (value: string) => {
+      const parsed = Date.parse(value);
+      if (!Number.isFinite(parsed)) return null;
+      const date = new Date(parsed);
+      const day = date.getUTCDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      date.setUTCDate(date.getUTCDate() + diff);
+      date.setUTCHours(0, 0, 0, 0);
+      return date.toISOString().slice(0, 10);
+    };
+    const executionByWeek = new Map<string, number[]>();
+    for (const row of maintenanceRows) {
+      const week = weekStartUtc(String(row.created_at || ''));
+      if (!week) continue;
+      const times = eventTimes.get(String(row.id)) || {};
+      const startMs = times.start ? Date.parse(times.start) : NaN;
+      const closeMs = row.closed_at
+        ? Date.parse(String(row.closed_at))
+        : times.close
+          ? Date.parse(times.close)
+          : NaN;
+      if (!Number.isFinite(startMs) || !Number.isFinite(closeMs) || closeMs < startMs) continue;
+      const values = executionByWeek.get(week) || [];
+      values.push(Math.round((closeMs - startMs) / 1000));
+      executionByWeek.set(week, values);
+    }
+    const weeklyExecutionTrend = Array.from(executionByWeek.entries())
+      .map(([week, values]) => {
+        const measurement = median(values);
+        return {
+          week,
+          samples: measurement.samples,
+          medianSeconds: measurement.medianSeconds,
+        };
+      })
+      .sort((a, b) => a.week.localeCompare(b.week));
+    const comparableWeeklyExecutionTrend = weeklyExecutionTrend.filter((row) => row.samples >= 5);
+    const previousComparableWeek =
+      comparableWeeklyExecutionTrend.length >= 2
+        ? comparableWeeklyExecutionTrend[comparableWeeklyExecutionTrend.length - 2]
+        : null;
+    const latestComparableWeek =
+      comparableWeeklyExecutionTrend.length >= 1
+        ? comparableWeeklyExecutionTrend[comparableWeeklyExecutionTrend.length - 1]
+        : null;
+    const weeklyExecutionChangePct =
+      previousComparableWeek?.medianSeconds != null
+      && latestComparableWeek?.medianSeconds != null
+      && previousComparableWeek.medianSeconds > 0
+        ? Math.round(
+            ((latestComparableWeek.medianSeconds - previousComparableWeek.medianSeconds)
+              / previousComparableWeek.medianSeconds) * 100,
+          )
+        : null;
+    const executionTrend = {
+      weeks: weeklyExecutionTrend,
+      comparableWeeks: comparableWeeklyExecutionTrend.length,
+      previousComparableWeek,
+      latestComparableWeek,
+      changePct: weeklyExecutionChangePct,
+      evidenceGate: comparableWeeklyExecutionTrend.length >= 2 ? 'TREND_ONLY' : 'INSUFFICIENT_SAMPLE',
+      e3Gate: 'HOLD_E3',
+      semantics:
+        'observational weekly execution-cycle trend; week-over-week change is not causal attribution to MOTIL and does not prove saved downtime',
+    };
+
 
     const closedMaintenanceRows = maintenanceRows
       .filter((row: any) => row.closed_at)
@@ -415,6 +481,7 @@ export async function GET(request: NextRequest) {
         medianExecutionCycleSeconds === null
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
+      executionTrend,
       evidenceLevel:
         timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
       workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
