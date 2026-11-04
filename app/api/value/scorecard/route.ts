@@ -2,6 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { loadLaudusFinanceControl } from '@/lib/integrations/laudus/finance-control';
+import {
+  financePriorityObservation,
+  financePriorityOutcome,
+  type FinancePriorityKey,
+} from '@/lib/value/finance-priority-outcomes';
 const managementRoles = new Set(['superadmin', 'admin']);
 
 export async function GET(request: NextRequest) {
@@ -100,6 +106,11 @@ export async function GET(request: NextRequest) {
     if (procurementAwardDecisions.error) throw procurementAwardDecisions.error;
     if (procurementAwardOutcomes.error) throw procurementAwardOutcomes.error;
 
+    const financeControl = await loadLaudusFinanceControl(
+      context.supabase,
+      context.organizationId,
+    );
+
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
     for (const row of financeRows) {
@@ -187,6 +198,7 @@ export async function GET(request: NextRequest) {
         priorityKey: String(row.new_values?.priority_key || ''),
         latencyMs: Number(row.new_values?.decision_latency_ms),
         businessDate: String(row.new_values?.business_date || '') || chileBusinessDate(String(row.created_at || '')),
+        baselineObservation: row.new_values?.observation_at_decision || null,
         createdAt: row.created_at,
       }))
       .filter((row: any) =>
@@ -210,6 +222,31 @@ export async function GET(request: NextRequest) {
         : priorityLatencies.length % 2 === 0
           ? Math.round((priorityLatencies[priorityMidpoint - 1] + priorityLatencies[priorityMidpoint]) / 2)
           : priorityLatencies[priorityMidpoint];
+    const todayBusinessDate = chileBusinessDate(new Date().toISOString());
+    const financePriorityOutcomes = financePriorityRows
+      .filter(
+        (row: any) =>
+          row.decision === 'accepted'
+          && row.businessDate
+          && todayBusinessDate
+          && row.businessDate < todayBusinessDate
+          && row.baselineObservation,
+      )
+      .map((row: any) => {
+        const currentObservation = financePriorityObservation(
+          row.priorityKey as FinancePriorityKey,
+          financeControl,
+        );
+        const outcome = financePriorityOutcome(row.baselineObservation, currentObservation);
+        return {
+          priorityKey: row.priorityKey,
+          businessDate: row.businessDate,
+          state: outcome.state,
+          delta: outcome.delta,
+          baseline: row.baselineObservation,
+          current: currentObservation,
+        };
+      });
     const financePriorityDecision = {
       total: financePriorityRows.length,
       accepted: financePriorityRows.filter((row: any) => row.decision === 'accepted').length,
@@ -223,6 +260,15 @@ export async function GET(request: NextRequest) {
       workflowLevel: financePriorityRows.length > 0 ? 4 : 3,
       evidenceLevel: financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0',
       valueGate: financePriorityRows.length >= 20 ? 'CALIBRATION_READY' : 'MEASURING',
+      outcomes: {
+        maturedAccepted: financePriorityOutcomes.length,
+        improved: financePriorityOutcomes.filter((row) => row.state === 'IMPROVED').length,
+        unchanged: financePriorityOutcomes.filter((row) => row.state === 'UNCHANGED').length,
+        worsened: financePriorityOutcomes.filter((row) => row.state === 'WORSENED').length,
+        unmeasurable: financePriorityOutcomes.filter((row) => row.state === 'UNMEASURABLE').length,
+        e3Gate: 'HOLD_E3',
+        semantics: 'state observed after an accepted human decision; temporal association only, not causal attribution or savings',
+      },
       semantics: 'latest human decision per finance priority and Chile business day; repeated clicks do not inflate adoption; no Laudus or canonical mutation',
     };
 
