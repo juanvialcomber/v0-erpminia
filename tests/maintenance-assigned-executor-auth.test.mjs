@@ -33,9 +33,11 @@ test('assigned executor does not require general maintenance edit access to read
   assert.match(workOrder, /actual_duration_hours/);
 });
 
-test('timer and close accept canonical assignee as a scoped execution capability', () => {
+test('timer accepts module writers or assignee, but close is reserved to canonical assignee', () => {
   assert.match(timer, /accessLevel !== 'ED' && !executionAccess\.ok/);
-  assert.match(close, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(close, /requireAssignedMaintenanceExecution/);
+  assert.match(close, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(close, /accessLevel !== 'ED'/);
 });
 
 test('assigned executor capability is identity based, not hard-coded by cargo or person name', () => {

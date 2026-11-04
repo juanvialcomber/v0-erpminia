@@ -16,7 +16,7 @@ async function getReviewerPerson(context: Awaited<ReturnType<typeof getOrganizat
     .eq('employment_status', 'active')
     .maybeSingle();
   if (error || !data) return null;
-  return ['Ariel López', 'Mauricio Astudillo'].includes(String(data.full_name || '')) ? data : null;
+  return String(data.full_name || '') === 'Ariel López' ? data : null;
 }
 
 async function authorizeRead(request: NextRequest, workOrderId: string) {
@@ -66,17 +66,41 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .eq('work_order_id', id);
   if (installationsError) return NextResponse.json({ error: installationsError.message }, { status: 500 });
 
+  const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
+    .from('work_order_events')
+    .select('id,event_at,actor_id,actor_name,payload')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .eq('event_type', 'fluid_closure_declared')
+    .order('event_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fluidDeclarationError) return NextResponse.json({ error: fluidDeclarationError.message }, { status: 500 });
+
+  const { data: fluidUsage, error: fluidUsageError } = await context.supabase
+    .from('maintenance_fluid_usage_records')
+    .select('id,fluid_name,quantity_liters,total_cost,cost_state,warehouse_code,used_at')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .order('used_at', { ascending: true });
+  if (fluidUsageError) return NextResponse.json({ error: fluidUsageError.message }, { status: 500 });
+
   const reviewer = await getReviewerPerson(context);
   return NextResponse.json({
     approvedInstallations: approvedInstallations || [],
     materialRequirementsCount: materialRequirementsCount || 0,
+    fluidClosure: fluidDeclaration || null,
+    fluidUsage: fluidUsage || [],
     review: review || {
       status: String(workOrder.status || '') === 'completed' ? 'pending' : null,
       decision_note: null,
       reviewed_by_name: null,
       reviewed_at: null,
     },
-    canApprove: Boolean(reviewer) && String(workOrder.status || '') === 'completed' && review?.status !== 'approved',
+    canApprove: Boolean(reviewer)
+      && Boolean(fluidDeclaration)
+      && String(workOrder.status || '') === 'completed'
+      && review?.status !== 'approved',
   });
 }
 
@@ -90,7 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const reviewer = await getReviewerPerson(context);
   if (!reviewer) {
-    return NextResponse.json({ error: 'Solo Ariel López o Mauricio Astudillo pueden aprobar la OT.' }, { status: 403 });
+    return NextResponse.json({ error: 'Ariel López debe revisar y aprobar la OT.' }, { status: 403 });
   }
 
   const { data: workOrder, error: workOrderError } = await context.supabase
@@ -103,6 +127,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!workOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo.' }, { status: 404 });
   if (String(workOrder.status || '') !== 'completed') {
     return NextResponse.json({ error: 'La OT debe estar terminada antes de ser aprobada.' }, { status: 409 });
+  }
+
+  const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
+    .from('work_order_events')
+    .select('id,actor_id,actor_name,payload,event_at')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .eq('event_type', 'fluid_closure_declared')
+    .order('event_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (fluidDeclarationError) return NextResponse.json({ error: fluidDeclarationError.message }, { status: 500 });
+  if (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true) {
+    return NextResponse.json(
+      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
+      { status: 409 },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as { note?: string | null; confirmMaterialsInstalled?: boolean } | null;

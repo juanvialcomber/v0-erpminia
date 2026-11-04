@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
@@ -24,9 +23,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
     const executionAccess = await requireAssignedMaintenanceExecution(context, id);
-    if (accessLevel !== 'ED' && !executionAccess.ok) return executionAccess.response;
+    if (!executionAccess.ok) return executionAccess.response;
+
+    const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
+      .from('work_order_events')
+      .select('id,event_at,actor_id,actor_name,payload')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .eq('event_type', 'fluid_closure_declared')
+      .order('event_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fluidDeclarationError) throw fluidDeclarationError;
+    if (!fluidDeclaration) {
+      return NextResponse.json(
+        { error: 'Antes de cerrar, el mecánico asignado debe confirmar los aceites/fluidos utilizados y el estado del residuo.' },
+        { status: 409 },
+      );
+    }
+    if (fluidDeclaration.actor_id !== context.userId) {
+      return NextResponse.json(
+        { error: 'La declaración de aceites/fluidos debe ser realizada por el mecánico asignado que está cerrando la OT.' },
+        { status: 409 },
+      );
+    }
+
+    const fluidPayload = (fluidDeclaration.payload || {}) as Record<string, unknown>;
+    if (fluidPayload.declared_by_assigned_executor !== true || typeof fluidPayload.fluids_used !== 'boolean') {
+      return NextResponse.json(
+        { error: 'La declaración de aceites/fluidos no es válida para cierre. Vuelve a confirmarla como mecánico asignado.' },
+        { status: 409 },
+      );
+    }
+
+    const { data: currentFluidUsage, error: currentFluidUsageError } = await context.supabase
+      .from('maintenance_fluid_usage_records')
+      .select('id,used_at')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id);
+    if (currentFluidUsageError) throw currentFluidUsageError;
+
+    const currentUsageCount = (currentFluidUsage || []).length;
+    const declaredUsageCount = Number(fluidPayload.fluid_usage_count || 0);
+    if (currentUsageCount !== declaredUsageCount) {
+      return NextResponse.json(
+        { error: 'Los datos de aceites/fluidos cambiaron después de la confirmación. El mecánico debe revisar y confirmar nuevamente antes de cerrar.' },
+        { status: 409 },
+      );
+    }
 
     const { count: evidenceCount, error: evidenceError } = await context.supabase
       .from('work_order_evidence_files')
