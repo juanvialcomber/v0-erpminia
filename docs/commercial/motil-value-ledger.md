@@ -305,3 +305,12 @@ Estos umbrales habilitan escala inicial, no E4.
 - Clasificación: `TREND_ONLY / HOLD_E3`. Todavía no existe una segunda semana completa comparable ni una intervención causal aislada.
 - Regla: cualquier cambio semanal puede deberse a mix de trabajos, criticidad, activos, equipo humano o volumen. No se presenta como downtime evitado, ahorro ni mejora atribuible a MOTIL.
 - Siguiente gate: acumular una segunda semana completa con `n>=5` y segmentar por tipo/prioridad/activo cuando la muestra permita comparación homogénea.
+
+
+## 2026-11-04 — Autoridad humana y latencia de cierre
+
+- Evidencia observada: 29 OT cerradas cuentan con revisión de supervisor; 29 tienen último estado aprobado y 0 un último estado distinto de aprobado.
+- Latencia observada cierre -> revisión: mediana aproximada 19.025 s (5,28 h) sobre 29 casos comparables.
+- Interpretación: demuestra que el gate humano está siendo usado y permite medir disciplina/latencia de cierre. No demuestra calidad mecánica, ausencia de fallas ni ahorro.
+- Clasificación: L4 / E2 / V4 para autoridad humana del workflow.
+- Gate V5: relacionar revisión/corrección con un outcome operacional posterior (reincidencia, tiempo de respuesta, disponibilidad o retrabajo) sobre cohortes comparables.
