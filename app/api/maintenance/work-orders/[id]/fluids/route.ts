@@ -37,7 +37,41 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .order('used_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ rows: data || [], canEdit: level === 'ED' || execution.ok });
+
+  const usageRows = data || [];
+  const { data: linkEvents, error: linkError } = await context.supabase
+    .from('work_order_events')
+    .select('source_record_id,payload')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .eq('event_type', 'waste_generated')
+    .eq('source_table', 'maintenance_waste_records')
+    .limit(5000);
+
+  if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
+  const wasteIds = Array.from(new Set((linkEvents || []).map((row) => row.source_record_id).filter(Boolean)));
+  const wasteResult = wasteIds.length
+    ? await context.supabase
+        .from('maintenance_waste_records')
+        .select('id,waste_code,waste_name,quantity,unit,status,classification,storage_location,destination_name')
+        .eq('organization_id', context.organizationId)
+        .eq('work_order_id', id)
+        .in('id', wasteIds)
+    : { data: [], error: null };
+  if (wasteResult.error) return NextResponse.json({ error: wasteResult.error.message }, { status: 500 });
+
+  const wasteById = new Map((wasteResult.data || []).map((row) => [row.id, row]));
+  const wasteByUsage = new Map<string, any>();
+  for (const event of linkEvents || []) {
+    const usageId = String((event.payload as any)?.source_fluid_usage_id || '');
+    const waste = wasteById.get(event.source_record_id);
+    if (usageId && waste) wasteByUsage.set(usageId, waste);
+  }
+
+  return NextResponse.json({
+    rows: usageRows.map((row) => ({ ...row, linked_waste: wasteByUsage.get(String(row.id)) || null })),
+    canEdit: level === 'ED' || execution.ok,
+  });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -57,6 +91,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const quantityLiters = numberOrNull(body.quantity_liters);
   if (quantityLiters === null || quantityLiters <= 0) {
     return NextResponse.json({ error: 'Los litros usados deben ser mayores que cero.' }, { status: 400 });
+  }
+
+  const recoveredWasteLiters = body.recovered_waste_liters === '' || body.recovered_waste_liters == null
+    ? null
+    : numberOrNull(body.recovered_waste_liters);
+  if (recoveredWasteLiters !== null && recoveredWasteLiters <= 0) {
+    return NextResponse.json({ error: 'Los litros de residuo recuperado deben ser mayores que cero.' }, { status: 400 });
+  }
+  const allowedLinkedWasteCodes = new Set(['used_oil','hydraulic_fluid','coolant','brake_fluid']);
+  const linkedWasteCode = String(body.linked_waste_code || 'used_oil').trim();
+  if (recoveredWasteLiters !== null && !allowedLinkedWasteCodes.has(linkedWasteCode)) {
+    return NextResponse.json({ error: 'Tipo de residuo líquido no válido.' }, { status: 400 });
   }
 
   const { data: order, error: orderError } = await context.supabase
@@ -135,6 +181,64 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  let linkedWaste = null;
+  if (recoveredWasteLiters !== null) {
+    const wasteNames: Record<string, string> = {
+      used_oil: 'Aceite usado',
+      hydraulic_fluid: 'Fluido hidráulico usado',
+      coolant: 'Refrigerante / anticongelante usado',
+      brake_fluid: 'Líquido de frenos usado',
+    };
+    const { data: wasteData, error: wasteError } = await context.supabase
+      .from('maintenance_waste_records')
+      .insert({
+        organization_id: context.organizationId,
+        work_order_id: id,
+        canonical_asset_id: canonicalAssetId,
+        waste_code: linkedWasteCode,
+        waste_name: wasteNames[linkedWasteCode] || 'Residuo líquido usado',
+        classification: 'to_classify',
+        quantity: recoveredWasteLiters,
+        unit: 'L',
+        storage_location: body.waste_storage_location ? String(body.waste_storage_location).trim() : null,
+        notes: body.waste_notes ? String(body.waste_notes).trim() : null,
+        status: 'generated',
+        created_by: context.authUserId,
+        updated_by: context.authUserId,
+      })
+      .select('*')
+      .single();
+
+    if (wasteError) {
+      await context.supabase
+        .from('maintenance_fluid_usage_records')
+        .delete()
+        .eq('organization_id', context.organizationId)
+        .eq('id', data.id);
+      return NextResponse.json({ error: 'No se pudo vincular el residuo al uso de fluido.' }, { status: 500 });
+    }
+    linkedWaste = wasteData;
+
+    await context.supabase.from('work_order_events').insert({
+      organization_id: context.organizationId,
+      work_order_id: id,
+      canonical_asset_id: canonicalAssetId,
+      event_type: 'waste_generated',
+      event_at: new Date().toISOString(),
+      actor_id: context.authUserId,
+      actor_name: context.userName || context.userEmail || null,
+      source_table: 'maintenance_waste_records',
+      source_record_id: wasteData.id,
+      summary: 'Residuo líquido vinculado al uso de fluido',
+      payload: {
+        source_fluid_usage_id: data.id,
+        waste_code: linkedWasteCode,
+        quantity: recoveredWasteLiters,
+        unit: 'L',
+      },
+    });
+  }
+
   await context.supabase.from('work_order_events').insert({
     organization_id: context.organizationId,
     work_order_id: id,
@@ -150,7 +254,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   return NextResponse.json({
-    data,
+    data: { ...data, linked_waste: linkedWaste },
+    linkedWasteCreated: Boolean(linkedWaste),
     inventoryMutated: false,
     note: 'El registro no descuenta stock de Bodega; la conciliación con movimientos se gestiona por separado.',
   }, { status: 201 });

@@ -24,6 +24,7 @@ type WasteRow = {
   generated_at: string;
   storage_location: string | null;
   destination_name: string | null;
+  from_lubrication?: boolean;
   work_order: { id: string; work_order_number: string; title: string; workshop_site: string | null } | null;
   asset: { id: string; asset_code: string | null; name: string | null; asset_type: string | null; category: string | null; manufacturer: string | null; model: string | null; license_plate: string | null; cost_center_code: string | null; validation_status: string | null } | null;
 };
@@ -111,7 +112,10 @@ export function MaintenanceWasteRegister() {
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {[row.asset?.asset_code,[row.asset?.manufacturer,row.asset?.model].filter(Boolean).join(' '),row.work_order?.workshop_site,row.work_order?.work_order_number].filter(Boolean).join(' · ')}
               </p>
-              <p className="mt-1 text-sm text-foreground">{row.waste_name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="text-sm text-foreground">{row.waste_name}</p>
+                {row.from_lubrication ? <Badge variant="secondary">Desde lubricación</Badge> : null}
+              </div>
             </div>
             <p className="text-sm tabular-nums">{Number(row.quantity).toLocaleString('es-CL')} {row.unit === 'unit' ? 'un' : row.unit}</p>
             <Badge variant={row.classification === 'hazardous' ? 'destructive' : 'outline'}>

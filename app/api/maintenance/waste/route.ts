@@ -48,8 +48,26 @@ export async function GET(request: NextRequest) {
 
     const orderMap = new Map((orders.data || []).map((row) => [row.id, row]));
     const assetMap = new Map((assets.data || []).map((row) => [row.id, row]));
+    const wasteIds = (waste || []).map((row) => row.id);
+    const linkEvents = wasteIds.length
+      ? await context.supabase
+          .from('work_order_events')
+          .select('source_record_id,payload')
+          .eq('organization_id', context.organizationId)
+          .eq('event_type', 'waste_generated')
+          .eq('source_table', 'maintenance_waste_records')
+          .in('source_record_id', wasteIds.slice(0, 250))
+      : { data: [], error: null };
+    if (linkEvents.error) throw linkEvents.error;
+    const linkedWasteIds = new Set(
+      (linkEvents.data || [])
+        .filter((row) => Boolean((row.payload as any)?.source_fluid_usage_id))
+        .map((row) => String(row.source_record_id)),
+    );
+
     const rows = (waste || []).map((row) => ({
       ...row,
+      from_lubrication: linkedWasteIds.has(String(row.id)),
       work_order: orderMap.get(row.work_order_id) || null,
       asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
     }));
