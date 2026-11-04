@@ -45,3 +45,14 @@ test('Ariel is the reviewer and sees mechanic fluid evidence before approval', (
   assert.match(reviewUi, /Registrado por mecánico/);
   assert.match(reviewUi, /Ariel López revisa la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
 });
+
+
+test('oil quantity is requested only when mechanic confirms fluid use', () => {
+  assert.match(closeUi, /fluidUsedChoice === 'yes'/);
+  assert.match(closeUi, /<WorkOrderFluidUsagePanel/);
+  assert.match(closeUi, /Si eliges “No”, no se solicitará cantidad/);
+  assert.match(closeUi, /No se utilizaron aceites ni fluidos\. No se requiere registrar litros ni residuos\./);
+  assert.match(closeUi, /Confirmar sin uso de aceites/);
+  assert.match(closureRoute, /if \(body\.fluids_used && usageCount < 1\)/);
+  assert.match(closureRoute, /if \(!body\.fluids_used && usageCount > 0\)/);
+});
