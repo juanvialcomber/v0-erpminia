@@ -52,3 +52,11 @@ test('EAM learning phase links approved history to audited reliability', () => {
   assert.match(ui,/\/dashboard\/mantenimiento\/confiabilidad/);
   assert.match(ui,/no crea trabajo automáticamente/i);
 });
+
+
+test('preventive plans keep direct navigation to the canonical asset 360', () => {
+  const preventive = fs.readFileSync('components/maintenance/preventive-plan-board.tsx','utf8');
+  assert.match(preventive,/Ficha 360/);
+  assert.match(preventive,/\/dashboard\/mantenimiento\/equipos\//);
+  assert.match(preventive,/canonical_asset_id \|\| schedule\.asset_id/);
+});
