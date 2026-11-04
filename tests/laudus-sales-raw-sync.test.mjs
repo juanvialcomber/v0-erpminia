@@ -46,5 +46,6 @@ test('sales receipts select receipt type leaf fields and keep modifiedAt orderin
   assert.match(sync, /'receiptType\.code'/);
   assert.match(sync, /'receiptType\.description'/);
   assert.doesNotMatch(sync, /'receiptId','receiptType','issuedDate'/);
+  assert.doesNotMatch(sync, /salesInvoices\.itemId/);
   assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'modifiedAt'/);
 });
