@@ -64,7 +64,7 @@ async function capture(request: NextRequest) {
       );
     }
 
-    const [workOrdersResult, eventsResult, evidenceResult, reviewsResult] = await Promise.all([
+    const [workOrdersResult, eventsResult, evidenceResult, reviewsResult, financePriorityResult] = await Promise.all([
       supabase
         .from('maintenance_work_orders')
         .select('id,status,closed_at,created_at')
@@ -86,9 +86,17 @@ async function capture(request: NextRequest) {
         .select('work_order_id,status,reviewed_at')
         .eq('organization_id', organization.id)
         .limit(5000),
+      supabase
+        .from('audit_log')
+        .select('new_values,created_at')
+        .eq('organization_id', organization.id)
+        .eq('action', 'finance_priority_decision')
+        .eq('resource_type', 'finance_priority')
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
-    for (const result of [workOrdersResult, eventsResult, evidenceResult, reviewsResult]) {
+    for (const result of [workOrdersResult, eventsResult, evidenceResult, reviewsResult, financePriorityResult]) {
       if (result.error) {
         console.error(`[value-scorecard-daily] maintenance ${organization.id}:`, result.error.message);
         return NextResponse.json(
@@ -228,6 +236,54 @@ async function capture(request: NextRequest) {
       ? Math.round((Array.from(approvedReviews).filter((id) => closedIds.has(id)).length / closedIds.size) * 100)
       : null;
 
+    const financePriorityRawRows = (financePriorityResult.data || [])
+      .map((row: any) => ({
+        decision: String(row.new_values?.decision || ''),
+        priorityKey: String(row.new_values?.priority_key || ''),
+        businessDate: String(row.new_values?.business_date || '') || chileBusinessDate(new Date(row.created_at)),
+        latencyMs: Number(row.new_values?.decision_latency_ms),
+        createdAt: row.created_at,
+      }))
+      .filter((row: any) =>
+        ['accepted', 'deferred', 'rejected'].includes(row.decision)
+        && ['freshness', 'overdue', 'due-soon', 'supplier-concentration', 'deposit', 'cost-centers', 'accounting'].includes(row.priorityKey),
+      );
+    const latestFinancePriorityByDay = new Map<string, any>();
+    for (const row of financePriorityRawRows) {
+      const key = `${row.businessDate || 'unknown'}:${row.priorityKey}`;
+      if (!latestFinancePriorityByDay.has(key)) latestFinancePriorityByDay.set(key, row);
+    }
+    const financePriorityRows = Array.from(latestFinancePriorityByDay.values());
+    const financePriorityLatencies = financePriorityRows
+      .map((row: any) => row.latencyMs)
+      .filter((value: number) => Number.isFinite(value) && value >= 0 && value <= 30 * 60 * 1000)
+      .sort((a: number, b: number) => a - b);
+    const financePriorityMidpoint = Math.floor(financePriorityLatencies.length / 2);
+    const financePriorityMedianMs =
+      financePriorityLatencies.length === 0
+        ? null
+        : financePriorityLatencies.length % 2 === 0
+          ? Math.round(
+              (financePriorityLatencies[financePriorityMidpoint - 1]
+                + financePriorityLatencies[financePriorityMidpoint]) / 2,
+            )
+          : financePriorityLatencies[financePriorityMidpoint];
+    const financePriorityDecision = {
+      total: financePriorityRows.length,
+      accepted: financePriorityRows.filter((row: any) => row.decision === 'accepted').length,
+      deferred: financePriorityRows.filter((row: any) => row.decision === 'deferred').length,
+      rejected: financePriorityRows.filter((row: any) => row.decision === 'rejected').length,
+      timedDecisions: financePriorityLatencies.length,
+      medianDecisionSeconds:
+        financePriorityMedianMs === null ? null : Math.round(financePriorityMedianMs / 1000),
+      rawEvents: financePriorityRawRows.length,
+      uniquePriorityDays: financePriorityRows.length,
+      workflowLevel: financePriorityRows.length > 0 ? 'L4' : 'L3',
+      evidenceLevel: financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0',
+      valueGate: financePriorityRows.length >= 20 ? 'CALIBRATION_READY' : 'MEASURING',
+      semantics: 'latest human decision per finance priority and Chile business day; repeated clicks do not inflate adoption',
+    };
+
     const maintenanceEvidenceLevel = approvedReviews.size > 0 || withEvidence.size > 0
       ? 'E2'
       : workOrders.length > 0
@@ -271,6 +327,7 @@ async function capture(request: NextRequest) {
 
     const enrichedPayload = {
       ...(data || {}),
+      financePriorityDecision,
       maintenanceValue,
       lecv: {
         financeProcurement: {
