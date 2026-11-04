@@ -40,3 +40,11 @@ test('commercial sync remains admin controlled and usage-tracked without automat
   assert.match(api, /access\.admin/);
   assert.match(api, /withLaudusApiUsageTracking/);
 });
+
+
+test('sales receipts use a proven one-row header contract', () => {
+  assert.match(sync, /fields:\s*\['receiptId','issuedDate','modifiedAt'\]/);
+  assert.doesNotMatch(sync, /salesInvoices\.itemId/);
+  assert.doesNotMatch(sync, /receiptType\.code/);
+  assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'modifiedAt'/);
+});
