@@ -31,6 +31,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const primaryPhoto = photos.find((photo: { id: string }) => photo.id === selectedPhotoId) || photos[0];
   const currentReview = review.data?.review;
   const canApprove = Boolean(review.data?.canApprove);
+  const legacyFluidDeclarationExemption = Boolean(review.data?.legacyFluidDeclarationExemption);
   const [confirmMaterialsInstalled, setConfirmMaterialsInstalled] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
@@ -166,10 +167,14 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 {fluidClosurePayload.note ? <p className="text-sm text-muted-foreground">Nota: {fluidClosurePayload.note}</p> : null}
               </>
             ) : currentReview?.status === 'approved' ? (
-              <p className="text-sm text-muted-foreground">Esta OT fue aprobada antes de exigir la declaración de aceites y fluidos. El histórico no permite determinar si se utilizaron.</p>
+              <p className="text-sm text-muted-foreground">OT aprobada sin declaración de fluidos en un cierre anterior al requisito. Uso y residuos no informados; esto no significa que no se utilizaran.</p>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
+                {legacyFluidDeclarationExemption ? (
+                  <p className="text-sm text-muted-foreground">Cierre anterior al requisito de aceites y fluidos. Ariel puede aprobar esta OT con excepción histórica. El consumo y los residuos no fueron declarados (no equivale a “No”).</p>
+                ) : (
+                  <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
+                )}
                 {fluidClosureEvidence.error ? (
                   <p role="alert" className="text-sm text-destructive">No se pudo comprobar el permiso para declarar aceites y fluidos.</p>
                 ) : fluidClosureEvidence.isLoading ? (
@@ -226,7 +231,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
               ) : (
                 <>
                   <p className="text-sm font-medium">Pendiente de aprobación</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Ariel López revisa la evidencia, los aceites/fluidos y el residuo declarado por el mecánico antes de aprobar la OT.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{legacyFluidDeclarationExemption ? 'Cierre anterior al requisito: Ariel revisa la evidencia disponible y aprueba con una excepción histórica explícita, sin presumir consumo de fluidos.' : 'Ariel López revisa la evidencia, los aceites/fluidos y el residuo declarado por el mecánico antes de aprobar la OT.'}</p>
                 </>
               )}
             </div>
