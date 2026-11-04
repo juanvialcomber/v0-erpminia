@@ -341,6 +341,7 @@ export async function GET(request: NextRequest) {
         { count: pendingAssets, error: assetError },
         { count: overduePayables, error: payableError },
         accountingResult,
+        accountingTotalResult,
         bankResult,
         dteResult,
       ] = await Promise.all([
@@ -356,8 +357,13 @@ export async function GET(request: NextRequest) {
           .gt('outstanding_amount', 0)
           .lt('due_date', new Date().toISOString().slice(0, 10)),
         context.supabase
+          .from('laudus_accounting_management_summary_v1')
+          .select('entries_with_lines,line_rows,with_account,with_currency,with_cost_center,with_description,with_document')
+          .eq('organization_id', context.organizationId)
+          .maybeSingle(),
+        context.supabase
           .from('laudus_accounting_entries_service_v1')
-          .select('entry_date,currency_code,cost_center_external_id')
+          .select('id', { count: 'exact', head: true })
           .eq('organization_id', context.organizationId),
         context.supabase
           .from('laudus_bank_statements_service_v1')
@@ -371,6 +377,7 @@ export async function GET(request: NextRequest) {
       if (assetError) throw assetError;
       if (payableError) throw payableError;
       if (accountingResult.error) throw accountingResult.error;
+      if (accountingTotalResult.error) throw accountingTotalResult.error;
       if (bankResult.error) throw bankResult.error;
       if (dteResult.error) throw dteResult.error;
 
@@ -406,19 +413,20 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      const accountingRows = accountingResult.data || [];
-      const accountingMissingCurrency = accountingRows.filter((row) => !text(row.currency_code)).length;
-      const accountingMissingCostCenter = accountingRows.filter((row) => !text(row.cost_center_external_id)).length;
-      if (accountingRows.length > 0 && (accountingMissingCurrency > 0 || accountingMissingCostCenter > 0)) {
+      const accountingSummary = accountingResult.data;
+      const accountingTotal = Number(accountingTotalResult.count || 0);
+      const accountingWithLines = Number(accountingSummary?.entries_with_lines || 0);
+      const accountingMissingLineCoverage = Math.max(accountingTotal - accountingWithLines, 0);
+      if (accountingTotal > 0 && accountingMissingLineCoverage > 0) {
         addIssue(issues, {
-          issue_key: 'laudus_systemic:accounting_dimension_coverage',
+          issue_key: 'laudus_systemic:accounting_line_coverage',
           entity_type: 'external_source',
           entity_id: null,
           issue_type: 'laudus_replacement_gap',
           field_name: null,
           severity: 'warning',
-          label: 'Contabilidad Laudus sin dimensiones suficientes para gestión MOTIL',
-          detail: `${accountingRows.length.toLocaleString('es-CL')} asientos están disponibles, pero ${accountingMissingCurrency.toLocaleString('es-CL')} no exponen moneda y ${accountingMissingCostCenter.toLocaleString('es-CL')} no exponen centro de costo en esta capa. Acción MOTIL: completar dimensiones desde líneas/maestros antes de usar contabilidad para gestión.`,
+          label: `${accountingMissingLineCoverage.toLocaleString('es-CL')} asientos Laudus sin líneas de gestión recuperadas`,
+          detail: `MOTIL conserva ${accountingTotal.toLocaleString('es-CL')} asientos fuente y ${accountingWithLines.toLocaleString('es-CL')} ya tienen líneas recuperadas. Acción MOTIL: completar el backfill de líneas antes de usar la historia incompleta para centros de costo, cuentas o análisis gerencial.`,
           href: '/dashboard/finanzas',
           action_label: 'Completar contabilidad',
           action_href: '/dashboard/finanzas',
