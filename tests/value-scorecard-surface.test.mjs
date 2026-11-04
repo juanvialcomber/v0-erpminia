@@ -200,3 +200,18 @@ test('value scorecard captures one idempotent daily snapshot in Chile time', () 
   assert.match(cron, /daily evidence snapshot; not audited savings or economic ROI/);
   assert.match(vercel, /\/api\/cron\/value-scorecard-daily/);
 });
+
+
+test('daily value snapshot persists maintenance LECV from operational evidence without claiming ROI', () => {
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+
+  assert.match(cron, /maintenance_work_orders/);
+  assert.match(cron, /work_order_events/);
+  assert.match(cron, /work_order_evidence_files/);
+  assert.match(cron, /work_order_supervisor_reviews/);
+  assert.match(cron, /maintenanceLecv/);
+  assert.match(cron, /NO_MEDIBLE_AUN/);
+  assert.match(cron, /not saved time, avoided downtime, or economic ROI/);
+  assert.match(cron, /eventCoveragePct/);
+  assert.match(cron, /supervisorReviewCoveragePct/);
+});
