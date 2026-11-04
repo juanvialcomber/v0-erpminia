@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import { formatAssetIdentity, formatWorkOrderNumber } from '@/lib/maintenance/work-order-display';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
+import { WorkOrderFluidUsagePanel } from '@/components/maintenance/work-order-fluid-usage-panel';
 
 type QueueRow = {
   work_order_id: string;
@@ -109,6 +110,12 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const evidence = evidenceData?.evidence || [];
   const evidenceCount = evidence.length;
 
+  const { data: fluidClosureData, mutate: mutateFluidClosure } = useSWR(
+    current ? `/api/maintenance/work-orders/${current.work_order_id}/fluids/closure` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
   const [textValue, setTextValue] = useState('');
   const [hoursValue, setHoursValue] = useState('');
   const [stepObservation, setStepObservation] = useState('');
@@ -116,6 +123,9 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const [meterValue, setMeterValue] = useState('');
   const [meterRecordedAt, setMeterRecordedAt] = useState(localDateTimeValue());
   const [meterReason, setMeterReason] = useState('');
+  const [fluidUsedChoice, setFluidUsedChoice] = useState<'yes' | 'no' | ''>('');
+  const [fluidWasteChoice, setFluidWasteChoice] = useState<'linked' | 'none_recovered' | 'not_applicable' | ''>('');
+  const [fluidClosureNote, setFluidClosureNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -129,6 +139,9 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     setMeterValue('');
     setMeterRecordedAt(localDateTimeValue());
     setMeterReason('');
+    setFluidUsedChoice('');
+    setFluidWasteChoice('');
+    setFluidClosureNote('');
   }, [current?.work_order_id, current?.next_action, current?.next_plan_step_id]);
 
   async function request(url: string, body: Record<string, unknown>) {
@@ -271,6 +284,23 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
       return patchCurrent({ actual_duration_hours: hours });
     }
 
+    if (current.next_action === 'record_fluid_closure') {
+      if (!fluidClosureData?.canDeclare) {
+        return setActionError('La declaración de aceites/fluidos debe realizarla el mecánico asignado a la OT.');
+      }
+      if (!fluidUsedChoice) return setActionError('Indica si se utilizaron aceites o fluidos.');
+      const fluidsUsed = fluidUsedChoice === 'yes';
+      const wasteStatus = fluidsUsed ? fluidWasteChoice : 'not_applicable';
+      if (fluidsUsed && !fluidWasteChoice) return setActionError('Indica qué ocurrió con el residuo del fluido.');
+      await request(`/api/maintenance/work-orders/${current.work_order_id}/fluids/closure`, {
+        fluids_used: fluidsUsed,
+        waste_status: wasteStatus,
+        note: fluidClosureNote.trim() || null,
+      });
+      await mutateFluidClosure();
+      return;
+    }
+
     if (current.next_action === 'record_runtime_evidence') {
       const body: Record<string, unknown> = { workOrderId: current.work_order_id, mode: meterMode };
       if (meterMode === 'meter_reading') {
@@ -320,15 +350,21 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   }
 
   const actionKey = ACTION_KEYS[current.next_action];
-  const copy = actionKey
-    ? { title: t.actionTitles[actionKey], description: t.actionDescriptions[actionKey] }
-    : t.fallbackAction;
+  const copy = current.next_action === 'record_fluid_closure'
+    ? {
+        title: 'Confirmar aceites y residuos',
+        description: 'El mecánico asignado debe registrar o confirmar los fluidos usados y qué ocurrió con el residuo antes de cerrar la OT.',
+      }
+    : actionKey
+      ? { title: t.actionTitles[actionKey], description: t.actionDescriptions[actionKey] }
+      : t.fallbackAction;
   const inline = [
     'complete_standard_plan_step',
     'record_root_cause',
     'record_preventive_actions',
     'record_actual_hours',
     'record_runtime_evidence',
+    'record_fluid_closure',
     'close_work_order',
   ].includes(current.next_action);
 
@@ -397,6 +433,57 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
               onChange={(event) => setHoursValue(event.target.value)}
               placeholder={t.placeholders.actualHours}
             />
+          ) : null}
+
+          {current.next_action === 'record_fluid_closure' ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/10 p-4">
+                <p className="font-medium">Registro del mecánico</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Este paso es obligatorio. Ariel revisará estos datos después del cierre antes de aprobar la OT.
+                </p>
+              </div>
+
+              <WorkOrderFluidUsagePanel workOrderId={current.work_order_id} readOnly={!fluidClosureData?.canDeclare} />
+
+              <div className="space-y-3 rounded-lg border p-4">
+                <p className="text-sm font-medium">¿Se utilizaron aceites o fluidos en esta OT?</p>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant={fluidUsedChoice === 'yes' ? 'default' : 'outline'} onClick={() => { setFluidUsedChoice('yes'); setFluidWasteChoice(''); }}>
+                    Sí
+                  </Button>
+                  <Button type="button" size="sm" variant={fluidUsedChoice === 'no' ? 'default' : 'outline'} onClick={() => { setFluidUsedChoice('no'); setFluidWasteChoice('not_applicable'); }}>
+                    No
+                  </Button>
+                </div>
+
+                {fluidUsedChoice === 'yes' ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">¿Qué ocurrió con el residuo?</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant={fluidWasteChoice === 'linked' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('linked')}>
+                        Residuo recuperado y registrado
+                      </Button>
+                      <Button type="button" size="sm" variant={fluidWasteChoice === 'none_recovered' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('none_recovered')}>
+                        No se recuperó residuo
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <textarea
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  rows={2}
+                  value={fluidClosureNote}
+                  onChange={(event) => setFluidClosureNote(event.target.value)}
+                  placeholder="Observación opcional del mecánico"
+                />
+
+                {!fluidClosureData?.canDeclare ? (
+                  <p className="text-sm text-amber-700">Sólo el mecánico asignado puede confirmar este paso.</p>
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {current.next_action === 'record_runtime_evidence' ? (
@@ -486,11 +573,13 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
 
           <div className="flex flex-col gap-2 sm:flex-row">
             {inline && data?.canEdit ? (
-              <Button className="sm:min-w-48" onClick={() => void performNextAction()} disabled={saving}>
+              <Button className="sm:min-w-48" onClick={() => void performNextAction()} disabled={saving || (current.next_action === 'record_fluid_closure' && !fluidClosureData?.canDeclare)}>
                 {saving
                   ? t.actions.saving
                   : current.next_action === 'close_work_order'
                     ? 'Cerrar OT'
+                    : current.next_action === 'record_fluid_closure'
+                    ? 'Confirmar aceites y residuos'
                     : current.next_action === 'complete_standard_plan_step'
                       ? t.actions.markStepDone
                       : t.actions.saveContinue}
