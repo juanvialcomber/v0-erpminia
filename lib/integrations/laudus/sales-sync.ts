@@ -55,12 +55,9 @@ const ENTITY_CONFIG = {
   sales_receipt: {
     path: '/sales/receipts/list',
     fields: [
-      'receiptId','receiptType.code','receiptType.description','issuedDate','dueDate','modifiedAt',
-      'salesInvoices.itemId','salesInvoices.salesInvoiceId','salesInvoices.docNumber',
-      'salesInvoices.customer.customerId','salesInvoices.customer.name',
-      'salesInvoices.customer.legalName','salesInvoices.originalAmount',
-      'salesInvoices.currencyCode','salesInvoices.parityToMainCurrency',
-      'salesInvoices.amount','salesInvoices.costCenter.costCenterId',
+      'receiptId','receiptType.code','receiptType.description',
+      'issuedDate','dueDate','document','authorizationCode',
+      'deposited','createAccounting','notes','createdAt','modifiedAt',
     ],
     orderField: 'modifiedAt',
     pages: 2,
