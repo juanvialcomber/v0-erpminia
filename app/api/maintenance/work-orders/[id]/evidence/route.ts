@@ -10,6 +10,8 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/h
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
 const MAX_BYTES = 20 * 1024 * 1024;
 const BUCKET = 'maintenance-work-order-evidence';
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+const WEB_PREVIEW_TYPES = new Set(['image/heic', 'image/heif']);
 async function authorize(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
@@ -78,9 +80,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const evidence = await Promise.all((data || []).map(async (row) => {
-    const { data: signed } = await context.supabase.storage
-      .from(row.storage_bucket)
-      .createSignedUrl(row.storage_path, 900);
+    const bucket = context.supabase.storage.from(row.storage_bucket);
+    const needsWebPreview = WEB_PREVIEW_TYPES.has(String(row.mime_type || '').toLowerCase());
+
+    const [originalResult, downloadResult, previewResult, thumbnailResult] = await Promise.all([
+      bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS),
+      bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, { download: true }),
+      needsWebPreview
+        ? bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, {
+            transform: { width: 1600, height: 1600, resize: 'contain', quality: 86 },
+          })
+        : Promise.resolve({ data: null, error: null }),
+      needsWebPreview
+        ? bucket.createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS, {
+            transform: { width: 320, height: 240, resize: 'cover', quality: 74 },
+          })
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    const originalUrl = originalResult.data?.signedUrl || null;
+    const downloadUrl = downloadResult.data?.signedUrl || originalUrl;
+    const previewUrl = needsWebPreview
+      ? previewResult.data?.signedUrl || null
+      : originalUrl;
+    const thumbnailUrl = needsWebPreview
+      ? thumbnailResult.data?.signedUrl || previewUrl
+      : originalUrl;
+
     return {
       id: row.id,
       evidence_type: row.evidence_type,
@@ -90,10 +116,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       notes: row.notes,
       captured_at: row.captured_at,
       created_at: row.created_at,
-      signed_url: signed?.signedUrl || null,
+      signed_url: previewUrl,
+      preview_url: previewUrl,
+      thumbnail_url: thumbnailUrl,
+      original_url: originalUrl,
+      download_url: downloadUrl,
+      preview_transformed: needsWebPreview,
+      preview_error: needsWebPreview && !previewUrl ? previewResult.error?.message || 'No se pudo generar vista web.' : null,
     };
   }));
-  return NextResponse.json({ evidence });
+  return NextResponse.json(
+    {
+      evidence,
+      signedUrlTtlSeconds: SIGNED_URL_TTL_SECONDS,
+      generatedAt: new Date().toISOString(),
+    },
+    { headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
+  );
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

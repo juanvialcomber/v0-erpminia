@@ -17,3 +17,11 @@ test('OT print includes every signed evidence image with 2 large and rest thumbn
 });
 
 test('A4 photographic evidence uses enlarged print slots',()=>{assert.match(source,/height: 250px !important/);assert.match(source,/height: 125px !important/);assert.match(source,/ot-print-thumbs mt-3 grid grid-cols-3/);});
+
+
+test('OT print uses refreshed web-safe photo previews instead of expiring raw HEIC urls',()=>{
+ assert.match(source,/refreshInterval: 10 \* 60 \* 1000/);
+ assert.match(source,/revalidateOnFocus: true/);
+ assert.match(source,/revalidateOnReconnect: true/);
+ assert.match(source,/photo\.preview_url \|\| photo\.signed_url \|\| null/);
+});
