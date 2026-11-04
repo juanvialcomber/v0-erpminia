@@ -6,7 +6,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
 type PartActionPayload = {
-  action?: 'issue_reserved' | 'install' | 'return';
+  action?: 'install' | 'return';
   partRecordId?: string;
   partId?: string;
   quantity?: number | string;
@@ -25,16 +25,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
     const body = (await request.json()) as PartActionPayload;
-
-    if (body.action === 'issue_reserved') {
-      const { data, error } = await context.supabase.rpc('issue_available_materials_to_work_order_v2', {
-        p_organization_id: context.organizationId,
-        p_work_order_id: workOrderId,
-      });
-      if (error) throw error;
-      return NextResponse.json({ data, issuedReserved: true }, { status: 201 });
-    }
-
     const quantity = Number(body.quantity || 0);
     if (!body.partId || !Number.isInteger(quantity) || quantity <= 0) return NextResponse.json({ error: 'Selecciona un repuesto y una cantidad entera mayor que cero' }, { status: 400 });
 
@@ -124,7 +114,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const [{ data: parts, error: partsError }, { data: movements, error: movementError }, costResult] = await Promise.all([
       context.supabase.from('work_order_parts').select('id, canonical_product_id, warehouse_stock_id, quantity_requested, quantity_reserved, quantity_issued, quantity_installed, quantity_returned, unit_cost, total_cost, status, notes, created_at').eq('organization_id', context.organizationId).eq('work_order_id', workOrderId).order('created_at', { ascending: false }),
-      context.supabase.from('stock_movements').select('id, stock_id, movement_type, quantity, unit_cost, total_cost, notes, created_at').eq('organization_id', context.organizationId).eq('work_order_id', workOrderId).order('created_at', { ascending: false }),
+      context.supabase.from('stock_movements').select('id, stock_id, movement_type, quantity, unit_cost, total_cost, notes, created_at, canonical_product_id, reference_doc, reference_id').eq('organization_id', context.organizationId).eq('work_order_id', workOrderId).order('created_at', { ascending: false }),
       context.supabase.rpc('get_work_order_cost_summary', { p_organization_id: context.organizationId, p_work_order_id: workOrderId }),
     ]);
     if (partsError) throw partsError;
