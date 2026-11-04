@@ -33,6 +33,13 @@ type Usage = {
   cost_state: 'source' | 'derived' | 'unavailable';
   warehouse_code: string | null;
   used_at: string;
+  linked_waste?: {
+    id: string;
+    waste_name: string;
+    quantity: number | string;
+    unit: string;
+    status: 'generated' | 'stored' | 'removed' | 'closed';
+  } | null;
 };
 
 function money(value: unknown) {
@@ -68,6 +75,9 @@ export function WorkOrderFluidUsagePanel({ workOrderId, readOnly = false }: { wo
           fluid_name: form.get('fluid_name') || null,
           quantity_liters: Number(form.get('quantity_liters')),
           inventory_units_used: form.get('inventory_units_used') ? Number(form.get('inventory_units_used')) : null,
+          recovered_waste_liters: form.get('recovered_waste_liters') ? Number(form.get('recovered_waste_liters')) : null,
+          linked_waste_code: form.get('linked_waste_code') || null,
+          waste_storage_location: form.get('waste_storage_location') || null,
           notes: form.get('notes') || null,
         }),
       });
@@ -75,7 +85,9 @@ export function WorkOrderFluidUsagePanel({ workOrderId, readOnly = false }: { wo
       if (!response.ok) throw new Error(payload?.error || 'No se pudo registrar el fluido.');
       event.currentTarget.reset();
       setOpen(false);
-      setMessage('Uso de fluido registrado. Bodega no fue modificada.');
+      setMessage(payload?.linkedWasteCreated
+        ? 'Uso de fluido y residuo vinculado registrados. Bodega no fue modificada.'
+        : 'Uso de fluido registrado. Bodega no fue modificada.');
       await mutate();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo registrar el fluido.');
@@ -112,6 +124,26 @@ export function WorkOrderFluidUsagePanel({ workOrderId, readOnly = false }: { wo
               <div className="space-y-2"><Label htmlFor="fluid-liters">Litros usados</Label><Input id="fluid-liters" name="quantity_liters" type="number" min="0.001" step="0.001" required /></div>
               <div className="space-y-2"><Label htmlFor="fluid-units">Unidades Bodega</Label><Input id="fluid-units" name="inventory_units_used" type="number" min="0.001" step="0.001" placeholder="Opcional" /></div>
             </div>
+            <div className="grid gap-4 rounded-md border border-dashed p-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="fluid-waste-liters">Residuo recuperado (L)</Label>
+                <Input id="fluid-waste-liters" name="recovered_waste_liters" type="number" min="0.001" step="0.001" placeholder="Opcional" />
+                <p className="text-[11px] text-muted-foreground">No se infiere desde los litros cargados; registra sólo lo realmente recuperado.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fluid-waste-type">Tipo de residuo</Label>
+                <select id="fluid-waste-type" name="linked_waste_code" defaultValue="used_oil" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="used_oil">Aceite usado</option>
+                  <option value="hydraulic_fluid">Fluido hidráulico usado</option>
+                  <option value="coolant">Refrigerante usado</option>
+                  <option value="brake_fluid">Líquido de frenos usado</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fluid-waste-location">Ubicación inicial</Label>
+                <Input id="fluid-waste-location" name="waste_storage_location" placeholder="Ej. Tambor / taller" />
+              </div>
+            </div>
             <div className="space-y-2"><Label htmlFor="fluid-notes">Nota</Label><Input id="fluid-notes" name="notes" /></div>
             <div className="flex gap-2"><Button type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Button><Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button></div>
           </form>
@@ -124,9 +156,20 @@ export function WorkOrderFluidUsagePanel({ workOrderId, readOnly = false }: { wo
 
         {rows.map((row) => (
           <div key={row.id} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-            <div><p className="font-medium">{row.fluid_name}</p><p className="text-xs text-muted-foreground">{row.warehouse_code || 'Sin Bodega vinculada'}</p></div>
+            <div>
+              <p className="font-medium">{row.fluid_name}</p>
+              <p className="text-xs text-muted-foreground">{row.warehouse_code || 'Sin Bodega vinculada'}</p>
+              {row.linked_waste ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Residuo vinculado: {row.linked_waste.waste_name} · {Number(row.linked_waste.quantity).toLocaleString('es-CL')} {row.linked_waste.unit} · {row.linked_waste.status}
+                </p>
+              ) : null}
+            </div>
             <p className="text-sm tabular-nums">{Number(row.quantity_liters).toLocaleString('es-CL')} L</p>
-            <Badge variant="outline">{row.cost_state === 'unavailable' ? 'Costo N/D' : money(row.total_cost)}</Badge>
+            <div className="flex flex-wrap justify-end gap-2">
+              {row.linked_waste ? <Badge variant="secondary">Residuo vinculado</Badge> : null}
+              <Badge variant="outline">{row.cost_state === 'unavailable' ? 'Costo N/D' : money(row.total_cost)}</Badge>
+            </div>
           </div>
         ))}
       </CardContent>
