@@ -178,7 +178,7 @@ async function recordCreationScopeContext(
 ) {
   const { error } = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
-    user_id: context.userId,
+    user_id: context.authUserId,
     action: 'maintenance_ot_create_context',
     resource_type: 'maintenance_work_order',
     resource_identifier: workOrder.id,
@@ -206,7 +206,7 @@ async function recordAdminInteractionTiming(
 
   const { error } = await context.supabase.from('audit_log').insert({
     organization_id: context.organizationId,
-    user_id: context.userId,
+    user_id: context.authUserId,
     action: 'maintenance_ot_create_interaction',
     resource_type: 'maintenance_work_order',
     resource_identifier: workOrderId,
@@ -471,8 +471,8 @@ export async function POST(request: NextRequest) {
       if (!assetRow) return NextResponse.json({ error: 'Equipo no encontrado o inactivo' }, { status: 404 });
       asset = assetRow as CanonicalAssetRow;
       if (workshopScope.isWorkshopHead) {
-        const { data: canonicalAsset, error: siteError } = await context.supabase.schema('canonical')
-          .from('assets').select('location')
+        const { data: canonicalAsset, error: siteError } = await context.supabase
+          .from('canonical_assets_current').select('location')
           .eq('organization_id', context.organizationId)
           .eq('id', canonicalAssetId).maybeSingle();
         if (siteError) throw siteError;
