@@ -108,6 +108,7 @@ test('mechanic work order inbox retains completed and pending-supervisor orders'
   assert.match(workOrdersUi, /viewerContext\.mode === 'execution'\) setViewFilter\('all'\)/);
   assert.match(workOrdersUi, /Tus OT cerradas siguen aquí/);
   assert.match(workOrdersUi, /isExecutorView \? 'Ver cierre' : t\.approval\.review/);
+  assert.match(workOrdersUi, /approved \? t\.approval\.record/);
   assert.match(workOrdersUi, /viewFilter === 'all'\s*\? operational/);
   assert.match(workOrdersUi, /pendingApproval = completedOrders\.filter/);
   assert.match(workOrdersUi, /setViewFilter\(isExecutorView \? 'all' : 'active'\)/);
