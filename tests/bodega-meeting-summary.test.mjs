@@ -14,7 +14,8 @@ test('bodega meeting summary exposes state differences and decision',()=>{
 });
 
 test('bodega summary preserves human reconciliation boundary',()=>{
-  assert.match(page,/antes de ajustar stock, comprometer disponibilidad o disparar compras/);
+  assert.match(page,/deuda de snapshot se resuelve usando Laudus como fuente vigente/);
+  assert.match(page,/conflictos contemporáneos requieren revisión humana/);
   assert.match(page,/reconciliationSummary/);
   assert.match(page,/No se reemplaza una conciliación ausente por cero/);
 });
