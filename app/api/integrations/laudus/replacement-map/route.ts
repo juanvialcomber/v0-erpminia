@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       context.supabase.from('procurement_sii_dte_imports').select('id', { count: 'exact', head: true }).eq('organization_id', context.organizationId),
       context.supabase.from('laudus_accounting_entries_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', context.organizationId),
       context.supabase.from('laudus_accounting_management_summary_v1').select('*').eq('organization_id', context.organizationId).maybeSingle(),
+      context.supabase.rpc('motil_laudus_invoice_trace_coverage', { p_organization_id: context.organizationId }),
     ]);
 
     const value = <T,>(index: number): T | null => {
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
     const dtes = value<any>(7);
     const accountingEntries = value<any>(8);
     const accountingSummary = value<any>(9);
+    const invoiceTraceCoverage = value<any>(10);
 
     const poRows = poReview?.data || [];
     const invoiceRows = invoices?.data || [];
@@ -51,6 +53,12 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().slice(0,10);
     const accountingTotal = accountingEntries?.count || 0;
     const accountingWithLines = Number(accountingSummary?.data?.entries_with_lines || 0);
+    const traceCoverage = invoiceTraceCoverage?.data || {};
+    const invoiceTraceRemaining = Math.max(
+      Number(traceCoverage?.invoices_total || invoiceRows.length || 0)
+      - Number(traceCoverage?.invoices_scanned || 0),
+      0,
+    );
 
     const domains = [
       {
@@ -80,9 +88,9 @@ export async function GET(request: NextRequest) {
       {
         key: 'invoices',
         label: 'Facturas',
-        state: 'transition',
-        detail: 'Facturas Laudus están disponibles como evidencia; el workflow MOTIL permanece separado hasta conciliación.',
-        blockers: invoiceRows.filter((row:any)=>['unpaid','partially_paid'].includes(String(row.payment_status))).length,
+        state: invoiceTraceRemaining === 0 ? 'operational' : 'transition',
+        detail: 'Facturas Laudus están disponibles como evidencia; falta persistir trazabilidad recepción↔factura antes de retirar Laudus de este control.',
+        blockers: invoiceTraceRemaining,
         actionHref: '/dashboard/compras/facturas',
       },
       {
