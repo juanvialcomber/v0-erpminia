@@ -1,5 +1,6 @@
 'use client';
 import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
+import { workOrderScopeViolation } from '@/lib/maintenance/work-order-scope.mjs';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -133,6 +134,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const initialAssetId = searchParams.get('assetId') || '';
   const reviewId = searchParams.get('reviewId') || '';
   const emergencyMode = searchParams.get('mode') === 'emergency' || searchParams.get('workType') === 'emergency';
+  const initialGeneralWork = !emergencyMode && searchParams.get('workType') === 'general';
   const [assignedPersonId, setAssignedPersonId] = useState('');
   const [canonicalAssetId, setCanonicalAssetId] = useState(initialAssetId);
   const [assetQuery, setAssetQuery] = useState('');
@@ -142,7 +144,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [materialQuantity, setMaterialQuantity] = useState('1');
   const [plannedMaterials, setPlannedMaterials] = useState<PlannedMaterial[]>([]);
   const [workType, setWorkType] = useState(emergencyMode ? 'emergency' : (searchParams.get('workType') || 'corrective'));
-  const [generalWork, setGeneralWork] = useState(!emergencyMode && searchParams.get('workType') === 'general');
+  const [generalWork, setGeneralWork] = useState(initialGeneralWork);
+  const [generalWorkConfirmed, setGeneralWorkConfirmed] = useState(initialGeneralWork);
   const [priority, setPriority] = useState(emergencyMode ? 'critical' : (searchParams.get('priority') || 'medium'));
   const [scheduledDate, setScheduledDate] = useState(searchParams.get('scheduledDate') || chileTodayDateKey());
   const [plannedHours, setPlannedHours] = useState(searchParams.get('plannedDurationHours') || '');
@@ -224,10 +227,12 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
 
   const validate = () => {
     if (!assignedPersonId) return emergencyMode ? 'No se pudo vincular tu perfil operativo a la OTe' : 'Selecciona primero al responsable de la OT';
-    if (emergencyMode && !canonicalAssetId) return 'Selecciona el equipo afectado por la emergencia';
+    const scopeViolation = workOrderScopeViolation({ canonicalAssetId, isGeneralWork: generalWork, generalWorkConfirmed });
+    if (scopeViolation === 'GENERAL_WITH_ASSET') return 'Quita el equipo antes de cambiar a trabajo general del taller';
+    if (scopeViolation === 'GENERAL_NOT_CONFIRMED') return 'Confirma explícitamente que es un trabajo general del taller';
+    if (scopeViolation === 'ASSET_REQUIRED') return emergencyMode ? 'Selecciona el equipo afectado por la emergencia' : t.validation.assetRequired;
     if (emergencyMode && !detectedAt) return 'Indica cuándo se detectó la emergencia';
     if (emergencyMode && !Number.isFinite(new Date(detectedAt).getTime())) return 'La hora de detección no es válida';
-    if (!generalWork && !canonicalAssetId) return t.validation.assetRequired;
     if (review && review.canonical_asset_id !== canonicalAssetId) return t.validation.reviewAssetMismatch;
     if (!title.trim()) return t.validation.titleRequired;
     if (!scheduledDate) return t.validation.dateRequired;
@@ -238,6 +243,9 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   };
 
   const chooseAsset = (asset: Asset) => {
+    setGeneralWork(false);
+    setGeneralWorkConfirmed(false);
+    if (workType === 'general') setWorkType('corrective');
     setCanonicalAssetId(asset.id);
     setAssetQuery(asset.name);
   };
@@ -270,6 +278,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
     const requestPayload = {
       assignedPersonId,
       canonicalAssetId: generalWork ? null : canonicalAssetId,
+      generalWorkConfirmed: generalWork ? generalWorkConfirmed : false,
       reviewId: reviewId || null,
       title: title.trim(),
       description: description.trim() || null,
@@ -422,8 +431,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
         </CardHeader>
         <CardContent className="space-y-5">
           {!reviewId && !emergencyMode ? <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant={!generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(false); if (workType === 'general') setWorkType('corrective'); }}>En equipo</Button>
-            <Button type="button" variant={generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(true); setCanonicalAssetId(''); setAssetQuery(''); setWorkType('general'); }}>Trabajo general del taller</Button>
+            <Button type="button" variant={!generalWork ? 'default' : 'outline'} onClick={() => { setGeneralWork(false); setGeneralWorkConfirmed(false); if (workType === 'general') setWorkType('corrective'); }}>En equipo</Button>
+            <Button type="button" variant={generalWork ? 'default' : 'outline'} onClick={() => { if (canonicalAssetId) { toast.error('Quita el equipo seleccionado antes de cambiar a trabajo general del taller'); return; } setGeneralWork(true); setGeneralWorkConfirmed(true); setWorkType('general'); }}>Trabajo general del taller</Button>
           </div> : null}
           {!generalWork ? <div className="space-y-2">
             <Label htmlFor="asset-search">Equipo</Label>
@@ -473,7 +482,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label>{t.fields.workType}</Label>
-              <Select value={workType} onValueChange={setWorkType} disabled={emergencyMode}>
+              <Select value={workType} onValueChange={setWorkType} disabled={emergencyMode || generalWork}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="corrective">{t.workTypes.corrective}</SelectItem>
