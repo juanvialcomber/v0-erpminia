@@ -275,6 +275,39 @@ export async function GET(request: NextRequest) {
       // Warehouse staging is optional until Laudus warehouse intake exists.
     }
 
+    try {
+      const negativeLaudusPositions = await fetchAll((from, to) => context.supabase
+        .from('laudus_negative_stock_positions_service_v1')
+        .select('canonical_product_id,sku,description,unit_of_measure,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
+        .eq('organization_id', context.organizationId)
+        .range(from, to));
+
+      for (const row of negativeLaudusPositions) {
+        const sku = text(row.sku);
+        const warehouseCode = text(row.warehouse_external_id);
+        if (!sku || !warehouseCode) continue;
+        const quantity = Number(row.warehouse_stock);
+        const quantityLabel = Number.isFinite(quantity) ? quantity.toLocaleString('es-CL') : '—';
+        const unit = text(row.unit_of_measure);
+        const warehouse = [warehouseCode, text(row.warehouse_name)].filter(Boolean).join(' · ');
+        const sourceAt = text(row.source_date_to || row.synced_at);
+
+        addIssue(issues, {
+          issue_key: `laudus_negative_stock:${norm(sku)}:${warehouseCode}`,
+          entity_type: 'inventory',
+          entity_id: row.canonical_product_id || null,
+          issue_type: 'global_negative_stock',
+          field_name: 'quantity',
+          severity: 'critical',
+          label: `${sku} · ${text(row.description) || 'Stock Laudus negativo'}`,
+          detail: `Laudus reporta ${quantityLabel}${unit ? ' ' + unit : ''} en ${warehouse || 'bodega sin identificar'}. Requiere revisar Kardex, movimientos, recepciones, consumos o conteos; MOTIL no corrige el saldo automáticamente.${sourceAt ? ' Evidencia fuente: ' + sourceAt + '.' : ''}`,
+          href: '/dashboard/bodega?status=negative',
+        });
+      }
+    } catch {
+      // Negative Laudus stock projection is optional until its service view is deployed.
+    }
+
     const productIds = new Set(products.map((row) => row.id));
     const assetIds = new Set(assets.map((row) => row.id));
     const peopleIds = new Set(people.map((row) => row.id));
