@@ -37,6 +37,104 @@ export async function GET(request: NextRequest) {
     if (supplierError) throw supplierError;
 
     const orderFilter = `canonical_supplier_id.eq.${supplierId}${supplier.tax_id ? `,supplier_tax_id.eq.${supplier.tax_id}` : ''}`;
+
+    const [{ data: laudusSupplier, error: laudusSupplierError }, { data: laudusHealth, error: laudusHealthError }] = await Promise.all([
+      context.supabase
+        .from('laudus_suppliers_service_v1')
+        .select('external_id,reconciliation_status,synced_at')
+        .eq('organization_id', context.organizationId)
+        .eq('canonical_supplier_id', supplierId)
+        .order('synced_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      context.supabase
+        .from('laudus_sync_health_service_v1')
+        .select('domain,health_status,last_success_at,consecutive_failures,open_incidents')
+        .eq('organization_id', context.organizationId)
+        .in('domain', ['suppliers','procurement']),
+    ]);
+    if (laudusSupplierError) throw laudusSupplierError;
+    if (laudusHealthError) throw laudusHealthError;
+
+    let laudusFinancial: Record<string, unknown> = {
+      linked: false,
+      coverage: { totalRows: 0, returnedRows: 0, complete: true },
+      summaryByCurrency: [],
+      invoices: [],
+      supplierSyncAt: null,
+      sourceHealth: laudusHealth || [],
+      readOnly: true,
+      canonicalMutated: false,
+    };
+
+    if (laudusSupplier?.external_id) {
+      const { data: laudusInvoices, error: laudusInvoicesError, count: laudusInvoiceCount } = await context.supabase
+        .from('laudus_purchase_invoice_payment_status_service_v1')
+        .select('purchase_invoice_external_id,doc_number,issued_date,due_date,total_amount,currency,paid_amount,outstanding_amount,payment_count,last_payment_at,payment_status', { count: 'exact' })
+        .eq('organization_id', context.organizationId)
+        .eq('supplier_external_id', laudusSupplier.external_id)
+        .order('issued_date', { ascending: false })
+        .limit(1000);
+      if (laudusInvoicesError) throw laudusInvoicesError;
+
+      const rows = laudusInvoices || [];
+      const totalRows = Number(laudusInvoiceCount ?? rows.length);
+      const complete = totalRows <= rows.length;
+      const byCurrency = new Map<string, {
+        currency: string;
+        invoiceCount: number;
+        totalAmount: number;
+        paidAmount: number;
+        outstandingAmount: number;
+        overdueAmount: number;
+        overdueInvoices: number;
+        latestInvoiceAt: string | null;
+        latestPaymentAt: string | null;
+      }>();
+
+      for (const row of rows) {
+        const currency = String(row.currency || '').trim();
+        if (!currency) continue;
+        const current = byCurrency.get(currency) || {
+          currency,
+          invoiceCount: 0,
+          totalAmount: 0,
+          paidAmount: 0,
+          outstandingAmount: 0,
+          overdueAmount: 0,
+          overdueInvoices: 0,
+          latestInvoiceAt: null,
+          latestPaymentAt: null,
+        };
+        current.invoiceCount += 1;
+        current.totalAmount += Number(row.total_amount || 0);
+        current.paidAmount += Number(row.paid_amount || 0);
+        current.outstandingAmount += Number(row.outstanding_amount || 0);
+        const dueAt = row.due_date ? Date.parse(row.due_date) : Number.NaN;
+        const outstanding = Number(row.outstanding_amount || 0);
+        if (Number.isFinite(dueAt) && dueAt < Date.now() && outstanding > 0) {
+          current.overdueAmount += outstanding;
+          current.overdueInvoices += 1;
+        }
+        if (row.issued_date && (!current.latestInvoiceAt || Date.parse(row.issued_date) > Date.parse(current.latestInvoiceAt))) current.latestInvoiceAt = row.issued_date;
+        if (row.last_payment_at && (!current.latestPaymentAt || Date.parse(row.last_payment_at) > Date.parse(current.latestPaymentAt))) current.latestPaymentAt = row.last_payment_at;
+        byCurrency.set(currency, current);
+      }
+
+      laudusFinancial = {
+        linked: true,
+        supplierExternalId: laudusSupplier.external_id,
+        reconciliationStatus: laudusSupplier.reconciliation_status || null,
+        supplierSyncAt: laudusSupplier.synced_at || null,
+        sourceHealth: laudusHealth || [],
+        coverage: { totalRows, returnedRows: rows.length, complete },
+        summaryByCurrency: complete ? Array.from(byCurrency.values()).sort((a,b) => a.currency.localeCompare(b.currency)) : [],
+        invoices: rows.slice(0, 20),
+        readOnly: true,
+        canonicalMutated: false,
+      };
+    }
+
     const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult] = await Promise.all([
       context.supabase.from('canonical_purchase_orders_v1').select('id, order_number, order_date, total_amount, currency, status, operational_status, expected_delivery_date, supplier_tax_id').eq('organization_id', context.organizationId).or(orderFilter).order('order_date', { ascending: false }).limit(100),
       context.supabase.from('canonical_supplier_quotations_v1').select('id, quotation_number, quotation_date, valid_until, total_amount, currency, lead_time_days, payment_terms, status').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('quotation_date', { ascending: false }).limit(100),
@@ -89,6 +187,7 @@ export async function GET(request: NextRequest) {
       invoices: invoicesResult.data || [],
       returns: returnsResult.data || [],
       suppliedProducts: Array.from(productMap.values()).sort((a, b) => b.spend - a.spend).slice(0, 100),
+      laudusFinancial,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la ficha del proveedor.';
