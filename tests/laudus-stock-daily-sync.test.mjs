@@ -23,12 +23,14 @@ test('daily stock sync retries only transient Laudus failures with a hard attemp
   assert.match(helper, /attempt === 2/);
 });
 
-test('daily stock sync reads physical warehouses before staging', () => {
+test('daily stock sync reads all stock-bearing Laudus warehouses before staging', () => {
   const readPhase = helper.indexOf('const snapshots: Snapshot[]');
   const stagePhase = helper.indexOf("motil_ingest_laudus_product_stock");
   assert.ok(readPhase >= 0 && stagePhase > readPhase);
-  assert.match(helper, /physicalWarehouseIds/);
-  assert.match(helper, /Read every physical warehouse before staging anything/);
+  assert.match(helper, /stockBearingWarehouseIds/);
+  for (const id of ['001','002','003','004','005','006']) assert.match(helper,new RegExp("'" + id + "'"));
+  assert.doesNotMatch(helper, /'007'/);
+  assert.match(helper, /Read every stock-bearing warehouse before staging anything/);
 });
 
 test('daily stock sync batches staging at 500 and finalizes last non-empty batch', () => {
