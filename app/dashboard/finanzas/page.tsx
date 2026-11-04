@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
 import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
+import { MotilFinanceOperatingCockpit } from '@/components/finance/motil-finance-operating-cockpit';
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
 
 const primarySections = [
@@ -34,9 +34,25 @@ export default function FinancePage() {
         </div>
       </section>
 
-      <LaudusFinanceStatusStrip />
-      <LaudusFinanceControlCard />
+      <MotilFinanceOperatingCockpit />
       <AssetCandidateReviewSignal />
+
+      <details className="rounded-lg border bg-card">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Fuente Laudus</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Solo lectura · contraste financiero y tributario cuando haga falta</p>
+          </div>
+          <span className="text-xs text-muted-foreground">Ver estado</span>
+        </summary>
+        <div className="space-y-3 border-t p-4">
+          <LaudusFinanceStatusStrip compact />
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Link href="/dashboard/calidad-datos/laudus" className="rounded-md border px-3 py-2 hover:bg-muted">Incidencias Laudus</Link>
+            <Link href="/dashboard/finanzas/trazabilidad" className="rounded-md border px-3 py-2 hover:bg-muted">Trazabilidad</Link>
+          </div>
+        </div>
+      </details>
 
       <section className="space-y-3" aria-label="Secciones de Finanzas">
         <div className="flex items-end justify-between gap-3 border-t pt-5">
