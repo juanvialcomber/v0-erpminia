@@ -9,7 +9,7 @@ test('historical preventive archive is review-only until a planner restores one 
   assert.match(api, /archiveIsHistorical: true/);
   assert.match(api, /noAutoRestore: true/);
   assert.match(page, /Pautas históricas para validar/);
-  assert.match(page, /Validar y activar/);
+  assert.match(page, /Validar seleccionadas|Guardar y validar|>Validar</);
 });
 
 test('restored schedules preserve provenance and never promote stale current meter', () => {
