@@ -115,10 +115,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
     );
   }, [query, stockItems]);
 
-  const reservedUnits = deliveredParts.reduce((sum, part) => sum + (part.status === 'reserved' ? Number(part.quantity_reserved || 0) : 0), 0);
-  const reservedLines = deliveredParts.filter((part) => part.status === 'reserved' && Number(part.quantity_reserved || 0) > 0).length;
   const purchaseReceivedProducts = new Set(movements.filter((movement) => movement.movement_type === 'receipt' && movement.reference_doc === 'operational_receipt' && movement.canonical_product_id).map((movement) => String(movement.canonical_product_id)));
-  const purchaseReservedUnits = deliveredParts.reduce((sum, part) => sum + (part.status === 'reserved' && part.canonical_product_id && purchaseReceivedProducts.has(part.canonical_product_id) ? Number(part.quantity_reserved || 0) : 0), 0);
   const selectedPart = stockItems.find((item) => item.id === selectedPartId);
   const selectedAvailable = Number(
     selectedPart?.quantity_available ??
@@ -152,25 +149,6 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
       await refreshAll();
     } catch (actionError) {
       setErrorMessage(actionError instanceof Error ? actionError.message : 'No se pudo entregar el repuesto');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const issueReserved = async () => {
-    if (reservedUnits <= 0) return;
-    setSubmitting(true);
-    setErrorMessage(null);
-    try {
-      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/issue-materials`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'No se pudieron entregar las reservas a la OT');
-      await refreshAll();
-    } catch (actionError) {
-      setErrorMessage(actionError instanceof Error ? actionError.message : 'No se pudieron entregar las reservas a la OT');
     } finally {
       setSubmitting(false);
     }
@@ -224,20 +202,8 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Registros de trabajo abiertos</p><p className="mt-1 font-medium">{Number(costs.openLaborEntries || 0)}</p></div>
         </div>
 
-        {reservedUnits > 0 ? <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium">Material reservado para esta OT</p>
-              <p className="mt-1 text-xs text-muted-foreground">{reservedLines} línea(s) · {reservedUnits} unidad(es). {purchaseReservedUnits > 0 ? `${purchaseReservedUnits} unidad(es) provienen de una recepción de compra vinculada a esta OT. ` : ''}Falta confirmar la entrega al ejecutor.</p>
-            </div>
-            <Button onClick={() => void issueReserved()} disabled={submitting}>
-              {submitting ? 'Entregando…' : 'Entregar reservas a la OT'}
-            </Button>
-          </div>
-        </section> : null}
-
         <section className="space-y-4 rounded-lg border p-4">
-          <div><h3 className="font-medium">Entregar desde bodega</h3><p className="mt-1 text-sm text-muted-foreground">La entrega descuenta existencias y queda vinculada a esta orden. Si el repuesto llegó por una compra de esta OT, usa primero la reserva automática de arriba.</p></div>
+          <div><h3 className="font-medium">Entregar desde bodega</h3><p className="mt-1 text-sm text-muted-foreground">Entrega manual para repuestos adicionales. Las reservas de materiales requeridos se gestionan en “Materiales de la OT”.</p></div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2"><Label htmlFor={`part-search-${workOrderId}`}>Buscar repuesto</Label><Input id={`part-search-${workOrderId}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Código, nombre o ubicación" /></div>
             <div className="space-y-2"><Label htmlFor={`part-quantity-${workOrderId}`}>Cantidad a entregar</Label><Input id={`part-quantity-${workOrderId}`} type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value || 1))} /></div>
@@ -263,7 +229,8 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
             const pending = Math.max(0, issued - installed - returned);
             const name = part.part?.part_name || part.part?.name || 'Repuesto';
             const code = part.part?.part_code || part.part?.product_code || 'Sin código';
-            return <div key={part.id} className="rounded-lg border p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{name}</p><Badge variant="outline">{code}</Badge>{reserved > 0 ? <Badge variant="outline">{reserved} reservado{reserved === 1 ? '' : 's'}</Badge> : pending === 0 ? <Badge variant="secondary">Confirmado</Badge> : <Badge variant="outline">{pending} pendiente{pending === 1 ? '' : 's'}</Badge>}</div><p className="mt-2 text-sm text-muted-foreground">Reservado: {reserved} · Entregado: {issued} · Instalado: {installed} · Devuelto: {returned}</p><p className="mt-1 text-sm">Costo utilizado: {money(installed * Number(part.unit_cost || 0))}</p></div>{pending > 0 ? <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void updatePart(part, 'install')} disabled={workingId !== null}><CheckCircle2 className="mr-2 h-4 w-4" />{workingId === `install-${part.id}` ? 'Confirmando…' : 'Confirmar instalación'}</Button><Button size="sm" variant="outline" onClick={() => void updatePart(part, 'return')} disabled={workingId !== null}><RotateCcw className="mr-2 h-4 w-4" />{workingId === `return-${part.id}` ? 'Devolviendo…' : 'Devolver a bodega'}</Button></div> : null}</div></div>;
+            const fromPurchase = Boolean(part.canonical_product_id && purchaseReceivedProducts.has(part.canonical_product_id));
+            return <div key={part.id} className="rounded-lg border p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{name}</p><Badge variant="outline">{code}</Badge>{fromPurchase ? <Badge variant="outline">Compra recibida</Badge> : null}{reserved > 0 ? <Badge variant="outline">{reserved} reservado{reserved === 1 ? '' : 's'}</Badge> : pending === 0 ? <Badge variant="secondary">Confirmado</Badge> : <Badge variant="outline">{pending} pendiente{pending === 1 ? '' : 's'}</Badge>}</div><p className="mt-2 text-sm text-muted-foreground">Reservado: {reserved} · Entregado: {issued} · Instalado: {installed} · Devuelto: {returned}</p><p className="mt-1 text-sm">Costo utilizado: {money(installed * Number(part.unit_cost || 0))}</p></div>{pending > 0 ? <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void updatePart(part, 'install')} disabled={workingId !== null}><CheckCircle2 className="mr-2 h-4 w-4" />{workingId === `install-${part.id}` ? 'Confirmando…' : 'Confirmar instalación'}</Button><Button size="sm" variant="outline" onClick={() => void updatePart(part, 'return')} disabled={workingId !== null}><RotateCcw className="mr-2 h-4 w-4" />{workingId === `return-${part.id}` ? 'Devolviendo…' : 'Devolver a bodega'}</Button></div> : null}</div></div>;
           })}
         </section>
 
