@@ -42,10 +42,9 @@ test('commercial sync remains admin controlled and usage-tracked without automat
 });
 
 
-test('sales receipts select receipt type leaf fields and keep modifiedAt ordering', () => {
-  assert.match(sync, /'receiptType\.code'/);
-  assert.match(sync, /'receiptType\.description'/);
-  assert.doesNotMatch(sync, /'receiptId','receiptType','issuedDate'/);
+test('sales receipts use a proven one-row header contract', () => {
+  assert.match(sync, /fields:\s*\['receiptId','issuedDate','modifiedAt'\]/);
   assert.doesNotMatch(sync, /salesInvoices\.itemId/);
+  assert.doesNotMatch(sync, /receiptType\.code/);
   assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'modifiedAt'/);
 });
