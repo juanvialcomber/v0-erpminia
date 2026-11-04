@@ -6,7 +6,10 @@ const strip = fs.readFileSync('components/integrations/laudus-finance-status-str
 const finance = fs.readFileSync('app/dashboard/finanzas/page.tsx','utf8');
 const home = fs.readFileSync('components/dashboard/dashboard-home.tsx','utf8');
 
-test('finance exposes Laudus as the financial source above the cockpit', () => {
+test('finance keeps Laudus visible but secondary to the MOTIL operating cockpit', () => {
+  assert.match(finance, /MotilFinanceOperatingCockpit/);
+  assert.ok(finance.indexOf('MotilFinanceOperatingCockpit') < finance.indexOf('LaudusFinanceStatusStrip'));
+  assert.match(finance, /Fuente Laudus/);
   assert.match(finance, /LaudusFinanceStatusStrip/);
   assert.match(strip, /Laudus · fuente financiera/);
   assert.match(strip, /solo lectura/);
