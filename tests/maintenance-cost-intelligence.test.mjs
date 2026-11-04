@@ -31,10 +31,15 @@ test('audited cost API is managerial maintenance authorized and tenant scoped', 
   assert.match(route, /maintenance_cost_intelligence_summary_v1/);
 });
 
-test('cost workspace refuses to rank legacy zero-cost closures as audited evidence', () => {
-  assert.match(panel, /Aún no hay cierres auditados con snapshot/i);
-  assert.match(panel, /legado no usado para ranking monetario/i);
-  assert.match(panel, /no benchmarks ni scores/i);
+test('cost workspace separates audited closure from monetary cost evidence', () => {
+  assert.match(route, /maintenance_cost_intelligence_base_v1/);
+  assert.match(route, /cost_evidence_work_orders/);
+  assert.match(route, /zero_cost_snapshots/);
+  assert.match(route, /snapshots_without_cost_evidence/);
+  assert.match(route, /no prueba costo real cero/i);
+  assert.match(panel, /Con costo capturado/);
+  assert.match(panel, /costo todavía no está capturado/i);
+  assert.match(panel, /no interpreta esos ceros como costo real cero/i);
   assert.match(page, /ledger histórico importado/i);
   assert.match(page, /MaintenanceAuditedCostIntelligence/);
   assert.match(page, /MaintenanceCostsBoard/);
