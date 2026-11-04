@@ -61,3 +61,12 @@ test('inventory readiness avoids the timed-out negative count on canonical_inven
   assert.match(helper, /negative_stock_products/);
   assert.doesNotMatch(helper, /canonical_inventory_current'\)\.select\('id', \{ count: 'exact', head: true \}\)\.eq\('organization_id', organizationId\)\.lt\('quantity', 0\)/);
 });
+
+
+test('inventory readiness separates fresh stock conflicts from stale MOTIL evidence', () => {
+  assert.match(helper, /laudus_inventory_freshness_summary_service_v1/);
+  assert.match(helper, /freshMismatches1d/);
+  assert.match(helper, /staleMismatches30d/);
+  assert.match(card, /frescas/);
+  assert.match(card, />30 días más antigua/);
+});
