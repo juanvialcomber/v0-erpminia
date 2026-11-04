@@ -284,3 +284,13 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cambio: `procurement_intake_requests` incorpora `evidence_scope`; los 3 fixtures conocidos se marcan `uat` por ID exacto y el `supplier_operational_score_v2` usa sólo OCs cuyo intake es operacional.
 - Resultado esperado con la evidencia actual: 0 OCs operacionales, 0 recepciones operacionales, 0 facturas operacionales, 0 devoluciones operacionales y score `Sin evidencia` hasta que exista una compra real.
 - Valor: evita que una decisión futura de adjudicación se apoye en desempeño generado por QA. Las pruebas permanecen trazables y disponibles para validar el software.
+
+
+## 2026-11-04 — Captura diaria del Value Scorecard
+
+- Hallazgo: `motil_value_scorecard_snapshots` conservaba sólo 1 snapshot histórico, pese a que MOTIL ya dispone de OT, eventos, evidencia operacional, WhatsApp e integración Laudus suficientes para construir series temporales.
+- Cambio: se añade un cron diario protegido por `CRON_SECRET` que ejecuta `motil_capture_value_scorecard_snapshot` por organización.
+- Fecha de negocio: se calcula explícitamente en `America/Santiago` para evitar cortes UTC incorrectos.
+- Idempotencia: la función existente mantiene un único snapshot por `organization_id + snapshot_date`; reintentos del mismo día actualizan el mismo corte.
+- Semántica: el snapshot registra evidencia, decisiones, outcomes y gate de escala; no representa ahorro auditado ni ROI económico por sí mismo.
+- Próximo paso: extender el payload persistido para incorporar el bloque de mantención y decisiones humanas ya calculado por `/api/value/scorecard`, de forma que LECV tenga historia diaria transversal y no sólo finanzas/compras.
