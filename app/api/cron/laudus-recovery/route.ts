@@ -9,6 +9,7 @@ import { syncLaudusSuppliers } from '@/lib/integrations/laudus/procurement-sync'
 const RECOVERY_CALL_BUDGET = 30;
 const MINIMUM_MONTHLY_RESERVE = 200;
 const COOLDOWN_MINUTES = 30;
+const STALE_RUNNING_MINUTES = 30;
 const RECOVERABLE_DOMAINS = new Set(['accounting_entries', 'suppliers']);
 
 type HealthRow = {
@@ -16,6 +17,7 @@ type HealthRow = {
   domain: string;
   health_status: string | null;
   last_failure_at: string | null;
+  last_started_at: string | null;
   consecutive_failures: number | null;
 };
 
@@ -24,6 +26,21 @@ function cooldownElapsed(lastFailureAt: string | null) {
   const ts = new Date(lastFailureAt).getTime();
   if (!Number.isFinite(ts)) return true;
   return Date.now() - ts >= COOLDOWN_MINUTES * 60 * 1000;
+}
+
+function runningIsStale(lastStartedAt: string | null) {
+  if (!lastStartedAt) return true;
+  const ts = new Date(lastStartedAt).getTime();
+  if (!Number.isFinite(ts)) return true;
+  return Date.now() - ts >= STALE_RUNNING_MINUTES * 60 * 1000;
+}
+
+function needsRecovery(row: HealthRow) {
+  const status = String(row.health_status || '').trim().toLowerCase();
+  if (!RECOVERABLE_DOMAINS.has(String(row.domain || ''))) return false;
+  if (status === 'running') return runningIsStale(row.last_started_at);
+  if (!['broken', 'degraded', 'unknown'].includes(status)) return false;
+  return Number(row.consecutive_failures || 0) > 0 && cooldownElapsed(row.last_failure_at);
 }
 
 export async function GET(request: NextRequest) {
@@ -41,20 +58,16 @@ export async function GET(request: NextRequest) {
   const db = await createClient();
   const { data: rows, error } = await db
     .from('laudus_sync_health_service_v1')
-    .select('organization_id, domain, health_status, last_failure_at, consecutive_failures')
+    .select('organization_id, domain, health_status, last_failure_at, last_started_at, consecutive_failures')
     .in('domain', [...RECOVERABLE_DOMAINS])
-    .in('health_status', ['broken', 'degraded'])
-    .gt('consecutive_failures', 0)
+    .in('health_status', ['broken', 'degraded', 'unknown', 'running'])
     .limit(20);
 
   if (error) {
     return NextResponse.json({ error: 'No se pudo leer el estado de recuperación Laudus.' }, { status: 503 });
   }
 
-  const candidates = ((rows || []) as HealthRow[]).filter((row) =>
-    RECOVERABLE_DOMAINS.has(String(row.domain || '')) &&
-    cooldownElapsed(row.last_failure_at),
-  );
+  const candidates = ((rows || []) as HealthRow[]).filter(needsRecovery);
 
   const byOrganization = new Map<string, HealthRow[]>();
   for (const row of candidates) {
@@ -129,6 +142,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     generatedAt: new Date().toISOString(),
     cooldownMinutes: COOLDOWN_MINUTES,
+    staleRunningMinutes: STALE_RUNNING_MINUTES,
     maxPlannedCalls: RECOVERY_CALL_BUDGET,
     reserve: MINIMUM_MONTHLY_RESERVE,
     candidates: candidates.length,
