@@ -69,14 +69,32 @@ export async function GET(request: NextRequest) {
     : { data: [], error: null };
   if (assetError) return NextResponse.json({ error: assetError.message }, { status: 500 });
 
-  const { data: activeSchedules, error: activeError } = await context.supabase
-    .from('preventive_maintenance_schedules')
-    .select('id,canonical_asset_id,asset_id,task_name,frequency_hours,frequency_days')
-    .eq('organization_id', context.organizationId)
-    .limit(1000);
+  const [{ data: activeSchedules, error: activeError }, { data: runtimeReadings, error: runtimeError }] = await Promise.all([
+    context.supabase
+      .from('preventive_maintenance_schedules')
+      .select('id,canonical_asset_id,asset_id,task_name,frequency_hours,frequency_days')
+      .eq('organization_id', context.organizationId)
+      .limit(1000),
+    assetIds.length
+      ? context.supabase
+          .from('asset_runtime_readings')
+          .select('canonical_asset_id,meter_hours,recorded_at')
+          .eq('organization_id', context.organizationId)
+          .in('canonical_asset_id', assetIds.slice(0, 100))
+          .order('recorded_at', { ascending: false })
+          .limit(5000)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
   if (activeError) return NextResponse.json({ error: activeError.message }, { status: 500 });
+  if (runtimeError) return NextResponse.json({ error: runtimeError.message }, { status: 500 });
 
   const assetMap = new Map((assets || []).map((row) => [row.id, row]));
+  const latestRuntimeByAsset = new Map<string, { meterHours: number | null; recordedAt: string | null }>();
+  for (const row of runtimeReadings || []) {
+    const assetId = String(row.canonical_asset_id || '');
+    if (!assetId || latestRuntimeByAsset.has(assetId)) continue;
+    latestRuntimeByAsset.set(assetId, { meterHours: asNumber(row.meter_hours), recordedAt: row.recorded_at || null });
+  }
   const reviewMap = new Map((reviews || []).map((row) => [String(row.archive_id), row]));
   const activeKeys = new Set((activeSchedules || []).map((row) => [
     row.canonical_asset_id || row.asset_id || '',
@@ -116,6 +134,8 @@ export async function GET(request: NextRequest) {
       dismissed,
       decision: review?.decision || 'pending',
       review,
+      currentMeter: latestRuntimeByAsset.get(assetId)?.meterHours ?? null,
+      currentMeterAt: latestRuntimeByAsset.get(assetId)?.recordedAt ?? null,
     };
   });
 
