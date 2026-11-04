@@ -43,3 +43,18 @@ test('Finance routes users to the dedicated Laudus fixed asset review', async ()
   assert.match(financeCard, /\/dashboard\/finanzas\/activos-laudus/);
   assert.match(financeCard, /Revisar activos/);
 });
+
+
+test('fixed asset review records human decisions without canonical mutation', async () => {
+  const route = await readFile(new URL('../app/api/integrations/laudus/fixed-asset-review/route.ts', import.meta.url), 'utf8');
+  const ui = await readFile(new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url), 'utf8');
+  assert.match(route, /export async function POST/);
+  assert.match(route, /review_record_only/);
+  assert.match(route, /appliedToCanonical: false/);
+  assert.match(route, /laudus_fixed_asset_review_decisions/);
+  assert.doesNotMatch(route, /from\('canonical_assets_current'\).*\.update/s);
+  assert.match(ui, /Confirmar candidato/);
+  assert.match(ui, /Rechazar/);
+  assert.match(ui, /Diferir/);
+  assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
+});
