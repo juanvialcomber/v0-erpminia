@@ -48,3 +48,15 @@ test('supplier 360 exposes source freshness and health without infrastructure de
   assert.match(page,/fuente requiere revisión/);
   assert.doesNotMatch(page,/supplierExternalId|source_payload|JWT|endpoint/i);
 });
+
+
+test('supplier 360 detail minimizes canonical payload before returning it to the browser', () => {
+  assert.match(api,/\.select\('id,tax_id,legal_name,trade_name,business_activity,payment_terms,address,commune,region,country,phone,email,is_active,validation_status'\)/);
+  assert.doesNotMatch(api,/\.from\('canonical_suppliers_v1'\)[\s\S]{0,120}\.select\('\*'\)/);
+  assert.doesNotMatch(api,/source_hash|source_file|source_row|import_batch_id|source_payload/);
+});
+
+test('Laudus payment states are translated to product language', () => {
+  assert.match(page,/partially_paid: 'Pago parcial'/);
+  assert.match(page,/credit_adjustment: 'Ajuste de crédito'/);
+});
