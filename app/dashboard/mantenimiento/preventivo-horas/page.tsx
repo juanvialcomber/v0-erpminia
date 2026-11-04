@@ -164,37 +164,114 @@ export default function PreventiveHoursPage() {
     <Card className="shadow-none"><CardHeader><CardTitle className="text-lg">{focusAssetId ? 'Pautas de esta intervención' : 'Pautas horarias'}</CardTitle><CardDescription>{focusAssetId ? 'La coordinación visual no altera el ciclo ni el estado de ninguna pauta.' : 'Cada pauta conserva su vencimiento, evidencia de horómetro y trazabilidad individual.'}</CardDescription></CardHeader><CardContent className="p-0">{isLoading ? <StatePanel tone="loading" title="Cargando pauta real" className="min-h-48 border-0 bg-transparent" /> : visibleTasks.length===0 ? <StatePanel tone="neutral" title={focusAssetId?'No hay pautas en esta ventana':'No hay pautas horarias configuradas'} description={focusAssetId?'La pauta pudo haber sido planificada o el vínculo de la intervención cambió.':'MOTIL no crea frecuencias por defecto. La planificación aparecerá cuando exista una pauta fuente.'} className="min-h-48 border-0 bg-transparent" /> : <div className="divide-y">{visibleTasks.map((row:any) => { const overdue=row.hour_status==='overdue'; const review=row.hour_status==='needs_review'; const missing=row.hour_status==='missing_meter'||row.hour_status==='missing_due_meter'; const planned=Boolean(row.generated_work_order_id); return <div key={row.schedule_id} className="p-4"><div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2">{planned ? <Badge>OT generada</Badge> : overdue ? <Badge variant="destructive">Vencida</Badge> : review ? <Badge variant="secondary">Revisar horómetro</Badge> : missing ? <Badge variant="outline">Sin base suficiente</Badge> : <Badge variant="outline">Pendiente</Badge>}<Badge variant="outline">Cada {number(row.frequency_hours)} h</Badge><span className="text-xs text-muted-foreground">{row.meter_evidence_source==='runtime_reading'?'Lectura Motil':'Snapshot fuente'}</span></div><p className="mt-2 font-medium">{row.asset_code?`${row.asset_code} · `:''}{row.asset_name||'Activo sin nombre'}</p><p className="mt-1 text-sm">{row.task_name}</p><div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground"><span>Actual: {row.effective_current_meter==null?'Sin lectura':`${number(row.effective_current_meter)} h`}</span><span>Vence: {row.due_meter==null?'Sin pauta':`${number(row.due_meter)} h`}</span><span>{row.remaining_hours==null?'Sin diferencia calculable':row.remaining_hours<0?`${number(Math.abs(Number(row.remaining_hours)))} h vencidas`:`${number(row.remaining_hours)} h restantes`}</span><span>Fuente: {row.source_reference||'Sin referencia'}</span></div></div><div className="flex flex-wrap gap-2"><Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/planes-estandar/progresivo?scheduleId=${encodeURIComponent(row.schedule_id)}`}><ClipboardCheck className="h-4 w-4"/>Definir plan</Link></Button>{planned ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.generated_work_order_id}`}>Abrir OT</Link></Button> : overdue && data?.canEdit ? <Button size="sm" onClick={() => void planSchedule(row.schedule_id)} disabled={planningId===row.schedule_id}><Wrench className="h-4 w-4"/>{planningId===row.schedule_id?'Generando…':'Planificar intervención'}</Button> : null}{(review||missing)?<Button asChild size="sm" variant="outline"><Link href="/dashboard/mantenimiento/horometros">Resolver horómetro</Link></Button>:null}</div></div></div>; })}</div>}</CardContent></Card>
 
     <Card className="shadow-none">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg"><ArchiveRestore className="h-4 w-4"/>Pautas históricas para validar <Badge variant="outline">{historyData?.summary?.reviewable || 0}</Badge></CardTitle>
-        <CardDescription>Frecuencias recuperadas desde fuentes históricas. Revísalas antes de activarlas; MOTIL no modifica ninguna pauta sin confirmación humana.</CardDescription>
+      <CardHeader className="gap-4">
+        <div>
+          <CardTitle className="flex flex-wrap items-center gap-2 text-lg"><ArchiveRestore className="h-4 w-4"/>Pautas históricas para validar</CardTitle>
+          <CardDescription className="mt-1">Bandeja de decisión para planificación. El archivo histórico permanece intacto y el horómetro vigente siempre se obtiene desde MOTIL.</CardDescription>
+        </div>
+        <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
+          <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Por revisar</p><p className="mt-1 text-2xl font-semibold tabular-nums">{historyData?.summary?.pending || 0}</p></div>
+          <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Validadas</p><p className="mt-1 text-2xl font-semibold tabular-nums">{historyData?.summary?.validated || 0}</p></div>
+          <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Descartadas</p><p className="mt-1 text-2xl font-semibold tabular-nums">{historyData?.summary?.dismissed || 0}</p></div>
+        </div>
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+            <label className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/>
+              <input value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Buscar equipo o tarea" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"/>
+            </label>
+            <select value={historyStatus} onChange={(event) => setHistoryStatus(event.target.value as typeof historyStatus)} className="h-9 rounded-md border bg-background px-3 text-sm">
+              <option value="pending">Por revisar</option>
+              <option value="validated">Validadas</option>
+              <option value="dismissed">Descartadas</option>
+              <option value="all">Todas</option>
+            </select>
+          </div>
+          {historyData?.canEdit && selectedArchiveIds.length > 0 ? <Button size="sm" onClick={() => void validateSelected()} disabled={batchValidating}>
+            <CheckCircle2 className="h-4 w-4"/>{batchValidating ? 'Validando…' : `Validar seleccionadas (${selectedArchiveIds.length})`}
+          </Button> : null}
+        </div>
+        {historyMessage ? <p className="text-sm text-muted-foreground" role="status">{historyMessage}</p> : null}
       </CardHeader>
       <CardContent className="p-0">
         {historyError ? <StatePanel tone="error" title="No fue posible cargar el archivo preventivo" description={historyError.message} className="min-h-0 border-0 bg-transparent" />
         : historyLoading ? <StatePanel tone="loading" title="Revisando archivo preventivo" className="min-h-32 border-0 bg-transparent" />
-        : !historyData?.summary?.reviewable ? <StatePanel tone="neutral" title="No hay pautas históricas pendientes de validación" description="No existen candidatos restaurables con equipo canónico vigente." className="min-h-32 border-0 bg-transparent" />
+        : filteredHistory.length === 0 ? <StatePanel tone="neutral" title="No hay pautas para este filtro" description="Cambia la búsqueda o el estado para revisar otras decisiones históricas." className="min-h-32 border-0 bg-transparent" />
         : <div className="divide-y">
-            {(historyData?.candidates || []).filter((row:any) => row.assetExists && !row.alreadyActive).map((row:any) => (
-              <div key={row.archiveId} className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_180px_auto] lg:items-center">
-                <div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">Pendiente de validación</Badge>
-                    <Badge variant="outline">{row.frequencyHours ? `Cada ${number(row.frequencyHours)} h` : row.frequencyDays ? `Cada ${row.frequencyDays} días` : 'Frecuencia N/D'}</Badge>
+            {historyGroups.map((group:any) => {
+              const expanded = expandedAssets.includes(group.assetId);
+              return <div key={group.assetId}>
+                <button type="button" onClick={() => setExpandedAssets((current) => current.includes(group.assetId) ? current.filter((id) => id !== group.assetId) : [...current, group.assetId])} className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/40">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{group.asset?.asset_code ? `${group.asset.asset_code} · ` : ''}{group.asset?.name || 'Equipo'}</span>
+                      {group.pending > 0 ? <Badge variant="outline">{group.pending} pendiente{group.pending===1?'':'s'}</Badge> : null}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{group.currentMeter == null ? 'Horómetro vigente: N/D' : `Horómetro vigente: ${number(group.currentMeter)} h`}{group.currentMeterAt ? ` · ${new Date(group.currentMeterAt).toLocaleDateString('es-CL')}` : ''}</p>
                   </div>
-                  <p className="mt-2 font-medium">{row.asset?.asset_code ? `${row.asset.asset_code} · ` : ''}{row.asset?.name || 'Equipo'}</p>
-                  <p className="mt-1 text-sm">{row.taskName || 'Pauta sin nombre'}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Fuente: {row.sourceReference || 'Archivo preventivo'}{row.lastExecutedMeter != null ? ` · última base histórica ${number(row.lastExecutedMeter)} ${row.meterUnit || 'h'}` : ''}</p>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  <p>Registro histórico: {row.archivedAt ? new Date(row.archivedAt).toLocaleDateString('es-CL') : 'Sin fecha'}</p>
-                  <p className="mt-1">La lectura vigente se toma desde MOTIL, no desde el archivo.</p>
-                </div>
-                <div>
-                  {historyData?.canEdit ? <Button size="sm" onClick={() => void restoreHistoricalSchedule(row.archiveId)} disabled={restoringArchiveId===row.archiveId}>
-                    <ArchiveRestore className="h-4 w-4"/>{restoringArchiveId===row.archiveId?'Activando…':'Validar y activar'}
-                  </Button> : <span className="text-xs text-muted-foreground">Sólo planificación puede restaurar.</span>}
-                </div>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{group.rows.length} pauta{group.rows.length===1?'':'s'}</span>
+                    {expanded ? <ChevronDown className="h-4 w-4"/> : <ChevronRight className="h-4 w-4"/>}
+                  </div>
+                </button>
+
+                {expanded ? <div className="border-t bg-muted/10">
+                  {group.rows.map((row:any) => {
+                    const pending = row.decision === 'pending';
+                    const editing = editingArchiveId === row.archiveId;
+                    const selected = selectedArchiveIds.includes(row.archiveId);
+                    return <div key={row.archiveId} className="border-b px-4 py-3 last:border-b-0">
+                      <div className="grid gap-3 lg:grid-cols-[32px_minmax(0,1fr)_150px_170px_auto] lg:items-center">
+                        <div>
+                          {pending && historyData?.canEdit ? <input type="checkbox" checked={selected} aria-label={`Seleccionar ${row.taskName || 'pauta'}`} onChange={(event) => setSelectedArchiveIds((current) => event.target.checked ? [...current, row.archiveId] : current.filter((id) => id !== row.archiveId))} className="h-4 w-4 rounded border"/> : null}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">{row.taskName || 'Pauta sin nombre'}</p>
+                            {row.decision === 'validated' ? <Badge>Validada</Badge> : row.decision === 'dismissed' ? <Badge variant="secondary">Descartada</Badge> : <Badge variant="outline">Pendiente</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">Histórico: {row.lastExecutedMeter == null ? 'base N/D' : `${number(row.lastExecutedMeter)} ${row.meterUnit || 'h'}`} · Fuente: {row.sourceReference || 'Archivo preventivo'}</p>
+                        </div>
+                        <div><p className="text-xs text-muted-foreground">Frecuencia</p><p className="text-sm">{row.frequencyHours ? `Cada ${number(row.frequencyHours)} h` : row.frequencyDays ? `Cada ${row.frequencyDays} días` : 'N/D'}</p></div>
+                        <div><p className="text-xs text-muted-foreground">Vigencia</p><p className="text-sm">{row.currentMeter == null ? 'Sin lectura actual' : `${number(row.currentMeter)} h actuales`}</p></div>
+                        <div className="flex justify-end gap-2">
+                          {pending && historyData?.canEdit ? <>
+                            <Button size="sm" onClick={() => void reviewHistoricalSchedule(row,'validate')} disabled={historyActionId===row.archiveId}>
+                              <CheckCircle2 className="h-4 w-4"/>{historyActionId===row.archiveId?'Guardando…':'Validar'}
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" aria-label="Más acciones"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={() => startEditHistorical(row)}><Pencil className="h-4 w-4"/>Editar antes de validar</DropdownMenuItem>
+                                <DropdownMenuItem variant="destructive" onSelect={() => void reviewHistoricalSchedule(row,'dismiss')}><XCircle className="h-4 w-4"/>Descartar</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </> : <span className="text-xs text-muted-foreground">{row.review?.reviewed_at ? new Date(row.review.reviewed_at).toLocaleDateString('es-CL') : ''}</span>}
+                        </div>
+                      </div>
+
+                      {editing ? <div className="mt-3 rounded-lg border bg-background p-3">
+                        <p className="text-sm font-medium">Editar antes de validar</p>
+                        <p className="mt-1 text-xs text-muted-foreground">El ajuste quedará registrado en la decisión de planificación; la fuente histórica original no cambia.</p>
+                        <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_160px_auto] md:items-end">
+                          <label className="text-xs text-muted-foreground">Tarea<input value={editTaskName} onChange={(event) => setEditTaskName(event.target.value)} className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground"/></label>
+                          <label className="text-xs text-muted-foreground">Frecuencia horas<input type="number" min="0" step="0.1" value={editFrequencyHours} onChange={(event) => setEditFrequencyHours(event.target.value)} className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground"/></label>
+                          <label className="text-xs text-muted-foreground">Frecuencia días<input type="number" min="0" step="1" value={editFrequencyDays} onChange={(event) => setEditFrequencyDays(event.target.value)} className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground"/></label>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setEditingArchiveId(null)}>Cancelar</Button>
+                            <Button size="sm" onClick={() => void reviewHistoricalSchedule(row,'validate',{
+                              taskName: editTaskName,
+                              frequencyHours: editFrequencyHours === '' ? null : Number(editFrequencyHours),
+                              frequencyDays: editFrequencyDays === '' ? null : Number(editFrequencyDays),
+                            })}>Guardar y validar</Button>
+                          </div>
+                        </div>
+                      </div> : null}
+                    </div>;
+                  })}
+                </div> : null}
+              </div>;
+            })}
           </div>}
       </CardContent>
     </Card>
