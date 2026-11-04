@@ -324,7 +324,10 @@ export async function GET(request: NextRequest) {
         };
       })
       .sort((a, b) => a.week.localeCompare(b.week));
-    const comparableWeeklyExecutionTrend = weeklyExecutionTrend.filter((row) => row.samples >= 5);
+    const currentWeekStart = weekStartUtc(new Date().toISOString());
+    const comparableWeeklyExecutionTrend = weeklyExecutionTrend.filter(
+      (row) => row.samples >= 5 && row.week !== currentWeekStart,
+    );
     const previousComparableWeek =
       comparableWeeklyExecutionTrend.length >= 2
         ? comparableWeeklyExecutionTrend[comparableWeeklyExecutionTrend.length - 2]
