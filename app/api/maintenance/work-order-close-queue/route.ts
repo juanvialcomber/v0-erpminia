@@ -55,7 +55,8 @@ const actionRank: Record<string, number> = {
   record_preventive_actions: 9,
   record_actual_hours: 10,
   record_runtime_evidence: 11,
-  close_work_order: 12,
+  record_fluid_closure: 12,
+  close_work_order: 13,
 };
 
 export async function GET(request: NextRequest) {
@@ -151,6 +152,19 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const rows = (data || []) as CloseQueueRow[];
+
+    const rowIds = rows.map((row) => row.work_order_id);
+    const fluidDeclarationIds = new Set<string>();
+    if (rowIds.length > 0) {
+      const { data: fluidDeclarations, error: fluidDeclarationError } = await context.supabase
+        .from('work_order_events')
+        .select('work_order_id')
+        .eq('organization_id', context.organizationId)
+        .eq('event_type', 'fluid_closure_declared')
+        .in('work_order_id', rowIds.slice(0, 250));
+      if (fluidDeclarationError) throw fluidDeclarationError;
+      for (const event of fluidDeclarations || []) fluidDeclarationIds.add(String(event.work_order_id));
+    }
     const assetIds = [...new Set(rows.map((row) => row.canonical_asset_id).filter((id): id is string => Boolean(id)))];
     const assetMap = new Map<string, AssetRow>();
     if (assetIds.length > 0) {
@@ -164,7 +178,18 @@ export async function GET(request: NextRequest) {
     }
 
     const queue = rows
-      .map((row) => ({ ...row, asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null }))
+      .map((row) => {
+        const hasFluidClosureDeclaration = fluidDeclarationIds.has(row.work_order_id);
+        const nextAction = row.next_action === 'close_work_order' && !hasFluidClosureDeclaration
+          ? 'record_fluid_closure'
+          : row.next_action;
+        return {
+          ...row,
+          next_action: nextAction,
+          fluid_closure_declared: hasFluidClosureDeclaration,
+          asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
+        };
+      })
       .sort((a, b) => {
         const actionDiff = (actionRank[a.next_action] ?? 99) - (actionRank[b.next_action] ?? 99);
         if (actionDiff !== 0) return actionDiff;
