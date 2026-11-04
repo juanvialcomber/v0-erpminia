@@ -6,7 +6,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
 type PartActionPayload = {
-  action?: 'install' | 'return';
+  action?: 'issue_reserved' | 'install' | 'return';
   partRecordId?: string;
   partId?: string;
   quantity?: number | string;
@@ -25,6 +25,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
     const body = (await request.json()) as PartActionPayload;
+
+    if (body.action === 'issue_reserved') {
+      const { data, error } = await context.supabase.rpc('issue_available_materials_to_work_order_v2', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: workOrderId,
+      });
+      if (error) throw error;
+      return NextResponse.json({ data, issuedReserved: true }, { status: 201 });
+    }
+
     const quantity = Number(body.quantity || 0);
     if (!body.partId || !Number.isInteger(quantity) || quantity <= 0) return NextResponse.json({ error: 'Selecciona un repuesto y una cantidad entera mayor que cero' }, { status: 400 });
 
