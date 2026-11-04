@@ -50,7 +50,28 @@ export default function LaudusReplacementPage() {
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
   const [syncingTrace, setSyncingTrace] = useState(false);
+  const [discoveringSales, setDiscoveringSales] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  async function discoverSales() {
+    setDiscoveringSales(true);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/sales-discovery', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo revisar Clientes/Ventas.');
+      setMessage(payload?.usageDetected
+        ? `Clientes/Ventas sí tiene uso en Laudus: ${Number(payload.customersObserved || 0)} clientes y ${Number(payload.salesOrdersObserved || 0)} pedidos observados en la muestra.`
+        : 'No se detectó uso de Clientes/Ventas en la muestra acotada.');
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo revisar Clientes/Ventas.');
+    } finally {
+      setDiscoveringSales(false);
+    }
+  }
 
   async function syncInvoiceTrace() {
     setSyncingTrace(true);
@@ -119,6 +140,11 @@ export default function LaudusReplacementPage() {
                     {domain.key === 'invoices' ? (
                       <Button size="sm" variant="outline" disabled={syncingTrace} onClick={() => void syncInvoiceTrace()}>
                         {syncingTrace ? 'Escaneando…' : 'Escanear 5'}
+                      </Button>
+                    ) : null}
+                    {domain.key === 'sales' ? (
+                      <Button size="sm" variant="outline" disabled={discoveringSales} onClick={() => void discoverSales()}>
+                        {discoveringSales ? 'Revisando…' : 'Descubrir'}
                       </Button>
                     ) : null}
                     <Link href={domain.actionHref} className="inline-flex items-center gap-2 text-sm font-medium hover:underline">
