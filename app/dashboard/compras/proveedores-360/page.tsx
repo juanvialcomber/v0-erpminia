@@ -164,6 +164,6 @@ function moneyFor(currency: string, value: number) {
 }
 
 function paymentStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = { paid: 'Pagada', partial: 'Pago parcial', pending: 'Pendiente', unpaid: 'Pendiente', overdue: 'Vencida' };
+  const labels: Record<string, string> = { paid: 'Pagada', partial: 'Pago parcial', partially_paid: 'Pago parcial', pending: 'Pendiente', unpaid: 'Pendiente', overdue: 'Vencida', credit_adjustment: 'Ajuste de crédito' };
   return status ? labels[status] || status : 'Estado N/D';
 }
