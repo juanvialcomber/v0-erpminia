@@ -66,7 +66,7 @@ export default function PreventiveHoursPage() {
       <PageHeaderContent>
         <PageHeaderEyebrow>Mantenimiento · Planificación por uso</PageHeaderEyebrow>
         <PageHeaderTitle>Preventivo por horómetro</PageHeaderTitle>
-        <PageHeaderDescription>Controla vencimientos por horómetro usando sólo pautas validadas y lecturas reales. Las frecuencias históricas quedan separadas hasta que planificación las confirme.</PageHeaderDescription>
+        <PageHeaderDescription>Controla vencimientos por horómetro usando sólo pautas validadas y lecturas reales. No existen umbrales genéricos: las frecuencias históricas quedan separadas hasta que planificación las confirme.</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
         <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/horometros"><Gauge className="h-4 w-4"/>Horómetros</Link></Button>
@@ -94,7 +94,7 @@ export default function PreventiveHoursPage() {
 
     <Card className="shadow-none">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg"><ArchiveRestore className="h-4 w-4"/>{historyData?.summary?.reviewable || 0} pautas para validar</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-lg"><ArchiveRestore className="h-4 w-4"/>Pautas históricas para validar <Badge variant="outline">{historyData?.summary?.reviewable || 0}</Badge></CardTitle>
         <CardDescription>Frecuencias recuperadas desde fuentes históricas. Revísalas antes de activarlas; MOTIL no modifica ninguna pauta sin confirmación humana.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
