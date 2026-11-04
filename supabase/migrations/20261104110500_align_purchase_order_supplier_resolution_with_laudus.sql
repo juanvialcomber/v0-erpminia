@@ -56,27 +56,28 @@ laudus_name_map as (
   ) x
   group by organization_id, name_key
 ),
+parsed_line_rows as (
+  select
+    pol.purchase_order_id,
+    pol.organization_id,
+    nullif(trim(pol.cost_center_code),'') as raw_code,
+    (regexp_match(nullif(trim(pol.cost_center_code),''), '^([0-9]+(?:-[0-9]+)*)'))[1] as parsed_code
+  from canonical.purchase_order_lines pol
+),
 line_cost_center as (
   select
-    purchase_order_id,
-    organization_id,
-    count(distinct nullif(trim(cost_center_code),'')) filter (
-      where nullif(trim(cost_center_code),'') is not null
-    ) as distinct_cost_centers,
-    min(nullif(trim(cost_center_code),'')) filter (
-      where nullif(trim(cost_center_code),'') is not null
-    ) as consensus_raw
-  from canonical.purchase_order_lines
-  group by purchase_order_id, organization_id
-),
-parsed_line_cost_center as (
-  select
-    purchase_order_id,
-    organization_id,
-    distinct_cost_centers,
-    consensus_raw,
-    (regexp_match(consensus_raw, '^([0-9]+(?:-[0-9]+)*)'))[1] as parsed_code
-  from line_cost_center
+    plr.purchase_order_id,
+    plr.organization_id,
+    count(distinct plr.raw_code) filter (where plr.raw_code is not null) as distinct_cost_centers,
+    min(plr.raw_code) filter (where plr.raw_code is not null) as consensus_raw,
+    min(plr.parsed_code) filter (where plr.parsed_code is not null) as parsed_code,
+    count(*) filter (where plr.raw_code is not null and plr.parsed_code is null) as unparsed_line_cost_centers,
+    count(*) filter (where plr.parsed_code is not null and cc.id is null) as unknown_line_cost_centers
+  from parsed_line_rows plr
+  left join canonical.cost_centers cc
+    on cc.organization_id = plr.organization_id
+   and upper(trim(cc.cost_center_code)) = upper(trim(plr.parsed_code))
+  group by plr.purchase_order_id, plr.organization_id
 )
 select
   po.organization_id,
@@ -110,7 +111,11 @@ select
     when nullif(trim(po.cost_center_code),'') is not null then 'already_linked'
     when plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is not null then 'line_consensus'
     when plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is null then 'unknown_code'
-    when coalesce(plc.distinct_cost_centers,0) > 1 then 'conflict'
+    when coalesce(plc.distinct_cost_centers,0) > 1
+      and coalesce(plc.unparsed_line_cost_centers,0) = 0
+      and coalesce(plc.unknown_line_cost_centers,0) = 0
+      then 'multi_line_allocation'
+    when coalesce(plc.distinct_cost_centers,0) > 1 then 'multi_line_review'
     else 'unresolved'
   end as cost_center_resolution_status,
   (
@@ -126,6 +131,11 @@ select
     (
       nullif(trim(po.cost_center_code),'') is not null
       or (plc.distinct_cost_centers = 1 and plc.parsed_code is not null and cc.id is not null)
+      or (
+        plc.distinct_cost_centers > 1
+        and coalesce(plc.unparsed_line_cost_centers,0) = 0
+        and coalesce(plc.unknown_line_cost_centers,0) = 0
+      )
     )
   ) as fully_resolvable,
   now() as evaluated_at
@@ -147,4 +157,4 @@ revoke all on integration.purchase_order_reconciliation_preview_v1 from public, 
 grant select on integration.purchase_order_reconciliation_preview_v1 to service_role;
 
 comment on view integration.purchase_order_reconciliation_preview_v1 is
-  'Read-only historical purchase-order reconciliation preview. Supplier identity uses direct canonical exact names first, then Laudus supplier identities already verified by exact tax ID. Cost centers require deterministic consensus. No source or canonical mutation.';
+  'Read-only historical purchase-order reconciliation preview. Supplier identity uses direct canonical exact names first, then Laudus identities verified by exact tax ID. Cost centers preserve valid multi-line allocations and flag only unknown or unparseable line assignments for review. No source or canonical mutation.';
