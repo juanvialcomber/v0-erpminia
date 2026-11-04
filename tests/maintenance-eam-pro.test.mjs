@@ -68,3 +68,13 @@ test('audited reliability routes human review back into preventive planning', ()
   assert.match(reliability,/preventivo-horas\?assetId=/);
   assert.match(reliability,/priorityAssetId/);
 });
+
+
+test('EAM distinguishes execution blockers from closeout pending evidence', () => {
+  assert.match(api,/function hasExecutionBlocker/);
+  assert.match(api,/function hasCloseoutPending/);
+  assert.match(api,/executionGate/);
+  assert.match(ui,/bloqueo.*de inicio/i);
+  assert.match(ui,/pendiente.*de cierre/i);
+  assert.match(ui,/Cierre pendiente/);
+});
