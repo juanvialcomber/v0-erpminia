@@ -5,6 +5,8 @@ import useSWR from 'swr';
 import { CheckCircle2, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { WorkOrderFluidUsagePanel } from '@/components/maintenance/work-order-fluid-usage-panel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const fetcher = async (url: string) => {
@@ -22,6 +24,7 @@ function formatDate(value?: string | null) {
 export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrderId: string; status?: string | null }) {
   const evidence = useSWR(`/api/maintenance/work-orders/${workOrderId}/evidence`, fetcher);
   const review = useSWR(status === 'completed' ? `/api/maintenance/work-orders/${workOrderId}/review` : null, fetcher);
+  const fluidClosureEvidence = useSWR(status === 'completed' ? `/api/maintenance/work-orders/${workOrderId}/fluids/closure` : null, fetcher);
 
   const photos = evidence.data?.evidence || [];
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
@@ -31,6 +34,11 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const [confirmMaterialsInstalled, setConfirmMaterialsInstalled] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [fluidUsedChoice, setFluidUsedChoice] = useState<'yes' | 'no' | ''>('');
+  const [fluidWasteChoice, setFluidWasteChoice] = useState<'linked' | 'none_recovered' | ''>('');
+  const [fluidDeclarationNote, setFluidDeclarationNote] = useState('');
+  const [declaringFluids, setDeclaringFluids] = useState(false);
+  const [fluidDeclarationError, setFluidDeclarationError] = useState<string | null>(null);
   const materialLines = review.data?.materialRequirementsCount ?? 0;
   const fluidClosure = review.data?.fluidClosure || null;
   const fluidClosurePayload = (fluidClosure?.payload || {}) as {
@@ -59,6 +67,35 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
       setApprovalError(error instanceof Error ? error.message : 'No se pudo aprobar la OT.');
     } finally {
       setApproving(false);
+    }
+  };
+
+  const declareFluids = async () => {
+    if (!fluidClosureEvidence.data?.canDeclare) return;
+    if (!fluidUsedChoice) return setFluidDeclarationError('Indica si se utilizaron aceites o fluidos.');
+    if (fluidUsedChoice === 'yes' && !fluidWasteChoice) {
+      return setFluidDeclarationError('Indica si el residuo fue recuperado.');
+    }
+    setDeclaringFluids(true);
+    setFluidDeclarationError(null);
+    try {
+      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/fluids/closure`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fluids_used: fluidUsedChoice === 'yes',
+          waste_status: fluidUsedChoice === 'no' ? 'not_applicable' : fluidWasteChoice,
+          note: fluidDeclarationNote.trim() || null,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar la declaración.');
+      await Promise.all([fluidClosureEvidence.mutate(), review.mutate()]);
+    } catch (error) {
+      setFluidDeclarationError(error instanceof Error ? error.message : 'No se pudo guardar la declaración.');
+    } finally {
+      setDeclaringFluids(false);
     }
   };
 
@@ -128,8 +165,46 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 ) : null}
                 {fluidClosurePayload.note ? <p className="text-sm text-muted-foreground">Nota: {fluidClosurePayload.note}</p> : null}
               </>
+            ) : currentReview?.status === 'approved' ? (
+              <p className="text-sm text-muted-foreground">Esta OT fue aprobada antes de exigir la declaración de aceites y fluidos. El histórico no permite determinar si se utilizaron.</p>
             ) : (
-              <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
+              <div className="space-y-3">
+                <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
+                {fluidClosureEvidence.error ? (
+                  <p role="alert" className="text-sm text-destructive">No se pudo comprobar el permiso para declarar aceites y fluidos.</p>
+                ) : fluidClosureEvidence.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Verificando quién puede completar la declaración…</p>
+                ) : fluidClosureEvidence.data?.canDeclare ? (
+                  <div className="space-y-3 rounded-md border p-3">
+                    <p className="text-sm text-muted-foreground">Esta OT ya está cerrada. Como mecánico asignado puedes completar la declaración pendiente; se registrará con fecha actual, sin reabrir ni alterar la OT.</p>
+                    <p className="text-sm font-medium">¿Se utilizaron aceites o fluidos?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" variant={fluidUsedChoice === 'yes' ? 'default' : 'outline'} onClick={() => { setFluidUsedChoice('yes'); setFluidWasteChoice(''); setFluidDeclarationError(null); }}>Sí</Button>
+                      <Button type="button" size="sm" variant={fluidUsedChoice === 'no' ? 'default' : 'outline'} onClick={() => { setFluidUsedChoice('no'); setFluidWasteChoice(''); setFluidDeclarationError(null); }}>No</Button>
+                    </div>
+                    {fluidUsedChoice === 'no' ? (
+                      <p className="text-sm text-muted-foreground">Sin uso de aceites: no se requieren litros ni registro de residuos.</p>
+                    ) : null}
+                    {fluidUsedChoice === 'yes' ? (
+                      <div className="space-y-3">
+                        <WorkOrderFluidUsagePanel workOrderId={workOrderId} />
+                        <p className="text-sm font-medium">¿Qué ocurrió con el residuo?</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" size="sm" variant={fluidWasteChoice === 'linked' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('linked')}>Recuperado y registrado</Button>
+                          <Button type="button" size="sm" variant={fluidWasteChoice === 'none_recovered' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('none_recovered')}>No se recuperó</Button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {fluidUsedChoice ? <Input value={fluidDeclarationNote} onChange={(event) => setFluidDeclarationNote(event.target.value)} placeholder="Observación (opcional)" aria-label="Observación de declaración de fluidos" /> : null}
+                    {fluidDeclarationError ? <p role="alert" className="text-sm text-destructive">{fluidDeclarationError}</p> : null}
+                    <Button type="button" disabled={declaringFluids || !fluidUsedChoice || (fluidUsedChoice === 'yes' && !fluidWasteChoice)} onClick={() => void declareFluids()}>
+                      {declaringFluids ? 'Guardando…' : fluidUsedChoice === 'no' ? 'Confirmar sin uso de aceites' : 'Confirmar aceites y residuos'}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">La OT ya fue cerrada. El mecánico asignado debe abrir esta misma OT con su cuenta, confirmar Sí o No y guardar la declaración. Después Ariel podrá aprobarla.</p>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
