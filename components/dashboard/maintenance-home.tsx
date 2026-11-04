@@ -257,7 +257,7 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
           </> : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          {decisionOfDay.assetHref ? <Button asChild variant="outline"><Link href={decisionOfDay.assetHref}>{locale === 'en' ? 'Asset 360' : 'Ficha 360'}</Link></Button> : null}
+          {decisionOfDay.assetHref ? <Button asChild variant="outline"><Link href={decisionOfDay.assetHref}>{locale === 'en' ? 'View asset' : 'Ver activo'}</Link></Button> : null}
           <Button asChild><Link href={decisionOfDay.href}>{locale === 'en' ? 'Resolve now' : 'Resolver ahora'}<ArrowRight className="h-4 w-4"/></Link></Button>
         </div>
       </CardContent>
