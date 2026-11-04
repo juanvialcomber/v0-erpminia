@@ -51,6 +51,9 @@ type MovementRow = {
   quantity?: number;
   notes?: string;
   created_at?: string;
+  canonical_product_id?: string | null;
+  reference_doc?: string | null;
+  reference_id?: string | null;
   stock?: { part_code?: string; part_name?: string };
 };
 
@@ -113,6 +116,8 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
 
   const reservedUnits = deliveredParts.reduce((sum, part) => sum + (part.status === 'reserved' ? Number(part.quantity_reserved || 0) : 0), 0);
   const reservedLines = deliveredParts.filter((part) => part.status === 'reserved' && Number(part.quantity_reserved || 0) > 0).length;
+  const purchaseReceivedProducts = new Set(movements.filter((movement) => movement.movement_type === 'receipt' && movement.reference_doc === 'operational_receipt' && movement.canonical_product_id).map((movement) => String(movement.canonical_product_id)));
+  const purchaseReservedUnits = deliveredParts.reduce((sum, part) => sum + (part.status === 'reserved' && part.canonical_product_id && purchaseReceivedProducts.has(part.canonical_product_id) ? Number(part.quantity_reserved || 0) : 0), 0);
   const selectedPart = stockItems.find((item) => item.id === selectedPartId);
   const selectedAvailable = Number(
     selectedPart?.quantity_available ??
@@ -156,11 +161,9 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
     setSubmitting(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/reserve-parts`, {
+      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/issue-materials`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ action: 'issue_reserved' }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudieron entregar las reservas a la OT');
@@ -223,8 +226,8 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
         {reservedUnits > 0 ? <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium">Material recibido y reservado para esta OT</p>
-              <p className="mt-1 text-xs text-muted-foreground">{reservedLines} línea(s) · {reservedUnits} unidad(es). La compra ya llegó a bodega y MOTIL la reservó para esta orden; falta confirmar la entrega al ejecutor.</p>
+              <p className="text-sm font-medium">Material reservado para esta OT</p>
+              <p className="mt-1 text-xs text-muted-foreground">{reservedLines} línea(s) · {reservedUnits} unidad(es). {purchaseReservedUnits > 0 ? `${purchaseReservedUnits} unidad(es) provienen de una recepción de compra vinculada a esta OT. ` : ''}Falta confirmar la entrega al ejecutor.</p>
             </div>
             <Button onClick={() => void issueReserved()} disabled={submitting}>
               {submitting ? 'Entregando…' : 'Entregar reservas a la OT'}
