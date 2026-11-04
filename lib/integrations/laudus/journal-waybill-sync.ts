@@ -175,15 +175,41 @@ function flattenWaybill(row: JsonRow): JsonRow[] {
     docNumber: row.docNumber ?? null,
     description: row.description ?? null,
     issuedDate: row.issuedDate ?? null,
-    supplier_supplierId: supplier.supplierId ?? null,
-    supplier_name: supplier.name ?? null,
-    supplier_legalName: supplier.legalName ?? null,
-    supplier_VATId: supplier.VATId ?? null,
-    warehouse_warehouseId: warehouse.warehouseId ?? null,
-    warehouse_name: warehouse.name ?? null,
+    supplier_supplierId: supplier.supplierId ?? row.supplier_supplierId ?? row['supplier.supplierId'] ?? null,
+    supplier_name: supplier.name ?? row.supplier_name ?? row['supplier.name'] ?? null,
+    supplier_legalName: supplier.legalName ?? row.supplier_legalName ?? row['supplier.legalName'] ?? null,
+    supplier_VATId: supplier.VATId ?? row.supplier_VATId ?? row['supplier.VATId'] ?? null,
+    warehouse_warehouseId: warehouse.warehouseId ?? row.warehouse_warehouseId ?? row['warehouse.warehouseId'] ?? null,
+    warehouse_name: warehouse.name ?? row.warehouse_name ?? row['warehouse.name'] ?? null,
   };
 
-  if (items.length === 0) return [base];
+  if (items.length === 0) {
+    const hasFlattenedItem =
+      row.items_itemId != null
+      || row['items.itemId'] != null
+      || row.items_product_productId != null
+      || row['items.product.productId'] != null
+      || row.items_product_sku != null
+      || row['items.product.sku'] != null;
+
+    if (!hasFlattenedItem) return [base];
+
+    return [{
+      ...base,
+      items_itemId: row.items_itemId ?? row['items.itemId'] ?? null,
+      items_product_productId: row.items_product_productId ?? row['items.product.productId'] ?? null,
+      items_product_sku: row.items_product_sku ?? row['items.product.sku'] ?? null,
+      items_product_description: row.items_product_description ?? row['items.product.description'] ?? null,
+      items_product_unitOfMeasure: row.items_product_unitOfMeasure ?? row['items.product.unitOfMeasure'] ?? null,
+      items_itemDescription: row.items_itemDescription ?? row['items.itemDescription'] ?? null,
+      items_quantity: row.items_quantity ?? row['items.quantity'] ?? null,
+      items_originalUnitCost: row.items_originalUnitCost ?? row['items.originalUnitCost'] ?? null,
+      items_currencyCode: row.items_currencyCode ?? row['items.currencyCode'] ?? null,
+      items_parityToMainCurrency: row.items_parityToMainCurrency ?? row['items.parityToMainCurrency'] ?? null,
+      items_unitCost: row.items_unitCost ?? row['items.unitCost'] ?? null,
+      items_costCenter_costCenterId: row.items_costCenter_costCenterId ?? row['items.costCenter.costCenterId'] ?? null,
+    }];
+  }
 
   return items.map((item: JsonRow) => {
     const product = item.product && typeof item.product === 'object' ? item.product : {};
