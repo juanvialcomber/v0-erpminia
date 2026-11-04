@@ -311,3 +311,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel de valor: L4 para el flujo operacional MOTIL. E2 por existencia de flujo real y acciones humanas; no se declara ahorro de tiempo ni costo evitado sin baseline comparable.
 - Métrica siguiente: número de casos resueltos completamente en MOTIL sin abrir Laudus, tiempo por ciclo y excepciones que todavía obligan a consultar el ERP.
 - Impacto económico: no medido todavía.
+
+
+## 2026-11-04 — Proveedor 360 + costo OT/activo + caja MOTIL
+
+- Corrección de evidencia: la muestra operativa anterior de 3 solicitudes/OC incluía casos UAT; no se usa como evidencia de adopción real.
+- Proveedor 360 ahora prioriza CxP y pagos MOTIL por identidad canónica de proveedor. Laudus queda como evidencia financiera read-only en un bloque secundario.
+- El vínculo proveedor → mantenimiento sólo cuenta cuando una OC tiene `work_order_id` o `canonical_asset_id` explícito. No se infiere por proveedor, producto, nombre o centro de costo.
+- El flujo existente ya propaga OT + activo + centro de costo cuando una necesidad de abastecimiento nace desde Mantenimiento y se adjudica en Compras.
+- Estado de costeo observado: 34 OT completadas con snapshot de cierre auditado; 34/34 con snapshot (100%), pero 0/34 con evidencia monetaria > 0 en repuestos, mano de obra, servicios externos o compra recibida vinculada.
+- Regla semántica nueva: snapshot con $0 sin evidencia monetaria ≠ costo real cero. Se publica como costo por completar.
+- Valor actual demostrado: L2/L3 de trazabilidad y control de calidad del dato económico; todavía no existe E2 monetaria suficiente para costo real por activo/OT.
+- Siguiente evidencia: primera compra real originada desde una OT, recepción aceptada, repuesto instalado o mano de obra valorizada y snapshot de cierre resultante.
+- Métrica primaria: `OT con evidencia monetaria / OT auditadas` y `compras operativas reales ligadas a OT/activo / compras operativas reales`.
+- Impacto económico: no medido. No se atribuye ahorro ni costo evitado.
