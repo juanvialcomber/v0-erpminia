@@ -40,3 +40,8 @@ test('commercial sync remains admin controlled and usage-tracked without automat
   assert.match(api, /access\.admin/);
   assert.match(api, /withLaudusApiUsageTracking/);
 });
+
+
+test('sales receipts paginate deterministically by receiptId', () => {
+  assert.match(sync, /sales_receipt:[\s\S]*?orderField:\s*'receiptId'/);
+});
