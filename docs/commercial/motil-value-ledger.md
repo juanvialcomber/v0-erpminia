@@ -294,3 +294,14 @@ Estos umbrales habilitan escala inicial, no E4.
 - Idempotencia: la función existente mantiene un único snapshot por `organization_id + snapshot_date`; reintentos del mismo día actualizan el mismo corte.
 - Semántica: el snapshot registra evidencia, decisiones, outcomes y gate de escala; no representa ahorro auditado ni ROI económico por sí mismo.
 - Próximo paso: extender el payload persistido para incorporar el bloque de mantención y decisiones humanas ya calculado por `/api/value/scorecard`, de forma que LECV tenga historia diaria transversal y no sólo finanzas/compras.
+
+
+## 2026-11-04 — Process mining de OT y gate E3
+
+- Universo actual observado: 47 OT con identidad operativa y 739 eventos de OT disponibles para reconstruir ciclos reales.
+- Flujo instrumentado: primer `timer_play` -> cierre de OT. Se agrupa por semana de creación y se publica mediana sólo con timestamps válidos.
+- Gate de comparación: una semana requiere al menos 5 ciclos medibles; la semana en curso se excluye siempre de comparaciones porque está incompleta.
+- Estado al 2026-11-04: sólo la semana iniciada el 2026-10-26 tiene muestra completa suficiente para comparación (`n=17`, mediana aproximada 5.474 s / 1,52 h). Las semanas anteriores no alcanzan `n>=5`; la semana del 2026-11-02 sigue abierta.
+- Clasificación: `TREND_ONLY / HOLD_E3`. Todavía no existe una segunda semana completa comparable ni una intervención causal aislada.
+- Regla: cualquier cambio semanal puede deberse a mix de trabajos, criticidad, activos, equipo humano o volumen. No se presenta como downtime evitado, ahorro ni mejora atribuible a MOTIL.
+- Siguiente gate: acumular una segunda semana completa con `n>=5` y segmentar por tipo/prioridad/activo cuando la muestra permita comparación homogénea.
