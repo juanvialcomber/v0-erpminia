@@ -8,7 +8,8 @@ type Supplier = { id: string; tax_id: string; legal_name: string; trade_name?: s
 type Performance = { operational_score?: number | null; delivery_score?: number | null; quality_score?: number | null; invoice_score?: number | null; evidence_dimensions?: number | null; score_version?: string | null; delivery_scored_orders?: number | null; receipt_count?: number | null; invoice_scored_count?: number | null; returns_count?: number | null; returned_quantity?: number | null };
 type LaudusCurrencySummary = { currency: string; invoiceCount: number; totalAmount: number; paidAmount: number; outstandingAmount: number; overdueAmount: number; overdueInvoices: number; latestInvoiceAt: string | null; latestPaymentAt: string | null };
 type LaudusFinancial = { linked: boolean; reconciliationStatus?: string | null; supplierSyncAt?: string | null; sourceHealth?: Array<{ domain: string; health_status: string | null; last_success_at: string | null; consecutive_failures: number | null; open_incidents: number | null }>; coverage: { totalRows: number; returnedRows: number; complete: boolean }; summaryByCurrency: LaudusCurrencySummary[]; invoices: Array<{ purchase_invoice_external_id: string; doc_number: string | null; issued_date: string | null; due_date: string | null; total_amount: number | null; currency: string | null; paid_amount: number | null; outstanding_amount: number | null; payment_count: number | null; last_payment_at: string | null; payment_status: string | null }>; readOnly: boolean; canonicalMutated: boolean };
-type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[]; laudusFinancial?: LaudusFinancial };
+type MotilFinancial = { summaryByCurrency: Array<{ currency:string; approvedAmount:number; paidAmount:number; outstandingAmount:number; overdueAmount:number; payableCount:number; overdueCount:number }>; payables:any[]; payments:any[]; unreconciledPayments:number; maintenanceLinkage:{ operationalOrders:number; linkedWorkOrders:number; linkedAssets:number; unlinkedOrders:number }; semantics:Record<string,string> };
+type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[]; motilFinancial?: MotilFinancial; laudusFinancial?: LaudusFinancial };
 const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 const pct = (value?: number | null) => value == null ? 'Sin evidencia' : `${Number(value).toFixed(0)}%`;
 
@@ -74,7 +75,12 @@ export default function Suppliers360Page() {
           <section className="rounded-lg border bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold">{detail.supplier.trade_name || detail.supplier.legal_name}</h2><p className="text-sm text-muted-foreground">{detail.supplier.legal_name} · {detail.supplier.tax_id}</p><p className="mt-2 text-sm">{detail.supplier.business_activity || 'Actividad no informada'}</p></div><div className="text-right text-sm"><p>{detail.supplier.email || 'Sin correo'}</p><p>{detail.supplier.phone || 'Sin teléfono'}</p><p>{detail.supplier.payment_terms || 'Sin condición de pago'}</p></div></div></section>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map(({ label, value, Icon }) => <article key={label} className="rounded-lg border bg-card p-4"><div className="flex justify-between text-muted-foreground"><span className="text-xs">{label}</span><Icon className="h-4 w-4"/></div><p className="mt-2 text-xl font-semibold">{value}</p></article>)}</section>
 
-          <LaudusFinancePanel financial={detail.laudusFinancial} />
+          <MotilFinancePanel financial={detail.motilFinancial} />
+
+          <details className="rounded-lg border bg-card">
+            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-medium">Fuente Laudus · evidencia financiera de contraste</summary>
+            <div className="border-t"><LaudusFinancePanel financial={detail.laudusFinancial} /></div>
+          </details>
 
           <section className="rounded-lg border bg-card p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Score operacional v2</p><h3 className="mt-1 text-lg font-semibold">Evidencia que alimenta la próxima adjudicación</h3><p className="mt-1 text-sm text-muted-foreground">Promedio simple sólo de dimensiones con evidencia. Sin datos, Motil no asigna score.</p></div><p className="text-sm text-muted-foreground">Evidencia: {Number(detail.performance?.evidence_dimensions || 0)}/3 dimensiones</p></div>
@@ -103,6 +109,43 @@ function ScoreDimension({ label, value, evidence }: { label: string; value?: num
 function Panel({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) { const count = Array.isArray(children) ? children.length : 1; return <section className="rounded-lg border bg-card"><div className="border-b p-4"><h3 className="font-semibold">{title}</h3></div><div className="divide-y">{count ? children : <p className="p-5 text-sm text-muted-foreground">{empty}</p>}</div></section>; }
 function Row({ title, meta, value }: { title: string; meta: string; value: string }) { return <div className="flex items-start justify-between gap-4 p-4"><div><p className="font-medium">{title}</p><p className="text-xs text-muted-foreground">{meta}</p></div><span className="shrink-0 text-sm">{value}</span></div>; }
 
+
+function MotilFinancePanel({ financial }: { financial?: MotilFinancial }) {
+  const summaries = financial?.summaryByCurrency || [];
+  const linkage = financial?.maintenanceLinkage;
+  return <section className="rounded-lg border bg-card">
+    <div className="flex flex-col gap-2 border-b p-5 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Finanzas · MOTIL</p>
+        <h3 className="mt-1 text-lg font-semibold">Caja y obligación operacional</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Lo aprobado, pagado y pendiente dentro del flujo MOTIL. Laudus queda como contraste contable en el bloque secundario.</p>
+      </div>
+      <a href="/dashboard/finanzas/pagos" className="text-xs font-medium underline underline-offset-2">Ir a Tesorería</a>
+    </div>
+    {!summaries.length ? <p className="p-5 text-sm text-muted-foreground">Este proveedor todavía no tiene CxP aprobadas en el flujo MOTIL.</p> :
+      <div className="space-y-4 p-5">
+        {summaries.map((summary) => <div key={summary.currency}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{summary.currency}</p><p className="text-xs text-muted-foreground">{summary.payableCount} CxP · {summary.overdueCount} vencidas</p></div>
+          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
+            <FinanceMetric label="Aprobado" value={moneyFor(summary.currency, summary.approvedAmount)} />
+            <FinanceMetric label="Pagado" value={moneyFor(summary.currency, summary.paidAmount)} />
+            <FinanceMetric label="Pendiente" value={moneyFor(summary.currency, summary.outstandingAmount)} />
+            <FinanceMetric label="Vencido" value={moneyFor(summary.currency, summary.overdueAmount)} />
+          </div>
+        </div>)}
+        <p className="text-xs text-muted-foreground">Pagos MOTIL por conciliar: {Number(financial?.unreconciledPayments || 0)}</p>
+      </div>}
+    <div className="grid gap-px border-t bg-border sm:grid-cols-4">
+      <FinanceMetric label="OC operativas" value={String(linkage?.operationalOrders ?? 0)} />
+      <FinanceMetric label="Con OT" value={String(linkage?.linkedWorkOrders ?? 0)} />
+      <FinanceMetric label="Con activo" value={String(linkage?.linkedAssets ?? 0)} />
+      <FinanceMetric label="Sin vínculo mantenimiento" value={String(linkage?.unlinkedOrders ?? 0)} />
+    </div>
+    <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+      El vínculo a mantenimiento sólo se publica cuando la OC tiene OT o activo explícito. MOTIL no infiere destino por nombre de proveedor, producto ni centro de costo.
+    </div>
+  </section>;
+}
 
 function LaudusFinancePanel({ financial }: { financial?: LaudusFinancial }) {
   if (!financial?.linked) {
