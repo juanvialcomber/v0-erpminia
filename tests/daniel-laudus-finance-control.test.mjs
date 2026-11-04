@@ -27,9 +27,10 @@ test('credit notes and reconciliation gaps keep conservative semantics', () => {
   assert.match(card, /No se usarán para atribución ejecutiva hasta resolverlos/);
 });
 
-test('Daniel finance workspace surfaces the Laudus control block', () => {
-  assert.match(page, /LaudusFinanceControlCard/);
-  assert.match(page, /<LaudusFinanceControlCard \/>/);
+test('Daniel finance workspace keeps Laudus secondary to the MOTIL operating cockpit', () => {
+  assert.match(page, /MotilFinanceOperatingCockpit/);
+  assert.match(page, /Fuente Laudus/);
+  assert.doesNotMatch(page, /LaudusFinanceControlCard/);
   assert.match(card, /Laudus · fuente financiera/);
   assert.match(card, /Pagos por verificar/);
 });
