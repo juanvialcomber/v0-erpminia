@@ -162,3 +162,79 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
+  if (!access.authorized) return access.response;
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const body = await request.json().catch(() => null);
+  const externalId = String(body?.externalId || '').trim();
+  const candidateAssetId = String(body?.candidateAssetId || '').trim() || null;
+  const decision = String(body?.decision || '').trim();
+  const evidenceLevel = String(body?.evidenceLevel || '').trim() || null;
+  const rationale = String(body?.rationale || '').trim();
+  const nameSimilarity = Number(body?.nameSimilarity ?? 0);
+  const scoreGap = Number(body?.scoreGap ?? 0);
+
+  const allowed = new Set(['confirm_candidate', 'reject_candidate', 'defer']);
+  if (!externalId || !allowed.has(decision)) {
+    return NextResponse.json({ error: 'Decisión de activo inválida.' }, { status: 400 });
+  }
+  if (!rationale) {
+    return NextResponse.json({ error: 'Debes registrar el fundamento de la decisión.' }, { status: 400 });
+  }
+  if (decision === 'confirm_candidate' && !candidateAssetId) {
+    return NextResponse.json({ error: 'La confirmación requiere un activo candidato.' }, { status: 400 });
+  }
+
+  if (candidateAssetId) {
+    const candidate = await context.supabase
+      .from('canonical_assets_current')
+      .select('id,asset_code,name,manufacturer,model,serial_number,license_plate,location')
+      .eq('organization_id', context.organizationId)
+      .eq('id', candidateAssetId)
+      .maybeSingle();
+
+    if (candidate.error) throw candidate.error;
+    if (!candidate.data) {
+      return NextResponse.json({ error: 'El activo candidato no pertenece a la organización.' }, { status: 404 });
+    }
+  }
+
+  const now = new Date().toISOString();
+  const payload = {
+    organization_id: context.organizationId,
+    laudus_external_id: externalId,
+    candidate_asset_id: candidateAssetId,
+    decision,
+    evidence_level: evidenceLevel,
+    name_similarity: Number.isFinite(nameSimilarity) ? nameSimilarity : 0,
+    score_gap: Number.isFinite(scoreGap) ? scoreGap : 0,
+    rationale,
+    reviewer_user_id: access.user.id,
+    decided_at: now,
+    candidate_snapshot: body?.candidateSnapshot || null,
+  };
+
+  const result = await context.supabase
+    .from('laudus_fixed_asset_review_decisions')
+    .upsert(payload, { onConflict: 'organization_id,laudus_external_id' })
+    .select('id,laudus_external_id,candidate_asset_id,decision,evidence_level,rationale,reviewer_user_id,decided_at')
+    .single();
+
+  if (result.error) {
+    console.error('[laudus/fixed-asset-review:post]', result.error);
+    return NextResponse.json({ error: 'No fue posible registrar la decisión del activo.' }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    review: result.data,
+    canonicalMutationExecuted: false,
+    laudusMutationExecuted: false,
+    message: 'Decisión registrada. No se modificó Laudus ni el maestro de activos.',
+  });
+}
