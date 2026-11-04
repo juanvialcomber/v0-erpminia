@@ -11,7 +11,8 @@ const close = await readFile(new URL('../app/api/maintenance/work-orders/[id]/cl
 test('assigned work-order execution bypass is narrow and excludes deletes', () => {
   assert.match(org, /method === 'PATCH'/);
   assert.match(org, /method === 'POST'/);
-  assert.match(org, /\(timer\|close\|evidence\|standard-plan\|offline-notes\)/);
+  assert.match(org, /\(timer\|close\|evidence\|standard-plan\|offline-notes\|fluids\)/);
+  assert.match(org, /fluids\\\/closure/);
   assert.match(org, /work-order-runtime-evidence/);
   assert.doesNotMatch(org, /method === 'DELETE'.*work-orders/s);
 });

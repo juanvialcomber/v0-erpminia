@@ -4,10 +4,12 @@ import fs from 'node:fs';
 
 const closeRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/close/route.ts','utf8');
 const closureRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/fluids/closure/route.ts','utf8');
+const fluidRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/fluids/route.ts','utf8');
 const closeQueue = fs.readFileSync('app/api/maintenance/work-order-close-queue/route.ts','utf8');
 const closeUi = fs.readFileSync('components/maintenance/progressive-work-order-close-queue.tsx','utf8');
 const reviewRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/review/route.ts','utf8');
 const reviewUi = fs.readFileSync('components/maintenance/work-order-evidence-and-approval.tsx','utf8');
+const organizationContext = fs.readFileSync('lib/api/organization-context.ts','utf8');
 
 test('only assigned mechanic can declare and close OT fluid data', () => {
   assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
@@ -44,4 +46,31 @@ test('Ariel is the reviewer and sees mechanic fluid evidence before approval', (
   assert.match(reviewUi, /Aceites y residuos/);
   assert.match(reviewUi, /Registrado por mecánico/);
   assert.match(reviewUi, /Ariel López revisa la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
+});
+
+
+test('oil quantity is requested only when mechanic confirms fluid use', () => {
+  assert.match(closeUi, /fluidUsedChoice === 'yes'/);
+  assert.match(closeUi, /<WorkOrderFluidUsagePanel/);
+  assert.match(closeUi, /Si eliges “No”, no se solicitará cantidad/);
+  assert.match(closeUi, /No se utilizaron aceites ni fluidos\. No se requiere registrar litros ni residuos\./);
+  assert.match(closeUi, /Confirmar sin uso de aceites/);
+  assert.match(closureRoute, /if \(body\.fluids_used && usageCount < 1\)/);
+  assert.match(closureRoute, /if \(!body\.fluids_used && usageCount > 0\)/);
+});
+
+
+test('assigned mechanic fluid routes bypass only the coarse maintenance role gate', () => {
+  assert.match(organizationContext, /timer\|close\|evidence\|standard-plan\|offline-notes\|fluids/);
+  assert.match(organizationContext, /fluids\\\/closure/);
+  assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
+  assert.match(closureRoute, /if \(!assigned\.ok\) return assigned\.response/);
+});
+
+
+test('only assigned mechanic can enter fluid usage while supervisors remain read-only', () => {
+  assert.match(fluidRoute, /const execution = await requireAssignedMaintenanceExecution\(context, id\)/);
+  assert.match(fluidRoute, /if \(!execution\.ok\) return execution\.response/);
+  assert.match(fluidRoute, /canEdit: execution\.ok/);
+  assert.doesNotMatch(fluidRoute, /if \(level === 'ED'\) return true/);
 });

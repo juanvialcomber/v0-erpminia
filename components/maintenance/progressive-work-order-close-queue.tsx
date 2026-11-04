@@ -444,10 +444,11 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                 </p>
               </div>
 
-              <WorkOrderFluidUsagePanel workOrderId={current.work_order_id} readOnly={!fluidClosureData?.canDeclare} />
-
               <div className="space-y-3 rounded-lg border p-4">
-                <p className="text-sm font-medium">¿Se utilizaron aceites o fluidos en esta OT?</p>
+                <div>
+                  <p className="text-sm font-medium">¿Se utilizaron aceites o fluidos en esta OT?</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Si eliges “No”, no se solicitará cantidad. Sólo debes dejar constancia para poder cerrar la OT.</p>
+                </div>
                 <div className="flex gap-2">
                   <Button type="button" size="sm" variant={fluidUsedChoice === 'yes' ? 'default' : 'outline'} onClick={() => { setFluidUsedChoice('yes'); setFluidWasteChoice(''); }}>
                     Sí
@@ -457,16 +458,25 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                   </Button>
                 </div>
 
+                {fluidUsedChoice === 'no' ? (
+                  <div className="rounded-md border bg-muted/20 p-3 text-sm">
+                    No se utilizaron aceites ni fluidos. No se requiere registrar litros ni residuos.
+                  </div>
+                ) : null}
+
                 {fluidUsedChoice === 'yes' ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">¿Qué ocurrió con el residuo?</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant={fluidWasteChoice === 'linked' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('linked')}>
-                        Residuo recuperado y registrado
-                      </Button>
-                      <Button type="button" size="sm" variant={fluidWasteChoice === 'none_recovered' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('none_recovered')}>
-                        No se recuperó residuo
-                      </Button>
+                  <div className="space-y-4">
+                    <WorkOrderFluidUsagePanel workOrderId={current.work_order_id} readOnly={!fluidClosureData?.canDeclare} />
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">¿Qué ocurrió con el residuo?</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant={fluidWasteChoice === 'linked' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('linked')}>
+                          Residuo recuperado y registrado
+                        </Button>
+                        <Button type="button" size="sm" variant={fluidWasteChoice === 'none_recovered' ? 'default' : 'outline'} onClick={() => setFluidWasteChoice('none_recovered')}>
+                          No se recuperó residuo
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -579,7 +589,9 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                   : current.next_action === 'close_work_order'
                     ? 'Cerrar OT'
                     : current.next_action === 'record_fluid_closure'
-                    ? 'Confirmar aceites y residuos'
+                    ? fluidUsedChoice === 'no'
+                      ? 'Confirmar sin uso de aceites'
+                      : 'Confirmar aceites y residuos'
                     : current.next_action === 'complete_standard_plan_step'
                       ? t.actions.markStepDone
                       : t.actions.saveContinue}

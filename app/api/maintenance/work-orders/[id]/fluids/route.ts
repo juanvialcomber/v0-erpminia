@@ -11,13 +11,6 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-async function canWrite(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }, workOrderId: string) {
-  const level = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (level === 'ED') return true;
-  const execution = await requireAssignedMaintenanceExecution(context, workOrderId);
-  return execution.ok;
-}
-
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -70,7 +63,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   return NextResponse.json({
     rows: usageRows.map((row) => ({ ...row, linked_waste: wasteByUsage.get(String(row.id)) || null })),
-    canEdit: level === 'ED' || execution.ok,
+    canEdit: execution.ok,
   });
 }
 
@@ -81,9 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
   if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
-  if (!(await canWrite(context, id))) {
-    return NextResponse.json({ error: 'No autorizado para registrar fluidos en esta OT.' }, { status: 403 });
-  }
+  const execution = await requireAssignedMaintenanceExecution(context, id);
+  if (!execution.ok) return execution.response;
 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: 'Solicitud inválida.' }, { status: 400 });

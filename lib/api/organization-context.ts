@@ -92,7 +92,11 @@ function isAssignedWorkOrderExecutionMutation(request: NextRequest) {
     return true;
   }
 
-  if (method === 'POST' && /^\/api\/maintenance\/work-orders\/[^/]+\/(timer|close|evidence|standard-plan|offline-notes)$/.test(path)) {
+  if (method === 'POST' && /^\/api\/maintenance\/work-orders\/[^/]+\/(timer|close|evidence|standard-plan|offline-notes|fluids)$/.test(path)) {
+    return true;
+  }
+
+  if (method === 'POST' && /^\/api\/maintenance\/work-orders\/[^/]+\/fluids\/closure$/.test(path)) {
     return true;
   }
 
