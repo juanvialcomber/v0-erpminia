@@ -19,9 +19,9 @@ test('finance keeps Laudus visible but secondary to the MOTIL operating cockpit'
   assert.match(strip, /Activos fijos/);
 });
 
-test('Daniel home shows the Laudus finance connection explicitly', () => {
-  assert.match(home, /personaKey === 'daniel_finance'/);
-  assert.match(home, /LaudusFinanceStatusStrip compact/);
+test('Daniel home stays operational and does not require Laudus visibility', () => {
+  assert.match(home, /personaKey/);
+  assert.doesNotMatch(home, /LaudusFinanceStatusStrip/);
 });
 
 test('finance source status uses live finance-control evidence and freshness', () => {
