@@ -45,14 +45,19 @@ type Asset = { id: string; asset_code: string | null; name: string | null };
 const phaseOrder = ['backlog','planning','prepared','execution','closeout','approval','history'] as const;
 type Phase = typeof phaseOrder[number];
 
-function hasOperationalBlocker(row?: Readiness | null) {
+function hasExecutionBlocker(row?: Readiness | null) {
   if (!row) return false;
   return Number(row.open_procurement_orders || 0) > 0
-    || Number(row.pending_parts || 0) > 0
     || Number(row.unmet_material_requirements || 0) > 0
-    || Number(row.pending_external_services || 0) > 0
+    || Number(row.pending_external_services || 0) > 0;
+}
+
+function hasCloseoutPending(row?: Readiness | null) {
+  if (!row) return false;
+  return Number(row.pending_parts || 0) > 0
     || Number(row.open_labor_entries || 0) > 0
-    || Boolean(row.external_cost_conflict);
+    || Boolean(row.external_cost_conflict)
+    || Number(row.standard_plan_steps_pending || 0) > 0;
 }
 
 function derivePhase(order: WorkOrder, readiness?: Readiness | null, review?: Review | null): Phase {
@@ -65,7 +70,7 @@ function derivePhase(order: WorkOrder, readiness?: Readiness | null, review?: Re
     return 'closeout';
   }
   if (!order.canonical_asset_id || !order.assigned_person_id) return 'backlog';
-  if (hasOperationalBlocker(readiness)) return 'planning';
+  if (hasExecutionBlocker(readiness)) return 'planning';
   if (order.scheduled_date) return 'prepared';
   return 'planning';
 }
@@ -77,7 +82,7 @@ function nextAction(phase: Phase, order: WorkOrder, readiness?: Readiness | null
     return 'Completar screening';
   }
   if (phase === 'planning') {
-    if (hasOperationalBlocker(readiness)) return 'Resolver materiales/servicios';
+    if (hasExecutionBlocker(readiness)) return 'Resolver materiales/servicios';
     return order.scheduled_date ? 'Preparar ejecución' : 'Programar fecha';
   }
   if (phase === 'prepared') return 'Liberar a ejecución';
@@ -182,7 +187,14 @@ export async function GET(request: NextRequest) {
     });
 
     const openRows = rows.filter((row) => !['approval','history'].includes(row.phase));
-    const blockedRows = openRows.filter((row) => Object.values(row.blockers).some((value) => typeof value === 'boolean' ? value : value > 0));
+    const blockedRows = openRows.filter((row) => {
+      const readiness = readinessMap.get(row.id) || null;
+      return hasExecutionBlocker(readiness);
+    });
+    const closeoutPendingRows = openRows.filter((row) => {
+      const readiness = readinessMap.get(row.id) || null;
+      return hasCloseoutPending(readiness);
+    });
     const assignedRows = openRows.filter((row) => Boolean(row.assignedToName));
     const scheduledRows = openRows.filter((row) => Boolean(row.scheduledDate));
     const approvedRows = rows.filter((row) => row.phase === 'history');
@@ -193,6 +205,7 @@ export async function GET(request: NextRequest) {
         workOrders: rows.length,
         open: openRows.length,
         blocked: blockedRows.length,
+        closeoutPending: closeoutPendingRows.length,
         assigned: assignedRows.length,
         scheduled: scheduledRows.length,
         pendingApproval: rows.filter((row) => row.phase === 'approval').length,
@@ -202,6 +215,7 @@ export async function GET(request: NextRequest) {
       },
       semantics: {
         model: 'MOTIL EAM phase model derived from canonical OT state; no parallel maintenance master is created.',
+        executionGate: 'Blocked counts only conditions that prevent starting execution: open procurement, unmet material requirements, or pending external services. Labor, installed/pending parts, plan steps, and cost conflicts remain closeout evidence and do not masquerade as start blockers.',
         approval: 'Ariel approval remains post-execution under the current La Patagua contract.',
         sapReference: 'SAP-style discipline: technical object + planning + preparation + execution + post-execution + completion, adapted to MOTIL authority rules.',
       },
