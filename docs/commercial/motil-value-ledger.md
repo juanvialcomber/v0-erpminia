@@ -298,3 +298,16 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel: L4 habilitado como control de proceso; evidencia E2 hasta observar reducción de backlog, tiempo de preparación, bloqueos o ciclo.
 - Métricas siguientes: tiempo Backlog→Preparado, porcentaje de OT preparadas sin bloqueo, cumplimiento de programación, tiempo Cierre→Aprobación, reincidencia 7/30d y costo final por activo.
 - Impacto económico: todavía no atribuido. El valor inmediato es control de proceso y reducción de reconstrucción manual; E3 requiere comparar outcomes antes/después.
+
+
+## 2026-11-04 — MOTIL-first Compras y Finanzas
+
+- Problema previo: Laudus seguía ocupando la jerarquía visual principal en Compras/Finanzas aunque MOTIL ya soportaba solicitud, OC, recepción, factura, three-way match, CxP, pago y conciliación.
+- Capacidad: nueva portada financiera MOTIL-first con una sola siguiente acción derivada de datos operacionales canónicos; Laudus queda colapsado como fuente financiera/tributaria de contraste y trazabilidad.
+- Cadena operacional soportada en MOTIL: necesidad → OC → recepción → factura → aprobación → vencimiento → pago → conciliación.
+- Evidencia productiva observada al instrumentar: 3 solicitudes, 3 OC operativas, 3 recepciones, 3 facturas, 2 CxP, 2 pagos y 0 excepciones de match abiertas.
+- Autoridad: MOTIL = workflow operacional; humano = aprobación/pago; Laudus = fuente financiera/tributaria read-only mientras no exista un gate explícito de escritura.
+- Reducción de dependencia: una compra nueva y su seguimiento ya no requieren entrar a Laudus; Laudus se usa para contraste, evidencia histórica, contabilidad y obligaciones donde siga siendo autoridad.
+- Nivel de valor: L4 para el flujo operacional MOTIL. E2 por existencia de flujo real y acciones humanas; no se declara ahorro de tiempo ni costo evitado sin baseline comparable.
+- Métrica siguiente: número de casos resueltos completamente en MOTIL sin abrir Laudus, tiempo por ciclo y excepciones que todavía obligan a consultar el ERP.
+- Impacto económico: no medido todavía.
