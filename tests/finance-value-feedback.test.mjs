@@ -88,3 +88,21 @@ test('finance priority adoption deduplicates repeated clicks by Chile business d
   assert.match(valuePage,/deduplicados por prioridad\/día/);
   assert.match(cron,/financePriorityDecision/);
 });
+
+
+test('finance outcomes are captured server-side and remain non-causal',()=>{
+  const priorityRoute = fs.readFileSync('app/api/value/finance-priority-decision/route.ts','utf8');
+  const outcomeLib = fs.readFileSync('lib/value/finance-priority-outcomes.ts','utf8');
+  const valueApi = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  const valuePage = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+
+  assert.match(priorityRoute,/loadLaudusFinanceControl/);
+  assert.match(priorityRoute,/observation_at_decision/);
+  assert.match(priorityRoute,/finance-priority-decision-v3/);
+  assert.match(outcomeLib,/financePriorityOutcome/);
+  assert.match(outcomeLib,/UNMEASURABLE/);
+  assert.match(valueApi,/state observed after an accepted human decision/);
+  assert.match(valueApi,/HOLD_E3/);
+  assert.match(valuePage,/Mejoraron después/);
+  assert.match(valuePage,/No atribuye causalidad a MOTIL ni equivale a ahorro/);
+});
