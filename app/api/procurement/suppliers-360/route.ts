@@ -123,7 +123,6 @@ export async function GET(request: NextRequest) {
 
       laudusFinancial = {
         linked: true,
-        supplierExternalId: laudusSupplier.external_id,
         reconciliationStatus: laudusSupplier.reconciliation_status || null,
         supplierSyncAt: laudusSupplier.synced_at || null,
         sourceHealth: laudusHealth || [],
