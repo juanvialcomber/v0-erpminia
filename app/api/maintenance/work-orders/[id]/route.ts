@@ -229,6 +229,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     if (body.status === 'in_progress') {
+      const releaseReadiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, id);
+      if (!releaseReadiness.ready) {
+        return NextResponse.json(
+          {
+            error: 'La OT no está preparada para ejecución.',
+            blockers: releaseReadiness.blockers,
+            emergencyBypass: releaseReadiness.emergencyBypass,
+          },
+          { status: 409 },
+        );
+      }
+
       const other = await findOtherRunningWorkOrder(context, id);
       if (other) {
         return NextResponse.json({
