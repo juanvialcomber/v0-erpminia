@@ -28,25 +28,37 @@ function asNumber(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizedTask(value: unknown) {
+  return String(value || '').trim();
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const { data: archive, error: archiveError } = await context.supabase
-    .from('motil_preventive_retired_archive_20261018')
-    .select('original_id,archived_at,original_record')
-    .eq('entity_type', 'schedule')
-    .order('archived_at', { ascending: false })
-    .limit(100);
+  const [{ data: archive, error: archiveError }, { data: reviews, error: reviewError }] = await Promise.all([
+    context.supabase
+      .from('motil_preventive_retired_archive_20261018')
+      .select('original_id,archived_at,original_record')
+      .eq('entity_type', 'schedule')
+      .order('archived_at', { ascending: false })
+      .limit(100),
+    context.supabase
+      .from('maintenance_preventive_history_reviews')
+      .select('archive_id,decision,reviewed_task_name,reviewed_frequency_hours,reviewed_frequency_days,review_note,reviewed_at')
+      .eq('organization_id', context.organizationId)
+      .limit(500),
+  ]);
   if (archiveError) return NextResponse.json({ error: archiveError.message }, { status: 500 });
+  if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
 
   const records = (archive || []).filter((row) => {
     const record = (row.original_record || {}) as ArchivedScheduleRecord;
     return record.organization_id === context.organizationId;
   });
-  const assetIds = Array.from(new Set(records.map((row) => String((row.original_record as ArchivedScheduleRecord)?.canonical_asset_id || '')).filter(Boolean)));
+  const assetIds = Array.from(new Set(records.map((row) => String((row.original_record as ArchivedScheduleRecord)?.canonical_asset_id || (row.original_record as ArchivedScheduleRecord)?.asset_id || '')).filter(Boolean)));
 
   const { data: assets, error: assetError } = assetIds.length
     ? await context.supabase
@@ -65,9 +77,10 @@ export async function GET(request: NextRequest) {
   if (activeError) return NextResponse.json({ error: activeError.message }, { status: 500 });
 
   const assetMap = new Map((assets || []).map((row) => [row.id, row]));
+  const reviewMap = new Map((reviews || []).map((row) => [String(row.archive_id), row]));
   const activeKeys = new Set((activeSchedules || []).map((row) => [
     row.canonical_asset_id || row.asset_id || '',
-    String(row.task_name || '').trim().toLowerCase(),
+    normalizedTask(row.task_name).toLowerCase(),
     row.frequency_hours ?? '',
     row.frequency_days ?? '',
   ].join('|')));
@@ -77,8 +90,11 @@ export async function GET(request: NextRequest) {
     const assetId = String(record.canonical_asset_id || record.asset_id || '');
     const frequencyHours = asNumber(record.frequency_hours);
     const frequencyDays = asNumber(record.frequency_days);
-    const key = [assetId, String(record.task_name || '').trim().toLowerCase(), frequencyHours ?? '', frequencyDays ?? ''].join('|');
+    const key = [assetId, normalizedTask(record.task_name).toLowerCase(), frequencyHours ?? '', frequencyDays ?? ''].join('|');
     const asset = assetMap.get(assetId) || null;
+    const review = reviewMap.get(String(row.original_id)) || null;
+    const alreadyActive = activeKeys.has(key) || review?.decision === 'validated';
+    const dismissed = review?.decision === 'dismissed';
     return {
       archiveId: row.original_id,
       archivedAt: row.archived_at,
@@ -96,16 +112,22 @@ export async function GET(request: NextRequest) {
       sourceHash: record.source_hash || null,
       estimatedDurationHours: asNumber(record.estimated_duration_hours),
       assetExists: Boolean(asset),
-      alreadyActive: activeKeys.has(key),
+      alreadyActive,
+      dismissed,
+      decision: review?.decision || 'pending',
+      review,
     };
   });
 
+  const pending = candidates.filter((row) => row.assetExists && !row.alreadyActive && !row.dismissed);
   return NextResponse.json({
     candidates,
     summary: {
       total: candidates.length,
-      reviewable: candidates.filter((row) => row.assetExists && !row.alreadyActive).length,
-      alreadyActive: candidates.filter((row) => row.alreadyActive).length,
+      pending: pending.length,
+      reviewable: pending.length,
+      validated: candidates.filter((row) => row.alreadyActive).length,
+      dismissed: candidates.filter((row) => row.dismissed).length,
       missingAsset: candidates.filter((row) => !row.assetExists).length,
     },
     canEdit: access.canWrite,
@@ -114,6 +136,7 @@ export async function GET(request: NextRequest) {
       archiveIsHistorical: true,
       noAutoRestore: true,
       currentMeterNotCopied: true,
+      decisionsAreAudited: true,
     },
   });
 }
@@ -125,8 +148,10 @@ export async function POST(request: NextRequest) {
   if (!context.ok) return context.response;
 
   const body = await request.json().catch(() => null);
+  const action = String(body?.action || 'validate').trim();
   const archiveId = String(body?.archiveId || '').trim();
   if (!archiveId) return NextResponse.json({ error: 'Pauta histórica requerida.' }, { status: 400 });
+  if (!['validate', 'dismiss'].includes(action)) return NextResponse.json({ error: 'Acción de revisión inválida.' }, { status: 400 });
 
   const { data: archived, error: archiveError } = await context.supabase
     .from('motil_preventive_retired_archive_20261018')
@@ -154,10 +179,39 @@ export async function POST(request: NextRequest) {
   if (assetError) return NextResponse.json({ error: assetError.message }, { status: 500 });
   if (!asset) return NextResponse.json({ error: 'El equipo histórico ya no existe en el maestro canónico.' }, { status: 409 });
 
-  const taskName = String(record.task_name || '').trim();
+  const reviewNote = body?.reviewNote ? String(body.reviewNote).trim() : null;
+
+  if (action === 'dismiss') {
+    const { data: review, error: reviewError } = await context.supabase
+      .from('maintenance_preventive_history_reviews')
+      .upsert({
+        organization_id: context.organizationId,
+        archive_id: archiveId,
+        canonical_asset_id: canonicalAssetId,
+        decision: 'dismissed',
+        reviewed_task_name: normalizedTask(record.task_name) || null,
+        reviewed_frequency_hours: asNumber(record.frequency_hours),
+        reviewed_frequency_days: asNumber(record.frequency_days),
+        review_note: reviewNote,
+        reviewed_by: context.authUserId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'organization_id,archive_id' })
+      .select('archive_id,decision,reviewed_at')
+      .single();
+    if (reviewError) return NextResponse.json({ error: reviewError.message }, { status: 500 });
+    return NextResponse.json({ data: review, canonicalScheduleCreated: false, archiveMutated: false });
+  }
+
+  const taskName = normalizedTask(body?.taskName ?? record.task_name);
   if (!taskName) return NextResponse.json({ error: 'La pauta histórica no tiene nombre de tarea.' }, { status: 409 });
-  const frequencyHours = asNumber(record.frequency_hours);
-  const frequencyDays = asNumber(record.frequency_days);
+
+  const frequencyHours = Object.prototype.hasOwnProperty.call(body || {}, 'frequencyHours')
+    ? asNumber(body.frequencyHours)
+    : asNumber(record.frequency_hours);
+  const frequencyDays = Object.prototype.hasOwnProperty.call(body || {}, 'frequencyDays')
+    ? asNumber(body.frequencyDays)
+    : asNumber(record.frequency_days);
   if ((frequencyHours === null || frequencyHours <= 0) && (frequencyDays === null || frequencyDays <= 0)) {
     return NextResponse.json({ error: 'La pauta histórica no tiene una frecuencia válida.' }, { status: 409 });
   }
@@ -170,7 +224,7 @@ export async function POST(request: NextRequest) {
     .or(`canonical_asset_id.eq.${canonicalAssetId},asset_id.eq.${canonicalAssetId}`);
   if (frequencyHours !== null) duplicateQuery = duplicateQuery.eq('frequency_hours', frequencyHours);
   else duplicateQuery = duplicateQuery.is('frequency_hours', null);
-  if (frequencyDays !== null) duplicateQuery = duplicateQuery.eq('frequency_days', frequencyDays);
+  if (frequencyDays !== null) duplicateQuery = duplicateQuery.eq('frequency_days', Math.round(frequencyDays));
   else duplicateQuery = duplicateQuery.is('frequency_days', null);
   const { data: duplicate, error: duplicateError } = await duplicateQuery.limit(1).maybeSingle();
   if (duplicateError) return NextResponse.json({ error: duplicateError.message }, { status: 500 });
@@ -181,7 +235,15 @@ export async function POST(request: NextRequest) {
     ? lastExecutedMeter + frequencyHours
     : null;
 
-  const sourceReference = [record.source_reference || 'Fuente histórica', 'Validada desde archivo MOTIL 2026-10-18'].join(' · ');
+  const edited = taskName !== normalizedTask(record.task_name)
+    || frequencyHours !== asNumber(record.frequency_hours)
+    || frequencyDays !== asNumber(record.frequency_days);
+  const sourceReference = [
+    record.source_reference || 'Fuente histórica',
+    edited ? 'Validada con ajuste por planificación' : 'Validada por planificación',
+    'Archivo MOTIL 2026-10-18',
+  ].join(' · ');
+
   const { data, error } = await context.supabase
     .from('preventive_maintenance_schedules')
     .insert({
@@ -211,10 +273,32 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const { error: reviewError } = await context.supabase
+    .from('maintenance_preventive_history_reviews')
+    .upsert({
+      organization_id: context.organizationId,
+      archive_id: archiveId,
+      canonical_asset_id: canonicalAssetId,
+      decision: 'validated',
+      reviewed_task_name: taskName,
+      reviewed_frequency_hours: frequencyHours,
+      reviewed_frequency_days: frequencyDays && frequencyDays > 0 ? Math.round(frequencyDays) : null,
+      review_note: reviewNote,
+      reviewed_by: context.authUserId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'organization_id,archive_id' });
+  if (reviewError) {
+    await context.supabase.from('preventive_maintenance_schedules').delete().eq('id', data.id).eq('organization_id', context.organizationId);
+    return NextResponse.json({ error: reviewError.message }, { status: 500 });
+  }
+
   return NextResponse.json({
     data,
     restoredFromArchiveId: archiveId,
     currentMeterCopied: false,
-    note: 'La pauta fue restaurada con frecuencia/fuente histórica; el horómetro vigente se obtiene de la evidencia actual de MOTIL.',
+    archiveMutated: false,
+    editedBeforeValidation: edited,
+    note: 'La pauta fue validada con trazabilidad histórica; el horómetro vigente se obtiene de la evidencia actual de MOTIL.',
   }, { status: 201 });
 }
