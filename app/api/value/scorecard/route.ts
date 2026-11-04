@@ -215,12 +215,49 @@ export async function GET(request: NextRequest) {
       if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
       eventTimes.set(key, current);
     }
-    const approvedReviewByOrder = new Map<string, string>();
+    const latestReviewByOrder = new Map<string, any>();
     for (const row of maintenanceSupervisorReviews.data || []) {
       const key = String(row.work_order_id || '');
       const reviewedAt = String(row.reviewed_at || '');
-      if (key && row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
+      const current = latestReviewByOrder.get(key);
+      if (
+        key
+        && reviewedAt
+        && (!current || Date.parse(reviewedAt) > Date.parse(String(current.reviewed_at || '')))
+      ) {
+        latestReviewByOrder.set(key, row);
+      }
     }
+    const approvedReviewByOrder = new Map<string, string>();
+    for (const [key, row] of latestReviewByOrder.entries()) {
+      const reviewedAt = String(row.reviewed_at || '');
+      if (row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
+    }
+    const closeToReviewSeconds = closedRows
+      .map((row: any) => {
+        const review = latestReviewByOrder.get(String(row.id));
+        if (!review?.reviewed_at || !row.closed_at) return null;
+        const closedMs = Date.parse(String(row.closed_at));
+        const reviewedMs = Date.parse(String(review.reviewed_at));
+        return Number.isFinite(closedMs) && Number.isFinite(reviewedMs) && reviewedMs >= closedMs
+          ? Math.round((reviewedMs - closedMs) / 1000)
+          : null;
+      })
+      .filter((value): value is number => value !== null);
+    const reviewLatency = median(closeToReviewSeconds);
+    const reviewedClosed = closedRows.filter((row: any) => latestReviewByOrder.has(String(row.id))).length;
+    const approvedClosed = closedRows.filter(
+      (row: any) => latestReviewByOrder.get(String(row.id))?.status === 'approved',
+    ).length;
+    const supervisorReview = {
+      reviewedClosed,
+      approvedClosed,
+      nonApprovedClosed: reviewedClosed - approvedClosed,
+      coveragePct: closedRows.length > 0 ? Math.round((reviewedClosed / closedRows.length) * 100) : null,
+      medianCloseToReviewSeconds: reviewLatency.medianSeconds,
+      latencySamples: reviewLatency.samples,
+      semantics: 'latest human supervisor review per closed work order; approval rate is workflow evidence, not proof of repair quality',
+    };
 
     const emergencyCycleRows = emergencyRows.map((row: any) => {
       const times = eventTimes.get(String(row.id)) || {};
@@ -463,6 +500,7 @@ export async function GET(request: NextRequest) {
       meterCoverageCount: meterRows.length,
       emergencyWorkOrders: emergencyRows.length,
       emergencyCycle,
+      supervisorReview,
       observedExecutionSeconds: timerSecondsObserved,
       observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
       workOrdersWithEvents: workOrdersWithEvents.size,
