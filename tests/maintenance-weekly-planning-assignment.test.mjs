@@ -19,12 +19,14 @@ test('manual work-order creation requires assignee and date, with equipment or e
   const api = read('app/api/maintenance/work-orders/route.ts');
   const assignees = read('app/api/maintenance/assignees/route.ts');
   assert.match(form, /if \(!assignedPersonId\)/);
-  assert.match(form, /if \(!generalWork && !canonicalAssetId\)/);
+  assert.match(form, /workOrderScopeViolation\\(\\{ canonicalAssetId, isGeneralWork: generalWork, generalWorkConfirmed \\}\\)/);
+  assert.match(form, /generalWorkConfirmed: generalWork \\? generalWorkConfirmed : false/);
   assert.match(form, /if \(!scheduledDate\)/);
   assert.match(form, /<Input id="scheduled-date" type="date"/);
   assert.match(form, /assignedPersonId,[\s\S]*canonicalAssetId: generalWork \? null : canonicalAssetId/);
   assert.match(form, /scheduledDate,\s*plannedDurationHours/);
-  assert.match(api, /if \(!canonicalAssetId && !isGeneralWork\)/);
+  assert.match(api, /workOrderScopeViolation\\(\\{ canonicalAssetId, isGeneralWork, generalWorkConfirmed \\}\\)/);
+  assert.match(api, /GENERAL_NOT_CONFIRMED/);
   assert.match(api, /getMaintenanceWorkOrderCreationCapability\(context\)/);
   assert.match(api, /const canCreateRequestedType = isEmergencyWork[\s\S]*creationCapability\.canCreateEmergency[\s\S]*creationCapability\.canCreate/);
   assert.match(api, /if \(!canCreateRequestedType\)/);
