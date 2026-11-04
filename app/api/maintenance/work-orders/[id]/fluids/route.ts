@@ -39,21 +39,37 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const usageRows = data || [];
-  const usageIds = usageRows.map((row) => row.id);
-  const wasteResult = usageIds.length
+  const { data: linkEvents, error: linkError } = await context.supabase
+    .from('work_order_events')
+    .select('source_record_id,payload')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', id)
+    .eq('event_type', 'waste_generated')
+    .eq('source_table', 'maintenance_waste_records')
+    .limit(5000);
+
+  if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
+  const wasteIds = Array.from(new Set((linkEvents || []).map((row) => row.source_record_id).filter(Boolean)));
+  const wasteResult = wasteIds.length
     ? await context.supabase
         .from('maintenance_waste_records')
-        .select('id,source_fluid_usage_id,waste_code,waste_name,quantity,unit,status,classification,storage_location,destination_name')
+        .select('id,waste_code,waste_name,quantity,unit,status,classification,storage_location,destination_name')
         .eq('organization_id', context.organizationId)
         .eq('work_order_id', id)
-        .in('source_fluid_usage_id', usageIds)
+        .in('id', wasteIds)
     : { data: [], error: null };
-
   if (wasteResult.error) return NextResponse.json({ error: wasteResult.error.message }, { status: 500 });
-  const wasteByUsage = new Map((wasteResult.data || []).map((row) => [row.source_fluid_usage_id, row]));
+
+  const wasteById = new Map((wasteResult.data || []).map((row) => [row.id, row]));
+  const wasteByUsage = new Map<string, any>();
+  for (const event of linkEvents || []) {
+    const usageId = String((event.payload as any)?.source_fluid_usage_id || '');
+    const waste = wasteById.get(event.source_record_id);
+    if (usageId && waste) wasteByUsage.set(usageId, waste);
+  }
 
   return NextResponse.json({
-    rows: usageRows.map((row) => ({ ...row, linked_waste: wasteByUsage.get(row.id) || null })),
+    rows: usageRows.map((row) => ({ ...row, linked_waste: wasteByUsage.get(String(row.id)) || null })),
     canEdit: level === 'ED' || execution.ok,
   });
 }
@@ -179,7 +195,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         organization_id: context.organizationId,
         work_order_id: id,
         canonical_asset_id: canonicalAssetId,
-        source_fluid_usage_id: data.id,
         waste_code: linkedWasteCode,
         waste_name: wasteNames[linkedWasteCode] || 'Residuo líquido usado',
         classification: 'to_classify',
