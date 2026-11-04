@@ -3,7 +3,7 @@ import { daysUntilWorkOrderDate, isWorkOrderScheduledOverdue } from '@/lib/maint
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { AlertCircle, ChevronRight, Inbox, Plus, Search, Siren } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -92,6 +92,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'approval' | 'completed' | 'historical'>('active');
+  const defaultViewResolved = useRef(false);
 
   const fetcher = async (url: string) => {
     const response = await fetch(url, { credentials: 'include' });
@@ -100,8 +101,16 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
     return payload;
   };
 
-  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/work-orders', fetcher);
+  const { data, error, isLoading, mutate } = useSWR('/api/maintenance/work-orders', fetcher, { revalidateOnFocus: true });
   const { data: viewerContext } = useSWR('/api/maintenance/viewer-context', fetcher, { revalidateOnFocus: false });
+  // Terrain users must retain all their assigned OTs after closing them.
+  // Closing a job does not equal supervisor approval or removal from their history.
+  useEffect(() => {
+    if (defaultViewResolved.current || !viewerContext?.mode) return;
+    defaultViewResolved.current = true;
+    if (viewerContext.mode === 'execution') setViewFilter('all');
+  }, [viewerContext?.mode]);
+  const isExecutorView = viewerContext?.mode === 'execution';
   const canCreateWorkOrder = Boolean(viewerContext?.canCreateWorkOrder);
   const canCreateEmergencyWorkOrder = Boolean(viewerContext?.canCreateEmergencyWorkOrder);
 
@@ -189,6 +198,9 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
                 <CardTitle className="text-base">{missingAssetOnly ? t.listTitles.missingAsset : viewFilter === 'historical' ? t.listTitles.historical : viewFilter === 'approval' ? t.listTitles.approval : viewFilter === 'completed' ? t.listTitles.completed : t.listTitles.operational}</CardTitle>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{fill(t.counts, { filtered: filteredOrders.length, total: workOrders.length })}</p>
+              {isExecutorView && !missingAssetOnly ? (
+                <p className="mt-1 text-xs text-muted-foreground">Tus OT cerradas siguen aquí, incluso mientras Ariel revisa su aprobación.</p>
+              ) : null}
               {!missingAssetOnly ? (
                 <div className="mt-3 flex flex-wrap gap-1 rounded-md border bg-background p-1">
                   <Button size="sm" variant={viewFilter === 'active' ? 'secondary' : 'ghost'} onClick={() => setViewFilter('active')}>{t.inboxViews.active}</Button>
@@ -208,7 +220,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder={t.filters.status} /></SelectTrigger><SelectContent><SelectItem value="all">{t.filters.statuses.all}</SelectItem><SelectItem value="open">{t.filters.statuses.open}</SelectItem><SelectItem value="in_progress">{t.filters.statuses.inProgress}</SelectItem><SelectItem value="completed">{t.filters.statuses.completed}</SelectItem></SelectContent></Select>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}><SelectTrigger><SelectValue placeholder={t.filters.priority} /></SelectTrigger><SelectContent><SelectItem value="all">{t.filters.priorities.all}</SelectItem><SelectItem value="critical">{t.filters.priorities.critical}</SelectItem><SelectItem value="high">{t.filters.priorities.high}</SelectItem><SelectItem value="medium">{t.filters.priorities.medium}</SelectItem><SelectItem value="low">{t.filters.priorities.low}</SelectItem></SelectContent></Select>
-              <Button variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); setPriorityFilter('all'); setViewFilter('active'); }}>{t.filters.clear}</Button>
+              <Button variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); setPriorityFilter('all'); setViewFilter(isExecutorView ? 'all' : 'active'); }}>{t.filters.clear}</Button>
             </div>
               </div>
             </details>
@@ -232,7 +244,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
                 const completed = ['completed', 'completado'].includes(status);
                 const approved = normalizeText(order.approval_status) === 'approved';
                 const nextAction = completed
-                  ? approved ? t.approval.record : t.approval.review
+                  ? approved ? 'Ver registro' : isExecutorView ? 'Ver cierre' : t.approval.review
                   : ['in_progress', 'en_progreso'].includes(status) ? 'Continuar' : 'Abrir';
                 const stateLabel = completed && !historical
                   ? approved ? t.approval.approved : t.approval.pending
