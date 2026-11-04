@@ -25,3 +25,11 @@ test('historical NULA supplier placeholder stays out of the actionable supplier 
   assert.match(migration, /'NULA' then 'source_placeholder'/);
   assert.match(migration, /<> 'NULA'/);
 });
+
+
+test('multi-center purchase orders remain valid when every line maps to a known canonical center', () => {
+  assert.match(migration, /multi_line_allocation/);
+  assert.match(migration, /multi_line_review/);
+  assert.match(migration, /unknown_line_cost_centers/);
+  assert.match(migration, /unparsed_line_cost_centers/);
+});
