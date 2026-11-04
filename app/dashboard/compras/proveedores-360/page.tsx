@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, PackageSearch, ReceiptText, Search, ShieldCheck, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, FileText, PackageSearch, ReceiptText, Search, ShieldCheck, ShoppingCart, WalletCards } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 
 type Supplier = { id: string; tax_id: string; legal_name: string; trade_name?: string | null; business_activity?: string | null; payment_terms?: string | null; email?: string | null; phone?: string | null; region?: string | null; is_active: boolean; validation_status: string };
 type Performance = { operational_score?: number | null; delivery_score?: number | null; quality_score?: number | null; invoice_score?: number | null; evidence_dimensions?: number | null; score_version?: string | null; delivery_scored_orders?: number | null; receipt_count?: number | null; invoice_scored_count?: number | null; returns_count?: number | null; returned_quantity?: number | null };
-type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[] };
+type LaudusCurrencySummary = { currency: string; invoiceCount: number; totalAmount: number; paidAmount: number; outstandingAmount: number; overdueAmount: number; overdueInvoices: number; latestInvoiceAt: string | null; latestPaymentAt: string | null };
+type LaudusFinancial = { linked: boolean; reconciliationStatus?: string | null; supplierSyncAt?: string | null; sourceHealth?: Array<{ domain: string; health_status: string | null; last_success_at: string | null; consecutive_failures: number | null; open_incidents: number | null }>; coverage: { totalRows: number; returnedRows: number; complete: boolean }; summaryByCurrency: LaudusCurrencySummary[]; invoices: Array<{ purchase_invoice_external_id: string; doc_number: string | null; issued_date: string | null; due_date: string | null; total_amount: number | null; currency: string | null; paid_amount: number | null; outstanding_amount: number | null; payment_count: number | null; last_payment_at: string | null; payment_status: string | null }>; readOnly: boolean; canonicalMutated: boolean };
+type Detail = { supplier: Supplier; contractor: any; performance: Performance | null; legacyPerformance?: any; orders: any[]; operationalOrders: any[]; quotations: any[]; contracts: any[]; documents: any[]; invoices: any[]; returns: any[]; suppliedProducts: any[]; laudusFinancial?: LaudusFinancial };
 const money = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
 const pct = (value?: number | null) => value == null ? 'Sin evidencia' : `${Number(value).toFixed(0)}%`;
 
@@ -51,7 +53,7 @@ export default function Suppliers360Page() {
   const scoreLabel = detail?.performance?.operational_score == null ? 'Sin evidencia' : `${Number(detail.performance.operational_score).toFixed(0)}/100`;
   const cards = detail ? [
     { label: 'Compras acumuladas', value: money.format(totals.spend), Icon: ShoppingCart },
-    { label: 'Facturado', value: money.format(totals.invoices), Icon: ReceiptText },
+    { label: 'Facturas operacionales', value: money.format(totals.invoices), Icon: ReceiptText },
     { label: 'Productos', value: detail.suppliedProducts.length, Icon: PackageSearch },
     { label: 'Contratos', value: detail.contracts.length, Icon: FileText },
     { label: 'Score operacional', value: scoreLabel, Icon: ShieldCheck },
@@ -71,6 +73,8 @@ export default function Suppliers360Page() {
         {detail && !loading && <>
           <section className="rounded-lg border bg-card p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-semibold">{detail.supplier.trade_name || detail.supplier.legal_name}</h2><p className="text-sm text-muted-foreground">{detail.supplier.legal_name} · {detail.supplier.tax_id}</p><p className="mt-2 text-sm">{detail.supplier.business_activity || 'Actividad no informada'}</p></div><div className="text-right text-sm"><p>{detail.supplier.email || 'Sin correo'}</p><p>{detail.supplier.phone || 'Sin teléfono'}</p><p>{detail.supplier.payment_terms || 'Sin condición de pago'}</p></div></div></section>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{cards.map(({ label, value, Icon }) => <article key={label} className="rounded-lg border bg-card p-4"><div className="flex justify-between text-muted-foreground"><span className="text-xs">{label}</span><Icon className="h-4 w-4"/></div><p className="mt-2 text-xl font-semibold">{value}</p></article>)}</section>
+
+          <LaudusFinancePanel financial={detail.laudusFinancial} />
 
           <section className="rounded-lg border bg-card p-5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Score operacional v2</p><h3 className="mt-1 text-lg font-semibold">Evidencia que alimenta la próxima adjudicación</h3><p className="mt-1 text-sm text-muted-foreground">Promedio simple sólo de dimensiones con evidencia. Sin datos, Motil no asigna score.</p></div><p className="text-sm text-muted-foreground">Evidencia: {Number(detail.performance?.evidence_dimensions || 0)}/3 dimensiones</p></div>
@@ -98,3 +102,68 @@ export default function Suppliers360Page() {
 function ScoreDimension({ label, value, evidence }: { label: string; value?: number | null; evidence: string }) { return <div className="rounded-lg border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{pct(value)}</p><p className="mt-1 text-xs text-muted-foreground">{evidence}</p></div>; }
 function Panel({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) { const count = Array.isArray(children) ? children.length : 1; return <section className="rounded-lg border bg-card"><div className="border-b p-4"><h3 className="font-semibold">{title}</h3></div><div className="divide-y">{count ? children : <p className="p-5 text-sm text-muted-foreground">{empty}</p>}</div></section>; }
 function Row({ title, meta, value }: { title: string; meta: string; value: string }) { return <div className="flex items-start justify-between gap-4 p-4"><div><p className="font-medium">{title}</p><p className="text-xs text-muted-foreground">{meta}</p></div><span className="shrink-0 text-sm">{value}</span></div>; }
+
+
+function LaudusFinancePanel({ financial }: { financial?: LaudusFinancial }) {
+  if (!financial?.linked) {
+    return <section className="rounded-lg border bg-card p-5">
+      <div className="flex items-start gap-3"><WalletCards className="mt-0.5 h-5 w-5 text-muted-foreground"/><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Laudus</p><h3 className="mt-1 font-semibold">Sin vínculo financiero confirmado</h3><p className="mt-1 text-sm text-muted-foreground">MOTIL no asociará facturas ni pagos por nombre aproximado. El proveedor debe estar conciliado con Laudus antes de mostrar exposición financiera.</p></div></div>
+    </section>;
+  }
+
+  const complete = financial.coverage?.complete === true;
+  const summaries = complete ? financial.summaryByCurrency || [] : [];
+  const health = financial.sourceHealth || [];
+  const sourceHealthy = health.length > 0 && health.every((row) => row.health_status === 'healthy' && Number(row.open_incidents || 0) === 0);
+  const sourceDate = financial.supplierSyncAt
+    ? new Date(financial.supplierSyncAt).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
+    : 'N/D';
+
+  return <section className="rounded-lg border bg-card">
+    <div className="flex flex-col gap-2 border-b p-5 sm:flex-row sm:items-end sm:justify-between">
+      <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Laudus</p><h3 className="mt-1 text-lg font-semibold">Exposición financiera</h3><p className="mt-1 text-sm text-muted-foreground">Lectura financiera reconciliada. Laudus conserva la autoridad contable y MOTIL no modifica sus registros.</p></div>
+      <p className="text-xs text-muted-foreground">Laudus · actualizado {sourceDate} · {sourceHealthy ? 'fuente saludable' : 'fuente requiere revisión'}</p>
+    </div>
+    {!complete ? <div className="m-5 flex gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm"><AlertTriangle className="h-4 w-4 shrink-0"/><p>Cobertura parcial: {financial.coverage.returnedRows} de {financial.coverage.totalRows} facturas. No se publican totales incompletos.</p></div>
+    : summaries.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No hay historia financiera con moneda verificable para este proveedor.</p>
+    : <div className="p-5">
+        {summaries.map((summary) => <div key={summary.currency} className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium">{summary.currency}</p><p className="text-xs text-muted-foreground">{summary.invoiceCount} facturas · {summary.overdueInvoices} vencidas</p></div>
+          <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-4">
+            <FinanceMetric label="Facturado" value={moneyFor(summary.currency, summary.totalAmount)} />
+            <FinanceMetric label="Pagado" value={moneyFor(summary.currency, summary.paidAmount)} />
+            <FinanceMetric label="Pendiente" value={moneyFor(summary.currency, summary.outstandingAmount)} />
+            <FinanceMetric label="Vencido" value={moneyFor(summary.currency, summary.overdueAmount)} />
+          </div>
+        </div>)}
+        <div className="mt-5 border-t pt-4">
+          <p className="text-sm font-medium">Facturas recientes</p>
+          <div className="mt-2 divide-y">
+            {(financial.invoices || []).slice(0, 8).map((row) => <div key={row.purchase_invoice_external_id} className="grid gap-2 py-3 text-sm sm:grid-cols-[1fr_120px_140px_120px] sm:items-center">
+              <div><p className="font-medium">Factura {row.doc_number || 'sin número'}</p><p className="text-xs text-muted-foreground">{row.issued_date ? new Date(row.issued_date).toLocaleDateString('es-CL') : 'Fecha N/D'} · {paymentStatusLabel(row.payment_status)}</p></div>
+              <div><p className="text-xs text-muted-foreground">Vence</p><p>{row.due_date ? new Date(row.due_date).toLocaleDateString('es-CL') : 'N/D'}</p></div>
+              <div><p className="text-xs text-muted-foreground">Pendiente</p><p>{row.currency ? moneyFor(row.currency, Number(row.outstanding_amount || 0)) : 'N/D'}</p></div>
+              <div className="sm:text-right"><p className="text-xs text-muted-foreground">Pagos</p><p>{Number(row.payment_count || 0)}</p></div>
+            </div>)}
+          </div>
+        </div>
+      </div>}
+  </section>;
+}
+
+function FinanceMetric({ label, value }: { label: string; value: string }) {
+  return <div className="bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></div>;
+}
+
+function moneyFor(currency: string, value: number) {
+  try {
+    return new Intl.NumberFormat('es-CL', { style: 'currency', currency, maximumFractionDigits: currency === 'CLP' ? 0 : 2 }).format(Number(value || 0));
+  } catch {
+    return `${currency} ${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(Number(value || 0))}`;
+  }
+}
+
+function paymentStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = { paid: 'Pagada', partial: 'Pago parcial', pending: 'Pendiente', unpaid: 'Pendiente', overdue: 'Vencida' };
+  return status ? labels[status] || status : 'Estado N/D';
+}
