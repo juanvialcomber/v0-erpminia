@@ -284,3 +284,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cambio: `procurement_intake_requests` incorpora `evidence_scope`; los 3 fixtures conocidos se marcan `uat` por ID exacto y el `supplier_operational_score_v2` usa sólo OCs cuyo intake es operacional.
 - Resultado esperado con la evidencia actual: 0 OCs operacionales, 0 recepciones operacionales, 0 facturas operacionales, 0 devoluciones operacionales y score `Sin evidencia` hasta que exista una compra real.
 - Valor: evita que una decisión futura de adjudicación se apoye en desempeño generado por QA. Las pruebas permanecen trazables y disponibles para validar el software.
+
+
+## 2026-11-04 — Mantenimiento: modelo EAM profesional por fases
+
+- Problema previo: MOTIL ya tenía OT, activos, planificación, materiales, cierre, aprobación, costos y confiabilidad, pero el ciclo completo no estaba expuesto como un único modelo operacional.
+- Capacidad: se añadió un modelo EAM derivado con siete fases: Backlog → Planificar → Preparar → Ejecutar → Cerrar → Revisar → Aprender.
+- Fuente: `maintenance_work_orders`, `work_order_close_readiness_v2`, `work_order_supervisor_reviews` y `maintenance_canonical_assets_v1`.
+- Regla canónica: no se crea un maestro paralelo de mantenimiento. La fase se deriva desde estado OT + asignación + programación + bloqueos + revisión humana.
+- Readiness visible: cobertura de responsable, cobertura de programación, bloqueos por materiales/repuestos/compras/servicios/horas/costo y siguiente acción humana.
+- Autoridad: Ariel mantiene aprobación post-ejecución bajo el flujo vigente de La Patagua; el modelo no introduce autoaprobación ni cierre automático.
+- Referencia de diseño: disciplina EAM comparable a SAP PM/S/4HANA Asset Management (objeto técnico + planificación + preparación + ejecución + post-ejecución + completion), adaptada a la autoridad y datos reales de MOTIL.
+- Nivel: L4 habilitado como control de proceso; evidencia E2 hasta observar reducción de backlog, tiempo de preparación, bloqueos o ciclo.
+- Métricas siguientes: tiempo Backlog→Preparado, porcentaje de OT preparadas sin bloqueo, cumplimiento de programación, tiempo Cierre→Aprobación, reincidencia 7/30d y costo final por activo.
+- Impacto económico: todavía no atribuido. El valor inmediato es control de proceso y reducción de reconstrucción manual; E3 requiere comparar outcomes antes/después.
