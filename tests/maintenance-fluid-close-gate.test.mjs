@@ -87,3 +87,17 @@ test('already completed OT can receive an explicit late assigned-mechanic declar
   assert.match(closureRoute, /Mecánico declaró que no utilizó aceites\/fluidos posteriormente al cierre/);
   assert.doesNotMatch(closureRoute, /\.update\(\{\s*status:/);
 });
+
+test('legacy OT closed before policy READY can be approved by Ariel without invented fluid declaration', () => {
+  assert.match(reviewRoute, /FLUID_DECLARATION_REQUIRED_FROM = Date\.parse\('2026-11-04T18:15:53\.252Z'\)/);
+  assert.match(reviewRoute, /function isLegacyFluidDeclarationExempt/);
+  assert.match(reviewRoute, /order\.status !== 'completed'/);
+  assert.match(reviewRoute, /!order\.created_by \|\| !order\.closed_at/);
+  assert.match(reviewRoute, /fluidDeclaration \|\| fluidUsageCount !== 0/);
+  assert.match(reviewRoute, /closedAt < FLUID_DECLARATION_REQUIRED_FROM/);
+  assert.match(reviewRoute, /hasValidFluidDeclaration \|\| legacyFluidDeclarationExemption/);
+  assert.match(reviewRoute, /!legacyFluidDeclarationExemption && \(!fluidDeclaration/);
+  assert.match(reviewRoute, /Excepción histórica: OT cerrada antes de la obligatoriedad/);
+  assert.match(reviewUi, /no equivale a “No”/);
+  assert.match(reviewUi, /legacyFluidDeclarationExemption/);
+});
