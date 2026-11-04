@@ -6,6 +6,22 @@ import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
+// First production READY deployment enforcing the mechanic's fluid declaration.
+ // This is a one-time historical cutoff, not an exemption for new OT closures.
+const FLUID_DECLARATION_REQUIRED_FROM = Date.parse('2026-11-04T18:15:53.252Z');
+
+function isLegacyFluidDeclarationExempt(
+  order: { status?: string | null; created_by?: string | null; closed_at?: string | null },
+  fluidDeclaration: { id: number } | null,
+  fluidUsageCount: number,
+) {
+  if (order.status !== 'completed' || !order.created_by || !order.closed_at || fluidDeclaration || fluidUsageCount !== 0) {
+    return false;
+  }
+  const closedAt = Date.parse(order.closed_at);
+  return Number.isFinite(closedAt) && closedAt < FLUID_DECLARATION_REQUIRED_FROM;
+}
+
 async function getReviewerPerson(context: Awaited<ReturnType<typeof getOrganizationContext>>) {
   if (!context.ok) return null;
   const { data, error } = await context.supabase
@@ -36,7 +52,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
-    .select('id,status,work_order_number')
+    .select('id,status,work_order_number,closed_at,created_by')
     .eq('organization_id', context.organizationId)
     .eq('id', id)
     .maybeSingle();
@@ -85,12 +101,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .order('used_at', { ascending: true });
   if (fluidUsageError) return NextResponse.json({ error: fluidUsageError.message }, { status: 500 });
 
+  const hasValidFluidDeclaration = Boolean(fluidDeclaration && (fluidDeclaration.payload as any)?.declared_by_assigned_executor === true);
+  const legacyFluidDeclarationExemption = isLegacyFluidDeclarationExempt(workOrder, fluidDeclaration, (fluidUsage || []).length);
   const reviewer = await getReviewerPerson(context);
   return NextResponse.json({
     approvedInstallations: approvedInstallations || [],
     materialRequirementsCount: materialRequirementsCount || 0,
     fluidClosure: fluidDeclaration || null,
     fluidUsage: fluidUsage || [],
+    legacyFluidDeclarationExemption,
     review: review || {
       status: String(workOrder.status || '') === 'completed' ? 'pending' : null,
       decision_note: null,
@@ -98,7 +117,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       reviewed_at: null,
     },
     canApprove: Boolean(reviewer)
-      && Boolean(fluidDeclaration)
+      && (hasValidFluidDeclaration || legacyFluidDeclarationExemption)
       && String(workOrder.status || '') === 'completed'
       && review?.status !== 'approved',
   });
@@ -119,7 +138,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
-    .select('id,status,work_order_number,canonical_asset_id')
+    .select('id,status,work_order_number,canonical_asset_id,created_by,closed_at')
     .eq('organization_id', context.organizationId)
     .eq('id', id)
     .maybeSingle();
@@ -139,7 +158,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .limit(1)
     .maybeSingle();
   if (fluidDeclarationError) return NextResponse.json({ error: fluidDeclarationError.message }, { status: 500 });
-  if (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true) {
+  // A previously closed OT must not be silently reclassified as "no oil used".
+  // Legacy exception applies only to closures BEFORE the policy was live and with
+  // no mechanic declaration or recorded fluid usage. New OT still require the mechanic.
+  let legacyFluidDeclarationExemption = false;
+  if (!fluidDeclaration) {
+    const { count: fluidUsageCount, error: fluidUsageError } = await context.supabase
+      .from('maintenance_fluid_usage_records')
+      .select('id', { head: true, count: 'exact' })
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id);
+    if (fluidUsageError) return NextResponse.json({ error: fluidUsageError.message }, { status: 500 });
+    legacyFluidDeclarationExemption = isLegacyFluidDeclarationExempt(workOrder, fluidDeclaration, fluidUsageCount || 0);
+  }
+  if (!legacyFluidDeclarationExemption && (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true)) {
     return NextResponse.json(
       { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
       { status: 409 },
@@ -147,7 +179,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const body = (await request.json().catch(() => null)) as { note?: string | null; confirmMaterialsInstalled?: boolean } | null;
-  const note = body?.note?.trim() || null;
+  const historicalNote = legacyFluidDeclarationExemption
+    ? 'Excepción histórica: OT cerrada antes de la obligatoriedad de declarar fluidos. Uso y residuos no informados.'
+    : null;
+  const note = [body?.note?.trim(), historicalNote].filter(Boolean).join(' · ') || null;
   const { data: reviewId, error: approvalError } = await context.supabase.rpc(
     'approve_work_order_with_material_confirmation_v1',
     {
