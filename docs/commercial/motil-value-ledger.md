@@ -325,3 +325,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Siguiente evidencia: primera compra real originada desde una OT, recepción aceptada, repuesto instalado o mano de obra valorizada y snapshot de cierre resultante.
 - Métrica primaria: `OT con evidencia monetaria / OT auditadas` y `compras operativas reales ligadas a OT/activo / compras operativas reales`.
 - Impacto económico: no medido. No se atribuye ahorro ni costo evitado.
+
+
+## 2026-11-04 — Compra de mantenimiento → OT → costo auditado
+
+- Se verificó la cadena técnica existente: una recepción de compra operacional vinculada a OT conserva OT, activo, producto, costo unitario y costo total en movimientos de stock.
+- La recepción ejecuta recálculo de cobertura; MOTIL reserva automáticamente material disponible para la OT, sin instalarlo ni consumirlo automáticamente.
+- Una sola acción humana canónica, `Materiales de la OT → Entregar reservas`, entrega el material reservado al ejecutor.
+- La instalación sigue requiriendo confirmación humana. Sólo la cantidad instalada × costo unitario entra como costo de repuesto del cierre.
+- La recepción de compra queda como evidencia financiera y no se suma nuevamente al total del cierre, evitando doble conteo.
+- La UI ahora distingue evidencia de `Compra recibida` tanto en cobertura de materiales como en repuestos/costo.
+- Candidata operacional observada: OTE-2026-0006 mantiene 1 unidad faltante y aún no tiene solicitud de compra; no se promovió automáticamente porque la decisión de abastecimiento sigue siendo humana.
+- Valor actual: mejor trazabilidad end-to-end y menor doble digitación entre Mantenimiento, Compras, Bodega y Finanzas.
+- Métricas siguientes: tiempo faltante→solicitud→OC→recepción→entrega→instalación; % materiales comprados vinculados a OT; % OT cerradas con evidencia monetaria real.
+- Impacto económico: todavía no medido.
