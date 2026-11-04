@@ -35,3 +35,45 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+
+export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_COMPRAS);
+  if (!access.authorized) return access.response;
+  if (!access.canWrite) return NextResponse.json({ error: 'No tienes permiso para aplicar conciliaciones.' }, { status: 403 });
+
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+
+  const body = await request.json().catch(() => null) as { limit?: number } | null;
+  const limit = Math.max(1, Math.min(Number(body?.limit || 25), 100));
+
+  try {
+    const { data, error } = await context.supabase.rpc(
+      'motil_apply_resolvable_purchase_order_reconciliation',
+      {
+        p_organization_id: context.organizationId,
+        p_actor_user_id: context.userId,
+        p_limit: limit,
+      },
+    );
+    if (error) throw error;
+
+    return NextResponse.json({
+      ok: true,
+      result: data,
+      policy: {
+        humanTriggered: true,
+        deterministicOnly: true,
+        neverOverwriteExisting: true,
+        laudusWriteBack: false,
+      },
+    });
+  } catch (error) {
+    console.error('[laudus/procurement-reconciliation:apply]', error);
+    return NextResponse.json(
+      { error: 'No fue posible aplicar el lote de conciliación.' },
+      { status: 500 },
+    );
+  }
+}
