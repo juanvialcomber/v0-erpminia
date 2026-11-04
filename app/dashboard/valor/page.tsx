@@ -73,6 +73,15 @@ type ApiResponse = {
     workflowLevel?: number;
     evidenceLevel?: string;
     valueGate?: string;
+    outcomes?: {
+      maturedAccepted?: number;
+      improved?: number;
+      unchanged?: number;
+      worsened?: number;
+      unmeasurable?: number;
+      e3Gate?: string;
+      semantics?: string;
+    };
     semantics?: string;
   } | null;
   procurementAwardValue?: {
@@ -450,6 +459,31 @@ export default function ValueScorecardPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">Aún no es ahorro ni ROI; sólo adopción y calibración del flujo.</p>
           </div>
+        </div>
+        <div className="grid gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Outcomes maduros</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.maturedAccepted || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Mejoraron después</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.improved || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Sin cambio</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.unchanged || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Empeoraron</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.worsened || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Gate causal</p>
+            <p className="mt-1 text-xl font-semibold">{financePriorityDecision.outcomes?.e3Gate || 'HOLD_E3'}</p>
+          </div>
+        </div>
+        <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+          “Mejoró después” describe asociación temporal entre decisión y estado posterior. No atribuye causalidad a MOTIL ni equivale a ahorro.
         </div>
       </section>
 
