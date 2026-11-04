@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import useSWR from 'swr';
 import { ArrowRight, CircleDot } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 type Domain = {
   key: string;
@@ -42,11 +44,32 @@ const stateLabel: Record<Domain['state'], string> = {
 };
 
 export default function LaudusReplacementPage() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/replacement-map',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
+  const [syncingTrace, setSyncingTrace] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function syncInvoiceTrace() {
+    setSyncingTrace(true);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/integrations/laudus/native-invoice-trace/sync', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo actualizar la trazabilidad.');
+      setMessage(`Trazabilidad: ${Number(payload?.scanned || 0)} facturas escaneadas, ${Number(payload?.tracesPersisted || 0)} trazas guardadas.`);
+      await mutate();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo actualizar la trazabilidad.');
+    } finally {
+      setSyncingTrace(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -57,6 +80,8 @@ export default function LaudusReplacementPage() {
           Objetivo: cero dependencia operacional diaria. Cada dominio debe pasar de fuente Laudus a evidencia, acción y autoridad MOTIL sin copiar inconsistencias.
         </p>
       </section>
+
+      {message ? <div className="rounded-lg border p-4 text-sm text-muted-foreground">{message}</div> : null}
 
       {error ? (
         <div className="rounded-lg border p-5 text-sm text-muted-foreground">No se pudo calcular el mapa de reemplazo.</div>
@@ -90,9 +115,16 @@ export default function LaudusReplacementPage() {
                       Pendientes detectados: {Number(domain.blockers || 0).toLocaleString('es-CL')}
                     </p>
                   </div>
-                  <Link href={domain.actionHref} className="inline-flex items-center justify-end gap-2 text-sm font-medium hover:underline">
-                    Resolver <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  <div className="flex items-center justify-end gap-2">
+                    {domain.key === 'invoices' ? (
+                      <Button size="sm" variant="outline" disabled={syncingTrace} onClick={() => void syncInvoiceTrace()}>
+                        {syncingTrace ? 'Escaneando…' : 'Escanear 5'}
+                      </Button>
+                    ) : null}
+                    <Link href={domain.actionHref} className="inline-flex items-center gap-2 text-sm font-medium hover:underline">
+                      Resolver <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>
