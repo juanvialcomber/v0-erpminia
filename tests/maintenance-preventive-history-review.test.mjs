@@ -17,7 +17,7 @@ test('restored schedules preserve provenance and never promote stale current met
   assert.match(api, /source_hash: record\.source_hash/);
   assert.match(api, /current_meter_snapshot: null/);
   assert.match(api, /currentMeterCopied: false/);
-  assert.match(page, /La lectura vigente se toma desde MOTIL/);
+  assert.match(page, /el horómetro vigente siempre se obtiene desde MOTIL/i);
 });
 
 test('restore is tenant scoped and requires a live canonical asset', () => {
