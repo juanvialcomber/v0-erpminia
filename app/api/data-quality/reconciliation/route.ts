@@ -466,6 +466,55 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+      const recovery = await context.supabase
+        .from('laudus_waybill_recovery_summary_v1')
+        .select('waybills_total,missing_supplier,missing_warehouse,missing_lines,future_dates,latest_sync_at')
+        .eq('organization_id', context.organizationId)
+        .maybeSingle();
+
+      if (recovery.error) throw recovery.error;
+      const row = recovery.data;
+      const missingLines = Number(row?.missing_lines || 0);
+      const missingSupplier = Number(row?.missing_supplier || 0);
+      const missingWarehouse = Number(row?.missing_warehouse || 0);
+      const futureDates = Number(row?.future_dates || 0);
+
+      if (missingLines > 0 || missingSupplier > 0 || missingWarehouse > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:waybill_recovery_debt',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: `${Math.max(missingLines, missingSupplier, missingWarehouse).toLocaleString('es-CL')} guías Laudus requieren recuperación`,
+          detail: `De ${Number(row?.waybills_total || 0).toLocaleString('es-CL')} guías, ${missingLines.toLocaleString('es-CL')} están sin líneas, ${missingSupplier.toLocaleString('es-CL')} sin proveedor y ${missingWarehouse.toLocaleString('es-CL')} sin bodega. Acción MOTIL: reingestar sólo la ventana afectada con el normalizador corregido y mantener la deuda abierta hasta cobertura cero.`,
+          href: '/dashboard/calidad-datos/reemplazo-laudus',
+          action_label: 'Recuperar guías',
+          action_href: '/dashboard/calidad-datos/reemplazo-laudus',
+        });
+      }
+
+      if (futureDates > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:waybill_future_dates',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'source_conflict',
+          field_name: 'issued_date',
+          severity: 'critical',
+          label: `${futureDates.toLocaleString('es-CL')} guía Laudus con fecha futura`,
+          detail: 'La condición permanece como evidencia de calidad hasta que deje de aparecer en la fuente. No se promueve como recepción física ni se corrige automáticamente.',
+          href: '/dashboard/calidad-datos/reemplazo-laudus',
+          action_label: 'Revisar evidencia',
+          action_href: '/dashboard/calidad-datos/reemplazo-laudus',
+        });
+      }
+    } catch {
+      // Waybill recovery projection is optional until its migration is deployed.
+    }
+
+    try {
       const negativeLaudusPositions = await fetchAll((from, to) => context.supabase
         .from('laudus_negative_stock_positions_service_v1')
         .select('canonical_product_id,sku,description,unit_of_measure,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
