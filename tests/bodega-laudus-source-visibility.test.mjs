@@ -21,7 +21,7 @@ test('Bodega presents Laudus as live ERP evidence, not a pending integration', (
   assert.match(readiness, /missingInMotilNonzero/);
   assert.match(readiness, /bodega_stock_source_authority_service_v1/);
   assert.match(readiness, /laudusStockRole: 'primary_when_consistent'/);
-  assert.match(readiness, /motilOperationalStockRole: 'comparison_evidence'/);
+  assert.match(readiness, /motilOperationalStockRole: comparisonIsComparable \? 'comparison_evidence' as const : 'stale_comparison_evidence' as const/);
   assert.match(readiness, /autoOverwrite: false/);
 });
 
@@ -61,4 +61,17 @@ test('Laudus becomes the effective displayed quantity only when the authority ga
   assert.match(route, /laudusIsPrimary/);
   assert.match(page, /Fuente: Laudus/);
   assert.match(page, /Laudus primario/);
+});
+
+
+test('Bodega does not present stale MOTIL comparisons as confirmed Laudus conflicts', () => {
+  const page = fs.readFileSync('app/dashboard/bodega/page.tsx', 'utf8');
+  const route = fs.readFileSync('app/api/inventory/intelligence/route.ts', 'utf8');
+
+  assert.match(route, /comparisonIsComparable/);
+  assert.match(route, /motilLagHours/);
+  assert.match(route, /stale_comparison/);
+  assert.match(page, /Comparación pendiente por frescura/);
+  assert.match(page, /MOTIL histórico/);
+  assert.match(page, /las diferencias aún no son concluyentes/);
 });
