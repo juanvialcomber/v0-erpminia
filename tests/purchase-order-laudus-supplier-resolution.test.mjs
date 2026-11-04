@@ -19,3 +19,9 @@ test('supplier resolution remains read-only and does not mutate canonical or Lau
   assert.match(migration, /revoke all on integration\.purchase_order_reconciliation_preview_v1/);
   assert.match(migration, /grant select .* service_role/i);
 });
+
+
+test('historical NULA supplier placeholder stays out of the actionable supplier queue', () => {
+  assert.match(migration, /'NULA' then 'source_placeholder'/);
+  assert.match(migration, /<> 'NULA'/);
+});
