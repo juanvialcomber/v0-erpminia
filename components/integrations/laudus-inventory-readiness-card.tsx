@@ -31,6 +31,9 @@ type Payload = {
     latestStockSync: string | null;
     latestMotilStockUpdate: string | null;
     stockIsStale: boolean;
+    comparisonFreshness: 'comparable' | 'motil_stale' | 'unknown';
+    comparisonIsComparable: boolean;
+    motilLagHours: number | null;
     openReconciliation: number;
     comparedProducts: number;
     alignedProducts: number;
@@ -50,6 +53,7 @@ type Payload = {
       relativeDeltaPct: number | null;
       domain: string;
     }>;
+    suppressedCriticalConsumables: number;
     negativePositions: Array<{
       productId: string;
       sku: string;
@@ -74,6 +78,9 @@ type Payload = {
   };
   reconciliation: {
     state: 'waiting_laudus' | 'ready_to_compare' | 'review';
+    comparisonFreshness: 'comparable' | 'motil_stale' | 'unknown';
+    comparisonIsComparable: boolean;
+    comparisonPolicy: string;
     defaultAbsoluteTolerance: number;
     requiresApprovedTolerance: boolean;
     physicalCountUsedAsEvidence: boolean;
@@ -82,7 +89,7 @@ type Payload = {
   policy: {
     primaryStockSource: 'laudus' | 'reconciliation';
     laudusStockRole: 'primary_when_consistent';
-    motilOperationalStockRole: 'comparison_evidence';
+    motilOperationalStockRole: 'comparison_evidence' | 'stale_comparison_evidence';
     crossSourceValidation: readonly ['official_email', 'whatsapp'];
     autoOverwrite: false;
   };
@@ -207,6 +214,20 @@ export function LaudusInventoryReadinessCard() {
         </p>
       </div>
 
+      {!isLoading && data && !data.laudus.comparisonIsComparable ? (
+        <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <History className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-medium">Comparación MOTIL ↔ Laudus no concluyente por frescura</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Laudus está actualizado, pero la evidencia operacional MOTIL quedó {data.laudus.motilLagHours == null ? 'sin timestamp comparable' : `${data.laudus.motilLagHours.toLocaleString('es-CL', { maximumFractionDigits: 1 })} h detrás`}. Las diferencias se muestran como evidencia observada, no como error confirmado ni base para corregir stock.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-card p-4">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
@@ -219,9 +240,11 @@ export function LaudusInventoryReadinessCard() {
         <div className="bg-card p-4">
           <GitCompareArrows className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
+          <p className="mt-1 text-xs text-muted-foreground">{!isLoading && data && !data.laudus.comparisonIsComparable ? 'Diferencias observadas · comparación stale' : 'Saldos distintos entre MOTIL y Laudus'}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL · ${count(data.laudus.stockRows)} posiciones ERP`}
+            {isLoading || !data ? '—' : !data.laudus.comparisonIsComparable
+              ? `${count(data.laudus.missingInMotilNonzero)} SKU Laudus no comparables contra el snapshot MOTIL vigente`
+              : `${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL · ${count(data.laudus.stockRows)} posiciones ERP`}
           </p>
         </div>
         <div className="bg-card p-4">
@@ -284,7 +307,7 @@ export function LaudusInventoryReadinessCard() {
         </div>
       ) : null}
 
-      {!isLoading && data && data.laudus.criticalConsumables.length > 0 ? (
+      {!isLoading && data && data.laudus.comparisonIsComparable && data.laudus.criticalConsumables.length > 0 ? (
         <div className="border-t px-4 py-4">
           <div className="flex items-start gap-2">
             <GitCompareArrows className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -340,7 +363,9 @@ export function LaudusInventoryReadinessCard() {
             <p className="mt-1 text-xs text-muted-foreground">
               {isLoading || !data
                 ? 'Verificando conciliación.'
-                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.quantityMismatches)} difieren · ${count(data.laudus.missingInMotilNonzero)} tienen saldo Laudus y no están en existencias MOTIL.`}
+                : !data.laudus.comparisonIsComparable
+                  ? `Comparación suspendida como evidencia concluyente: MOTIL está ${data.laudus.motilLagHours == null ? 'sin timestamp comparable' : `${data.laudus.motilLagHours.toLocaleString('es-CL', { maximumFractionDigits: 1 })} h detrás`}. Se conservan ${count(data.laudus.quantityMismatches)} diferencias observadas para revisar después del refresco.`
+                  : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.quantityMismatches)} difieren · ${count(data.laudus.missingInMotilNonzero)} tienen saldo Laudus y no están en existencias MOTIL.`}
             </p>
           </div>
         </div>
