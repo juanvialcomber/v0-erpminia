@@ -21,12 +21,18 @@ type ReleaseReadiness = {
     assignee: boolean;
     schedule: boolean;
     procurement: boolean;
-    parts: boolean;
     materials: boolean;
     externalServices: boolean;
-    labor: boolean;
-    costConflict: boolean;
   };
+};
+
+type MaterialRow = {
+  shortage?: number | string | null;
+  quantity_shortage?: number | string | null;
+};
+
+type MaterialCoverage = {
+  materials?: MaterialRow[] | null;
 };
 
 const labels: Record<keyof ReleaseReadiness['checks'], string> = {
@@ -34,15 +40,15 @@ const labels: Record<keyof ReleaseReadiness['checks'], string> = {
   assignee: 'Responsable',
   schedule: 'Fecha',
   procurement: 'Compras',
-  parts: 'Repuestos',
   materials: 'Materiales',
   externalServices: 'Servicios',
-  labor: 'Horas',
-  costConflict: 'Costo',
 };
+
+const materialShortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 
 export function WorkOrderExecutionReadiness({
   workOrderId,
+  assignedToName,
   status,
 }: {
   workOrderId: string;
@@ -55,8 +61,19 @@ export function WorkOrderExecutionReadiness({
     fetcher,
     { revalidateOnFocus: false },
   );
+  const { data: materialsResponse, error: materialsError } = useSWR<{ data?: MaterialCoverage | null }>(
+    shouldCheck ? `/api/maintenance/work-orders/${workOrderId}/materials` : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
 
   if (!shouldCheck) return null;
+
+  const materialRows = Array.isArray(materialsResponse?.data?.materials)
+    ? materialsResponse.data.materials
+    : [];
+  const shortageRows = materialRows.filter((row) => materialShortage(row) > 0);
+  const assigneeReady = Boolean(assignedToName?.trim());
 
   return (
     <Card className="shadow-none" aria-label="Preparación para ejecutar">
@@ -87,7 +104,7 @@ export function WorkOrderExecutionReadiness({
         ) : null}
 
         {data ? (
-          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {Object.entries(data.checks).map(([key, ok]) => (
               <div key={key} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                 {ok ? <CheckCircle2 className="h-4 w-4 text-muted-foreground" /> : <AlertTriangle className="h-4 w-4 text-destructive" />}
@@ -95,6 +112,31 @@ export function WorkOrderExecutionReadiness({
               </div>
             ))}
           </div>
+        ) : null}
+
+        {!assigneeReady ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            Falta asignar responsable antes de ejecutar el trabajo.
+          </div>
+        ) : null}
+
+        {!materialsError && materialRows.length === 0 ? (
+          <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+            <p>Sin requerimientos de material registrados. No se infiere que existan ni que estén cubiertos.</p>
+            <p className="mt-1">No reemplaza la decisión del supervisor ni bloquea el inicio de la OT.</p>
+          </div>
+        ) : null}
+
+        {!materialsError && shortageRows.length > 0 ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+            {shortageRows.length} requerimiento(s) de material mantienen faltantes registrados.
+          </div>
+        ) : null}
+
+        {materialsError ? (
+          <p className="text-sm text-muted-foreground">
+            No fue posible comprobar la cobertura detallada de materiales. Se mantiene la preparación canónica de la OT sin inferir cobertura.
+          </p>
         ) : null}
 
         {!isLoading && !error && data && !data.ready ? (
