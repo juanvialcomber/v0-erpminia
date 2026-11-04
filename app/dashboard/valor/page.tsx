@@ -98,6 +98,15 @@ type ApiResponse = {
       endToEnd?: { samples?: number; medianSeconds?: number | null };
       semantics?: string;
     };
+    supervisorReview?: {
+      reviewedClosed?: number;
+      approvedClosed?: number;
+      nonApprovedClosed?: number;
+      coveragePct?: number | null;
+      medianCloseToReviewSeconds?: number | null;
+      latencySamples?: number;
+      semantics?: string;
+    };
     observedExecutionSeconds?: number;
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
@@ -263,6 +272,7 @@ export default function ValueScorecardPage() {
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const executionTrend = maintenanceValue.executionTrend || {};
+  const supervisorReview = maintenanceValue.supervisorReview || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
 
   const saveBaseline = async () => {
@@ -615,6 +625,42 @@ export default function ValueScorecardPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
         </p>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border bg-card" aria-label="Revisión humana de Mantención">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Autoridad humana · Mantención</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Cierre → revisión supervisor</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mide cobertura y latencia del gate humano. Una aprobación confirma revisión del workflow; no demuestra calidad mecánica ni ahorro.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT cerradas revisadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(supervisorReview.reviewedClosed || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cobertura {supervisorReview.coveragePct == null ? '—' : `${number(supervisorReview.coveragePct)}%`}.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Aprobadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(supervisorReview.approvedClosed || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(supervisorReview.nonApprovedClosed || 0)} con último estado distinto de aprobado.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Mediana cierre → revisión</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(supervisorReview.medianCloseToReviewSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">n={number(supervisorReview.latencySamples || 0)} revisiones con timestamps comparables.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Lectura LECV</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">L4 · E2</p>
+            <p className="mt-1 text-xs text-muted-foreground">Gate humano medido; todavía no outcome V5.</p>
+          </div>
+        </div>
       </section>
 
       <section className="overflow-hidden rounded-xl border bg-card" aria-label="Tendencia semanal de ciclo de Mantención">
