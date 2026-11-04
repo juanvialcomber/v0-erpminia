@@ -6,6 +6,7 @@ import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/ap
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
+import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
 
 type WorkOrderPatchPayload = {
@@ -229,6 +230,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     if (body.status === 'in_progress') {
+      const releaseReadiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, id);
+      if (!releaseReadiness.ready) {
+        return NextResponse.json(
+          {
+            error: 'La OT no está preparada para ejecución.',
+            blockers: releaseReadiness.blockers,
+            emergencyBypass: releaseReadiness.emergencyBypass,
+          },
+          { status: 409 },
+        );
+      }
+
       const other = await findOtherRunningWorkOrder(context, id);
       if (other) {
         return NextResponse.json({

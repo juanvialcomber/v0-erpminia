@@ -27,11 +27,13 @@ export default function ReliabilityPage() {
   const recurringCauses = Array.isArray(data?.recurringCauses) ? data.recurringCauses : [];
   const priorityCause = recurringCauses[0];
   const priorityAsset = assets.find((row: any) => row.has_recurring_root_cause || Number(row.runtime?.valid_mtbf_intervals || 0) > 0) || assets[0];
-  const priorityHref = priorityCause?.canonical_asset_id
-    ? `/dashboard/mantenimiento/equipos/${priorityCause.canonical_asset_id}`
-    : priorityAsset?.canonical_asset_id
-      ? `/dashboard/mantenimiento/equipos/${priorityAsset.canonical_asset_id}`
-      : null;
+  const priorityAssetId = priorityCause?.canonical_asset_id || priorityAsset?.canonical_asset_id || null;
+  const priorityHref = priorityAssetId
+    ? `/dashboard/mantenimiento/equipos/${priorityAssetId}`
+    : null;
+  const preventiveReviewHref = priorityAssetId
+    ? `/dashboard/mantenimiento/preventivo-horas?assetId=${encodeURIComponent(priorityAssetId)}`
+    : null;
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
     <PageHeader>
@@ -42,6 +44,7 @@ export default function ReliabilityPage() {
       </PageHeaderContent>
       <PageHeaderActions>
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="h-4 w-4"/>Actualizar</Button>
+        {preventiveReviewHref ? <Button asChild variant="outline"><Link href={preventiveReviewHref}>Revisar preventivo</Link></Button> : null}
         {priorityHref ? <Button asChild><Link href={priorityHref}>Revisar prioridad<ArrowRight className="h-4 w-4"/></Link></Button> : null}
       </PageHeaderActions>
     </PageHeader>
