@@ -16,6 +16,22 @@ type Payload = {
     approvedInvoices: number;
     ordersAwaitingReceipt: number;
     openBalance: number;
+    operationalOrders: number;
+    maintenanceLinkedOrders: number;
+    unlinkedOperationalOrders: number;
+    excludedUatOrders: number;
+  };
+  maintenanceCost: {
+    auditedWorkOrders: number;
+    costEvidenceWorkOrders: number;
+    zeroCostSnapshots: number;
+    costEvidenceCoveragePercent: number | null;
+    auditedTotalCost: number | null;
+    partsCost: number | null;
+    laborCost: number | null;
+    externalCost: number | null;
+    lastAuditedCloseAt: string | null;
+    semantics: string;
   };
   nextAction: {
     key: string;
@@ -74,6 +90,32 @@ export function MotilFinanceOperatingCockpit() {
         <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
       </div>)}
     </div>
+
+    {!isLoading && !error && data ? <Card className="shadow-none">
+      <CardContent className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Puente económico · mantenimiento</p>
+          <p className="mt-1 text-sm font-medium">
+            {data.maintenanceCost.costEvidenceWorkOrders > 0
+              ? `${data.maintenanceCost.costEvidenceWorkOrders}/${data.maintenanceCost.auditedWorkOrders} OT con evidencia monetaria`
+              : `${data.maintenanceCost.auditedWorkOrders} OT auditadas · costo monetario aún no capturado`}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Compras operativas reales: {data.summary.operationalOrders}. Vinculadas explícitamente a OT/activo: {data.summary.maintenanceLinkedOrders}. Sin vínculo: {data.summary.unlinkedOperationalOrders}.
+            {data.summary.excludedUatOrders > 0 ? ` Se excluyeron ${data.summary.excludedUatOrders} casos UAT del control.` : ''}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {data.maintenanceCost.costEvidenceWorkOrders > 0
+              ? `Costo observado: ${money(data.maintenanceCost.auditedTotalCost || 0)}. No incluye costos sin evidencia.`
+              : 'MOTIL no interpreta snapshots en $0 como costo real cero.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline"><Link href="/dashboard/mantenimiento/costos">Costos OT</Link></Button>
+          <Button asChild size="sm" variant="outline"><Link href="/dashboard/finanzas/activos">Economía activos</Link></Button>
+        </div>
+      </CardContent>
+    </Card> : null}
 
     <div className="grid gap-3 md:grid-cols-3">
       <Link href="/dashboard/compras/flujo" className="rounded-lg border p-4 transition-colors hover:bg-muted/30"><ReceiptText className="h-4 w-4 text-muted-foreground"/><p className="mt-2 text-sm font-medium">Compra</p><p className="mt-1 text-xs text-muted-foreground">Necesidad → OC → recepción → factura.</p></Link>
