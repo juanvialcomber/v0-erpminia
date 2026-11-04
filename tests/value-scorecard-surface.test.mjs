@@ -232,3 +232,19 @@ test('maintenance weekly cohort trend excludes the incomplete current week and n
   assert.match(page, /La tendencia no se atribuye causalmente a MOTIL/);
   assert.match(page, /No equivale a downtime evitado/);
 });
+
+
+test('maintenance supervisor review metrics preserve human authority without claiming repair quality', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /latestReviewByOrder/);
+  assert.match(api, /medianCloseToReviewSeconds/);
+  assert.match(api, /approval rate is workflow evidence, not proof of repair quality/);
+  assert.match(cron, /supervisorReview/);
+  assert.match(cron, /workflow evidence, not proof of repair quality/);
+  assert.match(page, /Cierre → revisión supervisor/);
+  assert.match(page, /no demuestra calidad mecánica ni ahorro/);
+  assert.match(page, /Gate humano medido; todavía no outcome V5/);
+});
