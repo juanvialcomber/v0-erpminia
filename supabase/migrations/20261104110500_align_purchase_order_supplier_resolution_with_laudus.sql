@@ -95,6 +95,7 @@ select
   ) as proposed_supplier_id,
   greatest(coalesce(snm.supplier_count,0), coalesce(lnm.supplier_count,0)) as supplier_name_match_count,
   case
+    when upper(regexp_replace(coalesce(nullif(trim(po.supplier_name),''),''),'\s+',' ','g')) = 'NULA' then 'source_placeholder'
     when po.canonical_supplier_id is not null then 'already_linked'
     when snm.supplier_id is not null and snm.supplier_count = 1 then 'exact_unique_name'
     when lnm.supplier_id is not null and lnm.supplier_count = 1 then 'tax_verified_laudus'
@@ -114,9 +115,12 @@ select
   end as cost_center_resolution_status,
   (
     (
-      po.canonical_supplier_id is not null
-      or (snm.supplier_id is not null and snm.supplier_count = 1)
-      or (lnm.supplier_id is not null and lnm.supplier_count = 1)
+      upper(regexp_replace(coalesce(nullif(trim(po.supplier_name),''),''),'\s+',' ','g')) <> 'NULA'
+      and (
+        po.canonical_supplier_id is not null
+        or (snm.supplier_id is not null and snm.supplier_count = 1)
+        or (lnm.supplier_id is not null and lnm.supplier_count = 1)
+      )
     )
     and
     (
