@@ -49,23 +49,33 @@ export async function GET(request: NextRequest) {
         .limit(20),
     ]);
 
-    const firstError = summaryResult.error || costEvidenceResult.error || assetsResult.error || centersResult.error || typesResult.error || causesResult.error;
+    const firstError =
+      summaryResult.error ||
+      costEvidenceResult.error ||
+      assetsResult.error ||
+      centersResult.error ||
+      typesResult.error ||
+      causesResult.error;
     if (firstError) throw firstError;
 
     const baseSummary = summaryResult.data || {
-        completed_work_orders: 0,
-        audited_work_orders: 0,
-        completed_without_snapshot: 0,
-        audited_coverage_percent: null,
-        audited_total_cost: 0,
-        parts_cost: 0,
-        labor_cost: 0,
-        external_cost: 0,
-      };
+      completed_work_orders: 0,
+      audited_work_orders: 0,
+      completed_without_snapshot: 0,
+      audited_coverage_percent: null,
+      audited_total_cost: 0,
+      parts_cost: 0,
+      labor_cost: 0,
+      external_cost: 0,
+    };
+
     const auditedWorkOrders = Number(baseSummary.audited_work_orders || 0);
     const costEvidenceWorkOrders = Number(costEvidenceResult.count || 0);
     const zeroCostSnapshots = Math.max(0, auditedWorkOrders - costEvidenceWorkOrders);
-    const costEvidenceCoveragePercent = auditedWorkOrders > 0 ? Math.round((costEvidenceWorkOrders / auditedWorkOrders) * 1000) / 10 : null;
+    const costEvidenceCoveragePercent =
+      auditedWorkOrders > 0
+        ? Math.round((costEvidenceWorkOrders / auditedWorkOrders) * 1000) / 10
+        : null;
 
     return NextResponse.json({
       summary: {
@@ -73,22 +83,14 @@ export async function GET(request: NextRequest) {
         cost_evidence_work_orders: costEvidenceWorkOrders,
         zero_cost_snapshots: zeroCostSnapshots,
         cost_evidence_coverage_percent: costEvidenceCoveragePercent,
-        cost_state: auditedWorkOrders === 0
-          ? 'no_snapshots'
-          : costEvidenceWorkOrders === 0
-            ? 'snapshots_without_cost_evidence'
-            : costEvidenceWorkOrders < auditedWorkOrders
-              ? 'partial_cost_evidence'
-              : 'cost_evidence_available',
-      },
-        completed_work_orders: 0,
-        audited_work_orders: 0,
-        completed_without_snapshot: 0,
-        audited_coverage_percent: null,
-        audited_total_cost: 0,
-        parts_cost: 0,
-        labor_cost: 0,
-        external_cost: 0,
+        cost_state:
+          auditedWorkOrders === 0
+            ? 'no_snapshots'
+            : costEvidenceWorkOrders === 0
+              ? 'snapshots_without_cost_evidence'
+              : costEvidenceWorkOrders < auditedWorkOrders
+                ? 'partial_cost_evidence'
+                : 'cost_evidence_available',
       },
       byAsset: assetsResult.data || [],
       byCostCenter: centersResult.data || [],
@@ -96,6 +98,12 @@ export async function GET(request: NextRequest) {
       byRootCause: causesResult.data || [],
       source: 'work_order_closure_cost_snapshots',
       canonical: true,
+      semantics: {
+        zeroCostSnapshot:
+          'Un snapshot con total 0 no prueba costo real cero; indica que el cierre no contiene evidencia monetaria en repuestos, mano de obra, servicios externos o compras recibidas.',
+        costEvidence:
+          'Se considera evidencia monetaria cuando existe al menos un componente de costo mayor a cero o una compra recibida vinculada a la OT.',
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la inteligencia de costos de mantenimiento';
