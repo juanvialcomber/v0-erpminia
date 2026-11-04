@@ -60,6 +60,21 @@ type ApiResponse = {
     medianSeconds?: number | null;
     semantics?: string;
   } | null;
+  financePriorityDecision?: {
+    total?: number;
+    accepted?: number;
+    deferred?: number;
+    rejected?: number;
+    timedDecisions?: number;
+    medianDecisionSeconds?: number | null;
+    rawEvents?: number;
+    uniquePriorityDays?: number;
+    latestAt?: string | null;
+    workflowLevel?: number;
+    evidenceLevel?: string;
+    valueGate?: string;
+    semantics?: string;
+  } | null;
   procurementAwardValue?: {
     totalDecisions?: number;
     operationalDecisions?: number;
@@ -217,6 +232,7 @@ export default function ValueScorecardPage() {
   const outcomes = score.outcomes?.closed || 0;
   const financeReview = data?.financeReview || {};
   const financeReviewTiming = data?.financeReviewTiming || {};
+  const financePriorityDecision = data?.financePriorityDecision || {};
   const financeReviewTotal = financeReview.total || 0;
   const e3 = score.observedImpact?.e3Records || 0;
   const gates = score.adoptionGate || {};
@@ -388,6 +404,51 @@ export default function ValueScorecardPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
             </p>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Decisiones financieras priorizadas" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Finanzas · decisión humana</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Prioridades revisadas</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Una prioridad cuenta una vez por día de negocio en Chile. Clics repetidos no aumentan artificialmente adopción.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Nivel actual</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              L{number(financePriorityDecision.workflowLevel || 3)} · {financePriorityDecision.evidenceLevel || 'E0'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{financePriorityDecision.valueGate || 'MEASURING'}.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Decisiones únicas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(financePriorityDecision.total || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(financePriorityDecision.rawEvents || 0)} eventos brutos; deduplicados por prioridad/día.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Aceptadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(financePriorityDecision.accepted || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(financePriorityDecision.deferred || 0)} pospuestas · {number(financePriorityDecision.rejected || 0)} no aplican.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Latencia mediana</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(financePriorityDecision.medianDecisionSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Tiempo cockpit → decisión humana.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Gate E2</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              {number(financePriorityDecision.uniquePriorityDays || 0)}/20
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Aún no es ahorro ni ROI; sólo adopción y calibración del flujo.</p>
           </div>
         </div>
       </section>
