@@ -6,7 +6,8 @@ const summaryPage = readFileSync('app/dashboard/finanzas/page.tsx', 'utf8');
 const traceabilityPage = readFileSync('app/dashboard/finanzas/trazabilidad/page.tsx', 'utf8');
 
 test('finance summary stays composition-only and does not fabricate missing financial values', () => {
-  assert.match(summaryPage, /LaudusFinanceControlCard/);
+  assert.match(summaryPage, /MotilFinanceOperatingCockpit/);
+  assert.match(summaryPage, /Fuente Laudus/);
   assert.doesNotMatch(summaryPage, /Number\(value \|\| 0\)/);
   assert.doesNotMatch(summaryPage, /valorización aprobada del plan de cierre/);
   assert.doesNotMatch(summaryPage, /garantías financieras constituidas/);
