@@ -20,12 +20,41 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
 
   try {
     const { id } = await contextRoute.params;
-    const { data, error } = await context.supabase.rpc('get_work_order_supply_status_v1', {
-      p_organization_id: context.organizationId,
-      p_work_order_id: id,
-    });
+    const [{ data, error }, { data: receiptMovements, error: receiptError }] = await Promise.all([
+      context.supabase.rpc('get_work_order_supply_status_v1', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+      }),
+      context.supabase
+        .from('stock_movements')
+        .select('canonical_product_id,quantity,reference_doc,reference_id,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('work_order_id', id)
+        .eq('movement_type', 'receipt')
+        .eq('reference_doc', 'operational_receipt'),
+    ]);
     if (error) throw error;
-    return NextResponse.json({ data });
+    if (receiptError) throw receiptError;
+
+    const purchasedReceivedByProduct = new Map<string, number>();
+    for (const movement of receiptMovements || []) {
+      if (!movement.canonical_product_id) continue;
+      purchasedReceivedByProduct.set(
+        movement.canonical_product_id,
+        (purchasedReceivedByProduct.get(movement.canonical_product_id) || 0) + Number(movement.quantity || 0),
+      );
+    }
+
+    const status = data && typeof data === 'object' ? { ...data } : data;
+    if (status && typeof status === 'object' && Array.isArray((status as any).materials)) {
+      (status as any).materials = (status as any).materials.map((row: any) => ({
+        ...row,
+        purchase_received: row.product_id ? Number(purchasedReceivedByProduct.get(row.product_id) || 0) : 0,
+      }));
+      (status as any).purchase_received_units = Array.from(purchasedReceivedByProduct.values()).reduce((sum, value) => sum + value, 0);
+    }
+
+    return NextResponse.json({ data: status });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la cobertura de materiales';
     return NextResponse.json({ error: message }, { status: 500 });
