@@ -47,9 +47,12 @@ test('journal staging normalizes blank or non-numeric debit and credit values be
 });
 
 
-test('journal staging deduplicates repeated Laudus journalEntryId values before RPC',()=>{
+test('journal staging groups repeated journalEntryId rows while preserving every accounting line',()=>{
   assert.match(sync,/function dedupeJournalRows/);
   assert.match(sync,/new Map<string, JsonRow>/);
-  assert.match(sync,/byId\.set\(id, normalizeJournalRow\(row\)\)/);
-  assert.match(sync,/duplicatesRemoved/);
+  assert.match(sync,/const lineMap = new Map/);
+  assert.match(sync,/lines_lineId/);
+  assert.match(sync,/lines_account_accountNumber/);
+  assert.match(sync,/lines_costCenter_costCenterId/);
+  assert.match(sync,/lines: \[\.\.\.lineMap\.values\(\)\]/);
 });
