@@ -54,11 +54,7 @@ const ENTITY_CONFIG = {
   },
   sales_receipt: {
     path: '/sales/receipts/list',
-    fields: [
-      'receiptId','receiptType.code','receiptType.description',
-      'issuedDate','dueDate','document','authorizationCode',
-      'deposited','createAccounting','notes','createdAt','modifiedAt',
-    ],
+    fields: ['receiptId','issuedDate','modifiedAt'],
     orderField: 'modifiedAt',
     pages: 2,
   },
