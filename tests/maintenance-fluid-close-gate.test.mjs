@@ -101,3 +101,20 @@ test('legacy OT closed before policy READY can be approved by Ariel without inve
   assert.match(reviewUi, /no equivale a “No”/);
   assert.match(reviewUi, /legacyFluidDeclarationExemption/);
 });
+
+test('mechanic work order inbox retains completed and pending-supervisor orders', () => {
+  const workOrdersUi = fs.readFileSync('components/maintenance/work-orders-queue.tsx', 'utf8');
+  const workOrdersApi = fs.readFileSync('app/api/maintenance/work-orders/route.ts', 'utf8');
+  assert.match(workOrdersUi, /viewerContext\.mode === 'execution'\) setViewFilter\('all'\)/);
+  assert.match(workOrdersUi, /Tus OT cerradas siguen aquí/);
+  assert.match(workOrdersUi, /isExecutorView \? 'Ver cierre' : t\.approval\.review/);
+  assert.match(workOrdersUi, /approved \? t\.approval\.record/);
+  assert.match(workOrdersUi, /viewFilter === 'all'\s*\? operational/);
+  assert.match(workOrdersUi, /pendingApproval = completedOrders\.filter/);
+  assert.match(workOrdersUi, /setViewFilter\(isExecutorView \? 'all' : 'active'\)/);
+  assert.match(closeUi, /Ver mis órdenes cerradas/);
+  assert.match(closeUi, /Las OT que cerraste siguen disponibles/);
+  assert.match(workOrdersApi, /query = query\.eq\('assigned_person_id', executionScope\.personId\)/);
+  assert.match(workOrdersApi, /approval_status: row\.status === 'completed' \? \(review\?\.status \|\| 'pending'\)/);
+  assert.doesNotMatch(workOrdersApi.slice(workOrdersApi.indexOf('export async function GET('),workOrdersApi.indexOf('export async function POST(')), /not\('status', 'in'/);
+});

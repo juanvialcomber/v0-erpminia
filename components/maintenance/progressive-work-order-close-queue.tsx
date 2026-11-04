@@ -343,6 +343,8 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
           <div>
             <p className="font-medium">{t.empty.title}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t.empty.description}</p>
+            <p className="mt-2 text-sm text-muted-foreground">Las OT que cerraste siguen disponibles en Órdenes, aunque Ariel aún no las haya aprobado.</p>
+            <Button asChild variant="outline" className="mt-3"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Ver mis órdenes cerradas</Link></Button>
           </div>
         </CardContent>
       </Card>
@@ -379,6 +381,7 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
             </Badge>
           ) : null}
           <Badge variant="outline">{formatWorkOrderNumber(current.work_order_number, locale)}</Badge>
+          <Button asChild variant="ghost" size="sm"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Mis OT</Link></Button>
         </div>
       </div>
 
