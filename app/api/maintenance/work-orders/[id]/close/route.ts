@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
@@ -54,6 +53,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (fluidPayload.declared_by_assigned_executor !== true || typeof fluidPayload.fluids_used !== 'boolean') {
       return NextResponse.json(
         { error: 'La declaración de aceites/fluidos no es válida para cierre. Vuelve a confirmarla como mecánico asignado.' },
+        { status: 409 },
+      );
+    }
+
+    const { data: currentFluidUsage, error: currentFluidUsageError } = await context.supabase
+      .from('maintenance_fluid_usage_records')
+      .select('id,used_at')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id);
+    if (currentFluidUsageError) throw currentFluidUsageError;
+
+    const currentUsageCount = (currentFluidUsage || []).length;
+    const declaredUsageCount = Number(fluidPayload.fluid_usage_count || 0);
+    if (currentUsageCount !== declaredUsageCount) {
+      return NextResponse.json(
+        { error: 'Los datos de aceites/fluidos cambiaron después de la confirmación. El mecánico debe revisar y confirmar nuevamente antes de cerrar.' },
         { status: 409 },
       );
     }
