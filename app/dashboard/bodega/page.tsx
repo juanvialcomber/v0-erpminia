@@ -54,6 +54,8 @@ export default function BodegaPage() {
   const dieselLaudus = diesel?.laudus || null;
   const sourceAuthority = error ? null : data?.sourceAuthority || null;
   const reconciliationSummary = error ? null : data?.reconciliationSummary || null;
+  const legacySnapshotMismatches = Number(reconciliationSummary?.legacySnapshotMismatches || 0);
+  const laudusOnlyCurrent = Number(reconciliationSummary?.laudusOnlyCurrent || 0);
   const valuationTrusted = Boolean(sourceAuthority?.laudusIsPrimary) && !diesel?.hasConflict;
 
   const attention = [
@@ -83,13 +85,13 @@ export default function BodegaPage() {
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Diferencias</p>
-        <p className="mt-2 text-sm font-medium">{reconciliationSummary?number(reconciliationSummary.quantityMismatches)+' diferencias de cantidad':'Conciliación no disponible'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{reconciliationSummary?(number(reconciliationSummary.alignedProducts)+' productos alineados · '+number(reconciliationSummary.missingInMotilNonzero)+' con stock Laudus sin contraparte MOTIL'):'No se reemplaza una conciliación ausente por cero.'}</p>
+        <p className="mt-2 text-sm font-medium">{reconciliationSummary?number(legacySnapshotMismatches + laudusOnlyCurrent)+' registros con fuente más nueva':'Conciliación no disponible'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{reconciliationSummary?(number(legacySnapshotMismatches)+' corresponden a snapshot MOTIL antiguo · '+number(laudusOnlyCurrent)+' existen sólo en Laudus vigente'):'No se reemplaza una conciliación ausente por cero.'}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisión</p>
         <p className="mt-2 text-sm font-medium">{Number(overview.negative_stock_products||0)>0?number(overview.negative_stock_products)+' saldos negativos por conciliar':'Sin saldos negativos pendientes'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">Las diferencias se revisan antes de ajustar stock, comprometer disponibilidad o disparar compras.</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">La deuda de snapshot se resuelve usando Laudus como fuente vigente; sólo conflictos contemporáneos requieren revisión humana.</p>
         <Link href={Number(overview.negative_stock_products||0)>0?'/dashboard/bodega?status=negative':'/dashboard/bodega/fuentes'} className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">{Number(overview.negative_stock_products||0)>0?'Conciliar saldos':'Revisar fuentes'} <ArrowRight className="h-3 w-3"/></Link>
       </div>
     </section> : null}
