@@ -33,7 +33,8 @@ test('payments keeps short-term treasury actionable without expanding the full f
   assert.match(payments,/days_to_due/);
   assert.match(payments,/Vencidas/);
   assert.match(payments,/Sin vencimiento/);
-  assert.match(page,/LaudusFinanceControlCard/);
+  assert.match(page,/MotilFinanceOperatingCockpit/);
+  assert.match(page,/Fuente Laudus/);
   assert.doesNotMatch(page,/Próx\. 30 días/);
   assert.doesNotMatch(page,/Próx\. 60 días/);
   assert.doesNotMatch(page,/Próx\. 90 días/);
