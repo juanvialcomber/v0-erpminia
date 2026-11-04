@@ -244,7 +244,16 @@ export async function GET(request: NextRequest) {
           : null;
       })
       .filter((value): value is number => value !== null);
-    const reviewLatency = median(closeToReviewSeconds);
+    const sortedReviewLatency = [...closeToReviewSeconds].sort((a, b) => a - b);
+    const reviewLatencyMidpoint = Math.floor(sortedReviewLatency.length / 2);
+    const medianCloseToReviewSeconds =
+      sortedReviewLatency.length === 0
+        ? null
+        : sortedReviewLatency.length % 2 === 0
+          ? Math.round(
+              (sortedReviewLatency[reviewLatencyMidpoint - 1] + sortedReviewLatency[reviewLatencyMidpoint]) / 2,
+            )
+          : sortedReviewLatency[reviewLatencyMidpoint];
     const reviewedClosed = closedRows.filter((row: any) => latestReviewByOrder.has(String(row.id))).length;
     const approvedClosed = closedRows.filter(
       (row: any) => latestReviewByOrder.get(String(row.id))?.status === 'approved',
@@ -254,8 +263,8 @@ export async function GET(request: NextRequest) {
       approvedClosed,
       nonApprovedClosed: reviewedClosed - approvedClosed,
       coveragePct: closedRows.length > 0 ? Math.round((reviewedClosed / closedRows.length) * 100) : null,
-      medianCloseToReviewSeconds: reviewLatency.medianSeconds,
-      latencySamples: reviewLatency.samples,
+      medianCloseToReviewSeconds,
+      latencySamples: sortedReviewLatency.length,
       semantics: 'latest human supervisor review per closed work order; approval rate is workflow evidence, not proof of repair quality',
     };
 
