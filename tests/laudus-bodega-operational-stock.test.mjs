@@ -19,3 +19,21 @@ test("Laudus Bodega alignment keeps warehouse 002 idempotent and stock authority
   assert.match(sql, /then 'legacy_motil_stale'/i);
   assert.match(sql, /then 'laudus_zero_no_motil'/i);
 });
+
+
+test("Bodega read APIs prefer current Laudus operational stock without rewriting canonical inventory", async () => {
+  const [stockRoute, inventoryRoute] = await Promise.all([
+    readFile(new URL("../app/api/bodega/stock/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/bodega/inventory/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(stockRoute, /bodega_inventory_operational_service_v1/);
+  assert.match(stockRoute, /operational_quantity/);
+  assert.match(stockRoute, /canonical_fallback/);
+  assert.match(inventoryRoute, /bodega_inventory_operational_service_v1/);
+  assert.match(inventoryRoute, /const skuBatchSize = 50/);
+  assert.doesNotMatch(stockRoute, /\.update\(/);
+  assert.doesNotMatch(stockRoute, /\.upsert\(/);
+  assert.doesNotMatch(inventoryRoute, /\.update\(/);
+  assert.doesNotMatch(inventoryRoute, /\.upsert\(/);
+});
