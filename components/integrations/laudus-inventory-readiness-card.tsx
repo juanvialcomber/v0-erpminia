@@ -35,6 +35,9 @@ type Payload = {
     comparedProducts: number;
     alignedProducts: number;
     quantityMismatches: number;
+    freshMismatches1d: number;
+    staleMismatches7d: number;
+    staleMismatches30d: number;
     missingInMotilNonzero: number;
     laudusOnlyZero: number;
     negativeProducts: number;
@@ -221,7 +224,7 @@ export function LaudusInventoryReadinessCard() {
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL · ${count(data.laudus.stockRows)} posiciones ERP`}
+            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua`}
           </p>
         </div>
         <div className="bg-card p-4">
@@ -340,7 +343,7 @@ export function LaudusInventoryReadinessCard() {
             <p className="mt-1 text-xs text-muted-foreground">
               {isLoading || !data
                 ? 'Verificando conciliación.'
-                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.quantityMismatches)} difieren · ${count(data.laudus.missingInMotilNonzero)} tienen saldo Laudus y no están en existencias MOTIL.`}
+                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.freshMismatches1d)} diferencias frescas · ${count(data.laudus.staleMismatches30d)} diferencias con evidencia MOTIL >30 días más antigua.`}
             </p>
           </div>
         </div>
