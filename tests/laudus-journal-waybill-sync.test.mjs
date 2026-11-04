@@ -56,3 +56,14 @@ test('journal staging groups repeated journalEntryId rows while preserving every
   assert.match(sync,/lines_costCenter_costCenterId/);
   assert.match(sync,/lines: \[\.\.\.lineMap\.values\(\)\]/);
 });
+
+
+test('waybill sync preserves flattened Laudus supplier warehouse and item rows',()=>{
+  assert.match(sync,/row\.supplier_supplierId/);
+  assert.match(sync,/row\.supplier_VATId/);
+  assert.match(sync,/row\.warehouse_warehouseId/);
+  assert.match(sync,/hasFlattenedItem/);
+  assert.match(sync,/row\.items_itemId/);
+  assert.match(sync,/row\.items_product_sku/);
+  assert.match(sync,/row\.items_quantity/);
+});
