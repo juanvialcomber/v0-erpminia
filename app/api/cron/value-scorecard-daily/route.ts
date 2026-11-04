@@ -83,7 +83,7 @@ async function capture(request: NextRequest) {
         .limit(10000),
       supabase
         .from('work_order_supervisor_reviews')
-        .select('work_order_id,status')
+        .select('work_order_id,status,reviewed_at')
         .eq('organization_id', organization.id)
         .limit(5000),
     ]);
@@ -113,12 +113,46 @@ async function capture(request: NextRequest) {
         .map((row) => String(row.work_order_id || ''))
         .filter((id) => id && workOrderIds.has(id)),
     );
+    const latestReviewByOrder = new Map<string, any>();
+    for (const row of reviewsResult.data || []) {
+      const key = String(row.work_order_id || '');
+      const reviewedAt = String(row.reviewed_at || '');
+      const current = latestReviewByOrder.get(key);
+      if (
+        key
+        && workOrderIds.has(key)
+        && reviewedAt
+        && (!current || Date.parse(reviewedAt) > Date.parse(String(current.reviewed_at || '')))
+      ) {
+        latestReviewByOrder.set(key, row);
+      }
+    }
     const approvedReviews = new Set(
-      (reviewsResult.data || [])
-        .filter((row) => row.status === 'approved')
-        .map((row) => String(row.work_order_id || ''))
-        .filter((id) => id && workOrderIds.has(id)),
+      Array.from(latestReviewByOrder.entries())
+        .filter(([, row]) => row.status === 'approved')
+        .map(([key]) => key),
     );
+    const closeToReviewSeconds = workOrders
+      .map((row) => {
+        const review = latestReviewByOrder.get(String(row.id));
+        if (!(row as any).closed_at || !review?.reviewed_at) return null;
+        const closedMs = Date.parse(String((row as any).closed_at));
+        const reviewedMs = Date.parse(String(review.reviewed_at));
+        return Number.isFinite(closedMs) && Number.isFinite(reviewedMs) && reviewedMs >= closedMs
+          ? Math.round((reviewedMs - closedMs) / 1000)
+          : null;
+      })
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => a - b);
+    const reviewMidpoint = Math.floor(closeToReviewSeconds.length / 2);
+    const medianCloseToReviewSeconds =
+      closeToReviewSeconds.length === 0
+        ? null
+        : closeToReviewSeconds.length % 2 === 0
+          ? Math.round(
+              (closeToReviewSeconds[reviewMidpoint - 1] + closeToReviewSeconds[reviewMidpoint]) / 2,
+            )
+          : closeToReviewSeconds[reviewMidpoint];
 
     const eventCoveragePct = workOrders.length > 0
       ? Math.round((withEvents.size / workOrders.length) * 100)
@@ -210,6 +244,13 @@ async function capture(request: NextRequest) {
       workOrdersWithEvents: withEvents.size,
       workOrdersWithEvidence: withEvidence.size,
       approvedSupervisorReviews: approvedReviews.size,
+      supervisorReview: {
+        reviewedClosed: Array.from(latestReviewByOrder.keys()).filter((id) => closedIds.has(id)).length,
+        approvedClosed: Array.from(approvedReviews).filter((id) => closedIds.has(id)).length,
+        medianCloseToReviewSeconds,
+        latencySamples: closeToReviewSeconds.length,
+        semantics: 'latest human supervisor review per closed work order; workflow evidence, not proof of repair quality',
+      },
       eventCoveragePct,
       evidenceCoveragePct,
       supervisorReviewCoveragePct,
