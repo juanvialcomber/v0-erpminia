@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     const { data: supplier, error: supplierError } = await context.supabase
       .from('canonical_suppliers_v1')
-      .select('*')
+      .select('id,tax_id,legal_name,trade_name,business_activity,payment_terms,address,commune,region,country,phone,email,is_active,validation_status')
       .eq('organization_id', context.organizationId)
       .eq('id', supplierId)
       .single();
