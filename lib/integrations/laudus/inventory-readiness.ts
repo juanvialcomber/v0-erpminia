@@ -84,6 +84,14 @@ function isOlderThanHours(value: string | null | undefined, hours: number) {
   return Date.now() - timestamp > hours * 60 * 60 * 1000;
 }
 
+function hoursBetween(older: string | null | undefined, newer: string | null | undefined) {
+  if (!older || !newer) return null;
+  const olderMs = new Date(older).getTime();
+  const newerMs = new Date(newer).getTime();
+  if (!Number.isFinite(olderMs) || !Number.isFinite(newerMs)) return null;
+  return Math.max(0, Math.round(((newerMs - olderMs) / 3_600_000) * 10) / 10);
+}
+
 export async function loadLaudusInventoryReadiness(
   db: SupabaseClient,
   organizationId: string,
@@ -224,6 +232,14 @@ export async function loadLaudusInventoryReadiness(
   const laudusNegativeProducts = n(reconciliationSummary?.laudus_negative_products);
   const latestStockSync = readiness?.latest_stock_sync || reconciliationSummary?.latest_laudus_stock_sync || null;
   const stockIsStale = isOlderThanHours(latestStockSync, 8);
+  const latestMotilStockUpdate = reconciliationSummary?.latest_motil_stock_update || null;
+  const motilLagHours = hoursBetween(latestMotilStockUpdate, latestStockSync);
+  const comparisonFreshness = motilLagHours == null
+    ? 'unknown'
+    : motilLagHours > 24
+      ? 'motil_stale'
+      : 'comparable';
+  const comparisonIsComparable = comparisonFreshness === 'comparable';
   const authorityState = authority?.authority_state || (stockIsStale ? 'review_laudus_stale' : 'review_laudus_unavailable');
   const laudusIsPrimary = authorityState === 'laudus_primary';
 
@@ -263,8 +279,11 @@ export async function loadLaudusInventoryReadiness(
       physicalWarehouses: n(readiness?.physical_warehouses),
       mappedPhysicalWarehouses: n(readiness?.mapped_physical_warehouses),
       latestStockSync,
-      latestMotilStockUpdate: reconciliationSummary?.latest_motil_stock_update || null,
+      latestMotilStockUpdate,
       stockIsStale,
+      comparisonFreshness,
+      comparisonIsComparable,
+      motilLagHours,
       openReconciliation,
       comparedProducts: n(reconciliationSummary?.compared_products),
       alignedProducts: n(reconciliationSummary?.aligned_products),
@@ -274,7 +293,8 @@ export async function loadLaudusInventoryReadiness(
       negativeProducts: laudusNegativeProducts,
       negativePositions,
       negativeWarehouses: new Set(negativePositions.map((row) => row.warehouseCode).filter(Boolean)).size,
-      criticalConsumables,
+      criticalConsumables: comparisonIsComparable ? criticalConsumables : [],
+      suppressedCriticalConsumables: comparisonIsComparable ? 0 : criticalConsumables.length,
     },
     authority: {
       state: authorityState,
@@ -287,6 +307,9 @@ export async function loadLaudusInventoryReadiness(
     },
     reconciliation: {
       state: laudusState,
+      comparisonFreshness,
+      comparisonIsComparable,
+      comparisonPolicy: 'MOTIL y Laudus sólo se consideran comparables cuando la evidencia operacional MOTIL no queda más de 24 horas detrás del último stock Laudus.',
       defaultAbsoluteTolerance: 0,
       requiresApprovedTolerance: true,
       physicalCountUsedAsEvidence: true,
@@ -295,7 +318,7 @@ export async function loadLaudusInventoryReadiness(
     policy: {
       primaryStockSource: laudusIsPrimary ? 'laudus' as const : 'reconciliation' as const,
       laudusStockRole: 'primary_when_consistent' as const,
-      motilOperationalStockRole: 'comparison_evidence' as const,
+      motilOperationalStockRole: comparisonIsComparable ? 'comparison_evidence' as const : 'stale_comparison_evidence' as const,
       crossSourceValidation: ['official_email', 'whatsapp'] as const,
       autoOverwrite: false as const,
     },
