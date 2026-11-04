@@ -91,6 +91,12 @@ export async function GET(request: NextRequest) {
     const pipelineRows = pipelineResult.data || [];
     const validPipelineRows = pipelineRows.filter((row) => !/^UAT-/i.test(String(row.request_number || '').trim()));
     const validOrderIds = new Set(validPipelineRows.map((row) => row.order_id).filter(Boolean));
+    const excludedUatOrderIds = new Set(
+      pipelineRows
+        .filter((row) => /^UAT-/i.test(String(row.request_number || '').trim()))
+        .map((row) => row.order_id)
+        .filter(Boolean),
+    );
     const orderById = new Map<string, any>();
     for (const row of validPipelineRows) {
       if (!row.order_id || orderById.has(row.order_id)) continue;
@@ -203,7 +209,7 @@ export async function GET(request: NextRequest) {
         operationalOrders: orders.length,
         maintenanceLinkedOrders: linkedMaintenanceOrders.length,
         unlinkedOperationalOrders: orders.length - linkedMaintenanceOrders.length,
-        excludedUatOrders: Math.max(0, pipelineRows.length - validPipelineRows.length),
+        excludedUatOrders: excludedUatOrderIds.size,
       },
       maintenanceCost: {
         auditedWorkOrders,
