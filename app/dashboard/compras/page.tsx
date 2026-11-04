@@ -89,26 +89,38 @@ export default function ComprasPage() {
         sources={[
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
           sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'ERP de respaldo · solo lectura y conciliación.' }),
           { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
         ]}
       />
 
       <DataReceptionReadiness
-        description="Compras ya separa evidencia canónica y operación. Cuando Laudus sincronice, las OC, proveedores, facturas y pagos entrarán como fuente reconciliable sin reemplazar decisiones humanas."
+        description="Compras opera en MOTIL. Laudus queda como fuente histórica/financiera de contraste y nunca reemplaza decisiones humanas ni el flujo operacional."
         items={[
           { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
           { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
           { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
-          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Fuente de contraste disponible.' : sourceStatus.state('laudus') === 'review' ? 'Fuente disponible con incidencias por revisar.' : 'Fuente no disponible; Compras MOTIL sigue operando.' },
         ]}
       />
 
-      <LaudusProcurementReadinessCard />
-
-      <LaudusProcurementReconciliationCard />
-
-      <LaudusSupplierResolutionQueueCard />
+      <details className="rounded-lg border bg-card">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium">Fuente Laudus</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Histórico y conciliación · no necesario para operar una compra nueva</p>
+          </div>
+          <span className="text-xs text-muted-foreground">Ver detalle</span>
+        </summary>
+        <div className="space-y-4 border-t p-4">
+          <LaudusProcurementReadinessCard />
+          <LaudusProcurementReconciliationCard />
+          <LaudusSupplierResolutionQueueCard />
+          <Link href="/dashboard/calidad-datos/laudus" className="inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">
+            Ver todas las incidencias Laudus <ArrowRight className="h-3 w-3"/>
+          </Link>
+        </div>
+      </details>
 
       {error ? (
         <StatePanel
