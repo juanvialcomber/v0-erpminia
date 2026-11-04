@@ -13,6 +13,7 @@ type ActionItem = {
   evidence: string;
   href: string;
   assetHref?: string | null;
+  waitingSince?: string | null;
 };
 
 type AutopilotPreparation = {
@@ -53,6 +54,34 @@ const preventiveGroupKey = (row: any) => [
   row.frequency_hours ?? 'unknown-frequency',
 ].map(String).join('|');
 
+function santiagoDateWindow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const year = Number(values.year);
+  const month = Number(values.month);
+  const day = Number(values.day);
+  const today = new Date(Date.UTC(year, month - 1, day));
+  const weekday = today.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(today);
+  monday.setUTCDate(today.getUTCDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  const yesterday = new Date(today);
+  yesterday.setUTCDate(today.getUTCDate() - 1);
+  return {
+    today: today.toISOString().slice(0, 10),
+    yesterday: yesterday.toISOString().slice(0, 10),
+    weekStart: monday.toISOString().slice(0, 10),
+    weekEnd: sunday.toISOString().slice(0, 10),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!access.authorized) return access.response;
@@ -64,10 +93,10 @@ export async function GET(request: NextRequest) {
       context.supabase.from('work_order_close_readiness_v2').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_reliability_by_asset_v1').select('canonical_asset_id,asset_code,asset_name,audited_closures,recurring_cause_count,max_same_cause_occurrences,has_recurring_root_cause').eq('organization_id', context.organizationId),
-      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
+      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id,assigned_to_name,scheduled_date,status,created_at').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
       context.supabase.from('drilling_maintenance_review_queue_v1').select('review_id,canonical_asset_id,asset_code,asset_name,operation_date,review_reason,equipment_status_raw,machine_observations,review_status,linked_work_order_id,has_linked_work_order').eq('organization_id', context.organizationId).eq('review_status', 'pending').eq('has_linked_work_order', false).order('operation_date', { ascending: true }).limit(50),
       context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,completion_date,assigned_to_name').eq('organization_id', context.organizationId).not('created_by', 'is', null).eq('status', 'completed').order('completion_date', { ascending: false, nullsFirst: false }).limit(100),
-      context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status').eq('organization_id', context.organizationId),
+      context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status,reviewed_at,reviewed_by_name').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_meter_review_queue').select('id,canonical_asset_id,submitted_hours,previous_hours,attempted_at,reason').eq('organization_id', context.organizationId).eq('status', 'pending').order('attempted_at', { ascending: false }).limit(100),
     ]);
     const error = closeResult.error || preventiveResult.error || reliabilityResult.error || operationalOrdersResult.error || drillingReviewResult.error || completedOrdersResult.error || supervisorReviewsResult.error || meterReviewResult.error;
@@ -76,14 +105,109 @@ export async function GET(request: NextRequest) {
     const operationalOrderRows = operationalOrdersResult.data || [];
     const operationalWorkOrderIds = new Set(operationalOrderRows.map((row:any) => String(row.id)));
     const unassignedOperationalOrders = operationalOrderRows.filter((row:any) => !row.assigned_person_id);
+    const { today, yesterday, weekStart, weekEnd } = santiagoDateWindow();
+    const scheduledToday = operationalOrderRows.filter((row:any) => String(row.scheduled_date || '') === today);
+    const scheduledThisWeek = operationalOrderRows.filter((row:any) => {
+      const date = String(row.scheduled_date || '');
+      return Boolean(date) && date >= weekStart && date <= weekEnd;
+    });
     const allCloseRows = closeResult.data || [];
     const closeRows = allCloseRows.filter((row:any) => operationalWorkOrderIds.has(String(row.work_order_id)));
+    const closeByWorkOrder = new Map(closeRows.map((row:any) => [String(row.work_order_id), row]));
     const preventiveRows = preventiveResult.data || [];
     const reliabilityRows = reliabilityResult.data || [];
     const drillingReviewRows = drillingReviewResult.data || [];
     const completedOrderRows = completedOrdersResult.data || [];
     const approvedWorkOrderIds = new Set((supervisorReviewsResult.data || []).filter((row:any) => String(row.status || '').toLowerCase() === 'approved').map((row:any) => String(row.work_order_id)));
     const pendingApprovalRows = completedOrderRows.filter((row:any) => !approvedWorkOrderIds.has(String(row.id)));
+    const recentChanges: Array<{ kind: string; title: string; detail: string; href: string; occurredAt: string }> = [];
+    const changedSince = `${yesterday}T00:00:00`;
+
+    for (const row of operationalOrderRows) {
+      if (row.created_at && String(row.created_at) >= changedSince) {
+        recentChanges.push({
+          kind: 'work_order_created',
+          title: `Nueva OT · ${row.work_order_number || 'OT'}`,
+          detail: row.title || 'Orden de trabajo creada',
+          href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
+          occurredAt: String(row.created_at),
+        });
+      }
+    }
+    for (const row of completedOrderRows) {
+      if (row.completion_date && String(row.completion_date) >= changedSince) {
+        recentChanges.push({
+          kind: 'work_order_completed',
+          title: `OT terminada · ${row.work_order_number || 'OT'}`,
+          detail: row.title || 'Orden de trabajo terminada',
+          href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
+          occurredAt: String(row.completion_date),
+        });
+      }
+    }
+    for (const row of supervisorReviewsResult.data || []) {
+      if (String(row.status || '').toLowerCase() === 'approved' && row.reviewed_at && String(row.reviewed_at) >= changedSince) {
+        recentChanges.push({
+          kind: 'work_order_approved',
+          title: 'Cierre aprobado',
+          detail: row.reviewed_by_name ? `Aprobado por ${row.reviewed_by_name}` : 'Aprobación registrada',
+          href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.work_order_id))}`,
+          occurredAt: String(row.reviewed_at),
+        });
+      }
+    }
+    for (const row of drillingReviewRows) {
+      if (row.operation_date && String(row.operation_date) >= yesterday) {
+        recentChanges.push({
+          kind: 'operational_signal',
+          title: isOutOfServiceReview(row) ? 'Nueva señal · equipo fuera de servicio' : 'Nueva señal operacional',
+          detail: row.asset_code || row.asset_name || 'Equipo',
+          href: `/dashboard/mantenimiento/ordenes-trabajo/create?reviewId=${encodeURIComponent(String(row.review_id))}`,
+          occurredAt: `${row.operation_date}T12:00:00`,
+        });
+      }
+    }
+    for (const row of meterReviewResult.data || []) {
+      if (row.attempted_at && String(row.attempted_at) >= changedSince) {
+        recentChanges.push({
+          kind: 'meter_review',
+          title: 'Nueva revisión de horómetro',
+          detail: `${row.previous_hours ?? '—'} h → ${row.submitted_hours ?? '—'} h`,
+          href: '/dashboard/mantenimiento/horometros',
+          occurredAt: String(row.attempted_at),
+        });
+      }
+    }
+    recentChanges.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+
+    const weeklyPlan = scheduledThisWeek.map((row:any) => {
+      const readiness:any = closeByWorkOrder.get(String(row.id)) || null;
+      const blocked = readiness && (
+        Number(readiness.open_procurement_orders || 0) > 0
+        || Number(readiness.unmet_material_requirements || 0) > 0
+        || Number(readiness.pending_external_services || 0) > 0
+      );
+      const closeout = Boolean(readiness?.ready_to_close) || String(readiness?.next_action || '') === 'close_work_order';
+      const bucket = blocked ? 'blocked' : closeout ? 'closeout' : String(row.status || '').toLowerCase() === 'in_progress' ? 'execution' : 'prepared';
+      return {
+        id: row.id,
+        workOrderNumber: row.work_order_number,
+        title: row.title,
+        scheduledDate: row.scheduled_date,
+        assignedToName: row.assigned_to_name,
+        bucket,
+        href: closeout
+          ? `/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${encodeURIComponent(String(row.id))}`
+          : `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
+      };
+    });
+    const weeklySummary = {
+      prepared: weeklyPlan.filter((row) => row.bucket === 'prepared').length,
+      blocked: weeklyPlan.filter((row) => row.bucket === 'blocked').length,
+      execution: weeklyPlan.filter((row) => row.bucket === 'execution').length,
+      closeout: weeklyPlan.filter((row) => row.bucket === 'closeout').length,
+    };
+
     const actions: ActionItem[] = [];
 
     for (const row of meterReviewResult.data || []) {
@@ -99,6 +223,7 @@ export async function GET(request: NextRequest) {
         evidence: `Registrado ${new Date(row.attempted_at).toLocaleString('es-CL')} · no afecta planes preventivos`,
         href: '/dashboard/mantenimiento/horometros',
         assetHref: assetHref(row.canonical_asset_id),
+        waitingSince: row.attempted_at || null,
       });
     }
 
@@ -117,6 +242,7 @@ export async function GET(request: NextRequest) {
         evidence: `${observation}${dateEvidence}`,
         href: `/dashboard/mantenimiento/ordenes-trabajo/create?reviewId=${encodeURIComponent(String(row.review_id))}&workType=corrective&priority=${reviewPriority}`,
         assetHref: assetHref(row.canonical_asset_id),
+        waitingSince: row.operation_date ? `${row.operation_date}T12:00:00` : null,
       });
     }
 
@@ -130,6 +256,7 @@ export async function GET(request: NextRequest) {
         evidence: row.completion_date ? `Terminada ${new Date(row.completion_date).toLocaleString('es-CL')}` : 'OT terminada pendiente de revisión',
         href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
         assetHref: assetHref(row.canonical_asset_id),
+        waitingSince: row.completion_date || null,
       });
     }
 
@@ -143,6 +270,7 @@ export async function GET(request: NextRequest) {
         evidence: 'La OT no puede iniciar ejecución hasta quedar vinculada a una persona operativa.',
         href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(String(row.id))}`,
         assetHref: assetHref(row.canonical_asset_id),
+        waitingSince: row.created_at || null,
       });
     }
 
@@ -193,8 +321,16 @@ export async function GET(request: NextRequest) {
       const number = row.work_order_number || 'OT';
       const href = `/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${row.work_order_id}`;
       const common = { assetHref: assetHref(row.canonical_asset_id) };
-      if (Number(row.open_procurement_orders || 0) > 0 || Number(row.pending_parts || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict)) {
-        actions.push({ id:`blocked:${row.work_order_id}`, kind:'operational_blocker', priority:30, title:`Resolver bloqueo operacional · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Bloqueo operativo', href, ...common });
+      const executionBlocked = Number(row.open_procurement_orders || 0) > 0
+        || Number(row.unmet_material_requirements || 0) > 0
+        || Number(row.pending_external_services || 0) > 0;
+      const closeoutPending = Number(row.pending_parts || 0) > 0
+        || Number(row.open_labor_entries || 0) > 0
+        || Boolean(row.external_cost_conflict);
+      if (executionBlocked) {
+        actions.push({ id:`blocked:${row.work_order_id}`, kind:'operational_blocker', priority:30, title:`Resolver bloqueo de inicio · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Condición pendiente antes de ejecución', href, ...common });
+      } else if (closeoutPending) {
+        actions.push({ id:`closeout-evidence:${row.work_order_id}`, kind:'closure_evidence', priority:35, title:`Completar evidencia de cierre · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Horas, partes o costos pendientes para cierre auditado', href, ...common });
       } else if (Number(row.standard_plan_steps_pending || 0) > 0) {
         actions.push({ id:`plan:${row.work_order_id}`, kind:'plan_step', priority:40, title:`Ejecutar procedimiento · ${number}`, description:row.next_plan_step_title || row.title || 'Paso pendiente', evidence:`${Number(row.standard_plan_steps_completed || 0)}/${Number(row.standard_plan_steps_total || 0)} pasos realizados`, href, ...common });
       } else if (row.ready_to_close) {
@@ -218,6 +354,9 @@ export async function GET(request: NextRequest) {
     }
 
     actions.sort((a,b) => a.priority - b.priority || a.title.localeCompare(b.title, 'es'));
+    const decisionOfDay = actions[0]
+      ? { ...actions[0], autopilot: autopilotPreparation(actions[0]) }
+      : null;
 
     return NextResponse.json({
       summary: {
@@ -231,12 +370,22 @@ export async function GET(request: NextRequest) {
         pendingOperationalReviews: drillingReviewRows.length,
         pendingMeterReviews: (meterReviewResult.data || []).length,
         outOfServiceOperationalReviews: drillingReviewRows.filter((row:any) => isOutOfServiceReview(row)).length,
-        operationallyBlocked: closeRows.filter((row:any) => Number(row.open_procurement_orders || 0) > 0 || Number(row.pending_parts || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict)).length,
+        scheduledToday: scheduledToday.length,
+        scheduledThisWeek: scheduledThisWeek.length,
+        operationallyBlocked: closeRows.filter((row:any) => Number(row.open_procurement_orders || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0).length,
+        closeoutPending: closeRows.filter((row:any) => Number(row.pending_parts || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict) || Number(row.standard_plan_steps_pending || 0) > 0).length,
         pendingPlanSteps: closeRows.reduce((sum:number,row:any) => sum + Number(row.standard_plan_steps_pending || 0), 0),
         readyToClose: closeRows.filter((row:any) => row.ready_to_close).length,
         pendingApprovals: pendingApprovalRows.length,
         recurringReliabilityAssets: reliabilityRows.filter((row:any) => row.has_recurring_root_cause).length,
         totalActions: actions.length,
+      },
+      decisionOfDay,
+      recentChanges: recentChanges.slice(0, 8),
+      weeklyPlan: {
+        window: { today, weekStart, weekEnd },
+        summary: weeklySummary,
+        rows: weeklyPlan.slice(0, 20),
       },
       actions: actions.slice(0, 100).map((action) => ({
         ...action,
@@ -245,6 +394,10 @@ export async function GET(request: NextRequest) {
       canEdit: access.canWrite,
       semantics: {
         preventiveGrouping: 'Las pautas vencidas del mismo activo, vencimiento y frecuencia se agrupan sólo para coordinar la intervención. Cada pauta conserva su identidad y su OT independiente.',
+        executionBlocking: 'Bloqueo operacional significa que la OT no puede iniciar ejecución por compras abiertas, materiales faltantes o servicios externos pendientes. Horas, partes, pasos y conflictos de costo son pendientes de cierre y se muestran por separado.',
+        planningWindow: `Hoy y esta semana usan fecha programada de OT en America/Santiago: ${today}, ${weekStart} a ${weekEnd}.`,
+        recentChanges: 'Qué cambió desde ayer usa sólo timestamps explícitos de OT creadas/terminadas, aprobaciones, señales operacionales y revisiones de horómetro. No infiere cuándo comenzó un bloqueo.',
+        serviceAge: 'La antigüedad se muestra sólo cuando la acción tiene un timestamp verificable. No se inventa un SLA para estados sin inicio registrado.',
       },
       sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue'],
     });

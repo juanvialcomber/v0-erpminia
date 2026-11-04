@@ -14,9 +14,18 @@ import { CanonicalMaintenanceOverview } from '@/components/maintenance/canonical
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
-type ActionItem = { id: string; kind: string; priority: number; title: string; description: string; evidence: string; href: string; assetHref?: string | null; autopilot?: { state: 'prepared'; risk: 'low' | 'medium' | 'high'; requiresHumanDecision: true; preparedAction: string; authority: string } };
+type ActionItem = { id: string; kind: string; priority: number; title: string; description: string; evidence: string; href: string; assetHref?: string | null; waitingSince?: string | null; autopilot?: { state: 'prepared'; risk: 'low' | 'medium' | 'high'; requiresHumanDecision: true; preparedAction: string; authority: string } };
+type ChangeItem = { kind: string; title: string; detail: string; href: string; occurredAt: string };
+type WeeklyRow = { id: string; workOrderNumber?: string | null; title?: string | null; scheduledDate?: string | null; assignedToName?: string | null; bucket: 'prepared' | 'blocked' | 'execution' | 'closeout'; href: string };
 type Response = {
-  summary?: { openWorkOrders: number; unassignedOpenWorkOrders: number; overdueHourSchedules: number; unplannedOverdueHourSchedules: number; unplannedOverdueInterventionGroups: number; plannedOverdueHourSchedules: number; pendingOperationalReviews: number; outOfServiceOperationalReviews: number; operationallyBlocked: number; pendingPlanSteps: number; readyToClose: number; recurringReliabilityAssets: number; totalActions: number };
+  summary?: { openWorkOrders: number; unassignedOpenWorkOrders: number; overdueHourSchedules: number; unplannedOverdueHourSchedules: number; unplannedOverdueInterventionGroups: number; plannedOverdueHourSchedules: number; pendingOperationalReviews: number; outOfServiceOperationalReviews: number; scheduledToday: number; scheduledThisWeek: number; operationallyBlocked: number; closeoutPending: number; pendingPlanSteps: number; readyToClose: number; pendingApprovals: number; recurringReliabilityAssets: number; totalActions: number };
+  decisionOfDay?: ActionItem | null;
+  recentChanges?: ChangeItem[];
+  weeklyPlan?: {
+    window: { today: string; weekStart: string; weekEnd: string };
+    summary: { prepared: number; blocked: number; execution: number; closeout: number };
+    rows: WeeklyRow[];
+  };
   actions?: ActionItem[];
 };
 type ViewerMode = 'leadership' | 'planning' | 'execution' | 'oversight' | 'general';
@@ -32,6 +41,16 @@ const fetcher = async <T,>(url: string): Promise<T> => {
 
 function fill(template: string, vars: Record<string, string | number>) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(vars[key] ?? ''));
+}
+
+function waitingAge(value?: string | null, locale: Locale = 'es') {
+  if (!value) return null;
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return null;
+  const hours = Math.max(0, Math.floor((Date.now() - timestamp) / 3600000));
+  if (hours < 24) return locale === 'en' ? `${hours}h waiting` : `esperando ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return locale === 'en' ? `${days}d waiting` : `esperando ${days}d`;
 }
 
 type KindKey = 'approval_needed' | 'operational_review' | 'preventive_overdue' | 'assignment_needed' | 'meter_review' | 'operational_blocker' | 'plan_step' | 'ready_to_close' | 'closure_evidence' | 'reliability';
@@ -80,6 +99,9 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
   }
 
   const summary = data?.summary;
+  const decisionOfDay = data?.decisionOfDay || null;
+  const recentChanges = data?.recentChanges || [];
+  const weeklyPlan = data?.weeklyPlan;
   const rawActions = data?.actions || [];
   const actions = mode === 'planning'
     ? rawActions.filter((action) => planningKinds.has(action.kind))
@@ -152,6 +174,30 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
     ? t.flow.descriptionPlanning
     : t.flow.descriptionFull;
   const showOwnedFlow = mode === 'planning' || mode === 'leadership';
+  const showArielCockpit = mode === 'planning' || mode === 'leadership';
+  const cockpitCopy = locale === 'en'
+    ? {
+        title: 'Ariel cockpit',
+        description: 'One view for what is scheduled, blocked, awaiting approval, and repeating.',
+        items: [
+          ['Today', summary?.scheduledToday ?? '—', 'Scheduled work orders', '/dashboard/mantenimiento/calendario'],
+          ['This week', summary?.scheduledThisWeek ?? '—', 'Scheduled work orders', '/dashboard/mantenimiento/calendario'],
+          ['Blockers', summary?.operationallyBlocked ?? '—', 'Prevent execution', '/dashboard/mantenimiento/eam'],
+          ['Approve', summary?.pendingApprovals ?? '—', 'Completed work orders', '/dashboard/mantenimiento/ordenes-trabajo'],
+          ['Learn', summary?.recurringReliabilityAssets ?? '—', 'Audited recurrences', '/dashboard/mantenimiento/confiabilidad'],
+        ] as const,
+      }
+    : {
+        title: 'Cockpit Ariel',
+        description: 'Una vista para saber qué está programado, bloqueado, pendiente de aprobación y qué se está repitiendo.',
+        items: [
+          ['Hoy', summary?.scheduledToday ?? '—', 'OT programadas', '/dashboard/mantenimiento/calendario'],
+          ['Esta semana', summary?.scheduledThisWeek ?? '—', 'OT programadas', '/dashboard/mantenimiento/calendario'],
+          ['Bloqueos', summary?.operationallyBlocked ?? '—', 'Impiden ejecutar', '/dashboard/mantenimiento/eam'],
+          ['Por aprobar', summary?.pendingApprovals ?? '—', 'OT terminadas', '/dashboard/mantenimiento/ordenes-trabajo'],
+          ['Aprender', summary?.recurringReliabilityAssets ?? '—', 'Recurrencias auditadas', '/dashboard/mantenimiento/confiabilidad'],
+        ] as const,
+      };
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
     <div className="mb-2 flex flex-wrap justify-end gap-2">
@@ -183,6 +229,81 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
               : <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo"><ArrowRight className="h-4 w-4" />{t.cta.reviewOrders}</Link></Button>}
       </PageHeaderActions>
     </PageHeader>
+
+    {showArielCockpit ? <section aria-labelledby="ariel-maintenance-cockpit" className="space-y-3">
+      <div>
+        <h2 id="ariel-maintenance-cockpit" className="text-lg font-semibold">{cockpitCopy.title}</h2>
+        <p className="text-sm text-muted-foreground">{cockpitCopy.description}</p>
+      </div>
+      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-5">
+        {cockpitCopy.items.map(([label, value, detail, href]) => <Link key={label} href={href} className="bg-card p-4 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <p className="text-3xl font-semibold tracking-tight tabular-nums">{isLoading ? '—' : value}</p>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+        </Link>)}
+      </div>
+    </section> : null}
+
+    {showArielCockpit && decisionOfDay ? <Card className="shadow-none" aria-label="Decisión del día">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{locale === 'en' ? 'Decision of the day' : 'Decisión del día'}</p>
+            <CardTitle className="mt-1 text-lg">{decisionOfDay.title}</CardTitle>
+            <CardDescription className="mt-1">{decisionOfDay.description}</CardDescription>
+          </div>
+          {waitingAge(decisionOfDay.waitingSince, locale) ? <Badge variant="outline">{waitingAge(decisionOfDay.waitingSince, locale)}</Badge> : null}
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="space-y-2 text-sm">
+          <p><span className="font-medium">{locale === 'en' ? 'Evidence:' : 'Evidencia:'}</span> <span className="text-muted-foreground">{decisionOfDay.evidence}</span></p>
+          {decisionOfDay.autopilot ? <>
+            <p><span className="font-medium">{locale === 'en' ? 'MOTIL prepares:' : 'MOTIL prepara:'}</span> <span className="text-muted-foreground">{decisionOfDay.autopilot.preparedAction}</span></p>
+            <p><span className="font-medium">{locale === 'en' ? 'Ariel decides:' : 'Ariel decide:'}</span> <span className="text-muted-foreground">{decisionOfDay.autopilot.authority}</span></p>
+          </> : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {decisionOfDay.assetHref ? <Button asChild variant="outline"><Link href={decisionOfDay.assetHref}>{locale === 'en' ? 'View asset' : 'Ver activo'}</Link></Button> : null}
+          <Button asChild><Link href={decisionOfDay.href}>{locale === 'en' ? 'Resolve now' : 'Resolver ahora'}<ArrowRight className="h-4 w-4"/></Link></Button>
+        </div>
+      </CardContent>
+    </Card> : null}
+
+    {showArielCockpit ? <div className="grid gap-4 xl:grid-cols-2">
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base">{locale === 'en' ? 'What changed since yesterday' : 'Qué cambió desde ayer'}</CardTitle>
+          <CardDescription>{locale === 'en' ? 'Only timestamped operational events. No inferred changes.' : 'Sólo eventos operacionales con timestamp explícito. Sin cambios inferidos.'}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {recentChanges.length === 0 ? <p className="px-5 pb-5 text-sm text-muted-foreground">{locale === 'en' ? 'No timestamped changes to report.' : 'Sin cambios trazables que reportar.'}</p> : <div className="divide-y">{recentChanges.slice(0, 5).map((change) => <Link key={`${change.kind}-${change.occurredAt}-${change.href}`} href={change.href} className="flex items-center justify-between gap-3 px-5 py-3 outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"><div className="min-w-0"><p className="truncate text-sm font-medium">{change.title}</p><p className="truncate text-xs text-muted-foreground">{change.detail}</p></div><ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground"/></Link>)}</div>}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-base">{locale === 'en' ? 'Weekly plan' : 'Plan semanal'}</CardTitle>
+          <CardDescription>{locale === 'en' ? 'The same scheduled work, reduced to four operational states.' : 'Las mismas OT programadas, reducidas a cuatro estados operacionales.'}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-4">
+            {[
+              [locale === 'en' ? 'Ready' : 'Preparadas', weeklyPlan?.summary.prepared ?? '—'],
+              [locale === 'en' ? 'Blocked' : 'Bloqueadas', weeklyPlan?.summary.blocked ?? '—'],
+              [locale === 'en' ? 'Running' : 'Ejecutando', weeklyPlan?.summary.execution ?? '—'],
+              [locale === 'en' ? 'Close' : 'Por cerrar', weeklyPlan?.summary.closeout ?? '—'],
+            ].map(([label, value]) => <div key={String(label)} className="bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums">{isLoading ? '—' : value}</p></div>)}
+          </div>
+          {(weeklyPlan?.rows || []).slice(0, 4).map((row) => <Link key={row.id} href={row.href} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"><div className="min-w-0"><p className="truncate text-sm font-medium">{row.workOrderNumber || 'OT'} · {row.title || (locale === 'en' ? 'Work order' : 'Orden de trabajo')}</p><p className="truncate text-xs text-muted-foreground">{[row.scheduledDate, row.assignedToName].filter(Boolean).join(' · ') || (locale === 'en' ? 'Context pending' : 'Contexto pendiente')}</p></div><Badge variant={row.bucket === 'blocked' ? 'destructive' : 'outline'}>{row.bucket === 'prepared' ? (locale === 'en' ? 'Ready' : 'Preparada') : row.bucket === 'blocked' ? (locale === 'en' ? 'Blocked' : 'Bloqueada') : row.bucket === 'execution' ? (locale === 'en' ? 'Running' : 'Ejecutando') : (locale === 'en' ? 'Close' : 'Por cerrar')}</Badge></Link>)}
+          <Button asChild variant="outline" className="w-full"><Link href="/dashboard/mantenimiento/calendario">{locale === 'en' ? 'Open full calendar' : 'Abrir calendario completo'}</Link></Button>
+        </CardContent>
+      </Card>
+    </div> : null}
+
     <WhatsappOperationalUpdates mode="maintenance"/>
     <p className="text-sm text-muted-foreground">Primero mostramos lo que necesita atención. Abre una acción para continuar.</p>
     <Card className="shadow-none">
