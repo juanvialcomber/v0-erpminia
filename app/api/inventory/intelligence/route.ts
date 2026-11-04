@@ -163,12 +163,30 @@ export async function GET(request: NextRequest) {
     );
     const hasDieselConflict = !laudusIsPrimary && dieselSourcesDiffer;
 
+    const [legacySnapshotMismatchCountResult, laudusOnlyCurrentCountResult] = await Promise.all([
+      context.supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'legacy_motil_stale'),
+      context.supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'laudus_only_current'),
+    ]);
+
+    if (legacySnapshotMismatchCountResult.error) throw legacySnapshotMismatchCountResult.error;
+    if (laudusOnlyCurrentCountResult.error) throw laudusOnlyCurrentCountResult.error;
+
     const summary = reconciliationSummaryResult.data
       ? {
           comparedProducts: Number(reconciliationSummaryResult.data.compared_products || 0),
           alignedProducts: Number(reconciliationSummaryResult.data.aligned_products || 0),
           quantityMismatches: Number(reconciliationSummaryResult.data.quantity_mismatches || 0),
+          legacySnapshotMismatches: legacySnapshotMismatchCountResult.count || 0,
           missingInMotilNonzero: Number(reconciliationSummaryResult.data.missing_in_motil_nonzero || 0),
+          laudusOnlyCurrent: laudusOnlyCurrentCountResult.count || 0,
           laudusOnlyZero: Number(reconciliationSummaryResult.data.laudus_only_zero || 0),
           laudusNegativeProducts: Number(reconciliationSummaryResult.data.laudus_negative_products || 0),
           latestLaudusStockSync: reconciliationSummaryResult.data.latest_laudus_stock_sync || null,
