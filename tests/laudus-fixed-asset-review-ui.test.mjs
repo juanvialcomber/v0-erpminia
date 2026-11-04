@@ -20,7 +20,9 @@ test('fixed asset review API reuses canonical review queue and remains read-only
   assert.match(route, /slice\(0, 50\)/);
   assert.doesNotMatch(route, /\.insert\(/);
   assert.doesNotMatch(route, /\.update\(/);
-  assert.doesNotMatch(route, /\.upsert\(/);
+  assert.match(route, /laudus_fixed_asset_review_decisions/);
+  assert.doesNotMatch(route, /from\('canonical_assets_current'\)[\s\S]{0,1200}\.update\(/);
+  assert.doesNotMatch(route, /from\('laudus_fixed_assets_service_v1'\)[\s\S]{0,1200}\.update\(/);
   assert.doesNotMatch(route, /\.delete\(/);
 });
 
@@ -45,9 +47,9 @@ test('Finance routes users to the dedicated Laudus fixed asset review', async ()
 });
 
 
-test('fixed-asset review records human decisions without mutating Laudus or canonical assets', () => {
-  const route = readFileSync(new URL('../app/api/integrations/laudus/fixed-asset-review/route.ts', import.meta.url), 'utf8');
-  const ui = readFileSync(new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url), 'utf8');
+test('fixed-asset review records human decisions without mutating Laudus or canonical assets', async () => {
+  const route = await readFile(new URL('../app/api/integrations/laudus/fixed-asset-review/route.ts', import.meta.url), 'utf8');
+  const ui = await readFile(new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url), 'utf8');
 
   assert.match(route, /confirm_candidate/);
   assert.match(route, /reject_candidate/);
