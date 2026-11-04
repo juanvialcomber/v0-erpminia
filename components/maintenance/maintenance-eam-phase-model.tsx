@@ -160,6 +160,20 @@ export function MaintenanceEamPhaseModel() {
         })}
       </div>
 
+      <Card className="shadow-none">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">Aprender de cierres aprobados</p>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Los cierres auditados alimentan Confiabilidad para revisar recurrencias, MTTR, MTBF cuando exista base suficiente y costo auditado. MOTIL no crea trabajo automáticamente desde estos hallazgos.
+            </p>
+          </div>
+          <Link href="/dashboard/mantenimiento/confiabilidad" className="inline-flex shrink-0 items-center gap-2 text-sm font-medium">
+            Revisar confiabilidad <ArrowRight className="h-4 w-4" />
+          </Link>
+        </CardContent>
+      </Card>
+
       <p className="text-xs leading-5 text-muted-foreground">
         Modelo derivado desde OT, activos, readiness de cierre y revisión humana. No crea un maestro paralelo. La aprobación final permanece en Ariel bajo el flujo operacional actual.
       </p>
