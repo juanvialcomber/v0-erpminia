@@ -22,3 +22,11 @@ test('replacement dashboard exposes blockers and one action per domain',()=>{
   assert.match(page,/Resolver/);
   assert.match(layout,/reemplazo-laudus/);
 });
+
+
+test('replacement dashboard can scan one bounded invoice-trace batch explicitly',()=>{
+  assert.match(page,/native-invoice-trace\/sync/);
+  assert.match(page,/Escanear 5/);
+  assert.match(page,/method: 'POST'/);
+  assert.match(page,/await mutate\(\)/);
+});
