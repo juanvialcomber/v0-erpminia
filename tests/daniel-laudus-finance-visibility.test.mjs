@@ -8,7 +8,7 @@ const home = fs.readFileSync('components/dashboard/dashboard-home.tsx','utf8');
 
 test('finance keeps Laudus visible but secondary to the MOTIL operating cockpit', () => {
   assert.match(finance, /MotilFinanceOperatingCockpit/);
-  assert.ok(finance.indexOf('MotilFinanceOperatingCockpit') < finance.indexOf('LaudusFinanceStatusStrip'));
+  assert.ok(finance.indexOf('<MotilFinanceOperatingCockpit />') < finance.indexOf('<LaudusFinanceStatusStrip compact />'));
   assert.match(finance, /Fuente Laudus/);
   assert.match(finance, /LaudusFinanceStatusStrip/);
   assert.match(strip, /Laudus · fuente financiera/);
