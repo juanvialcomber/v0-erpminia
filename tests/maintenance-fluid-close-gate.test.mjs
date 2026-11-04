@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const closeRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/close/route.ts','utf8');
 const closureRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/fluids/closure/route.ts','utf8');
+const fluidRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/fluids/route.ts','utf8');
 const closeQueue = fs.readFileSync('app/api/maintenance/work-order-close-queue/route.ts','utf8');
 const closeUi = fs.readFileSync('components/maintenance/progressive-work-order-close-queue.tsx','utf8');
 const reviewRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/review/route.ts','utf8');
@@ -64,4 +65,12 @@ test('assigned mechanic fluid routes bypass only the coarse maintenance role gat
   assert.match(organizationContext, /fluids\\\/closure/);
   assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
   assert.match(closureRoute, /if \(!assigned\.ok\) return assigned\.response/);
+});
+
+
+test('only assigned mechanic can enter fluid usage while supervisors remain read-only', () => {
+  assert.match(fluidRoute, /const execution = await requireAssignedMaintenanceExecution\(context, id\)/);
+  assert.match(fluidRoute, /if \(!execution\.ok\) return execution\.response/);
+  assert.match(fluidRoute, /canEdit: execution\.ok/);
+  assert.doesNotMatch(fluidRoute, /if \(level === 'ED'\) return true/);
 });
