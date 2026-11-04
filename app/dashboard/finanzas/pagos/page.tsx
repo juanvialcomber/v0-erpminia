@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MotilBankStatementIntakeCard } from '@/components/finance/motil-bank-statement-intake-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -201,6 +202,8 @@ export default function PayablesPage() {
       {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que Laudus no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
+
+    <MotilBankStatementIntakeCard />
 
     <Card className="shadow-none"><CardHeader><CardTitle>Pagos y conciliación</CardTitle><CardDescription>La conciliación no reconoce gasto; confirma la salida de caja con referencia trazable.</CardDescription></CardHeader><CardContent className="space-y-3">
       {!payments.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay pagos registrados.</p> : null}
