@@ -12,7 +12,7 @@ test('MOTIL finance control derives the next decision from canonical operational
   assert.match(route,/procurement_supplier_payments/);
   assert.match(route,/procurement_match_exceptions/);
   assert.match(route,/procurement_supplier_invoices/);
-  assert.match(route,/procurement_operational_orders/);
+  assert.match(route,/operational_procurement_pipeline/);
   assert.match(route,/procurement_operational_receipts/);
   assert.doesNotMatch(route,/schema\('integration'\)/);
 });
@@ -41,4 +41,17 @@ test('MOTIL finance cockpit exposes one next action and the full operational cha
   assert.match(cockpit,/Necesidad → OC → recepción → factura/);
   assert.match(cockpit,/Aprobación → vencimiento → pago → conciliación/);
   assert.match(cockpit,/Laudus queda como fuente financiera\/tributaria de contraste/);
+});
+
+
+test('MOTIL finance control excludes UAT and exposes maintenance cost coverage', () => {
+  assert.match(route,/validPipelineRows/);
+  assert.match(route,/excludedUatOrderIds/);
+  assert.match(route,/maintenance_cost_intelligence_summary_v1/);
+  assert.match(route,/maintenance_cost_intelligence_base_v1/);
+  assert.match(route,/costEvidenceWorkOrders/);
+  assert.match(route,/zeroCostSnapshots/);
+  assert.match(route,/Un snapshot con \$0 sin evidencia monetaria no se interpreta como costo real cero/);
+  assert.match(cockpit,/Puente económico · mantenimiento/);
+  assert.match(cockpit,/MOTIL no interpreta snapshots en \$0 como costo real cero/);
 });
