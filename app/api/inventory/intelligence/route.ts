@@ -23,6 +23,14 @@ function normalizeReconciliation(row: any) {
   };
 }
 
+function hoursBetween(older: string | null | undefined, newer: string | null | undefined) {
+  if (!older || !newer) return null;
+  const olderMs = new Date(older).getTime();
+  const newerMs = new Date(newer).getTime();
+  if (!Number.isFinite(olderMs) || !Number.isFinite(newerMs)) return null;
+  return Math.max(0, Math.round(((newerMs - olderMs) / 3_600_000) * 10) / 10);
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
   if (!access.authorized) return access.response;
@@ -115,6 +123,10 @@ export async function GET(request: NextRequest) {
 
     const authority = authorityResult.data || null;
     const laudusIsPrimary = authority?.authority_state === 'laudus_primary';
+    const latestLaudusStockSync = reconciliationSummaryResult.data?.latest_laudus_stock_sync || null;
+    const latestMotilStockUpdate = reconciliationSummaryResult.data?.latest_motil_stock_update || null;
+    const motilLagHours = hoursBetween(latestMotilStockUpdate, latestLaudusStockSync);
+    const comparisonIsComparable = motilLagHours != null && motilLagHours <= 24;
 
     const reconciliationBySku = new Map<string, any>();
     for (const row of reconciliationResult.data || []) {
@@ -136,8 +148,10 @@ export async function GET(request: NextRequest) {
         laudus_stock: laudus?.laudus_stock ?? null,
         laudus_synced_at: laudus?.laudus_synced_at ?? null,
         laudus_source_date_to: laudus?.source_date_to ?? null,
-        laudus_quantity_delta: laudus?.quantity_delta ?? null,
-        laudus_reconciliation_state: laudus?.reconciliation_state ?? 'not_in_laudus',
+        laudus_quantity_delta: comparisonIsComparable ? laudus?.quantity_delta ?? null : null,
+        laudus_reconciliation_state: comparisonIsComparable ? laudus?.reconciliation_state ?? 'not_in_laudus' : 'stale_comparison',
+        laudus_comparison_is_comparable: comparisonIsComparable,
+        laudus_motil_lag_hours: motilLagHours,
         laudus_stock_position_count: laudus?.stock_position_count ?? 0,
         operational_resolution: operational?.operational_resolution ?? null,
         operational_quantity: num(operational?.operational_quantity),
@@ -156,12 +170,12 @@ export async function GET(request: NextRequest) {
     const currentDiesel = dieselPositionResult.data?.[0] || null;
     const dieselLaudus = normalizeReconciliation(dieselLaudusResult.data || null);
     const dieselOperational = dieselOperationalResult.data || null;
-    const dieselSourcesDiffer = Boolean(currentDiesel || dieselLaudus) && (
+    const dieselSourcesDiffer = comparisonIsComparable && Boolean(currentDiesel || dieselLaudus) && (
       !currentDiesel ||
       !dieselLaudus ||
       dieselLaudus.reconciliation_state !== 'aligned'
     );
-    const hasDieselConflict = !laudusIsPrimary && dieselSourcesDiffer;
+    const hasDieselConflict = comparisonIsComparable && !laudusIsPrimary && dieselSourcesDiffer;
 
     const summary = reconciliationSummaryResult.data
       ? {
@@ -171,8 +185,10 @@ export async function GET(request: NextRequest) {
           missingInMotilNonzero: Number(reconciliationSummaryResult.data.missing_in_motil_nonzero || 0),
           laudusOnlyZero: Number(reconciliationSummaryResult.data.laudus_only_zero || 0),
           laudusNegativeProducts: Number(reconciliationSummaryResult.data.laudus_negative_products || 0),
-          latestLaudusStockSync: reconciliationSummaryResult.data.latest_laudus_stock_sync || null,
-          latestMotilStockUpdate: reconciliationSummaryResult.data.latest_motil_stock_update || null,
+          latestLaudusStockSync,
+          latestMotilStockUpdate,
+          comparisonIsComparable,
+          motilLagHours,
         }
       : null;
 
@@ -189,6 +205,8 @@ export async function GET(request: NextRequest) {
           : currentDiesel?.quantity_available ?? null,
         effectiveSource: laudusIsPrimary && dieselLaudus?.laudus_stock != null ? 'laudus' : 'motil',
         operationalResolution: dieselOperational?.operational_resolution ?? null,
+        comparisonIsComparable,
+        motilLagHours,
       } : null,
       reconciliationSummary: summary,
       sourceAuthority: authority ? {
