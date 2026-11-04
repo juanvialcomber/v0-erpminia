@@ -337,7 +337,13 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const [{ count: pendingAssets, error: assetError }, { count: overduePayables, error: payableError }] = await Promise.all([
+      const [
+        { count: pendingAssets, error: assetError },
+        { count: overduePayables, error: payableError },
+        accountingResult,
+        bankResult,
+        dteResult,
+      ] = await Promise.all([
         context.supabase
           .from('laudus_fixed_assets_service_v1')
           .select('id', { count: 'exact', head: true })
@@ -349,9 +355,24 @@ export async function GET(request: NextRequest) {
           .eq('organization_id', context.organizationId)
           .gt('outstanding_amount', 0)
           .lt('due_date', new Date().toISOString().slice(0, 10)),
+        context.supabase
+          .from('laudus_accounting_entries_service_v1')
+          .select('entry_date,currency_code,cost_center_external_id')
+          .eq('organization_id', context.organizationId),
+        context.supabase
+          .from('laudus_bank_statements_service_v1')
+          .select('bank_account_external_id,date_from,date_to,opening_balance,closing_balance')
+          .eq('organization_id', context.organizationId),
+        context.supabase
+          .from('laudus_dtes_service_v1')
+          .select('issued_date,issuer_tax_id,receiver_tax_id')
+          .eq('organization_id', context.organizationId),
       ]);
       if (assetError) throw assetError;
       if (payableError) throw payableError;
+      if (accountingResult.error) throw accountingResult.error;
+      if (bankResult.error) throw bankResult.error;
+      if (dteResult.error) throw dteResult.error;
 
       if ((pendingAssets || 0) > 0) {
         addIssue(issues, {
@@ -381,6 +402,62 @@ export async function GET(request: NextRequest) {
           detail: 'Brecha financiera operativa. Acción MOTIL: llevar cada obligación a Finanzas con factura, proveedor, vencimiento, saldo, estado de pago y acción humana; no marcar pagada por inferencia.',
           href: '/dashboard/compras/facturas',
           action_label: 'Revisar vencidas',
+          action_href: '/dashboard/compras/facturas',
+        });
+      }
+
+      const accountingRows = accountingResult.data || [];
+      const accountingMissingCurrency = accountingRows.filter((row) => !text(row.currency_code)).length;
+      const accountingMissingCostCenter = accountingRows.filter((row) => !text(row.cost_center_external_id)).length;
+      if (accountingRows.length > 0 && (accountingMissingCurrency > 0 || accountingMissingCostCenter > 0)) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:accounting_dimension_coverage',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'warning',
+          label: 'Contabilidad Laudus sin dimensiones suficientes para gestión MOTIL',
+          detail: `${accountingRows.length.toLocaleString('es-CL')} asientos están disponibles, pero ${accountingMissingCurrency.toLocaleString('es-CL')} no exponen moneda y ${accountingMissingCostCenter.toLocaleString('es-CL')} no exponen centro de costo en esta capa. Acción MOTIL: completar dimensiones desde líneas/maestros antes de usar contabilidad para gestión.`,
+          href: '/dashboard/finanzas',
+          action_label: 'Completar contabilidad',
+          action_href: '/dashboard/finanzas',
+        });
+      }
+
+      const bankRows = bankResult.data || [];
+      const bankMissingAccounts = bankRows.filter((row) => !text(row.bank_account_external_id)).length;
+      const bankMissingBalances = bankRows.filter((row) => row.opening_balance == null || row.closing_balance == null).length;
+      if (bankRows.length < 5 || bankMissingAccounts > 0 || bankMissingBalances > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:bank_statement_coverage',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: 'Cobertura bancaria Laudus insuficiente para conciliación',
+          detail: `Sólo ${bankRows.length.toLocaleString('es-CL')} extractos disponibles; ${bankMissingAccounts.toLocaleString('es-CL')} sin cuenta bancaria y ${bankMissingBalances.toLocaleString('es-CL')} sin saldos completos. Acción MOTIL: conectar fuente bancaria/canonizar extractos antes de retirar la conciliación manual.`,
+          href: '/dashboard/finanzas',
+          action_label: 'Resolver bancos',
+          action_href: '/dashboard/finanzas',
+        });
+      }
+
+      const dteRows = dteResult.data || [];
+      const dteMissingParty = dteRows.filter((row) => !text(row.issuer_tax_id) || !text(row.receiver_tax_id)).length;
+      if (dteRows.length < 10 || dteMissingParty > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:dte_coverage',
+          entity_type: 'invoice',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: 'Cobertura DTE Laudus incompleta',
+          detail: `Sólo ${dteRows.length.toLocaleString('es-CL')} DTE disponibles y ${dteMissingParty.toLocaleString('es-CL')} sin emisor/receptor completo. Acción MOTIL: usar una fuente fiscal/DTE completa y reconciliarla con facturas antes de depender de MOTIL para cierre tributario.`,
+          href: '/dashboard/compras/facturas',
+          action_label: 'Completar DTE',
           action_href: '/dashboard/compras/facturas',
         });
       }
