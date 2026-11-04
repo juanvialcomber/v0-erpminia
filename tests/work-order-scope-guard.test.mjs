@@ -37,3 +37,11 @@ test('server validates scope and records immutable creation context', () => {
   assert.match(route, /creation_request_id: workOrder\.creation_request_id/);
   assert.match(route, /if \(!idempotentReplay\) \{[\s\S]*recordCreationScopeContext\(context, request, createdOrder, generalWorkConfirmed\)/);
 });
+
+
+test('work-order production integration uses exposed asset view and auth identity for audit', () => {
+  assert.doesNotMatch(route, /schema\('canonical'\)/);
+  assert.match(route, /from\('canonical_assets_current'\)\.select\('location'\)/);
+  assert.match(route, /user_id: context\.authUserId/);
+  assert.doesNotMatch(route, /user_id: context\.userId/);
+});
