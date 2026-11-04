@@ -7,14 +7,16 @@ const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
 test('Laudus recovery only targets unhealthy accounting and supplier domains',()=>{
   assert.match(route,/RECOVERABLE_DOMAINS = new Set\(\['accounting_entries', 'suppliers'\]\)/);
-  assert.match(route,/\.in\('health_status', \['broken', 'degraded'\]\)/);
-  assert.match(route,/\.gt\('consecutive_failures', 0\)/);
+  assert.match(route,/\.in\('health_status', \['broken', 'degraded', 'unknown', 'running'\]\)/);
+  assert.match(route,/Number\(row\.consecutive_failures \|\| 0\) > 0/);
+  assert.match(route,/runningIsStale\(row\.last_started_at\)/);
   assert.doesNotMatch(route,/syncLaudusProcurement/);
   assert.doesNotMatch(route,/syncLaudusPurchaseWaybills/);
 });
 
 test('Laudus recovery preserves cooldown and monthly reserve',()=>{
   assert.match(route,/COOLDOWN_MINUTES = 30/);
+  assert.match(route,/STALE_RUNNING_MINUTES = 30/);
   assert.match(route,/RECOVERY_CALL_BUDGET = 30/);
   assert.match(route,/MINIMUM_MONTHLY_RESERVE = 200/);
   assert.match(route,/monthly_remaining_exact/);
@@ -43,4 +45,15 @@ test('Laudus recovery is staggered away from stock and backfill crons',()=>{
   const backfill=vercel.crons.find((cron)=>cron.path==='/api/cron/laudus-accounting-backfill');
   assert.notEqual(recovery.schedule,stock?.schedule);
   assert.notEqual(recovery.schedule,backfill?.schedule);
+});
+
+
+test('Laudus recovery does not treat a fresh running sync as failed',()=> {
+  assert.match(route,/if \(status === 'running'\) return runningIsStale\(row\.last_started_at\)/);
+  assert.match(route,/Date\.now\(\) - ts >= STALE_RUNNING_MINUTES \* 60 \* 1000/);
+});
+
+test('Laudus recovery includes unknown state only when prior failures exist',()=> {
+  assert.match(route,/\['broken', 'degraded', 'unknown'\]\.includes\(status\)/);
+  assert.match(route,/Number\(row\.consecutive_failures \|\| 0\) > 0/);
 });
