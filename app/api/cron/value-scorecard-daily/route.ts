@@ -73,7 +73,7 @@ async function capture(request: NextRequest) {
         .limit(5000),
       supabase
         .from('work_order_events')
-        .select('work_order_id')
+        .select('work_order_id,event_type,event_at')
         .eq('organization_id', organization.id)
         .limit(10000),
       supabase
@@ -123,6 +123,63 @@ async function capture(request: NextRequest) {
     const eventCoveragePct = workOrders.length > 0
       ? Math.round((withEvents.size / workOrders.length) * 100)
       : null;
+
+    const eventTimes = new Map<string, { start?: string; close?: string }>();
+    for (const row of eventsResult.data || []) {
+      const key = String(row.work_order_id || '');
+      if (!key || !workOrderIds.has(key)) continue;
+      const current = eventTimes.get(key) || {};
+      const at = String(row.event_at || '');
+      if (row.event_type === 'timer_play' && (!current.start || at < current.start)) current.start = at;
+      if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
+      eventTimes.set(key, current);
+    }
+    const weekStartUtc = (value: string) => {
+      const parsed = Date.parse(value);
+      if (!Number.isFinite(parsed)) return null;
+      const date = new Date(parsed);
+      const day = date.getUTCDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      date.setUTCDate(date.getUTCDate() + diff);
+      date.setUTCHours(0, 0, 0, 0);
+      return date.toISOString().slice(0, 10);
+    };
+    const median = (values: number[]) => {
+      const clean = [...values].sort((a, b) => a - b);
+      if (!clean.length) return null;
+      const middle = Math.floor(clean.length / 2);
+      return clean.length % 2 === 0
+        ? Math.round((clean[middle - 1] + clean[middle]) / 2)
+        : clean[middle];
+    };
+    const executionByWeek = new Map<string, number[]>();
+    for (const row of workOrders) {
+      const week = weekStartUtc(String((row as any).created_at || ''));
+      if (!week) continue;
+      const times = eventTimes.get(String(row.id)) || {};
+      const startMs = times.start ? Date.parse(times.start) : NaN;
+      const closeMs = times.close ? Date.parse(times.close) : NaN;
+      if (!Number.isFinite(startMs) || !Number.isFinite(closeMs) || closeMs < startMs) continue;
+      const values = executionByWeek.get(week) || [];
+      values.push(Math.round((closeMs - startMs) / 1000));
+      executionByWeek.set(week, values);
+    }
+    const weeklyExecutionTrend = Array.from(executionByWeek.entries())
+      .map(([week, values]) => ({ week, samples: values.length, medianSeconds: median(values) }))
+      .sort((a, b) => a.week.localeCompare(b.week));
+    const comparableWeeks = weeklyExecutionTrend.filter((row) => row.samples >= 5);
+    const previousComparableWeek = comparableWeeks.length >= 2 ? comparableWeeks[comparableWeeks.length - 2] : null;
+    const latestComparableWeek = comparableWeeks.length >= 1 ? comparableWeeks[comparableWeeks.length - 1] : null;
+    const weeklyExecutionChangePct =
+      previousComparableWeek?.medianSeconds != null
+      && latestComparableWeek?.medianSeconds != null
+      && previousComparableWeek.medianSeconds > 0
+        ? Math.round(
+            ((latestComparableWeek.medianSeconds - previousComparableWeek.medianSeconds)
+              / previousComparableWeek.medianSeconds) * 100,
+          )
+        : null;
+
     const evidenceCoveragePct = workOrders.length > 0
       ? Math.round((withEvidence.size / workOrders.length) * 100)
       : null;
@@ -149,6 +206,16 @@ async function capture(request: NextRequest) {
       eventCoveragePct,
       evidenceCoveragePct,
       supervisorReviewCoveragePct,
+      executionTrend: {
+        weeks: weeklyExecutionTrend,
+        comparableWeeks: comparableWeeks.length,
+        previousComparableWeek,
+        latestComparableWeek,
+        changePct: weeklyExecutionChangePct,
+        evidenceGate: comparableWeeks.length >= 2 ? 'TREND_ONLY' : 'INSUFFICIENT_SAMPLE',
+        e3Gate: 'HOLD_E3',
+        semantics: 'observational weekly execution-cycle trend; not causal attribution to MOTIL',
+      },
       lecv: maintenanceLecv,
       attribution: 'NO_MEDIBLE_AUN',
       semantics: 'observed operational evidence and human review; not saved time, avoided downtime, or economic ROI',
