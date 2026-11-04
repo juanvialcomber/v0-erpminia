@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Droplets, Gauge, RefreshCw, ShieldAlert, Workflow, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, BellRing, CheckCircle2, Clock3, Droplets, Gauge, RefreshCw, ShieldAlert, Workflow, Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -204,6 +204,11 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
       {(mode === 'planning' || mode === 'leadership' || mode === 'general') ? (
         <Link href="/dashboard/mantenimiento/eam" className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
           <Workflow className="h-4 w-4" /> Flujo EAM
+        </Link>
+      ) : null}
+      {(mode === 'planning' || mode === 'leadership' || mode === 'general') ? (
+        <Link href="/dashboard/mantenimiento/avisos" className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted">
+          <BellRing className="h-4 w-4" /> Avisos
         </Link>
       ) : null}
       {(mode === 'planning' || mode === 'leadership' || mode === 'general') ? (
