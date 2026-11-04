@@ -53,6 +53,31 @@ const preventiveGroupKey = (row: any) => [
   row.frequency_hours ?? 'unknown-frequency',
 ].map(String).join('|');
 
+function santiagoDateWindow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const year = Number(values.year);
+  const month = Number(values.month);
+  const day = Number(values.day);
+  const today = new Date(Date.UTC(year, month - 1, day));
+  const weekday = today.getUTCDay();
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
+  const monday = new Date(today);
+  monday.setUTCDate(today.getUTCDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+  return {
+    today: today.toISOString().slice(0, 10),
+    weekStart: monday.toISOString().slice(0, 10),
+    weekEnd: sunday.toISOString().slice(0, 10),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
   if (!access.authorized) return access.response;
@@ -64,7 +89,7 @@ export async function GET(request: NextRequest) {
       context.supabase.from('work_order_close_readiness_v2').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_reliability_by_asset_v1').select('canonical_asset_id,asset_code,asset_name,audited_closures,recurring_cause_count,max_same_cause_occurrences,has_recurring_root_cause').eq('organization_id', context.organizationId),
-      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
+      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id,scheduled_date').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
       context.supabase.from('drilling_maintenance_review_queue_v1').select('review_id,canonical_asset_id,asset_code,asset_name,operation_date,review_reason,equipment_status_raw,machine_observations,review_status,linked_work_order_id,has_linked_work_order').eq('organization_id', context.organizationId).eq('review_status', 'pending').eq('has_linked_work_order', false).order('operation_date', { ascending: true }).limit(50),
       context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,completion_date,assigned_to_name').eq('organization_id', context.organizationId).not('created_by', 'is', null).eq('status', 'completed').order('completion_date', { ascending: false, nullsFirst: false }).limit(100),
       context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status').eq('organization_id', context.organizationId),
@@ -76,6 +101,12 @@ export async function GET(request: NextRequest) {
     const operationalOrderRows = operationalOrdersResult.data || [];
     const operationalWorkOrderIds = new Set(operationalOrderRows.map((row:any) => String(row.id)));
     const unassignedOperationalOrders = operationalOrderRows.filter((row:any) => !row.assigned_person_id);
+    const { today, weekStart, weekEnd } = santiagoDateWindow();
+    const scheduledToday = operationalOrderRows.filter((row:any) => String(row.scheduled_date || '') === today);
+    const scheduledThisWeek = operationalOrderRows.filter((row:any) => {
+      const date = String(row.scheduled_date || '');
+      return Boolean(date) && date >= weekStart && date <= weekEnd;
+    });
     const allCloseRows = closeResult.data || [];
     const closeRows = allCloseRows.filter((row:any) => operationalWorkOrderIds.has(String(row.work_order_id)));
     const preventiveRows = preventiveResult.data || [];
@@ -193,8 +224,16 @@ export async function GET(request: NextRequest) {
       const number = row.work_order_number || 'OT';
       const href = `/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${row.work_order_id}`;
       const common = { assetHref: assetHref(row.canonical_asset_id) };
-      if (Number(row.open_procurement_orders || 0) > 0 || Number(row.pending_parts || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict)) {
-        actions.push({ id:`blocked:${row.work_order_id}`, kind:'operational_blocker', priority:30, title:`Resolver bloqueo operacional · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Bloqueo operativo', href, ...common });
+      const executionBlocked = Number(row.open_procurement_orders || 0) > 0
+        || Number(row.unmet_material_requirements || 0) > 0
+        || Number(row.pending_external_services || 0) > 0;
+      const closeoutPending = Number(row.pending_parts || 0) > 0
+        || Number(row.open_labor_entries || 0) > 0
+        || Boolean(row.external_cost_conflict);
+      if (executionBlocked) {
+        actions.push({ id:`blocked:${row.work_order_id}`, kind:'operational_blocker', priority:30, title:`Resolver bloqueo de inicio · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Condición pendiente antes de ejecución', href, ...common });
+      } else if (closeoutPending) {
+        actions.push({ id:`closeout-evidence:${row.work_order_id}`, kind:'closure_evidence', priority:35, title:`Completar evidencia de cierre · ${number}`, description:row.title || 'Orden de trabajo', evidence:row.next_action || 'Horas, partes o costos pendientes para cierre auditado', href, ...common });
       } else if (Number(row.standard_plan_steps_pending || 0) > 0) {
         actions.push({ id:`plan:${row.work_order_id}`, kind:'plan_step', priority:40, title:`Ejecutar procedimiento · ${number}`, description:row.next_plan_step_title || row.title || 'Paso pendiente', evidence:`${Number(row.standard_plan_steps_completed || 0)}/${Number(row.standard_plan_steps_total || 0)} pasos realizados`, href, ...common });
       } else if (row.ready_to_close) {
@@ -231,7 +270,10 @@ export async function GET(request: NextRequest) {
         pendingOperationalReviews: drillingReviewRows.length,
         pendingMeterReviews: (meterReviewResult.data || []).length,
         outOfServiceOperationalReviews: drillingReviewRows.filter((row:any) => isOutOfServiceReview(row)).length,
-        operationallyBlocked: closeRows.filter((row:any) => Number(row.open_procurement_orders || 0) > 0 || Number(row.pending_parts || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict)).length,
+        scheduledToday: scheduledToday.length,
+        scheduledThisWeek: scheduledThisWeek.length,
+        operationallyBlocked: closeRows.filter((row:any) => Number(row.open_procurement_orders || 0) > 0 || Number(row.unmet_material_requirements || 0) > 0 || Number(row.pending_external_services || 0) > 0).length,
+        closeoutPending: closeRows.filter((row:any) => Number(row.pending_parts || 0) > 0 || Number(row.open_labor_entries || 0) > 0 || Boolean(row.external_cost_conflict) || Number(row.standard_plan_steps_pending || 0) > 0).length,
         pendingPlanSteps: closeRows.reduce((sum:number,row:any) => sum + Number(row.standard_plan_steps_pending || 0), 0),
         readyToClose: closeRows.filter((row:any) => row.ready_to_close).length,
         pendingApprovals: pendingApprovalRows.length,
@@ -245,6 +287,8 @@ export async function GET(request: NextRequest) {
       canEdit: access.canWrite,
       semantics: {
         preventiveGrouping: 'Las pautas vencidas del mismo activo, vencimiento y frecuencia se agrupan sólo para coordinar la intervención. Cada pauta conserva su identidad y su OT independiente.',
+        executionBlocking: 'Bloqueo operacional significa que la OT no puede iniciar ejecución por compras abiertas, materiales faltantes o servicios externos pendientes. Horas, partes, pasos y conflictos de costo son pendientes de cierre y se muestran por separado.',
+        planningWindow: `Hoy y esta semana usan fecha programada de OT en America/Santiago: ${today}, ${weekStart} a ${weekEnd}.`,
       },
       sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue'],
     });
