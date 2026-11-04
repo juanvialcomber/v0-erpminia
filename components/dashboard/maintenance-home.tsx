@@ -16,7 +16,7 @@ import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
 type ActionItem = { id: string; kind: string; priority: number; title: string; description: string; evidence: string; href: string; assetHref?: string | null; autopilot?: { state: 'prepared'; risk: 'low' | 'medium' | 'high'; requiresHumanDecision: true; preparedAction: string; authority: string } };
 type Response = {
-  summary?: { openWorkOrders: number; unassignedOpenWorkOrders: number; overdueHourSchedules: number; unplannedOverdueHourSchedules: number; unplannedOverdueInterventionGroups: number; plannedOverdueHourSchedules: number; pendingOperationalReviews: number; outOfServiceOperationalReviews: number; operationallyBlocked: number; pendingPlanSteps: number; readyToClose: number; recurringReliabilityAssets: number; totalActions: number };
+  summary?: { openWorkOrders: number; unassignedOpenWorkOrders: number; overdueHourSchedules: number; unplannedOverdueHourSchedules: number; unplannedOverdueInterventionGroups: number; plannedOverdueHourSchedules: number; pendingOperationalReviews: number; outOfServiceOperationalReviews: number; scheduledToday: number; scheduledThisWeek: number; operationallyBlocked: number; closeoutPending: number; pendingPlanSteps: number; readyToClose: number; pendingApprovals: number; recurringReliabilityAssets: number; totalActions: number };
   actions?: ActionItem[];
 };
 type ViewerMode = 'leadership' | 'planning' | 'execution' | 'oversight' | 'general';
@@ -152,6 +152,30 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
     ? t.flow.descriptionPlanning
     : t.flow.descriptionFull;
   const showOwnedFlow = mode === 'planning' || mode === 'leadership';
+  const showArielCockpit = mode === 'planning' || mode === 'leadership';
+  const cockpitCopy = locale === 'en'
+    ? {
+        title: 'Ariel cockpit',
+        description: 'One view for what is scheduled, blocked, awaiting approval, and repeating.',
+        items: [
+          ['Today', summary?.scheduledToday ?? '—', 'Scheduled work orders', '/dashboard/mantenimiento/calendario'],
+          ['This week', summary?.scheduledThisWeek ?? '—', 'Scheduled work orders', '/dashboard/mantenimiento/calendario'],
+          ['Blockers', summary?.operationallyBlocked ?? '—', 'Prevent execution', '/dashboard/mantenimiento/eam'],
+          ['Approve', summary?.pendingApprovals ?? '—', 'Completed work orders', '/dashboard/mantenimiento/ordenes-trabajo'],
+          ['Learn', summary?.recurringReliabilityAssets ?? '—', 'Audited recurrences', '/dashboard/mantenimiento/confiabilidad'],
+        ] as const,
+      }
+    : {
+        title: 'Cockpit Ariel',
+        description: 'Una vista para saber qué está programado, bloqueado, pendiente de aprobación y qué se está repitiendo.',
+        items: [
+          ['Hoy', summary?.scheduledToday ?? '—', 'OT programadas', '/dashboard/mantenimiento/calendario'],
+          ['Esta semana', summary?.scheduledThisWeek ?? '—', 'OT programadas', '/dashboard/mantenimiento/calendario'],
+          ['Bloqueos', summary?.operationallyBlocked ?? '—', 'Impiden ejecutar', '/dashboard/mantenimiento/eam'],
+          ['Por aprobar', summary?.pendingApprovals ?? '—', 'OT terminadas', '/dashboard/mantenimiento/ordenes-trabajo'],
+          ['Aprender', summary?.recurringReliabilityAssets ?? '—', 'Recurrencias auditadas', '/dashboard/mantenimiento/confiabilidad'],
+        ] as const,
+      };
 
   return <div className="mx-auto w-full max-w-[1600px] space-y-6">
     <div className="mb-2 flex flex-wrap justify-end gap-2">
@@ -183,6 +207,24 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
               : <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo"><ArrowRight className="h-4 w-4" />{t.cta.reviewOrders}</Link></Button>}
       </PageHeaderActions>
     </PageHeader>
+
+    {showArielCockpit ? <section aria-labelledby="ariel-maintenance-cockpit" className="space-y-3">
+      <div>
+        <h2 id="ariel-maintenance-cockpit" className="text-lg font-semibold">{cockpitCopy.title}</h2>
+        <p className="text-sm text-muted-foreground">{cockpitCopy.description}</p>
+      </div>
+      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-5">
+        {cockpitCopy.items.map(([label, value, detail, href]) => <Link key={label} href={href} className="bg-card p-4 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <p className="text-3xl font-semibold tracking-tight tabular-nums">{isLoading ? '—' : value}</p>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+        </Link>)}
+      </div>
+    </section> : null}
+
     <WhatsappOperationalUpdates mode="maintenance"/>
     <p className="text-sm text-muted-foreground">Primero mostramos lo que necesita atención. Abre una acción para continuar.</p>
     <Card className="shadow-none">
