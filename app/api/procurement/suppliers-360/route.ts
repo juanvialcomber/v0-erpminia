@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
     const [ordersResult, quotationsResult, operationalOrdersResult, returnsResult, invoicesResult, performanceResult, legacyPerformanceResult, contractorResult] = await Promise.all([
       context.supabase.from('canonical_purchase_orders_v1').select('id, order_number, order_date, total_amount, currency, status, operational_status, expected_delivery_date, supplier_tax_id').eq('organization_id', context.organizationId).or(orderFilter).order('order_date', { ascending: false }).limit(100),
       context.supabase.from('canonical_supplier_quotations_v1').select('id, quotation_number, quotation_date, valid_until, total_amount, currency, lead_time_days, payment_terms, status').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('quotation_date', { ascending: false }).limit(100),
-      context.supabase.from('procurement_operational_orders').select('id, order_number, status, currency, total_amount, expected_delivery_date, actual_delivery_date, issued_at').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('issued_at', { ascending: false }).limit(100),
+      context.supabase.from('procurement_operational_orders').select('id, order_number, status, currency, total_amount, expected_delivery_date, actual_delivery_date, issued_at, work_order_id, canonical_asset_id, cost_center_id').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('issued_at', { ascending: false }).limit(100),
       context.supabase.from('procurement_supplier_returns').select('id, return_number, reason, resolution_type, status, requested_at, resolved_at').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('requested_at', { ascending: false }).limit(100),
       context.supabase.from('procurement_supplier_invoices').select('id, invoice_number, invoice_date, total_amount, currency, status, approval_basis, procurement_match_exceptions(id,status,exception_type,difference)').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).order('invoice_date', { ascending: false }).limit(100),
       context.supabase.from('supplier_operational_score_v2').select('*').eq('organization_id', context.organizationId).eq('supplier_id', supplierId).maybeSingle(),
@@ -149,6 +149,81 @@ export async function GET(request: NextRequest) {
     if (firstError) throw firstError;
 
     const orderIds = (ordersResult.data || []).map((order) => order.id);
+    const operationalOrders = operationalOrdersResult.data || [];
+    const linkedWorkOrderIds = [...new Set(operationalOrders.map((row) => row.work_order_id).filter(Boolean))];
+    const linkedAssetIds = [...new Set(operationalOrders.map((row) => row.canonical_asset_id).filter(Boolean))];
+
+    const { data: motilPayables, error: motilPayablesError } = await context.supabase
+      .from('procurement_accounts_payable_v1')
+      .select('id,invoice_id,invoice_number,invoice_date,supplier_id,supplier_name,currency,approved_amount,due_date,status,paid_amount,outstanding_amount,days_to_due')
+      .eq('organization_id', context.organizationId)
+      .eq('supplier_id', supplierId)
+      .order('due_date', { ascending: true, nullsFirst: true })
+      .limit(200);
+    if (motilPayablesError) throw motilPayablesError;
+
+    const payableIds = (motilPayables || []).map((row) => row.id);
+    const { data: motilPayments, error: motilPaymentsError } = payableIds.length
+      ? await context.supabase
+          .from('procurement_supplier_payments')
+          .select('id,payable_id,amount,currency,payment_date,payment_reference,reconciled_at,reconciliation_reference')
+          .eq('organization_id', context.organizationId)
+          .in('payable_id', payableIds)
+          .order('payment_date', { ascending: false })
+          .limit(200)
+      : { data: [], error: null };
+    if (motilPaymentsError) throw motilPaymentsError;
+
+    const motilFinanceByCurrency = new Map<string, {
+      currency: string;
+      approvedAmount: number;
+      paidAmount: number;
+      outstandingAmount: number;
+      overdueAmount: number;
+      payableCount: number;
+      overdueCount: number;
+    }>();
+    for (const row of motilPayables || []) {
+      const currency = String(row.currency || '').trim() || 'CLP';
+      const current = motilFinanceByCurrency.get(currency) || {
+        currency,
+        approvedAmount: 0,
+        paidAmount: 0,
+        outstandingAmount: 0,
+        overdueAmount: 0,
+        payableCount: 0,
+        overdueCount: 0,
+      };
+      const outstanding = Number(row.outstanding_amount || 0);
+      current.approvedAmount += Number(row.approved_amount || 0);
+      current.paidAmount += Number(row.paid_amount || 0);
+      current.outstandingAmount += outstanding;
+      current.payableCount += 1;
+      if (Number(row.days_to_due) < 0 && outstanding > 0) {
+        current.overdueAmount += outstanding;
+        current.overdueCount += 1;
+      }
+      motilFinanceByCurrency.set(currency, current);
+    }
+
+    const motilFinancial = {
+      summaryByCurrency: [...motilFinanceByCurrency.values()].sort((a,b) => a.currency.localeCompare(b.currency)),
+      payables: motilPayables || [],
+      payments: motilPayments || [],
+      unreconciledPayments: (motilPayments || []).filter((row) => !row.reconciled_at).length,
+      maintenanceLinkage: {
+        operationalOrders: operationalOrders.length,
+        linkedWorkOrders: linkedWorkOrderIds.length,
+        linkedAssets: linkedAssetIds.length,
+        unlinkedOrders: operationalOrders.filter((row) => !row.work_order_id && !row.canonical_asset_id).length,
+      },
+      semantics: {
+        payable: 'Obligación aprobada en el flujo operacional MOTIL.',
+        payment: 'Salida de caja registrada en MOTIL; la conciliación confirma evidencia bancaria/contable.',
+        maintenanceLink: 'Sólo cuenta vínculos explícitos de la OC a OT o activo. MOTIL no infiere el destino por producto o proveedor.',
+      },
+    };
+
     const [linesResult, contractsResult, documentsResult] = await Promise.all([
       orderIds.length
         ? context.supabase.from('canonical_purchase_order_lines_v1').select('purchase_order_id, canonical_product_id, product_code, description, quantity, unit, unit_cost, net_amount').eq('organization_id', context.organizationId).in('purchase_order_id', orderIds).limit(3000)
@@ -179,7 +254,8 @@ export async function GET(request: NextRequest) {
       performance: performanceResult.data || null,
       legacyPerformance: legacyPerformanceResult.data || null,
       orders: ordersResult.data || [],
-      operationalOrders: operationalOrdersResult.data || [],
+      operationalOrders,
+      motilFinancial,
       quotations: quotationsResult.data || [],
       contracts: contractsResult.data || [],
       documents: documentsResult.data || [],
