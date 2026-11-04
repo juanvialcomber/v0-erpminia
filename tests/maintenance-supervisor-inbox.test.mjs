@@ -25,3 +25,24 @@ test('secondary detail is collapsed and evidence is large with visible selectabl
   assert.match(evidence, /setSelectedPhotoId\(photo.id\)/);
   assert.doesNotMatch(evidence, /Ver \{photos.length - 1\} evidencia/);
 });
+
+
+test('Ariel cockpit exposes one simple operating view over canonical maintenance signals', () => {
+  assert.match(home, /Cockpit Ariel/);
+  assert.match(home, /scheduledToday/);
+  assert.match(home, /scheduledThisWeek/);
+  assert.match(home, /pendingApprovals/);
+  assert.match(home, /recurringReliabilityAssets/);
+  assert.match(home, /\/dashboard\/mantenimiento\/eam/);
+  assert.match(home, /\/dashboard\/mantenimiento\/confiabilidad/);
+});
+
+test('control center separates execution blockers from closeout evidence', () => {
+  assert.match(control, /const executionBlocked =/);
+  assert.match(control, /const closeoutPending =/);
+  assert.match(control, /Resolver bloqueo de inicio/);
+  assert.match(control, /Completar evidencia de cierre/);
+  assert.match(control, /executionBlocking/);
+  assert.match(control, /scheduledToday/);
+  assert.match(control, /scheduledThisWeek/);
+});
