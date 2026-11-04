@@ -12,18 +12,7 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const [
-      inventory,
-      supplierSummary,
-      poReview,
-      invoices,
-      payables,
-      assets,
-      bankStatements,
-      dtes,
-      accountingEntries,
-      accountingSummary,
-    ] = await Promise.all([
+    const results = await Promise.allSettled([
       context.supabase.from('laudus_inventory_reconciliation_summary_service_v1').select('*').eq('organization_id', context.organizationId).maybeSingle(),
       context.supabase.from('laudus_supplier_bridge_summary_service_v1').select('*').eq('organization_id', context.organizationId).maybeSingle(),
       context.supabase.from('purchase_order_reconciliation_preview_service_v1').select('purchase_order_id,cost_center_resolution_status,supplier_resolution_status').eq('organization_id', context.organizationId),
@@ -36,16 +25,32 @@ export async function GET(request: NextRequest) {
       context.supabase.from('laudus_accounting_management_summary_v1').select('*').eq('organization_id', context.organizationId).maybeSingle(),
     ]);
 
-    const firstError = [inventory.error,supplierSummary.error,poReview.error,invoices.error,payables.error,assets.error,bankStatements.error,dtes.error,accountingEntries.error,accountingSummary.error].find(Boolean);
-    if (firstError) throw firstError;
+    const value = <T,>(index: number): T | null => {
+      const result = results[index];
+      if (result.status !== 'fulfilled') return null;
+      const payload = result.value as any;
+      if (payload?.error) return null;
+      return payload as T;
+    };
 
-    const poRows = poReview.data || [];
-    const invoiceRows = invoices.data || [];
-    const payableRows = payables.data || [];
-    const assetRows = assets.data || [];
+    const inventory = value<any>(0);
+    const supplierSummary = value<any>(1);
+    const poReview = value<any>(2);
+    const invoices = value<any>(3);
+    const payables = value<any>(4);
+    const assets = value<any>(5);
+    const bankStatements = value<any>(6);
+    const dtes = value<any>(7);
+    const accountingEntries = value<any>(8);
+    const accountingSummary = value<any>(9);
+
+    const poRows = poReview?.data || [];
+    const invoiceRows = invoices?.data || [];
+    const payableRows = payables?.data || [];
+    const assetRows = assets?.data || [];
     const today = new Date().toISOString().slice(0,10);
-    const accountingTotal = accountingEntries.count || 0;
-    const accountingWithLines = Number(accountingSummary.data?.entries_with_lines || 0);
+    const accountingTotal = accountingEntries?.count || 0;
+    const accountingWithLines = Number(accountingSummary?.data?.entries_with_lines || 0);
 
     const domains = [
       {
@@ -53,15 +58,15 @@ export async function GET(request: NextRequest) {
         label: 'Inventario',
         state: 'operational',
         detail: 'Stock Laudus ya alimenta la vista operacional MOTIL; diferencias históricas quedan separadas de conflictos reales.',
-        blockers: Number((inventory.data as any)?.negative_positions || 0),
+        blockers: Number((inventory?.data as any)?.negative_positions || 0),
         actionHref: '/dashboard/bodega',
       },
       {
         key: 'suppliers',
         label: 'Proveedores',
-        state: ((supplierSummary.data as any)?.unresolved || 0) === 0 ? 'operational' : 'review',
+        state: ((supplierSummary?.data as any)?.unresolved || 0) === 0 ? 'operational' : 'review',
         detail: 'Identidad canónica reutiliza RUT verificado y evita revisar miles de OC históricas.',
-        blockers: Number((supplierSummary.data as any)?.unresolved || 0) + Number((supplierSummary.data as any)?.ambiguous || 0),
+        blockers: Number((supplierSummary?.data as any)?.unresolved || 0) + Number((supplierSummary?.data as any)?.ambiguous || 0),
         actionHref: '/dashboard/compras',
       },
       {
@@ -99,17 +104,17 @@ export async function GET(request: NextRequest) {
       {
         key: 'banks',
         label: 'Bancos',
-        state: (bankStatements.data || []).length > 0 ? 'transition' : 'blocked',
+        state: (bankStatements?.data || []).length > 0 ? 'transition' : 'blocked',
         detail: 'MOTIL ya tiene una fuente bancaria propia e idempotente; falta poblarla con extractos reales.',
-        blockers: (bankStatements.data || []).length > 0 ? 0 : 1,
+        blockers: (bankStatements?.data || []).length > 0 ? 0 : 1,
         actionHref: '/dashboard/finanzas/pagos',
       },
       {
         key: 'dte',
         label: 'DTE / SII',
-        state: (dtes.count || 0) > 0 ? 'transition' : 'blocked',
+        state: (dtes?.count || 0) > 0 ? 'transition' : 'blocked',
         detail: 'La autoridad objetivo es SII directo; Laudus quedará sólo como referencia histórica.',
-        blockers: (dtes.count || 0) > 0 ? 0 : 1,
+        blockers: (dtes?.count || 0) > 0 ? 0 : 1,
         actionHref: '/dashboard/administracion/sii/preparacion',
       },
       {
