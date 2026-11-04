@@ -346,6 +346,70 @@ export async function GET(request: NextRequest) {
           ? Math.round((shortageToProcurementSeconds[shortageMidpoint - 1] + shortageToProcurementSeconds[shortageMidpoint]) / 2)
           : shortageToProcurementSeconds[shortageMidpoint];
 
+    const maintenanceProReleaseAt = '2026-11-04T15:56:10Z';
+    const maintenanceProReleaseMs = Date.parse(maintenanceProReleaseAt);
+    const maintenanceProWindowMs = 7 * 86400000;
+
+    const cohortMetrics = (rows: any[]) => {
+      const timer = rows.filter((row:any) => Number(row.total_timer_seconds || 0) > 0);
+      const rootCause = rows.filter((row:any) => Boolean(String(row.root_cause || '').trim()));
+      const preventiveAction = rows.filter((row:any) => Boolean(String(row.preventive_actions || '').trim()));
+      const meter = rows.filter((row:any) => row.meter_reading !== null && row.meter_reading !== undefined);
+      const closed = rows.filter((row:any) => Boolean(row.closed_at));
+
+      const approvalSeconds = closed
+        .map((row:any) => {
+          const approvedAt = approvedReviewByOrder.get(String(row.id));
+          if (!approvedAt) return null;
+          const closedMs = Date.parse(String(row.closed_at || ''));
+          const approvedMs = Date.parse(String(approvedAt));
+          return Number.isFinite(closedMs) && Number.isFinite(approvedMs) && approvedMs >= closedMs
+            ? Math.round((approvedMs - closedMs) / 1000)
+            : null;
+        })
+        .filter((value): value is number => value !== null)
+        .sort((a,b)=>a-b);
+      const approvalMiddle = Math.floor(approvalSeconds.length / 2);
+      const approvalMedianSeconds = approvalSeconds.length === 0
+        ? null
+        : approvalSeconds.length % 2 === 0
+          ? Math.round((approvalSeconds[approvalMiddle - 1] + approvalSeconds[approvalMiddle]) / 2)
+          : approvalSeconds[approvalMiddle];
+
+      const pct = (n:number) => rows.length > 0 ? Math.round((n / rows.length) * 100) : null;
+      return {
+        workOrders: rows.length,
+        closedWorkOrders: closed.length,
+        timerCoveragePct: pct(timer.length),
+        rootCauseCoveragePct: pct(rootCause.length),
+        preventiveActionCoveragePct: pct(preventiveAction.length),
+        meterCoveragePct: pct(meter.length),
+        approvedClosures: approvalSeconds.length,
+        medianCloseToApprovalSeconds: approvalMedianSeconds,
+      };
+    };
+
+    const preProRows = maintenanceRows.filter((row:any) => {
+      const createdMs = Date.parse(String(row.created_at || ''));
+      return Number.isFinite(createdMs)
+        && createdMs >= maintenanceProReleaseMs - maintenanceProWindowMs
+        && createdMs < maintenanceProReleaseMs;
+    });
+    const postProRows = maintenanceRows.filter((row:any) => {
+      const createdMs = Date.parse(String(row.created_at || ''));
+      return Number.isFinite(createdMs)
+        && createdMs >= maintenanceProReleaseMs
+        && createdMs <= maintenanceProReleaseMs + maintenanceProWindowMs;
+    });
+    const maintenanceProCohort = {
+      releaseAt: maintenanceProReleaseAt,
+      windowDays: 7,
+      before: cohortMetrics(preProRows),
+      after: cohortMetrics(postProRows),
+      gate: preProRows.length >= 10 && postProRows.length >= 10 ? 'COMPARABLE_SAMPLE' : 'MEASURING',
+      semantics: 'Seven-day creation cohorts around the Maintenance Pro release. Coverage and approval latency are observed; differences are not causal impact until comparable sample and confounders are reviewed.',
+    };
+
     const isUatAwardEvidence = (row: any) =>
       String(row?.evidence_scope || '').toLowerCase() === 'uat'
       || /^uat\b/i.test(String(row?.decision_notes || '').trim());
@@ -435,10 +499,11 @@ export async function GET(request: NextRequest) {
         medianCreateSeconds: maintenanceCreateMedianMs === null ? null : Math.round(maintenanceCreateMedianMs / 1000),
         semantics: 'active interaction from first input on OT creation form to successful creation; excludes mechanical execution and waiting',
       },
+      proCohort: maintenanceProCohort,
       valueGate: {
         attribution: 'NO_MEDIBLE_AUN',
         pricingReadiness: 'MARKET_ANCHORED',
-        nextMeasurement: 'Minutos administrativos por OT antes de MOTIL versus con MOTIL.',
+        nextMeasurement: 'Completar 3 muestras manuales comparables y madurar la cohorte pre/post Maintenance Pro.',
         semantics: 'coverage and workflow evidence are observed; savings, avoided downtime and ROI require a comparable baseline and attributable outcome',
       },
       semantics: 'observed maintenance execution and traceability; not saved time, avoided downtime, or economic ROI; execution cycle is first timer start to work-order closure',
