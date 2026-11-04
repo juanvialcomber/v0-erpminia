@@ -8,7 +8,7 @@ create or replace function public.motil_ingest_laudus_sales_raw(
 )
 returns jsonb
 language plpgsql
-security definer
+security invoker
 set search_path = public, integration, pg_temp
 as $$
 declare
