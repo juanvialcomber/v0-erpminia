@@ -48,6 +48,8 @@ type LaudusConsumableMismatchRow = {
   laudus_stock: number | string | null;
   motil_stock: number | string | null;
   quantity_delta: number | string | null;
+  motil_updated_at: string | null;
+  laudus_synced_at: string | null;
 };
 
 type LaudusReconciliationSummaryRow = {
@@ -101,6 +103,8 @@ export async function loadLaudusInventoryReadiness(
     reconciliationSummaryResult,
     negativePositionsResult,
     consumableMismatchesResult,
+    legacySnapshotMismatchCount,
+    laudusOnlyCurrentCount,
     authorityResult,
   ] = await Promise.all([
     count(db.from('warehouse_stock').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)),
@@ -139,11 +143,25 @@ export async function loadLaudusInventoryReadiness(
       .order('warehouse_stock', { ascending: true }),
     db
       .from('laudus_inventory_reconciliation_service_v1')
-      .select('product_external_id,sku,description,unit_of_measure,laudus_stock,motil_stock,quantity_delta')
+      .select('product_external_id,sku,description,unit_of_measure,laudus_stock,motil_stock,quantity_delta,motil_updated_at,laudus_synced_at')
       .eq('organization_id', organizationId)
       .eq('operational_category', 'process_consumable')
       .eq('reconciliation_state', 'quantity_mismatch')
       .gte('laudus_stock', 0),
+    count(
+      db
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'legacy_motil_stale'),
+    ),
+    count(
+      db
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'laudus_only_current'),
+    ),
     db
       .from('bodega_stock_source_authority_service_v1')
       .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
@@ -187,6 +205,10 @@ export async function loadLaudusInventoryReadiness(
     return 'Consumible';
   };
   const criticalConsumables = ((consumableMismatchesResult.data || []) as LaudusConsumableMismatchRow[])
+    .filter((row) => {
+      if (!row.motil_updated_at || !row.laudus_synced_at) return true;
+      return new Date(row.motil_updated_at).getTime() >= new Date(row.laudus_synced_at).getTime();
+    })
     .map((row) => {
       const sku = String(row.sku || '');
       const laudusStock = n(row.laudus_stock);
@@ -269,7 +291,9 @@ export async function loadLaudusInventoryReadiness(
       comparedProducts: n(reconciliationSummary?.compared_products),
       alignedProducts: n(reconciliationSummary?.aligned_products),
       quantityMismatches,
+      legacySnapshotMismatches: legacySnapshotMismatchCount,
       missingInMotilNonzero,
+      laudusOnlyCurrent: laudusOnlyCurrentCount,
       laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
       negativeProducts: laudusNegativeProducts,
       negativePositions,
