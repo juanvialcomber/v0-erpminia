@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -76,7 +77,10 @@ export default function CalidadDatosPage() {
   return <div className="space-y-6">
     <section className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
       <div><p className="text-sm font-medium text-muted-foreground">Datos · revisión transversal</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Revisiones</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola bandeja para discrepancias de productos, proveedores, equipos, inventario, compras, finanzas y futuras fuentes externas. Revisar no modifica automáticamente la fuente.</p></div>
-      <Button variant="outline" onClick={() => void mutate()}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild variant="outline"><Link href="/dashboard/calidad-datos/laudus">Incidencias Laudus</Link></Button>
+        <Button variant="outline" onClick={() => void mutate()}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>
+      </div>
     </section>
 
     <DataSourceStatusStrip
