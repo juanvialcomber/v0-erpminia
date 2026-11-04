@@ -325,3 +325,13 @@ Estos umbrales habilitan escala inicial, no E4.
 - Snapshot diario: conserva esta evidencia junto con Mantención para construir historia LECV transversal.
 - Estado observado antes de adopción real: 0 decisiones financieras priorizadas persistidas; el sistema queda preparado pero no se eleva evidencia por implementación.
 - Gate E2: ≥20 decisiones prioridad/día únicas con latencia válida suficiente para calibrar el flujo. E3 requiere además baseline comparable y outcome posterior; una decisión por sí sola no es ahorro.
+
+
+## 2026-11-04 — Finanzas: outcome posterior a decisión, sin atribución causal
+
+- Cambio: al registrar una prioridad financiera, el servidor captura el estado observado directamente desde `loadLaudusFinanceControl`; no acepta métricas económicas enviadas por el navegador como verdad.
+- Métricas por prioridad: frescura de sincronización, monto vencido, monto a 7 días, concentración del principal proveedor, pagos sin depósito, centros de costo no resueltos y vigencia contable.
+- Seguimiento: desde el día de negocio siguiente, MOTIL compara el estado actual contra la observación guardada en la decisión aceptada.
+- Estados: `IMPROVED | UNCHANGED | WORSENED | UNMEASURABLE`.
+- Semántica obligatoria: `IMPROVED` significa sólo que el indicador mejoró después de una decisión humana. No prueba que MOTIL causó el resultado, no es ahorro y no habilita E3 por sí solo.
+- Gate: outcomes posteriores permiten fortalecer E2 y seleccionar casos candidatos a E3; E3 exige comparación/baseline y atribución suficiente.
