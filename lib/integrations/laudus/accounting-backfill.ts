@@ -59,7 +59,7 @@ function normalizeAndDedupe(rows: JsonRow[]) {
 
     if (Array.isArray(row.lines)) {
       for (const line of row.lines as JsonRow[]) {
-        const normalizedLine = {
+        const normalizedLine: JsonRow = {
           ...line,
           debit: normalizeNumberish(line?.debit),
           credit: normalizeNumberish(line?.credit),
