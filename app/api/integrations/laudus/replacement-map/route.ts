@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       context.supabase.rpc('motil_laudus_invoice_trace_coverage', { p_organization_id: context.organizationId }),
       context.supabase.from('laudus_waybills_service_v1').select('id', { count: 'exact', head: true }).eq('organization_id', context.organizationId),
       context.supabase.from('canonical_goods_receipts_v1').select('id', { count: 'exact', head: true }).eq('organization_id', context.organizationId),
+      context.supabase.from('laudus_waybill_recovery_summary_v1').select('*').eq('organization_id', context.organizationId).maybeSingle(),
     ]);
 
     const value = <T,>(index: number): T | null => {
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
     const invoiceTraceCoverage = value<any>(10);
     const waybills = value<any>(11);
     const canonicalReceipts = value<any>(12);
+    const waybillRecovery = value<any>(13);
 
     const poRows = poReview?.data || [];
     const invoiceRows = invoices?.data || [];
@@ -93,7 +95,9 @@ export async function GET(request: NextRequest) {
         key: 'receipts',
         label: 'Recepciones / Guías',
         state: (waybills?.count || 0) > 0 && (canonicalReceipts?.count || 0) >= (waybills?.count || 0) ? 'operational' : 'transition',
-        detail: 'Laudus aporta guías como evidencia documental; MOTIL sólo promueve recepción física cuando existe aceptación operacional verificable.',
+        detail: waybillRecovery?.data
+          ? `Guías Laudus son evidencia, no recepción física. Deuda de fuente: ${Number(waybillRecovery.data.missing_lines || 0)} sin líneas, ${Number(waybillRecovery.data.missing_supplier || 0)} sin proveedor, ${Number(waybillRecovery.data.missing_warehouse || 0)} sin bodega.`
+          : 'Laudus aporta guías como evidencia documental; MOTIL sólo promueve recepción física cuando existe aceptación operacional verificable.',
         blockers: Math.max(Number(waybills?.count || 0) - Number(canonicalReceipts?.count || 0), 0),
         actionHref: '/dashboard/compras',
       },
