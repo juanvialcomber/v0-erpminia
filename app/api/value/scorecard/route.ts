@@ -1,5 +1,22 @@
 export const dynamic = 'force-dynamic';
 
+function coverageBand(percent: number | null) {
+  if (percent === null) return 'C0';
+  if (percent >= 95) return 'C5';
+  if (percent >= 80) return 'C4';
+  if (percent >= 50) return 'C3';
+  if (percent >= 20) return 'C2';
+  return 'C1';
+}
+
+function valueLevel(workflowLevel: number, evidenceLevel: string) {
+  if (workflowLevel >= 4 && evidenceLevel === 'E3') return 'V5';
+  if (workflowLevel >= 4 && evidenceLevel === 'E2') return 'V4';
+  if (workflowLevel >= 3 && ['E1', 'E2'].includes(evidenceLevel)) return 'V3';
+  if (workflowLevel >= 2) return 'V2';
+  return 'V1';
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { loadLaudusFinanceControl } from '@/lib/integrations/laudus/finance-control';
@@ -247,6 +264,13 @@ export async function GET(request: NextRequest) {
           current: currentObservation,
         };
       });
+    const financePriorityKeyCount = new Set(financePriorityRows.map((row: any) => row.priorityKey)).size;
+    const financeDecisionCoveragePct = Math.round((financePriorityKeyCount / 7) * 100);
+    const financeWorkflowLevel = financePriorityRows.length > 0 ? 4 : 3;
+    const financeEvidenceLevel = financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0';
+    const financeCoverageLevel = coverageBand(financePriorityRows.length > 0 ? financeDecisionCoveragePct : null);
+    const financeValueLevel = valueLevel(financeWorkflowLevel, financeEvidenceLevel);
+
     const financePriorityDecision = {
       total: financePriorityRows.length,
       accepted: financePriorityRows.filter((row: any) => row.decision === 'accepted').length,
@@ -257,8 +281,13 @@ export async function GET(request: NextRequest) {
       rawEvents: financePriorityRawRows.length,
       uniquePriorityDays: financePriorityRows.length,
       latestAt: financePriorityRows[0]?.createdAt || null,
-      workflowLevel: financePriorityRows.length > 0 ? 4 : 3,
-      evidenceLevel: financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0',
+      workflowLevel: financeWorkflowLevel,
+      evidenceLevel: financeEvidenceLevel,
+      decisionCoveragePct: financeDecisionCoveragePct,
+      reviewedPriorityKinds: financePriorityKeyCount,
+      coverageLevel: financeCoverageLevel,
+      valueLevel: financeValueLevel,
+      lecv: `L${financeWorkflowLevel} / ${financeEvidenceLevel} / ${financeCoverageLevel} / ${financeValueLevel}`,
       valueGate: financePriorityRows.length >= 20 ? 'CALIBRATION_READY' : 'MEASURING',
       outcomes: {
         maturedAccepted: financePriorityOutcomes.length,
@@ -604,6 +633,19 @@ export async function GET(request: NextRequest) {
       semantics: 'controlled UAT/test award decisions remain traceable but are excluded from operational adoption, outcomes and ROI evidence',
     };
 
+    const maintenanceWorkflowLevel = timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0;
+    const maintenanceEvidenceLevel =
+      timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0';
+    const maintenanceCoreCoverageValues = [
+      coveragePct(timerRows.length),
+      coveragePct(assignedRows.length),
+      coveragePct(assetLinkedRows.length),
+    ].filter((value): value is number => value !== null);
+    const maintenanceCoreCoveragePct =
+      maintenanceCoreCoverageValues.length > 0 ? Math.min(...maintenanceCoreCoverageValues) : null;
+    const maintenanceCoverageLevel = coverageBand(maintenanceCoreCoveragePct);
+    const maintenanceValueLevel = valueLevel(maintenanceWorkflowLevel, maintenanceEvidenceLevel);
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -644,9 +686,12 @@ export async function GET(request: NextRequest) {
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
       executionTrend,
-      evidenceLevel:
-        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
-      workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      evidenceLevel: maintenanceEvidenceLevel,
+      workflowLevel: maintenanceWorkflowLevel,
+      coreCoveragePct: maintenanceCoreCoveragePct,
+      coverageLevel: maintenanceCoverageLevel,
+      valueLevel: maintenanceValueLevel,
+      lecv: `L${maintenanceWorkflowLevel} / ${maintenanceEvidenceLevel} / ${maintenanceCoverageLevel} / ${maintenanceValueLevel}`,
       connectedDomains,
       connectedDomainCount: connectedDomains.length,
       supplyChain: {
