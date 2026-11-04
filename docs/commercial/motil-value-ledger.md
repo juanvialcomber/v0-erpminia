@@ -335,3 +335,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Estados: `IMPROVED | UNCHANGED | WORSENED | UNMEASURABLE`.
 - Semántica obligatoria: `IMPROVED` significa sólo que el indicador mejoró después de una decisión humana. No prueba que MOTIL causó el resultado, no es ahorro y no habilita E3 por sí solo.
 - Gate: outcomes posteriores permiten fortalecer E2 y seleccionar casos candidatos a E3; E3 exige comparación/baseline y atribución suficiente.
+
+
+## 2026-11-04 — Torre de Decisiones ejecutiva
+
+- Capacidad: `/dashboard/decisiones` incorpora una Torre con las 5 decisiones ejecutivas de mayor presión del corte actual.
+- Fuente: reutiliza `/api/dashboard/ia-operacional`; no crea una nueva cola ni modifica la prioridad canónica.
+- Estructura por decisión: evidencia, responsable/área, acción de resolución, outcome posterior y LECV cuando el dominio ya está instrumentado.
+- LECV explícito: Mantención usa cobertura conservadora del flujo núcleo (mínimo entre timer, asignación y activo); Finanzas usa cobertura de tipos de prioridad realmente revisados. V5 permanece bloqueado mientras E3 no esté demostrado.
+- Dominios no instrumentados: muestran `LECV pendiente` en lugar de inferir madurez o valor.
+- Outcome: Finanzas y Mantención muestran estados/series observadas con semántica no causal. La Torre nunca ejecuta una decisión ni transforma asociación temporal en ROI.
+- Valor operacional: concentra decisión + evidencia + acción + seguimiento en una sola superficie gerencial, reduciendo navegación sin reemplazar los módulos responsables.
+- Siguiente medición: uso de la Torre por responsables, tiempo hasta apertura de contexto y porcentaje de decisiones que llegan a outcome medible.
