@@ -9,7 +9,8 @@ test('Daniel finance cockpit leads with a clear summary and sections',()=>{
   assert.match(page,/Exposición, decisiones y evidencia/);
   assert.match(page,/Secciones de Finanzas/);
   assert.match(page,/Ir al detalle/);
-  assert.match(page,/LaudusFinanceControlCard/);
+  assert.match(page,/MotilFinanceOperatingCockpit/);
+  assert.match(page,/Fuente Laudus/);
 });
 
 test('summary page stays intentionally lightweight',()=>{
@@ -38,7 +39,7 @@ test('finance summary follows MOTIL visual tokens',()=>{
 });
 
 test('summary precedes module sections',()=>{
-  const summary = page.indexOf('<LaudusFinanceControlCard />');
+  const summary = page.indexOf('<MotilFinanceOperatingCockpit />');
   const sections = page.indexOf('Secciones de Finanzas');
   assert.ok(summary >= 0);
   assert.ok(sections > summary);
