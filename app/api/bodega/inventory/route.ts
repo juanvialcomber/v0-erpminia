@@ -145,17 +145,30 @@ export async function GET(request: NextRequest) {
 
       let operationalBySku = new Map<string, OperationalStockRow>();
       if (pageSkus.length > 0) {
-        const { data: operationalData, error: operationalError } = await supabase
-          .from('bodega_inventory_operational_service_v1')
-          .select('sku,operational_quantity')
-          .eq('organization_id', orgId)
-          .in('sku', pageSkus);
+        const operationalRows: OperationalStockRow[] = [];
+        const skuBatchSize = 50;
+        let operationalQueryFailed = false;
 
-        if (operationalError) {
-          console.error('[v0] Laudus operational inventory error:', operationalError);
-        } else {
+        for (let i = 0; i < pageSkus.length; i += skuBatchSize) {
+          const skuBatch = pageSkus.slice(i, i + skuBatchSize);
+          const { data: operationalData, error: operationalError } = await supabase
+            .from('bodega_inventory_operational_service_v1')
+            .select('sku,operational_quantity')
+            .eq('organization_id', orgId)
+            .in('sku', skuBatch);
+
+          if (operationalError) {
+            operationalQueryFailed = true;
+            console.error('[v0] Laudus operational inventory error:', operationalError);
+            break;
+          }
+
+          operationalRows.push(...((operationalData || []) as OperationalStockRow[]));
+        }
+
+        if (!operationalQueryFailed) {
           operationalBySku = new Map(
-            ((operationalData || []) as OperationalStockRow[])
+            operationalRows
               .filter((row) => row.sku)
               .map((row) => [String(row.sku).trim().toUpperCase(), row] as const),
           );
