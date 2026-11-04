@@ -10,7 +10,7 @@ test('inventory readiness makes Laudus primary only when the cross-source author
   assert.match(helper, /bodega_stock_source_authority_service_v1/);
   assert.match(helper, /primaryStockSource: laudusIsPrimary \? 'laudus'/);
   assert.match(helper, /laudusStockRole: 'primary_when_consistent'/);
-  assert.match(helper, /motilOperationalStockRole: 'comparison_evidence'/);
+  assert.match(helper, /motilOperationalStockRole: comparisonIsComparable \? 'comparison_evidence' as const : 'stale_comparison_evidence' as const/);
   assert.match(helper, /crossSourceValidation: \['official_email', 'whatsapp'\]/);
   assert.match(helper, /autoOverwrite: false/);
 });
