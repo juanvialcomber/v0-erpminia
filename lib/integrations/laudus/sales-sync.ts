@@ -62,7 +62,7 @@ const ENTITY_CONFIG = {
       'salesInvoices.currencyCode','salesInvoices.parityToMainCurrency',
       'salesInvoices.amount','salesInvoices.costCenter.costCenterId',
     ],
-    orderField: 'modifiedAt',
+    orderField: 'receiptId',
     pages: 2,
   },
 } as const;
