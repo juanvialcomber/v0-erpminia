@@ -60,6 +60,30 @@ type ApiResponse = {
     medianSeconds?: number | null;
     semantics?: string;
   } | null;
+  financePriorityDecision?: {
+    total?: number;
+    accepted?: number;
+    deferred?: number;
+    rejected?: number;
+    timedDecisions?: number;
+    medianDecisionSeconds?: number | null;
+    rawEvents?: number;
+    uniquePriorityDays?: number;
+    latestAt?: string | null;
+    workflowLevel?: number;
+    evidenceLevel?: string;
+    valueGate?: string;
+    outcomes?: {
+      maturedAccepted?: number;
+      improved?: number;
+      unchanged?: number;
+      worsened?: number;
+      unmeasurable?: number;
+      e3Gate?: string;
+      semantics?: string;
+    };
+    semantics?: string;
+  } | null;
   procurementAwardValue?: {
     totalDecisions?: number;
     operationalDecisions?: number;
@@ -98,6 +122,15 @@ type ApiResponse = {
       endToEnd?: { samples?: number; medianSeconds?: number | null };
       semantics?: string;
     };
+    supervisorReview?: {
+      reviewedClosed?: number;
+      approvedClosed?: number;
+      nonApprovedClosed?: number;
+      coveragePct?: number | null;
+      medianCloseToReviewSeconds?: number | null;
+      latencySamples?: number;
+      semantics?: string;
+    };
     observedExecutionSeconds?: number;
     observedExecutionHours?: number;
     workOrdersWithEvents?: number;
@@ -105,6 +138,16 @@ type ApiResponse = {
     measurableExecutionCycles?: number;
     medianExecutionCycleSeconds?: number | null;
     medianExecutionCycleHours?: number | null;
+    executionTrend?: {
+      weeks?: Array<{ week?: string; samples?: number; medianSeconds?: number | null }>;
+      comparableWeeks?: number;
+      previousComparableWeek?: { week?: string; samples?: number; medianSeconds?: number | null } | null;
+      latestComparableWeek?: { week?: string; samples?: number; medianSeconds?: number | null } | null;
+      changePct?: number | null;
+      evidenceGate?: string;
+      e3Gate?: string;
+      semantics?: string;
+    };
     recurrence7d?: {
       matured?: number;
       recurrent?: number;
@@ -198,6 +241,7 @@ export default function ValueScorecardPage() {
   const outcomes = score.outcomes?.closed || 0;
   const financeReview = data?.financeReview || {};
   const financeReviewTiming = data?.financeReviewTiming || {};
+  const financePriorityDecision = data?.financePriorityDecision || {};
   const financeReviewTotal = financeReview.total || 0;
   const e3 = score.observedImpact?.e3Records || 0;
   const gates = score.adoptionGate || {};
@@ -252,6 +296,8 @@ export default function ValueScorecardPage() {
     : null;
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
+  const executionTrend = maintenanceValue.executionTrend || {};
+  const supervisorReview = maintenanceValue.supervisorReview || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
 
   const saveBaseline = async () => {
@@ -368,6 +414,76 @@ export default function ValueScorecardPage() {
               Monto de obligaciones con decisión humana registrada. Contexto, no ahorro.
             </p>
           </div>
+        </div>
+      </section>
+
+      <section aria-label="Decisiones financieras priorizadas" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Finanzas · decisión humana</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Prioridades revisadas</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Una prioridad cuenta una vez por día de negocio en Chile. Clics repetidos no aumentan artificialmente adopción.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Nivel actual</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              L{number(financePriorityDecision.workflowLevel || 3)} · {financePriorityDecision.evidenceLevel || 'E0'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">{financePriorityDecision.valueGate || 'MEASURING'}.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Decisiones únicas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(financePriorityDecision.total || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(financePriorityDecision.rawEvents || 0)} eventos brutos; deduplicados por prioridad/día.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Aceptadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(financePriorityDecision.accepted || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(financePriorityDecision.deferred || 0)} pospuestas · {number(financePriorityDecision.rejected || 0)} no aplican.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Latencia mediana</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(financePriorityDecision.medianDecisionSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Tiempo cockpit → decisión humana.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Gate E2</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              {number(financePriorityDecision.uniquePriorityDays || 0)}/20
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Aún no es ahorro ni ROI; sólo adopción y calibración del flujo.</p>
+          </div>
+        </div>
+        <div className="grid gap-px border-t bg-border sm:grid-cols-2 xl:grid-cols-5">
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Outcomes maduros</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.maturedAccepted || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Mejoraron después</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.improved || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Sin cambio</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.unchanged || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Empeoraron</p>
+            <p className="mt-1 text-xl font-semibold">{number(financePriorityDecision.outcomes?.worsened || 0)}</p>
+          </div>
+          <div className="bg-card px-5 py-4">
+            <p className="text-xs text-muted-foreground">Gate causal</p>
+            <p className="mt-1 text-xl font-semibold">{financePriorityDecision.outcomes?.e3Gate || 'HOLD_E3'}</p>
+          </div>
+        </div>
+        <div className="border-t px-5 py-3 text-xs text-muted-foreground">
+          “Mejoró después” describe asociación temporal entre decisión y estado posterior. No atribuye causalidad a MOTIL ni equivale a ahorro.
         </div>
       </section>
 
@@ -604,6 +720,80 @@ export default function ValueScorecardPage() {
         <p className="mt-3 text-xs text-muted-foreground">
           Gate inicial: ≥3 muestras manuales comparables. El tiempo mecánico y la espera permanecen fuera de esta medición.
         </p>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border bg-card" aria-label="Revisión humana de Mantención">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Autoridad humana · Mantención</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Cierre → revisión supervisor</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mide cobertura y latencia del gate humano. Una aprobación confirma revisión del workflow; no demuestra calidad mecánica ni ahorro.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">OT cerradas revisadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(supervisorReview.reviewedClosed || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Cobertura {supervisorReview.coveragePct == null ? '—' : `${number(supervisorReview.coveragePct)}%`}.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Aprobadas</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{number(supervisorReview.approvedClosed || 0)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {number(supervisorReview.nonApprovedClosed || 0)} con último estado distinto de aprobado.
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Mediana cierre → revisión</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(supervisorReview.medianCloseToReviewSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">n={number(supervisorReview.latencySamples || 0)} revisiones con timestamps comparables.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Lectura LECV</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">L4 · E2</p>
+            <p className="mt-1 text-xs text-muted-foreground">Gate humano medido; todavía no outcome V5.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border bg-card" aria-label="Tendencia semanal de ciclo de Mantención">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Process mining · Mantención</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Ciclo semanal observado</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Compara semanas sólo cuando existen al menos 5 OT con inicio y cierre medibles. La tendencia no se atribuye causalmente a MOTIL.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Semana anterior comparable</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(executionTrend.previousComparableWeek?.medianSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {executionTrend.previousComparableWeek?.week || '—'} · n={number(executionTrend.previousComparableWeek?.samples || 0)}
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Última semana comparable</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{duration(executionTrend.latestComparableWeek?.medianSeconds)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {executionTrend.latestComparableWeek?.week || '—'} · n={number(executionTrend.latestComparableWeek?.samples || 0)}
+            </p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Cambio observado</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              {executionTrend.changePct == null ? '—' : `${executionTrend.changePct > 0 ? '+' : ''}${number(executionTrend.changePct)}%`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Negativo = ciclo menor. No equivale a downtime evitado.</p>
+          </div>
+          <div className="bg-card px-5 py-5">
+            <p className="text-xs text-muted-foreground">Gate de evidencia</p>
+            <p className="mt-1 text-2xl font-semibold tracking-tight">{executionTrend.evidenceGate || 'INSUFFICIENT_SAMPLE'}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{executionTrend.e3Gate || 'HOLD_E3'} hasta identificar intervención y comparación causal suficiente.</p>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2" aria-label="Outcomes de Mantención">

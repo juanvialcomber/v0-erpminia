@@ -188,3 +188,63 @@ test('value dashboard separates operational award evidence from UAT', () => {
   assert.match(page, /no cuentan como adopción, outcome ni valor económico/);
   assert.match(page, /primera adjudicación operacional real/);
 });
+
+
+test('value scorecard captures one idempotent daily snapshot in Chile time', () => {
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const vercel = fs.readFileSync('vercel.json', 'utf8');
+
+  assert.match(cron, /America\/Santiago/);
+  assert.match(cron, /motil_capture_value_scorecard_snapshot/);
+  assert.match(cron, /CRON_SECRET/);
+  assert.match(cron, /daily evidence snapshot; not audited savings or economic ROI/);
+  assert.match(vercel, /\/api\/cron\/value-scorecard-daily/);
+});
+
+
+test('daily value snapshot persists maintenance LECV from operational evidence without claiming ROI', () => {
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+
+  assert.match(cron, /maintenance_work_orders/);
+  assert.match(cron, /work_order_events/);
+  assert.match(cron, /work_order_evidence_files/);
+  assert.match(cron, /work_order_supervisor_reviews/);
+  assert.match(cron, /maintenanceLecv/);
+  assert.match(cron, /NO_MEDIBLE_AUN/);
+  assert.match(cron, /not saved time, avoided downtime, or economic ROI/);
+  assert.match(cron, /eventCoveragePct/);
+  assert.match(cron, /supervisorReviewCoveragePct/);
+});
+
+
+test('maintenance weekly cohort trend excludes the incomplete current week and never promotes causality', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /currentWeekStart/);
+  assert.match(api, /row\.samples >= 5 && row\.week !== currentWeekStart/);
+  assert.match(api, /TREND_ONLY/);
+  assert.match(api, /HOLD_E3/);
+  assert.match(api, /not causal attribution to MOTIL/);
+  assert.match(cron, /row\.samples >= 5 && row\.week !== currentWeekStart/);
+  assert.match(page, /Ciclo semanal observado/);
+  assert.match(page, /La tendencia no se atribuye causalmente a MOTIL/);
+  assert.match(page, /No equivale a downtime evitado/);
+});
+
+
+test('maintenance supervisor review metrics preserve human authority without claiming repair quality', () => {
+  const api = fs.readFileSync('app/api/value/scorecard/route.ts', 'utf8');
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts', 'utf8');
+  const page = fs.readFileSync('app/dashboard/valor/page.tsx', 'utf8');
+
+  assert.match(api, /latestReviewByOrder/);
+  assert.match(api, /medianCloseToReviewSeconds/);
+  assert.match(api, /approval rate is workflow evidence, not proof of repair quality/);
+  assert.match(cron, /supervisorReview/);
+  assert.match(cron, /workflow evidence, not proof of repair quality/);
+  assert.match(page, /Cierre → revisión supervisor/);
+  assert.match(page, /no demuestra calidad mecánica ni ahorro/);
+  assert.match(page, /Gate humano medido; todavía no outcome V5/);
+});

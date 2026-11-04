@@ -284,3 +284,66 @@ Estos umbrales habilitan escala inicial, no E4.
 - Cambio: `procurement_intake_requests` incorpora `evidence_scope`; los 3 fixtures conocidos se marcan `uat` por ID exacto y el `supplier_operational_score_v2` usa sólo OCs cuyo intake es operacional.
 - Resultado esperado con la evidencia actual: 0 OCs operacionales, 0 recepciones operacionales, 0 facturas operacionales, 0 devoluciones operacionales y score `Sin evidencia` hasta que exista una compra real.
 - Valor: evita que una decisión futura de adjudicación se apoye en desempeño generado por QA. Las pruebas permanecen trazables y disponibles para validar el software.
+
+
+## 2026-11-04 — Captura diaria del Value Scorecard
+
+- Hallazgo: `motil_value_scorecard_snapshots` conservaba sólo 1 snapshot histórico, pese a que MOTIL ya dispone de OT, eventos, evidencia operacional, WhatsApp e integración Laudus suficientes para construir series temporales.
+- Cambio: se añade un cron diario protegido por `CRON_SECRET` que ejecuta `motil_capture_value_scorecard_snapshot` por organización.
+- Fecha de negocio: se calcula explícitamente en `America/Santiago` para evitar cortes UTC incorrectos.
+- Idempotencia: la función existente mantiene un único snapshot por `organization_id + snapshot_date`; reintentos del mismo día actualizan el mismo corte.
+- Semántica: el snapshot registra evidencia, decisiones, outcomes y gate de escala; no representa ahorro auditado ni ROI económico por sí mismo.
+- Próximo paso: extender el payload persistido para incorporar el bloque de mantención y decisiones humanas ya calculado por `/api/value/scorecard`, de forma que LECV tenga historia diaria transversal y no sólo finanzas/compras.
+
+
+## 2026-11-04 — Process mining de OT y gate E3
+
+- Universo actual observado: 47 OT con identidad operativa y 739 eventos de OT disponibles para reconstruir ciclos reales.
+- Flujo instrumentado: primer `timer_play` -> cierre de OT. Se agrupa por semana de creación y se publica mediana sólo con timestamps válidos.
+- Gate de comparación: una semana requiere al menos 5 ciclos medibles; la semana en curso se excluye siempre de comparaciones porque está incompleta.
+- Estado al 2026-11-04: sólo la semana iniciada el 2026-10-26 tiene muestra completa suficiente para comparación (`n=17`, mediana aproximada 5.474 s / 1,52 h). Las semanas anteriores no alcanzan `n>=5`; la semana del 2026-11-02 sigue abierta.
+- Clasificación: `TREND_ONLY / HOLD_E3`. Todavía no existe una segunda semana completa comparable ni una intervención causal aislada.
+- Regla: cualquier cambio semanal puede deberse a mix de trabajos, criticidad, activos, equipo humano o volumen. No se presenta como downtime evitado, ahorro ni mejora atribuible a MOTIL.
+- Siguiente gate: acumular una segunda semana completa con `n>=5` y segmentar por tipo/prioridad/activo cuando la muestra permita comparación homogénea.
+
+
+## 2026-11-04 — Autoridad humana y latencia de cierre
+
+- Evidencia observada: 29 OT cerradas cuentan con revisión de supervisor; 29 tienen último estado aprobado y 0 un último estado distinto de aprobado.
+- Latencia observada cierre -> revisión: mediana aproximada 19.025 s (5,28 h) sobre 29 casos comparables.
+- Interpretación: demuestra que el gate humano está siendo usado y permite medir disciplina/latencia de cierre. No demuestra calidad mecánica, ausencia de fallas ni ahorro.
+- Clasificación: L4 / E2 / V4 para autoridad humana del workflow.
+- Gate V5: relacionar revisión/corrección con un outcome operacional posterior (reincidencia, tiempo de respuesta, disponibilidad o retrabajo) sobre cohortes comparables.
+
+
+## 2026-11-04 — Finanzas: decisiones priorizadas sin inflación de adopción
+
+- Hallazgo: el cockpit financiero ya permite aceptar, posponer o rechazar prioridades de MOTIL, pero el conteo histórico podía crecer por clics repetidos sobre la misma prioridad.
+- Cambio: las decisiones se consolidan por `priority_key + business_date` en horario `America/Santiago`; sólo la última decisión de cada prioridad/día cuenta para adopción y calibración.
+- Persistencia: nuevos eventos guardan `business_date` y `metric_version=finance-priority-decision-v2`; eventos v1 siguen siendo legibles mediante fecha derivada.
+- Scorecard: incorpora total único, aceptadas, pospuestas, rechazadas, latencia mediana, eventos brutos y gate de calibración.
+- Snapshot diario: conserva esta evidencia junto con Mantención para construir historia LECV transversal.
+- Estado observado antes de adopción real: 0 decisiones financieras priorizadas persistidas; el sistema queda preparado pero no se eleva evidencia por implementación.
+- Gate E2: ≥20 decisiones prioridad/día únicas con latencia válida suficiente para calibrar el flujo. E3 requiere además baseline comparable y outcome posterior; una decisión por sí sola no es ahorro.
+
+
+## 2026-11-04 — Finanzas: outcome posterior a decisión, sin atribución causal
+
+- Cambio: al registrar una prioridad financiera, el servidor captura el estado observado directamente desde `loadLaudusFinanceControl`; no acepta métricas económicas enviadas por el navegador como verdad.
+- Métricas por prioridad: frescura de sincronización, monto vencido, monto a 7 días, concentración del principal proveedor, pagos sin depósito, centros de costo no resueltos y vigencia contable.
+- Seguimiento: desde el día de negocio siguiente, MOTIL compara el estado actual contra la observación guardada en la decisión aceptada.
+- Estados: `IMPROVED | UNCHANGED | WORSENED | UNMEASURABLE`.
+- Semántica obligatoria: `IMPROVED` significa sólo que el indicador mejoró después de una decisión humana. No prueba que MOTIL causó el resultado, no es ahorro y no habilita E3 por sí solo.
+- Gate: outcomes posteriores permiten fortalecer E2 y seleccionar casos candidatos a E3; E3 exige comparación/baseline y atribución suficiente.
+
+
+## 2026-11-04 — Torre de Decisiones ejecutiva
+
+- Capacidad: `/dashboard/decisiones` incorpora una Torre con las 5 decisiones ejecutivas de mayor presión del corte actual.
+- Fuente: reutiliza `/api/dashboard/ia-operacional`; no crea una nueva cola ni modifica la prioridad canónica.
+- Estructura por decisión: evidencia, responsable/área, acción de resolución, outcome posterior y LECV cuando el dominio ya está instrumentado.
+- LECV explícito: Mantención usa cobertura conservadora del flujo núcleo (mínimo entre timer, asignación y activo); Finanzas usa cobertura de tipos de prioridad realmente revisados. V5 permanece bloqueado mientras E3 no esté demostrado.
+- Dominios no instrumentados: muestran `LECV pendiente` en lugar de inferir madurez o valor.
+- Outcome: Finanzas y Mantención muestran estados/series observadas con semántica no causal. La Torre nunca ejecuta una decisión ni transforma asociación temporal en ROI.
+- Valor operacional: concentra decisión + evidencia + acción + seguimiento en una sola superficie gerencial, reduciendo navegación sin reemplazar los módulos responsables.
+- Siguiente medición: uso de la Torre por responsables, tiempo hasta apertura de contexto y porcentaje de decisiones que llegan a outcome medible.

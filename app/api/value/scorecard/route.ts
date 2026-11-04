@@ -1,7 +1,30 @@
 export const dynamic = 'force-dynamic';
 
+function coverageBand(percent: number | null) {
+  if (percent === null) return 'C0';
+  if (percent >= 95) return 'C5';
+  if (percent >= 80) return 'C4';
+  if (percent >= 50) return 'C3';
+  if (percent >= 20) return 'C2';
+  return 'C1';
+}
+
+function valueLevel(workflowLevel: number, evidenceLevel: string) {
+  if (workflowLevel >= 4 && evidenceLevel === 'E3') return 'V5';
+  if (workflowLevel >= 4 && evidenceLevel === 'E2') return 'V4';
+  if (workflowLevel >= 3 && ['E1', 'E2'].includes(evidenceLevel)) return 'V3';
+  if (workflowLevel >= 2) return 'V2';
+  return 'V1';
+}
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { loadLaudusFinanceControl } from '@/lib/integrations/laudus/finance-control';
+import {
+  financePriorityObservation,
+  financePriorityOutcome,
+  type FinancePriorityKey,
+} from '@/lib/value/finance-priority-outcomes';
 const managementRoles = new Set(['superadmin', 'admin']);
 
 export async function GET(request: NextRequest) {
@@ -14,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [current, history, financeReviews, financeTiming, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, procurementAwardDecisions, procurementAwardOutcomes] = await Promise.all([
+    const [current, history, financeReviews, financeTiming, financePriorityDecisions, maintenanceWorkOrders, maintenanceEvents, maintenanceSupplyChain, maintenanceAdminTiming, maintenanceSupervisorReviews, procurementAwardDecisions, procurementAwardOutcomes] = await Promise.all([
       context.supabase.rpc('motil_value_scorecard_preview', {
         p_organization_id: context.organizationId,
       }),
@@ -34,6 +57,14 @@ export async function GET(request: NextRequest) {
         .eq('organization_id', context.organizationId)
         .eq('action', 'finance_review_decision')
         .eq('resource_type', 'laudus_purchase_invoice')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      context.supabase
+        .from('audit_log')
+        .select('resource_identifier,new_values,created_at')
+        .eq('organization_id', context.organizationId)
+        .eq('action', 'finance_priority_decision')
+        .eq('resource_type', 'finance_priority')
         .order('created_at', { ascending: false })
         .limit(500),
       context.supabase
@@ -83,6 +114,7 @@ export async function GET(request: NextRequest) {
     if (history.error) throw history.error;
     if (financeReviews.error) throw financeReviews.error;
     if (financeTiming.error) throw financeTiming.error;
+    if (financePriorityDecisions.error) throw financePriorityDecisions.error;
     if (maintenanceWorkOrders.error) throw maintenanceWorkOrders.error;
     if (maintenanceEvents.error) throw maintenanceEvents.error;
     if (maintenanceSupplyChain.error) throw maintenanceSupplyChain.error;
@@ -90,6 +122,11 @@ export async function GET(request: NextRequest) {
     if (maintenanceSupervisorReviews.error) throw maintenanceSupervisorReviews.error;
     if (procurementAwardDecisions.error) throw procurementAwardDecisions.error;
     if (procurementAwardOutcomes.error) throw procurementAwardOutcomes.error;
+
+    const financeControl = await loadLaudusFinanceControl(
+      context.supabase,
+      context.organizationId,
+    );
 
     const financeRows = financeReviews.data || [];
     const latestFinanceReviews = new Map<string, any>();
@@ -160,6 +197,110 @@ export async function GET(request: NextRequest) {
       semantics: 'time from finance cockpit load to human decision; not manual baseline',
     };
 
+    const chileBusinessDate = (value: string) => {
+      const date = new Date(value);
+      if (!Number.isFinite(date.getTime())) return null;
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Santiago',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date);
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return `${values.year}-${values.month}-${values.day}`;
+    };
+    const financePriorityRawRows = (financePriorityDecisions.data || [])
+      .map((row: any) => ({
+        decision: String(row.new_values?.decision || ''),
+        priorityKey: String(row.new_values?.priority_key || ''),
+        latencyMs: Number(row.new_values?.decision_latency_ms),
+        businessDate: String(row.new_values?.business_date || '') || chileBusinessDate(String(row.created_at || '')),
+        baselineObservation: row.new_values?.observation_at_decision || null,
+        createdAt: row.created_at,
+      }))
+      .filter((row: any) =>
+        ['accepted', 'deferred', 'rejected'].includes(row.decision)
+        && ['freshness', 'overdue', 'due-soon', 'supplier-concentration', 'deposit', 'cost-centers', 'accounting'].includes(row.priorityKey),
+      );
+    const latestPriorityByDay = new Map<string, any>();
+    for (const row of financePriorityRawRows) {
+      const key = `${row.businessDate || 'unknown'}:${row.priorityKey}`;
+      if (!latestPriorityByDay.has(key)) latestPriorityByDay.set(key, row);
+    }
+    const financePriorityRows = Array.from(latestPriorityByDay.values());
+    const priorityLatencies = financePriorityRows
+      .map((row: any) => row.latencyMs)
+      .filter((value: number) => Number.isFinite(value) && value >= 0 && value <= 30 * 60 * 1000)
+      .sort((a: number, b: number) => a - b);
+    const priorityMidpoint = Math.floor(priorityLatencies.length / 2);
+    const priorityMedianMs =
+      priorityLatencies.length === 0
+        ? null
+        : priorityLatencies.length % 2 === 0
+          ? Math.round((priorityLatencies[priorityMidpoint - 1] + priorityLatencies[priorityMidpoint]) / 2)
+          : priorityLatencies[priorityMidpoint];
+    const todayBusinessDate = chileBusinessDate(new Date().toISOString());
+    const financePriorityOutcomes = financePriorityRows
+      .filter(
+        (row: any) =>
+          row.decision === 'accepted'
+          && row.businessDate
+          && todayBusinessDate
+          && row.businessDate < todayBusinessDate
+          && row.baselineObservation,
+      )
+      .map((row: any) => {
+        const currentObservation = financePriorityObservation(
+          row.priorityKey as FinancePriorityKey,
+          financeControl,
+        );
+        const outcome = financePriorityOutcome(row.baselineObservation, currentObservation);
+        return {
+          priorityKey: row.priorityKey,
+          businessDate: row.businessDate,
+          state: outcome.state,
+          delta: outcome.delta,
+          baseline: row.baselineObservation,
+          current: currentObservation,
+        };
+      });
+    const financePriorityKeyCount = new Set(financePriorityRows.map((row: any) => row.priorityKey)).size;
+    const financeDecisionCoveragePct = Math.round((financePriorityKeyCount / 7) * 100);
+    const financeWorkflowLevel = financePriorityRows.length > 0 ? 4 : 3;
+    const financeEvidenceLevel = financePriorityRows.length >= 20 ? 'E2' : financePriorityRows.length > 0 ? 'E1' : 'E0';
+    const financeCoverageLevel = coverageBand(financePriorityRows.length > 0 ? financeDecisionCoveragePct : null);
+    const financeValueLevel = valueLevel(financeWorkflowLevel, financeEvidenceLevel);
+
+    const financePriorityDecision = {
+      total: financePriorityRows.length,
+      accepted: financePriorityRows.filter((row: any) => row.decision === 'accepted').length,
+      deferred: financePriorityRows.filter((row: any) => row.decision === 'deferred').length,
+      rejected: financePriorityRows.filter((row: any) => row.decision === 'rejected').length,
+      timedDecisions: priorityLatencies.length,
+      medianDecisionSeconds: priorityMedianMs === null ? null : Math.round(priorityMedianMs / 1000),
+      rawEvents: financePriorityRawRows.length,
+      uniquePriorityDays: financePriorityRows.length,
+      latestAt: financePriorityRows[0]?.createdAt || null,
+      workflowLevel: financeWorkflowLevel,
+      evidenceLevel: financeEvidenceLevel,
+      decisionCoveragePct: financeDecisionCoveragePct,
+      reviewedPriorityKinds: financePriorityKeyCount,
+      coverageLevel: financeCoverageLevel,
+      valueLevel: financeValueLevel,
+      lecv: `L${financeWorkflowLevel} / ${financeEvidenceLevel} / ${financeCoverageLevel} / ${financeValueLevel}`,
+      valueGate: financePriorityRows.length >= 20 ? 'CALIBRATION_READY' : 'MEASURING',
+      outcomes: {
+        maturedAccepted: financePriorityOutcomes.length,
+        improved: financePriorityOutcomes.filter((row) => row.state === 'IMPROVED').length,
+        unchanged: financePriorityOutcomes.filter((row) => row.state === 'UNCHANGED').length,
+        worsened: financePriorityOutcomes.filter((row) => row.state === 'WORSENED').length,
+        unmeasurable: financePriorityOutcomes.filter((row) => row.state === 'UNMEASURABLE').length,
+        e3Gate: 'HOLD_E3',
+        semantics: 'state observed after an accepted human decision; temporal association only, not causal attribution or savings',
+      },
+      semantics: 'latest human decision per finance priority and Chile business day; repeated clicks do not inflate adoption; no Laudus or canonical mutation',
+    };
+
     const maintenanceRows = maintenanceWorkOrders.data || [];
     const maintenanceEventRows = maintenanceEvents.data || [];
     const timerRows = maintenanceRows.filter(
@@ -215,12 +356,58 @@ export async function GET(request: NextRequest) {
       if (row.event_type === 'work_order_closed' && (!current.close || at > current.close)) current.close = at;
       eventTimes.set(key, current);
     }
-    const approvedReviewByOrder = new Map<string, string>();
+    const latestReviewByOrder = new Map<string, any>();
     for (const row of maintenanceSupervisorReviews.data || []) {
       const key = String(row.work_order_id || '');
       const reviewedAt = String(row.reviewed_at || '');
-      if (key && row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
+      const current = latestReviewByOrder.get(key);
+      if (
+        key
+        && reviewedAt
+        && (!current || Date.parse(reviewedAt) > Date.parse(String(current.reviewed_at || '')))
+      ) {
+        latestReviewByOrder.set(key, row);
+      }
     }
+    const approvedReviewByOrder = new Map<string, string>();
+    for (const [key, row] of latestReviewByOrder.entries()) {
+      const reviewedAt = String(row.reviewed_at || '');
+      if (row.status === 'approved' && reviewedAt) approvedReviewByOrder.set(key, reviewedAt);
+    }
+    const closeToReviewSeconds = closedRows
+      .map((row: any) => {
+        const review = latestReviewByOrder.get(String(row.id));
+        if (!review?.reviewed_at || !row.closed_at) return null;
+        const closedMs = Date.parse(String(row.closed_at));
+        const reviewedMs = Date.parse(String(review.reviewed_at));
+        return Number.isFinite(closedMs) && Number.isFinite(reviewedMs) && reviewedMs >= closedMs
+          ? Math.round((reviewedMs - closedMs) / 1000)
+          : null;
+      })
+      .filter((value): value is number => value !== null);
+    const sortedReviewLatency = [...closeToReviewSeconds].sort((a, b) => a - b);
+    const reviewLatencyMidpoint = Math.floor(sortedReviewLatency.length / 2);
+    const medianCloseToReviewSeconds =
+      sortedReviewLatency.length === 0
+        ? null
+        : sortedReviewLatency.length % 2 === 0
+          ? Math.round(
+              (sortedReviewLatency[reviewLatencyMidpoint - 1] + sortedReviewLatency[reviewLatencyMidpoint]) / 2,
+            )
+          : sortedReviewLatency[reviewLatencyMidpoint];
+    const reviewedClosed = closedRows.filter((row: any) => latestReviewByOrder.has(String(row.id))).length;
+    const approvedClosed = closedRows.filter(
+      (row: any) => latestReviewByOrder.get(String(row.id))?.status === 'approved',
+    ).length;
+    const supervisorReview = {
+      reviewedClosed,
+      approvedClosed,
+      nonApprovedClosed: reviewedClosed - approvedClosed,
+      coveragePct: closedRows.length > 0 ? Math.round((reviewedClosed / closedRows.length) * 100) : null,
+      medianCloseToReviewSeconds,
+      latencySamples: sortedReviewLatency.length,
+      semantics: 'latest human supervisor review per closed work order; approval rate is workflow evidence, not proof of repair quality',
+    };
 
     const emergencyCycleRows = emergencyRows.map((row: any) => {
       const times = eventTimes.get(String(row.id)) || {};
@@ -287,6 +474,75 @@ export async function GET(request: NextRequest) {
         : executionCycles.length % 2 === 0
           ? Math.round((executionCycles[executionMidpoint - 1] + executionCycles[executionMidpoint]) / 2)
           : executionCycles[executionMidpoint];
+
+    const weekStartUtc = (value: string) => {
+      const parsed = Date.parse(value);
+      if (!Number.isFinite(parsed)) return null;
+      const date = new Date(parsed);
+      const day = date.getUTCDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      date.setUTCDate(date.getUTCDate() + diff);
+      date.setUTCHours(0, 0, 0, 0);
+      return date.toISOString().slice(0, 10);
+    };
+    const executionByWeek = new Map<string, number[]>();
+    for (const row of maintenanceRows) {
+      const week = weekStartUtc(String(row.created_at || ''));
+      if (!week) continue;
+      const times = eventTimes.get(String(row.id)) || {};
+      const startMs = times.start ? Date.parse(times.start) : NaN;
+      const closeMs = row.closed_at
+        ? Date.parse(String(row.closed_at))
+        : times.close
+          ? Date.parse(times.close)
+          : NaN;
+      if (!Number.isFinite(startMs) || !Number.isFinite(closeMs) || closeMs < startMs) continue;
+      const values = executionByWeek.get(week) || [];
+      values.push(Math.round((closeMs - startMs) / 1000));
+      executionByWeek.set(week, values);
+    }
+    const weeklyExecutionTrend = Array.from(executionByWeek.entries())
+      .map(([week, values]) => {
+        const measurement = median(values);
+        return {
+          week,
+          samples: measurement.samples,
+          medianSeconds: measurement.medianSeconds,
+        };
+      })
+      .sort((a, b) => a.week.localeCompare(b.week));
+    const currentWeekStart = weekStartUtc(new Date().toISOString());
+    const comparableWeeklyExecutionTrend = weeklyExecutionTrend.filter(
+      (row) => row.samples >= 5 && row.week !== currentWeekStart,
+    );
+    const previousComparableWeek =
+      comparableWeeklyExecutionTrend.length >= 2
+        ? comparableWeeklyExecutionTrend[comparableWeeklyExecutionTrend.length - 2]
+        : null;
+    const latestComparableWeek =
+      comparableWeeklyExecutionTrend.length >= 1
+        ? comparableWeeklyExecutionTrend[comparableWeeklyExecutionTrend.length - 1]
+        : null;
+    const weeklyExecutionChangePct =
+      previousComparableWeek?.medianSeconds != null
+      && latestComparableWeek?.medianSeconds != null
+      && previousComparableWeek.medianSeconds > 0
+        ? Math.round(
+            ((latestComparableWeek.medianSeconds - previousComparableWeek.medianSeconds)
+              / previousComparableWeek.medianSeconds) * 100,
+          )
+        : null;
+    const executionTrend = {
+      weeks: weeklyExecutionTrend,
+      comparableWeeks: comparableWeeklyExecutionTrend.length,
+      previousComparableWeek,
+      latestComparableWeek,
+      changePct: weeklyExecutionChangePct,
+      evidenceGate: comparableWeeklyExecutionTrend.length >= 2 ? 'TREND_ONLY' : 'INSUFFICIENT_SAMPLE',
+      e3Gate: 'HOLD_E3',
+      semantics:
+        'observational weekly execution-cycle trend; week-over-week change is not causal attribution to MOTIL and does not prove saved downtime',
+    };
 
 
     const closedMaintenanceRows = maintenanceRows
@@ -377,6 +633,19 @@ export async function GET(request: NextRequest) {
       semantics: 'controlled UAT/test award decisions remain traceable but are excluded from operational adoption, outcomes and ROI evidence',
     };
 
+    const maintenanceWorkflowLevel = timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0;
+    const maintenanceEvidenceLevel =
+      timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0';
+    const maintenanceCoreCoverageValues = [
+      coveragePct(timerRows.length),
+      coveragePct(assignedRows.length),
+      coveragePct(assetLinkedRows.length),
+    ].filter((value): value is number => value !== null);
+    const maintenanceCoreCoveragePct =
+      maintenanceCoreCoverageValues.length > 0 ? Math.min(...maintenanceCoreCoverageValues) : null;
+    const maintenanceCoverageLevel = coverageBand(maintenanceCoreCoveragePct);
+    const maintenanceValueLevel = valueLevel(maintenanceWorkflowLevel, maintenanceEvidenceLevel);
+
     const maintenanceValue = {
       workOrders: maintenanceRows.length,
       closedWorkOrders: closedRows.length,
@@ -394,6 +663,7 @@ export async function GET(request: NextRequest) {
       meterCoverageCount: meterRows.length,
       emergencyWorkOrders: emergencyRows.length,
       emergencyCycle,
+      supervisorReview,
       observedExecutionSeconds: timerSecondsObserved,
       observedExecutionHours: Math.round((timerSecondsObserved / 3600) * 10) / 10,
       workOrdersWithEvents: workOrdersWithEvents.size,
@@ -415,9 +685,13 @@ export async function GET(request: NextRequest) {
         medianExecutionCycleSeconds === null
           ? null
           : Math.round((medianExecutionCycleSeconds / 3600) * 100) / 100,
-      evidenceLevel:
-        timerRows.length >= 10 && maintenanceEventRows.length >= 50 ? 'E2' : timerRows.length > 0 ? 'E1' : 'E0',
-      workflowLevel: timerRows.length > 0 && maintenanceEventRows.length > 0 ? 4 : maintenanceRows.length > 0 ? 2 : 0,
+      executionTrend,
+      evidenceLevel: maintenanceEvidenceLevel,
+      workflowLevel: maintenanceWorkflowLevel,
+      coreCoveragePct: maintenanceCoreCoveragePct,
+      coverageLevel: maintenanceCoverageLevel,
+      valueLevel: maintenanceValueLevel,
+      lecv: `L${maintenanceWorkflowLevel} / ${maintenanceEvidenceLevel} / ${maintenanceCoverageLevel} / ${maintenanceValueLevel}`,
       connectedDomains,
       connectedDomainCount: connectedDomains.length,
       supplyChain: {
@@ -448,6 +722,7 @@ export async function GET(request: NextRequest) {
       current: current.data || null,
       financeReview,
       financeReviewTiming,
+      financePriorityDecision,
       maintenanceValue,
       procurementAwardValue,
       history: history.data || null,
