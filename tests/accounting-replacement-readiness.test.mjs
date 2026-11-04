@@ -34,3 +34,13 @@ test('Finance shows accounting replacement coverage honestly',()=>{
   assert.match(card,/Con líneas útiles/);
   assert.match(page,/AccountingReplacementReadinessCard/);
 });
+
+
+test('data-quality ledger measures accounting line coverage instead of empty header dimensions',()=>{
+  const dataQuality = fs.readFileSync('app/api/data-quality/reconciliation/route.ts','utf8');
+  assert.match(dataQuality,/laudus_accounting_management_summary_v1/);
+  assert.match(dataQuality,/entries_with_lines/);
+  assert.match(dataQuality,/accountingMissingLineCoverage/);
+  assert.doesNotMatch(dataQuality,/accountingMissingCurrency/);
+  assert.doesNotMatch(dataQuality,/accountingMissingCostCenter/);
+});
