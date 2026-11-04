@@ -186,6 +186,7 @@ export async function GET(request: NextRequest) {
         return {
           ...row,
           next_action: nextAction,
+          ready_to_close: Boolean(row.ready_to_close) && hasFluidClosureDeclaration,
           fluid_closure_declared: hasFluidClosureDeclaration,
           asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
         };
