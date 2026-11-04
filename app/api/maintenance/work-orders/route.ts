@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
 import { resolveWorkshopHeadScope, workshopHeadOrderFilter, workshopSiteFromKnownLocation, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
+import { workOrderScopeViolation } from '@/lib/maintenance/work-order-scope.mjs';
 
 type WorkOrderRow = {
   id: string;
@@ -44,6 +45,7 @@ type SupervisorReviewRow = {
 
 type WorkOrderPayload = {
   canonicalAssetId?: string;
+  generalWorkConfirmed?: boolean;
   canonical_asset_id?: string;
   reviewId?: string | null;
   review_id?: string | null;
@@ -166,6 +168,30 @@ async function recordEmergencyDetection(
     },
   });
   if (error) throw error;
+}
+
+async function recordCreationScopeContext(
+  context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true },
+  request: NextRequest,
+  workOrder: WorkOrderRow,
+  generalWorkConfirmed: boolean,
+) {
+  const { error } = await context.supabase.from('audit_log').insert({
+    organization_id: context.organizationId,
+    user_id: context.userId,
+    action: 'maintenance_ot_create_context',
+    resource_type: 'maintenance_work_order',
+    resource_identifier: workOrder.id,
+    new_values: {
+      canonical_asset_id: workOrder.canonical_asset_id,
+      work_type: workOrder.work_type,
+      general_work_confirmed: generalWorkConfirmed,
+      creation_request_id: workOrder.creation_request_id,
+    },
+    user_agent: request.headers.get('user-agent'),
+    status: 'completed',
+  });
+  if (error) console.error('[maintenance/work-orders:create-context]', error);
 }
 
 async function recordAdminInteractionTiming(
@@ -358,6 +384,11 @@ export async function POST(request: NextRequest) {
     const workType = body.workType || body.work_type || 'corrective';
     const isGeneralWork = workType === 'general';
     const isEmergencyWork = workType === 'emergency';
+    const generalWorkConfirmed = body.generalWorkConfirmed === true;
+    const scopeViolation = workOrderScopeViolation({ canonicalAssetId, isGeneralWork, generalWorkConfirmed });
+    if (scopeViolation === 'GENERAL_WITH_ASSET') return NextResponse.json({ error: 'Quita el equipo antes de cambiar a trabajo general del taller' }, { status: 400 });
+    if (scopeViolation === 'GENERAL_NOT_CONFIRMED') return NextResponse.json({ error: 'Confirma explícitamente que es un trabajo general del taller' }, { status: 400 });
+    if (scopeViolation === 'ASSET_REQUIRED') return NextResponse.json({ error: isEmergencyWork ? 'Una OTe debe quedar asociada a un equipo' : 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
     const detectedAtRaw = body.detectedAt || body.detected_at || null;
     let detectedAtIso: string | null = null;
     if (isEmergencyWork) {
@@ -376,7 +407,6 @@ export async function POST(request: NextRequest) {
     const creationRequestId = request.headers.get('idempotency-key')?.trim() || null;
     const planningDecisionId = body.planningDecisionId || null;
     if(planningDecisionId && (!UUID_PATTERN.test(planningDecisionId) || creationRequestId!==planningDecisionId)) return NextResponse.json({error:'Referencia de planificación inválida'},{status:400});
-    if (!canonicalAssetId && !isGeneralWork) return NextResponse.json({ error: isEmergencyWork ? 'Una OTe debe quedar asociada a un equipo' : 'Selecciona un equipo o elige trabajo general del taller' }, { status: 400 });
     if (reviewId && !canonicalAssetId) return NextResponse.json({ error: 'Una revisión de equipo debe conservar su equipo asociado' }, { status: 400 });
     if (!body.title?.trim()) return NextResponse.json({ error: 'Describe brevemente el trabajo a realizar' }, { status: 400 });
     if (!context.authUserId) {
@@ -513,6 +543,7 @@ export async function POST(request: NextRequest) {
         await recordEmergencyDetection(context, assignedLinkedOrder as WorkOrderRow, detectedAtIso);
       }
       if (!review.linked_work_order_id) {
+        await recordCreationScopeContext(context, request, assignedLinkedOrder as WorkOrderRow, generalWorkConfirmed);
         await recordAdminInteractionTiming(context, request, assignedLinkedOrder.id);
       }
 
@@ -683,6 +714,7 @@ export async function POST(request: NextRequest) {
       await recordEmergencyDetection(context, createdOrder, detectedAtIso);
     }
     if (!idempotentReplay) {
+      await recordCreationScopeContext(context, request, createdOrder, generalWorkConfirmed);
       await recordAdminInteractionTiming(context, request, createdOrder.id);
     }
     return NextResponse.json(
