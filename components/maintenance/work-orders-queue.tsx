@@ -244,7 +244,7 @@ export function WorkOrdersQueue({ locale, dictionary }: { locale: Locale; dictio
                 const completed = ['completed', 'completado'].includes(status);
                 const approved = normalizeText(order.approval_status) === 'approved';
                 const nextAction = completed
-                  ? approved ? 'Ver registro' : isExecutorView ? 'Ver cierre' : t.approval.review
+                  ? approved ? t.approval.record : isExecutorView ? 'Ver cierre' : t.approval.review
                   : ['in_progress', 'en_progreso'].includes(status) ? 'Continuar' : 'Abrir';
                 const stateLabel = completed && !historical
                   ? approved ? t.approval.approved : t.approval.pending
