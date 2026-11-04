@@ -136,13 +136,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: order, error: orderError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('id,canonical_asset_id,work_order_number')
+      .select('id,canonical_asset_id,work_order_number,status,closed_at')
       .eq('organization_id', context.organizationId)
       .eq('id', id)
       .single();
     if (orderError) throw orderError;
 
     const now = new Date().toISOString();
+    const isPostClose = Boolean(order.closed_at) || ['completed', 'closed'].includes(String(order.status || ''));
     const payload = {
       fluids_used: body.fluids_used,
       waste_status: wasteStatus,
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       note: String(body.note || '').trim() || null,
       declared_by_assigned_executor: true,
       declaration_version: 'v1',
+      declaration_post_close: isPostClose,
     };
 
     const { data: event, error: eventError } = await context.supabase
@@ -165,9 +167,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         actor_name: context.userName || context.userEmail || null,
         source_table: 'maintenance_fluid_usage_records',
         source_record_id: id,
-        summary: body.fluids_used
-          ? 'Mecánico confirmó aceites/fluidos y estado de residuos para cierre'
-          : 'Mecánico confirmó que no se utilizaron aceites/fluidos en la OT',
+        summary: isPostClose
+          ? (body.fluids_used
+            ? 'Mecánico declaró aceites/fluidos posteriormente al cierre'
+            : 'Mecánico declaró que no utilizó aceites/fluidos posteriormente al cierre')
+          : body.fluids_used
+            ? 'Mecánico confirmó aceites/fluidos y estado de residuos para cierre'
+            : 'Mecánico confirmó que no se utilizaron aceites/fluidos en la OT',
         payload,
       })
       .select('id,event_type,event_at,actor_id,actor_name,payload')
