@@ -70,3 +70,21 @@ test('time reduction stays gated until manual and assisted samples are sufficien
   assert.match(valuePage,/Reducción observada de tiempo/);
   assert.match(valuePage,/Se habilita sólo con 3 muestras manuales y 20 decisiones asistidas con tiempo válido/);
 });
+
+
+test('finance priority adoption deduplicates repeated clicks by Chile business day',()=>{
+  const priorityRoute = fs.readFileSync('app/api/value/finance-priority-decision/route.ts','utf8');
+  const valueApi = fs.readFileSync('app/api/value/scorecard/route.ts','utf8');
+  const valuePage = fs.readFileSync('app/dashboard/valor/page.tsx','utf8');
+  const cron = fs.readFileSync('app/api/cron/value-scorecard-daily/route.ts','utf8');
+
+  assert.match(priorityRoute,/America\/Santiago/);
+  assert.match(priorityRoute,/business_date/);
+  assert.match(priorityRoute,/latestByPriorityDay/);
+  assert.match(priorityRoute,/repeated clicks do not inflate adoption/);
+  assert.match(valueApi,/financePriorityDecision/);
+  assert.match(valueApi,/latestPriorityByDay/);
+  assert.match(valuePage,/Prioridades revisadas/);
+  assert.match(valuePage,/deduplicados por prioridad\/día/);
+  assert.match(cron,/financePriorityDecision/);
+});
