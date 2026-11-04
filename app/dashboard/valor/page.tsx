@@ -135,6 +135,32 @@ type ApiResponse = {
       medianCreateSeconds?: number | null;
       semantics?: string;
     };
+    proCohort?: {
+      releaseAt?: string;
+      windowDays?: number;
+      gate?: string;
+      before?: {
+        workOrders?: number;
+        closedWorkOrders?: number;
+        timerCoveragePct?: number | null;
+        rootCauseCoveragePct?: number | null;
+        preventiveActionCoveragePct?: number | null;
+        meterCoveragePct?: number | null;
+        approvedClosures?: number;
+        medianCloseToApprovalSeconds?: number | null;
+      };
+      after?: {
+        workOrders?: number;
+        closedWorkOrders?: number;
+        timerCoveragePct?: number | null;
+        rootCauseCoveragePct?: number | null;
+        preventiveActionCoveragePct?: number | null;
+        meterCoveragePct?: number | null;
+        approvedClosures?: number;
+        medianCloseToApprovalSeconds?: number | null;
+      };
+      semantics?: string;
+    };
     valueGate?: {
       attribution?: string;
       pricingReadiness?: string;
@@ -253,6 +279,9 @@ export default function ValueScorecardPage() {
   const maintenanceTimerCoverage = maintenanceValue.timerCoverage ?? null;
   const recurrence7d = maintenanceValue.recurrence7d || {};
   const shortageToProcurement = maintenanceValue.shortageToProcurement || {};
+  const maintenanceProCohort = maintenanceValue.proCohort || {};
+  const maintenanceBefore = maintenanceProCohort.before || {};
+  const maintenanceAfter = maintenanceProCohort.after || {};
 
   const saveBaseline = async () => {
     if (!baselineStartedAt.current) return;
@@ -503,6 +532,41 @@ export default function ValueScorecardPage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Pricing readiness: {maintenanceValue.valueGate?.pricingReadiness || 'MARKET_ANCHORED'}. Las {number(maintenanceValue.emergencyWorkOrders || 0)} OTe observadas se medirán como cohorte separada.
           </p>
+        </div>
+      </section>
+
+      <section aria-label="Cohorte Maintenance Pro" className="overflow-hidden rounded-xl border bg-card">
+        <div className="border-b px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Maintenance Pro · pre/post</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-tight">Medir el cambio sin inventar impacto</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Compara cohortes de OT creadas durante 7 días antes y después del release. Hasta tener muestra comparable, sólo muestra evidencia observada.
+          </p>
+        </div>
+        <div className="grid gap-px bg-border lg:grid-cols-2">
+          {[
+            ['Antes', maintenanceBefore],
+            ['Después', maintenanceAfter],
+          ].map(([label, raw]) => {
+            const cohort = raw as NonNullable<typeof maintenanceProCohort.before>;
+            return <div key={String(label)} className="bg-card px-5 py-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{String(label)}</p>
+                <span className="text-xs text-muted-foreground">{number(cohort.workOrders || 0)} OT</span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                <div><p className="text-xs text-muted-foreground">Cronómetro</p><p className="mt-1 font-semibold">{cohort.timerCoveragePct == null ? '—' : `${number(cohort.timerCoveragePct)}%`}</p></div>
+                <div><p className="text-xs text-muted-foreground">Causa raíz</p><p className="mt-1 font-semibold">{cohort.rootCauseCoveragePct == null ? '—' : `${number(cohort.rootCauseCoveragePct)}%`}</p></div>
+                <div><p className="text-xs text-muted-foreground">Acción preventiva</p><p className="mt-1 font-semibold">{cohort.preventiveActionCoveragePct == null ? '—' : `${number(cohort.preventiveActionCoveragePct)}%`}</p></div>
+                <div><p className="text-xs text-muted-foreground">Horómetro</p><p className="mt-1 font-semibold">{cohort.meterCoveragePct == null ? '—' : `${number(cohort.meterCoveragePct)}%`}</p></div>
+                <div><p className="text-xs text-muted-foreground">Cierres</p><p className="mt-1 font-semibold">{number(cohort.closedWorkOrders || 0)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Cierre → aprobación</p><p className="mt-1 font-semibold">{duration(cohort.medianCloseToApprovalSeconds)}</p><p className="text-[11px] text-muted-foreground">{number(cohort.approvedClosures || 0)} medibles</p></div>
+              </div>
+            </div>;
+          })}
+        </div>
+        <div className="border-t px-5 py-4 text-xs text-muted-foreground">
+          Gate: {maintenanceProCohort.gate || 'MEASURING'}. Release de referencia: {maintenanceProCohort.releaseAt || '—'}. Una diferencia pre/post no se declara causal hasta revisar muestra y cambios de contexto.
         </div>
       </section>
 
