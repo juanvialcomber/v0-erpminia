@@ -3,6 +3,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 
 type WorkOrderAssetRow = { asset_id: string | null };
 type EquipmentHseRequirementsRow = { ppe_required: string | null; hazards: string | null; training_required: string | null; inspection_frequency: string | number | null };
@@ -18,6 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   try {
+    const authority = await getMaintenanceActorAuthority(context);
+    const assigned = await requireAssignedMaintenanceExecution(context, id);
+    if (!authority.canReadAllWorkOrders && !assigned.ok) return assigned.response;
     const { data: ot } = await context.supabase.from('maintenance_work_orders').select('asset_id').eq('organization_id', context.organizationId).eq('id', id).single();
     const typedOt = ot as WorkOrderAssetRow | null;
     if (!typedOt) return NextResponse.json({ error: 'No se encontró la OT' }, { status: 404 });
@@ -38,6 +44,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
+    const assigned = await requireAssignedMaintenanceExecution(context, id);
+    const hseLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.HSE_INCIDENTE);
+    if (!assigned.ok && hseLevel !== 'ED') {
+      return NextResponse.json({ error: 'Solo el ejecutor asignado o un responsable HSE autorizado puede reportar un incidente de esta OT.' }, { status: 403 });
+    }
 
     const body = (await request.json()) as HseIncidentPayload;
     const { incident_type, severity, description, findings } = body;
