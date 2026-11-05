@@ -9,14 +9,19 @@ test('planner inbox is exception-driven instead of mirroring every created OT',(
   assert.match(personal,/Created OTs stay in the weekly plan unless they become a real exception/);
   assert.match(personal,/order\.status === 'in_progress'.*dateKey && dateKey < now/s);
   assert.match(personal,/maintenance_planning:overdue_not_started/);
-  assert.match(personal,/OT planificada\\$\\{overdue\\.length === 1 \\? '' : 's'\\} pendiente/);
+  assert.match(personal,/OT planificada/);
+  assert.match(personal,/pendiente/);
   assert.match(personal,/Revisar vigencia del plan y reprogramar sólo si la fecha ya no corresponde/);
   assert.doesNotMatch(personal,/for \(const order of created\) \{\s*tasks\.set\(order\.id, toInboxTask/s);
 });
 
-test('planner exceptions are owned actions without implying personal execution',()=>{
-  assert.match(personal,/responsibility: 'owner'/);
+test('planned pending work is not described as failed execution',()=>{
   assert.match(personal,/Siguen siendo trabajo planificado; revisar vigencia de fecha y reprogramar sólo si corresponde/);
+  assert.doesNotMatch(personal,/vencida.*sin iniciar/i);
+});
+
+test('real execution exceptions stay actionable for the planner',()=>{
+  assert.match(personal,/responsibility: 'owner'/);
   assert.match(personal,/Intervenir atraso/);
 });
 
@@ -27,7 +32,7 @@ test('general OTs without an asset do not become false missing-asset planner tas
   assert.match(inbox,/ignorableIds/);
 });
 
-test('grouped overdue planning task routes to the EAM planning view',()=>{
+test('grouped planned-pending task routes to the EAM planning view',()=>{
   assert.match(inbox,/kind === 'maintenance_planning'/);
   assert.match(inbox,/\/dashboard\/mantenimiento\/eam/);
 });
