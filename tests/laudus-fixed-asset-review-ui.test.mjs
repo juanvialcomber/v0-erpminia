@@ -7,7 +7,7 @@ const componentPath = new URL('../components/integrations/laudus-fixed-asset-rev
 const pagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
 const financeCardPath = new URL('../components/integrations/laudus-finance-control-card.tsx', import.meta.url);
 
-test('fixed asset review API reuses canonical review queue and remains read-only', async () => {
+test('fixed asset review GET reuses canonical review queue and remains read-only', async () => {
   const route = await readFile(routePath, 'utf8');
 
   assert.match(route, /motil_laudus_fixed_asset_review_queue/);
@@ -18,10 +18,11 @@ test('fixed asset review API reuses canonical review queue and remains read-only
   assert.match(route, /noLaudusMutation: true/);
   assert.match(route, /filter\(\(row\) => !row\.decision\)/);
   assert.match(route, /slice\(0, 50\)/);
-  assert.doesNotMatch(route, /\.insert\(/);
-  assert.doesNotMatch(route, /\.update\(/);
-  assert.doesNotMatch(route, /\.upsert\(/);
-  assert.doesNotMatch(route, /\.delete\(/);
+  const getBlock = route.slice(route.indexOf('export async function GET'), route.indexOf('type ReviewDecision'));
+  assert.doesNotMatch(getBlock, /\.insert\(/);
+  assert.doesNotMatch(getBlock, /\.update\(/);
+  assert.doesNotMatch(getBlock, /\.upsert\(/);
+  assert.doesNotMatch(getBlock, /\.delete\(/);
 });
 
 test('fixed asset review UI exposes evidence and human authority', async () => {
@@ -42,4 +43,19 @@ test('Finance routes users to the dedicated Laudus fixed asset review', async ()
   assert.match(page, /LaudusFixedAssetReview/);
   assert.match(financeCard, /\/dashboard\/finanzas\/activos-laudus/);
   assert.match(financeCard, /Revisar activos/);
+});
+
+
+test('fixed asset review records human decisions without canonical mutation', async () => {
+  const route = await readFile(new URL('../app/api/integrations/laudus/fixed-asset-review/route.ts', import.meta.url), 'utf8');
+  const ui = await readFile(new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url), 'utf8');
+  assert.match(route, /export async function POST/);
+  assert.match(route, /review_record_only/);
+  assert.match(route, /appliedToCanonical: false/);
+  assert.match(route, /laudus_fixed_asset_review_decisions/);
+  assert.doesNotMatch(route, /from\('canonical_assets_current'\).*\.update/s);
+  assert.match(ui, /Confirmar candidato/);
+  assert.match(ui, /Rechazar/);
+  assert.match(ui, /Diferir/);
+  assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowLeft, ArrowRight, CheckCircle2, Database, Search, ShieldCheck } from 'lucide-react';
@@ -97,13 +98,15 @@ function date(value: string | null) {
 }
 
 export function LaudusFixedAssetReview() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/fixed-asset-review',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 15 * 60 * 1000 },
   );
   const [search, setSearch] = useState('');
   const [index, setIndex] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [rationale, setRationale] = useState('');
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -128,6 +131,40 @@ export function LaudusFixedAssetReview() {
 
   const safeIndex = rows.length ? Math.min(index, rows.length - 1) : 0;
   const current = rows[safeIndex] || null;
+
+  const decide = async (decision: 'confirm_candidate' | 'reject_candidate' | 'defer') => {
+    if (!current || saving) return;
+    setSaving(true);
+    try {
+      const response = await fetch('/api/integrations/laudus/fixed-asset-review', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          externalId: current.externalId,
+          candidateAssetId: current.candidate.assetId,
+          decision,
+          rationale: rationale.trim() || null,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la revisión.');
+      toast.success(
+        decision === 'confirm_candidate'
+          ? 'Candidato confirmado para conciliación'
+          : decision === 'reject_candidate'
+            ? 'Candidato rechazado'
+            : 'Caso diferido',
+      );
+      setRationale('');
+      setIndex((value) => Math.max(0, value));
+      await mutate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No fue posible registrar la revisión.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -271,6 +308,44 @@ export function LaudusFixedAssetReview() {
             </div>
           </div>
 
+          <div className="border-t px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Decisión</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Registra una decisión trazable. Confirmar no modifica automáticamente el activo canónico ni escribe en Laudus.
+            </p>
+            <Input
+              value={rationale}
+              onChange={(event) => setRationale(event.target.value)}
+              className="mt-3"
+              placeholder="Observación opcional para Finanzas"
+              disabled={saving}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => decide('confirm_candidate')}
+                disabled={saving || !current.candidate.assetId}
+              >
+                Confirmar candidato
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => decide('reject_candidate')}
+                disabled={saving}
+              >
+                Rechazar
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => decide('defer')}
+                disabled={saving}
+              >
+                Diferir
+              </Button>
+            </div>
+          </div>
           <div className="border-t px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Evidencia</p>
             <div className="mt-3 flex flex-wrap gap-2">

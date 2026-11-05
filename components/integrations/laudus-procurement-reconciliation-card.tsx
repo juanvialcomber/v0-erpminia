@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
+import { toast } from 'sonner';
 import { AlertTriangle, CheckCircle2, GitMerge } from 'lucide-react';
 import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
+import { Button } from '@/components/ui/button';
 
 type Payload = {
   summary: {
@@ -37,11 +40,36 @@ const pct = (part: number, total: number) =>
   total ? `${((part / total) * 100).toLocaleString('es-CL', { maximumFractionDigits: 1 })}%` : '0%';
 
 export function LaudusProcurementReconciliationCard() {
-  const { data, error, isLoading } = useSWR<Payload>(
+  const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/procurement-reconciliation',
     fetcher,
     { revalidateOnFocus: false, refreshInterval: 900000 },
   );
+
+  const [applying, setApplying] = useState(false);
+
+  const applyBatch = async () => {
+    if (applying || !data?.summary.fullyResolvable) return;
+    setApplying(true);
+    try {
+      const response = await fetch('/api/integrations/laudus/procurement-reconciliation', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No fue posible aplicar el lote.');
+      const applied = Number(payload?.result?.applied || 0);
+      const conflicts = Number(payload?.result?.conflicts || 0);
+      toast.success(`Conciliación aplicada: ${applied} OC${conflicts ? ` · ${conflicts} conflictos revalidando` : ''}`);
+      await mutate();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No fue posible aplicar el lote.');
+    } finally {
+      setApplying(false);
+    }
+  };
 
   if (error) return null;
 
@@ -65,8 +93,14 @@ export function LaudusProcurementReconciliationCard() {
           <LaudusSourceMark state={isLoading ? 'syncing' : data ? 'connected' : 'pending'} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Vista previa determinística. No modifica cabeceras, proveedores ni centros de costo.
+          Vista determinística. La aplicación requiere acción humana y sólo completa campos faltantes; nunca sobrescribe valores existentes ni escribe en Laudus.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={applyBatch} disabled={applying || !data?.summary.fullyResolvable}>
+            {applying ? 'Aplicando…' : 'Aplicar 25 resolubles'}
+          </Button>
+          <span className="text-xs text-muted-foreground">Cada OC se revalida dentro de la transacción antes de modificar MOTIL.</span>
+        </div>
       </div>
 
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
