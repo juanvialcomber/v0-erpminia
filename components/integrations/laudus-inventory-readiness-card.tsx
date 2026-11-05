@@ -224,7 +224,7 @@ export function LaudusInventoryReadinessCard() {
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua`}
+            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua · ${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL`}
           </p>
         </div>
         <div className="bg-card p-4">
