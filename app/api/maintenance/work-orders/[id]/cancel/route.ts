@@ -24,62 +24,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Indica el motivo de la anulación (mínimo 5 caracteres).' }, { status: 400 });
   }
 
-  const { data: order, error: orderError } = await context.supabase
-    .from('maintenance_work_orders')
-    .select('id,status,timer_status,canonical_asset_id')
-    .eq('organization_id', context.organizationId)
-    .eq('id', id)
-    .single();
-  if (orderError) return NextResponse.json({ error: orderError.message }, { status: 500 });
-
-  const status = String(order.status || '').toLowerCase();
-  if (['completed', 'closed', 'cancelled', 'canceled'].includes(status)) {
-    return NextResponse.json({ error: 'La OT ya está finalizada o anulada.' }, { status: 409 });
-  }
-  if (String(order.timer_status || 'idle') !== 'idle') {
-    return NextResponse.json(
-      { error: 'Detén el cronómetro antes de anular la OT para preservar el tiempo registrado.' },
-      { status: 409 },
-    );
-  }
-
-  const now = new Date().toISOString();
-  const { data: updated, error: updateError } = await context.supabase
-    .from('maintenance_work_orders')
-    .update({
-      status: 'cancelled',
-      cancellation_reason: reason,
-      cancelled_at: now,
-      updated_at: now,
-    })
-    .eq('organization_id', context.organizationId)
-    .eq('id', id)
-    .select('*')
-    .single();
-  if (updateError) {
-    const code = (updateError as { code?: string }).code;
-    return NextResponse.json(
-      { error: updateError.message || 'No se pudo anular la OT.' },
-      { status: code === '55000' || code === 'P0001' ? 409 : 500 },
-    );
-  }
-
-  const { error: eventError } = await context.supabase.from('work_order_events').insert({
-    organization_id: context.organizationId,
-    work_order_id: id,
-    canonical_asset_id: order.canonical_asset_id || null,
-    event_type: 'work_order_cancelled',
-    event_at: now,
-    actor_id: context.authUserId,
-    actor_name: context.userName || context.userEmail || null,
-    source_table: 'maintenance_work_orders',
-    source_record_id: id,
-    summary: 'Orden anulada por usuario autorizado',
-    payload: { reason },
+  const { data, error } = await context.supabase.rpc('cancel_work_order_safely', {
+    p_organization_id: context.organizationId,
+    p_work_order_id: id,
+    p_reason: reason,
+    p_actor_id: context.authUserId,
+    p_actor_name: context.userName || context.userEmail || null,
   });
-  if (eventError) {
-    console.error('[maintenance/work-order-cancel:event]', eventError);
+
+  if (error) {
+    const code = (error as { code?: string }).code;
+    const status = code === 'P0002' ? 404
+      : code === '22023' ? 400
+        : code === '55000' || code === 'P0001' ? 409
+          : 500;
+    return NextResponse.json({ error: error.message || 'No se pudo anular la OT.' }, { status });
   }
 
-  return NextResponse.json({ data: updated });
+  return NextResponse.json({ data });
 }
