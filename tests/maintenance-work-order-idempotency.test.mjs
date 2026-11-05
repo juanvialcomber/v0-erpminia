@@ -39,3 +39,25 @@ test('free-text material request events do not duplicate on an idempotent replay
   assert.match(route, /event_type', 'material_request_recorded'/);
   assert.match(route, /if \(existingEvent\) return/);
 });
+
+
+test('post-create enrichment failures keep the OT truthful and retryable instead of returning a false create failure', () => {
+  assert.match(route, /const creationWarnings:/);
+  assert.match(route, /runCreationStep/);
+  assert.match(route, /creationComplete: creationWarnings\.length === 0/);
+  assert.match(route, /creationWarnings,/);
+  assert.match(route, /retrySafe: true/);
+  assert.match(route, /work_order_creation_followup_required/);
+  assert.match(route, /creationWarnings\.length > 0 && !idempotentReplay/);
+});
+
+test('create form keeps the same idempotency key while pending enrichment is retried', () => {
+  assert.match(form, /pendingCreatedWorkOrderId/);
+  assert.match(form, /payload\?\.creationComplete === false/);
+  assert.match(form, /Reintentar completar OT/);
+  assert.match(form, /OT creada · faltan pasos por completar/);
+  assert.match(form, /clearRequestId\(\)/);
+  const incompleteBranch = form.indexOf("payload?.creationComplete === false");
+  const clearIndex = form.indexOf("clearRequestId()", incompleteBranch);
+  assert.ok(incompleteBranch >= 0 && clearIndex > incompleteBranch, 'request key must only clear after the incomplete branch returns');
+});

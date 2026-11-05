@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
@@ -10,9 +9,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
-  const level = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const assigned = await requireAssignedMaintenanceExecution(context, id);
-  if (level !== 'ED' && !assigned.ok) return assigned.response;
+  if (!assigned.ok) return assigned.response;
 
   const body = await request.json().catch(() => null);
   const operationId = typeof body?.operationId === 'string' ? body.operationId : '';

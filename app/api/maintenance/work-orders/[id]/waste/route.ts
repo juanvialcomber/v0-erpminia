@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
@@ -44,8 +44,6 @@ type WastePayload = {
 };
 
 async function canWriteWaste(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }, workOrderId: string) {
-  const level = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (level === 'ED') return true;
   const execution = await requireAssignedMaintenanceExecution(context, workOrderId);
   return execution.ok;
 }
@@ -64,9 +62,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .maybeSingle();
     if (!order) return NextResponse.json({ error: 'No se encontró la OT' }, { status: 404 });
 
-    const level = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
+    const authority = await getMaintenanceActorAuthority(context);
     const execution = await requireAssignedMaintenanceExecution(context, id);
-    if (level !== 'ED' && level !== 'LEC' && !execution.ok) {
+    if (!authority.canReadAllWorkOrders && !execution.ok) {
       return NextResponse.json({ error: 'No tienes acceso a los residuos de esta OT.' }, { status: 403 });
     }
 
@@ -80,7 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       data: data || [],
-      canEdit: Boolean(order.created_by) && (level === 'ED' || execution.ok),
+      canEdit: Boolean(order.created_by) && execution.ok,
       complianceCertified: false,
     });
   } catch (error) {

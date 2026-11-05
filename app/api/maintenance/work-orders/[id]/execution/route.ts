@@ -2,8 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
 type ExecutionPayload = {
   action?: 'install_part' | 'return_part' | 'add_labor' | 'add_external_service';
@@ -23,8 +24,6 @@ type ExecutionPayload = {
 };
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
@@ -32,6 +31,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
     if (scope === 'missing') return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
+    const authority = await getMaintenanceActorAuthority(context);
+    const assigned = await requireAssignedMaintenanceExecution(context, id);
+    if (!authority.canReadAllWorkOrders && !assigned.ok) return assigned.response;
 
     const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult, materialsResult, approvalResult] = await Promise.all([
       context.supabase.from('maintenance_work_orders').select('id, work_order_number, title, description, status, assigned_to_name, scheduled_date, start_date, completion_date, actual_duration_hours, down_time_hours, root_cause, preventive_actions').eq('organization_id', context.organizationId).eq('id', id).maybeSingle(),
@@ -57,12 +59,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const materialNames = new Map((materialProducts || []).map(row => [row.id, row]));
     const enrichedMaterials = (materialsResult.data || []).map(row => ({ ...row, product: row.canonical_product_id ? materialNames.get(row.canonical_product_id) || null : null }));
 
-    const { data: workers, error: workersError } = await context.supabase
-      .from('people')
-      .select('id,full_name,role_title,profile_id,employment_status')
-      .eq('organization_id', context.organizationId)
-      .eq('employment_status', 'active')
-      .order('full_name');
+    const { data: workers, error: workersError } = authority.canPlan
+      ? await context.supabase
+          .from('people')
+          .select('id,full_name,role_title,profile_id,employment_status')
+          .eq('organization_id', context.organizationId)
+          .eq('employment_status', 'active')
+          .order('full_name')
+      : { data: [], error: null };
     if (workersError) throw workersError;
 
     const cost = costsResult.data;
@@ -94,7 +98,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       externalServices: servicesResult.data || [],
       events: eventsResult.data || [],
       costs,
-      canEdit: access.canWrite && scope === 'operational',
+      canEdit: authority.canPlan && scope === 'operational',
       record_scope: scope,
     });
   } catch (error) {
@@ -104,8 +108,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
@@ -113,6 +115,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede registrar costos y movimientos administrativos de la OT.' }, { status: 403 });
 
     const body = (await request.json()) as ExecutionPayload;
 

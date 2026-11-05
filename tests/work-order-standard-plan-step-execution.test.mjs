@@ -31,8 +31,9 @@ test('standard plan API exposes execution state and completes through RPC', () =
   assert.match(route,/work_order_standard_plan_execution_v1/);
   assert.match(route,/pendingSteps/);
   assert.match(route,/complete_work_order_standard_plan_step_v1/);
-  assert.match(route,/getModuleAccessLevel/);
+  assert.match(route,/getMaintenanceActorAuthority/);
   assert.match(route,/requireAssignedMaintenanceExecution/);
+  assert.match(route,/if \(!executionAccess\.ok\) return executionAccess\.response/);
 });
 
 test('work order plan UI is progressive and explicit', () => {

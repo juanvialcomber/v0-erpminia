@@ -3,43 +3,53 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 
-function toDateOnly(value?: string | null) {
+function toIso(value?: string | null) {
   if (!value) return null;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().split('T')[0];
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
+
+function toDateOnly(value?: string | null) {
+  const iso = toIso(value);
+  return iso ? iso.slice(0, 10) : null;
+}
+
+type WorkOrderRow = {
+  id: string;
+  work_order_number: string | null;
+  canonical_asset_id: string | null;
+  title: string | null;
+  work_type: string | null;
+  status: string | null;
+  priority: string | null;
+  assigned_to_name: string | null;
+  scheduled_date: string | null;
+  start_date: string | null;
+  completion_date: string | null;
+  closed_at: string | null;
+  actual_duration_hours: number | string | null;
+  root_cause: string | null;
+  preventive_actions: string | null;
+  created_by: string | null;
+  created_at: string | null;
+};
 
 type AssetRow = {
   id: string;
   asset_code: string | null;
-  asset_name: string | null;
+  name: string | null;
   asset_type: string | null;
   location: string | null;
   criticality: string | null;
 };
 
-type HistoryRow = {
-  id: string;
-  work_order_id: string | null;
-  asset_id: string | null;
-  maintenance_type: string | null;
-  performed_by_name: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  parts_replaced: string | null;
+type CostSnapshotRow = {
+  work_order_id: string;
+  closure_sequence: number | string | null;
   parts_cost: number | string | null;
-  labor_hours: number | string | null;
   labor_cost: number | string | null;
-  notes: string | null;
-  created_at: string | null;
-  work_order?: Array<{
-    work_order_number: string | null;
-    title: string | null;
-    status: string | null;
-    priority: string | null;
-    scheduled_date: string | null;
-  }> | null;
+  total_cost: number | string | null;
+  closed_at: string | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -47,123 +57,109 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const searchParams = new URL(request.url).searchParams;
-    const assetId = searchParams.get('assetId');
-    const pageSize = 1000;
+    const searchParams = request.nextUrl.searchParams;
+    const assetId = searchParams.get('assetId')?.trim() || null;
+    const requestedLimit = Number(searchParams.get('limit') || '200');
+    const limit = Number.isFinite(requestedLimit) ? Math.min(1000, Math.max(1, Math.floor(requestedLimit))) : 200;
 
-    let assetQuery = context.supabase
-      .from('maintenance_assets')
-      .select('id, asset_code, asset_name, asset_type, location, status, criticality')
+    let query = context.supabase
+      .from('maintenance_work_orders')
+      .select('id,work_order_number,canonical_asset_id,title,work_type,status,priority,assigned_to_name,scheduled_date,start_date,completion_date,closed_at,actual_duration_hours,root_cause,preventive_actions,created_by,created_at')
       .eq('organization_id', context.organizationId)
-      .order('asset_name', { ascending: true });
+      .in('status', ['completed', 'closed'])
+      .order('closed_at', { ascending: false, nullsFirst: false })
+      .order('completion_date', { ascending: false, nullsFirst: false })
+      .limit(limit);
 
-    if (assetId) {
-      assetQuery = assetQuery.eq('id', assetId);
+    if (assetId) query = query.eq('canonical_asset_id', assetId);
+
+    const { data: workOrders, error: workOrdersError } = await query;
+    if (workOrdersError) throw workOrdersError;
+
+    const rows = (workOrders || []) as WorkOrderRow[];
+    const assetIds = [...new Set(rows.map((row) => row.canonical_asset_id).filter((id): id is string => Boolean(id)))];
+    const workOrderIds = rows.map((row) => row.id);
+
+    const [assetsResult, snapshotsResult] = await Promise.all([
+      assetIds.length
+        ? context.supabase
+            .from('canonical_assets_current')
+            .select('id,asset_code,name,asset_type,location,criticality')
+            .eq('organization_id', context.organizationId)
+            .in('id', assetIds)
+        : Promise.resolve({ data: [], error: null }),
+      workOrderIds.length
+        ? context.supabase
+            .from('work_order_closure_cost_snapshots')
+            .select('work_order_id,closure_sequence,parts_cost,labor_cost,total_cost,closed_at')
+            .eq('organization_id', context.organizationId)
+            .in('work_order_id', workOrderIds)
+            .order('closure_sequence', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (assetsResult.error) throw assetsResult.error;
+    if (snapshotsResult.error) throw snapshotsResult.error;
+
+    const assetById = new Map(((assetsResult.data || []) as AssetRow[]).map((asset) => [asset.id, asset]));
+    const snapshotByWorkOrder = new Map<string, CostSnapshotRow>();
+    for (const snapshot of (snapshotsResult.data || []) as CostSnapshotRow[]) {
+      if (!snapshotByWorkOrder.has(snapshot.work_order_id)) snapshotByWorkOrder.set(snapshot.work_order_id, snapshot);
     }
 
-    const { data: assets, error: assetsError } = await assetQuery;
-    if (assetsError) throw assetsError;
+    const entries = rows.map((row) => {
+      const asset = row.canonical_asset_id ? assetById.get(row.canonical_asset_id) : null;
+      const snapshot = snapshotByWorkOrder.get(row.id) || null;
+      const closedAt = row.closed_at || row.completion_date || snapshot?.closed_at || row.created_at;
+      const notes = [
+        row.root_cause ? `Causa: ${row.root_cause}` : null,
+        row.preventive_actions ? `Prevención: ${row.preventive_actions}` : null,
+      ].filter(Boolean).join(' · ') || null;
 
-    const assetRows = (Array.isArray(assets) ? (assets as AssetRow[]) : []);
-    const assetIds = assetRows.map((asset) => asset.id);
-    if (assetIds.length === 0) {
-      return NextResponse.json({ entries: [], assets: [], summary: { total: 0, assets: 0 } });
-    }
-
-    const historyRows: HistoryRow[] = [];
-    let start = 0;
-
-    while (true) {
-      const end = start + pageSize - 1;
-      const { data: batch, error: historyError } = await context.supabase
-        .from('maintenance_history')
-        .select(`
-          id,
-          work_order_id,
-          asset_id,
-          maintenance_type,
-          performed_by_name,
-          start_time,
-          end_time,
-          parts_replaced,
-          parts_cost,
-          labor_hours,
-          labor_cost,
-          notes,
-          created_at,
-          work_order:maintenance_work_orders(
-            work_order_number,
-            title,
-            status,
-            priority,
-            scheduled_date
-          )
-        `)
-        .in('asset_id', assetIds)
-        .order('created_at', { ascending: false })
-        .range(start, end);
-
-      if (historyError) {
-        // If table doesn't exist, return empty entries instead of error
-        if (historyError.message.includes('Could not find the table') || 
-            historyError.message.includes('does not exist')) {
-          break;
-        }
-        throw historyError;
-      }
-
-      const batchRows = Array.isArray(batch) ? (batch as HistoryRow[]) : [];
-      historyRows.push(...batchRows);
-      if (batchRows.length < pageSize) break;
-      start += pageSize;
-    }
-
-    const assetById = new Map(assetRows.map((asset) => [asset.id, asset]));
-    const entries = historyRows.map((row) => {
-      const asset = row.asset_id ? assetById.get(row.asset_id) : null;
-      const workOrder = Array.isArray(row.work_order) ? row.work_order[0] : null;
       return {
-        id: row.id,
-        workOrderId: row.work_order_id,
-        assetId: row.asset_id,
-        assetName: asset?.asset_name || 'Sin activo',
+        id: `work-order:${row.id}`,
+        workOrderId: row.id,
+        assetId: row.canonical_asset_id,
+        assetName: asset?.name || 'Sin activo canónico',
         assetCode: asset?.asset_code || null,
         assetType: asset?.asset_type || null,
         location: asset?.location || null,
         criticality: asset?.criticality || null,
-        maintenanceType: row.maintenance_type || null,
-        performedByName: row.performed_by_name || null,
-        startTime: row.start_time ? new Date(row.start_time).toISOString() : null,
-        endTime: row.end_time ? new Date(row.end_time).toISOString() : null,
-        partsReplaced: row.parts_replaced || null,
-        partsCost: Number(row.parts_cost || 0),
-        laborHours: Number(row.labor_hours || 0),
-        laborCost: Number(row.labor_cost || 0),
-        notes: row.notes || null,
-        createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
-        createdDate: toDateOnly(row.created_at),
-        workOrder: workOrder
-          ? {
-              workOrderNumber: workOrder.work_order_number || null,
-              title: workOrder.title || null,
-              status: workOrder.status || null,
-              priority: workOrder.priority || null,
-              scheduledDate: toDateOnly(workOrder.scheduled_date),
-            }
-          : null,
+        maintenanceType: row.work_type || null,
+        performedByName: row.assigned_to_name || null,
+        startTime: toIso(row.start_date),
+        endTime: toIso(row.closed_at || row.completion_date),
+        partsReplaced: null,
+        partsCost: Number(snapshot?.parts_cost || 0),
+        laborHours: Number(row.actual_duration_hours || 0),
+        laborCost: Number(snapshot?.labor_cost || 0),
+        notes,
+        createdAt: toIso(closedAt),
+        createdDate: toDateOnly(closedAt),
+        recordScope: row.created_by ? 'operational' : 'historical',
+        source: 'maintenance_work_orders',
+        workOrder: {
+          workOrderNumber: row.work_order_number || null,
+          title: row.title || null,
+          status: row.status || null,
+          priority: row.priority || null,
+          scheduledDate: toDateOnly(row.scheduled_date),
+        },
       };
     });
 
     return NextResponse.json({
       entries,
-      assets: assetRows,
+      assets: [...assetById.values()],
       summary: {
         total: entries.length,
-        assets: assetRows.length,
+        assets: new Set(entries.map((entry) => entry.assetId).filter(Boolean)).size,
       },
+      canonical: true,
+      source: 'maintenance_work_orders',
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cargar la bitacora';
+    const message = error instanceof Error ? error.message : 'No se pudo cargar la bitácora';
     return NextResponse.json({ entries: [], assets: [], summary: { total: 0, assets: 0 }, error: message }, { status: 500 });
   }
 }

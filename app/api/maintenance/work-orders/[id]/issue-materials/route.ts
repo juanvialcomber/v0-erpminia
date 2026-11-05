@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const context = await getOrganizationContext(request);
@@ -10,6 +11,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     const { id } = await params;
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede entregar materiales desde el flujo de la OT.' }, { status: 403 });
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 

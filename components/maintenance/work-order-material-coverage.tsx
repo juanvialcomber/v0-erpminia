@@ -71,6 +71,10 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const status = (data?.data || data || {}) as SupplyStatus;
+  const permissions = data?.permissions || {};
+  const canDefine = Boolean(permissions.canDefine);
+  const canIssue = Boolean(permissions.canIssue);
+  const canSendToPurchasing = Boolean(permissions.canSendToPurchasing);
   const rows = Array.isArray(status.materials) ? status.materials : [];
   const shortageCount = rows.filter((row) => shortage(row) > 0).length;
   const reservedTotal = rows.reduce((sum, row) => sum + reserved(row), 0);
@@ -180,9 +184,10 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
-            {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
-            {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
-            {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
+            {primaryAction.action === 'add' && canDefine ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
+            {primaryAction.action === 'issue' && canIssue ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
+            {primaryAction.action === 'procure' && canSendToPurchasing ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
+            {((primaryAction.action === 'add' && !canDefine) || (primaryAction.action === 'issue' && !canIssue) || (primaryAction.action === 'procure' && !canSendToPurchasing)) ? <Badge variant="outline">Pendiente de jefatura</Badge> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
             {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
           </div>
@@ -197,9 +202,9 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           {[['Requerido', requiredTotal], ['Reservado', reservedTotal], ['Entregado', issuedTotal], ['Faltante', shortageTotal], ['En Compras', procurementTotal]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}
         </div> : null}
 
-        <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div>
+        {canDefine ? <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div> : null}
 
-        {adding ? <div className="rounded-lg border bg-muted/20 p-4">
+        {adding && canDefine ? <div className="rounded-lg border bg-muted/20 p-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">
             <div className="space-y-2"><p className="text-xs font-medium">Buscar producto canónico</p><Input value={query} onChange={(event) => { setQuery(event.target.value); setSelected(null); }} placeholder="Código o nombre, mínimo 2 caracteres" /></div>
             <div className="space-y-2"><p className="text-xs font-medium">Cantidad</p><Input type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>

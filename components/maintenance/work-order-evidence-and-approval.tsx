@@ -171,7 +171,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
             ) : (
               <div className="space-y-3">
                 {legacyFluidDeclarationExemption ? (
-                  <p className="text-sm text-muted-foreground">Cierre anterior al requisito de aceites y fluidos. Ariel puede aprobar esta OT con excepción histórica. El consumo y los residuos no fueron declarados (no equivale a “No”).</p>
+                  <p className="text-sm text-muted-foreground">Cierre anterior al requisito de aceites y fluidos. Ariel o Mauricio pueden aprobar esta OT con excepción histórica. El consumo y los residuos no fueron declarados (no equivale a “No”).</p>
                 ) : (
                   <p className="text-sm text-destructive">Falta la declaración obligatoria del mecánico asignado.</p>
                 )}
@@ -207,7 +207,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">La OT ya fue cerrada. El mecánico asignado debe abrir esta misma OT con su cuenta, confirmar Sí o No y guardar la declaración. Después Ariel podrá aprobarla.</p>
+                  <p className="text-sm text-muted-foreground">La OT ya fue cerrada. El mecánico asignado debe abrir esta misma OT con su cuenta, confirmar Sí o No y guardar la declaración. Después Ariel o Mauricio podrán aprobarla.</p>
                 )}
               </div>
             )}
@@ -231,7 +231,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
               ) : (
                 <>
                   <p className="text-sm font-medium">Pendiente de aprobación</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{legacyFluidDeclarationExemption ? 'Cierre anterior al requisito: Ariel revisa la evidencia disponible y aprueba con una excepción histórica explícita, sin presumir consumo de fluidos.' : 'Ariel López revisa la evidencia, los aceites/fluidos y el residuo declarado por el mecánico antes de aprobar la OT.'}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{legacyFluidDeclarationExemption ? 'Cierre anterior al requisito: Ariel o Mauricio revisan la evidencia disponible y aprueban con una excepción histórica explícita, sin presumir consumo de fluidos.' : 'Ariel López o Mauricio Astudillo revisan la evidencia, los aceites/fluidos y el residuo declarado por el mecánico antes de aprobar la OT.'}</p>
                 </>
               )}
             </div>

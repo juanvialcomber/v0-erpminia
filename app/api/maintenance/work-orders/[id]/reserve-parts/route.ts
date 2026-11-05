@@ -2,7 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
 type PartActionPayload = {
@@ -14,13 +15,13 @@ type PartActionPayload = {
 };
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const { id: workOrderId } = await params;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   try {
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede gestionar repuestos de la OT.' }, { status: 403 });
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, workOrderId);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
@@ -43,13 +44,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const { id: workOrderId } = await params;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   try {
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede gestionar repuestos de la OT.' }, { status: 403 });
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, workOrderId);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
@@ -102,8 +103,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (!access.authorized) return access.response;
   const { id: workOrderId } = await params;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -111,6 +110,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, workOrderId);
     if (scope === 'missing') return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
+    const authority = await getMaintenanceActorAuthority(context);
+    const assigned = await requireAssignedMaintenanceExecution(context, workOrderId);
+    if (!authority.canReadAllWorkOrders && !assigned.ok) return assigned.response;
 
     const [{ data: parts, error: partsError }, { data: movements, error: movementError }, costResult] = await Promise.all([
       context.supabase.from('work_order_parts').select('id, canonical_product_id, warehouse_stock_id, quantity_requested, quantity_reserved, quantity_issued, quantity_installed, quantity_returned, unit_cost, total_cost, status, notes, created_at').eq('organization_id', context.organizationId).eq('work_order_id', workOrderId).order('created_at', { ascending: false }),
@@ -146,7 +148,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         pendingParts: Number(summary?.pending_parts || 0),
         openLaborEntries: Number(summary?.open_labor_entries || 0),
       },
-      canEdit: access.canWrite && scope === 'operational',
+      canEdit: authority.canPlan && scope === 'operational',
       record_scope: scope,
     });
   } catch (error) {

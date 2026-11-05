@@ -91,11 +91,19 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   const [editOpen, setEditOpen] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const saveInFlight = useRef(false);
   const costCenters = data?.costCenters || [];
   const assignees = data?.assignees || [];
   const isHistorical = workOrder?.record_scope === 'historical' || data?.record_scope === 'historical';
-  const canEdit = Boolean(data?.canEdit) && !isHistorical;
+  const permissions = data?.permissions || {};
+  const canPlan = Boolean(permissions.canPlan) && !isHistorical;
+  const canEditOrder = Boolean(permissions.canEditOrder) && !isHistorical;
+  const canAssign = Boolean(permissions.canAssign) && !isHistorical;
+  const canCancel = Boolean(permissions.canCancel) && !isHistorical;
+  const canStart = Boolean(permissions.canStart) && !isHistorical;
+  const canRecordExecution = Boolean(permissions.canRecordExecution) && !isHistorical;
+  const canClose = Boolean(permissions.canClose) && !isHistorical;
   const selectedCostCenter = costCenters.find((row: { id: string }) => row.id === workOrder?.cost_center_id);
   const isExecution = viewer?.mode === 'execution';
 
@@ -211,7 +219,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           description={workOrder.description}
           status={workOrder.status}
           assignedPersonId={workOrder.assigned_person_id}
-          canEdit={canEdit}
+          canEdit={canRecordExecution}
           onWorkOrderChange={mutate}
         />
         <div className="mx-auto w-full max-w-xl space-y-4">
@@ -240,9 +248,9 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
       : !workOrder.cost_center_id
         ? t.financial.pending
         : !isStarted
-          ? t.actions.startWork
+          ? 'Esperar inicio del responsable'
           : !isCompleted
-            ? t.actions.continueClose
+            ? 'Trabajo en ejecución'
             : t.status.completed;
 
     return <div className="mx-auto max-w-5xl space-y-5">
@@ -256,7 +264,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || t.noAsset}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {canEdit && !isCompleted ? <Button type="button" variant="outline" onClick={() => {
+          {canEditOrder && !isCompleted ? <Button type="button" variant="outline" onClick={() => {
             setEditOpen(true);
             requestAnimationFrame(() => document.getElementById('edit-work-order')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
           }}><Pencil className="mr-2 h-4 w-4" />Editar</Button> : null}
@@ -299,7 +307,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
 
       ) : null}
       {saveMessage && (saveState === 'saved' || saveState === 'error') ? <div role="status" aria-live="polite" className={`fixed right-4 top-20 z-50 max-w-sm rounded-lg border px-5 py-4 text-sm font-semibold shadow-xl ${saveState === 'saved' ? 'border-emerald-500/50 bg-background text-foreground' : 'border-destructive/50 bg-background text-destructive'}`}>{saveState === 'saved' ? '✓ Cambios guardados correctamente' : saveMessage}<button type="button" onClick={() => { setSaveMessage(''); setSaveState('idle'); }} aria-label="Cerrar aviso" className="ml-4 text-muted-foreground">×</button></div> : null}
-      {canEdit ? <details id="edit-work-order" open={editOpen} onToggle={(event) => setEditOpen(event.currentTarget.open)} className="scroll-mt-24 rounded-lg border bg-card">
+      {canEditOrder ? <details id="edit-work-order" open={editOpen} onToggle={(event) => setEditOpen(event.currentTarget.open)} className="scroll-mt-24 rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Editar OT</summary>
         <form className="grid gap-4 border-t p-4" onSubmit={(event) => {
           event.preventDefault();
@@ -326,12 +334,21 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <div className="flex flex-wrap items-center gap-3"><Button type="submit" disabled={saveState === 'saving'}>{saveState === 'saving' ? 'Guardando…' : 'Guardar cambios'}</Button></div>
           {saveMessage ? <div role="status" aria-live="polite" className={saveState === 'error' ? 'rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive' : 'rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm font-medium text-foreground'}>{saveState === 'saved' ? '✓ ' : ''}{saveMessage}</div> : null}
         </form>
-        <div className="border-t p-4">
+        {canCancel ? <div className="border-t p-4">
           <details>
             <summary className="cursor-pointer text-sm text-muted-foreground">Anular OT</summary>
-            <div className="mt-3 flex items-center justify-between gap-4 rounded-md border p-3"><p className="text-sm text-muted-foreground">La OT quedará en el historial y no podrá ejecutarse.</p><Button type="button" variant="destructive" onClick={() => void patchOrder({ status: 'cancelled' })}>Confirmar anulación</Button></div>
+            <div className="mt-3 space-y-3 rounded-md border p-3">
+              <p className="text-sm text-muted-foreground">La OT quedará en el historial, el cronómetro activo se cerrará y no podrá volver a ejecutarse.</p>
+              <div className="space-y-2">
+                <Label htmlFor="cancel-reason">Motivo de anulación</Label>
+                <Input id="cancel-reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: trabajo reemplazado, equipo fuera de alcance, OT duplicada" />
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" variant="destructive" disabled={!cancelReason.trim()} onClick={() => void patchOrder({ status: 'cancelled', cancel_reason: cancelReason.trim() })}>Confirmar anulación</Button>
+              </div>
+            </div>
           </details>
-        </div>
+        </div> : null}
       </details> : null}
 
       <Card className="shadow-none">
@@ -339,21 +356,21 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <CardContent className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="assignee">{t.assigneeCard.label}</Label>
-            <select id="assignee" value={workOrder.assigned_person_id || ''} disabled={!canEdit || isCompleted} onChange={(event) => void patchOrder({ assigned_person_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <select id="assignee" value={workOrder.assigned_person_id || ''} disabled={!canAssign || isCompleted} onChange={(event) => void patchOrder({ assigned_person_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
               <option value="">{t.assigneeCard.unassigned}</option>
               {assignees.map((row: { id: string; full_name: string; role_title?: string | null }) => <option key={row.id} value={row.id}>{row.full_name}{row.role_title ? ` · ${row.role_title}` : ''}</option>)}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="cost-center">{t.financial.label}</Label>
-            <select id="cost-center" value={workOrder.cost_center_id || ''} disabled={!canEdit || isCompleted} onChange={(event) => void patchOrder({ cost_center_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <select id="cost-center" value={workOrder.cost_center_id || ''} disabled={!canAssign || isCompleted} onChange={(event) => void patchOrder({ cost_center_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
               <option value="">{t.financial.none}</option>
               {costCenters.map((row: { id: string; code: string; name: string }) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}
             </select>
           </div>
           <div className="lg:col-span-2 flex flex-wrap gap-2">
-            {!isStarted ? <Button onClick={() => void patchOrder({ status: 'in_progress' })} disabled={!canEdit || !preparationReady}><PlayCircle className="mr-2 h-4 w-4" />{t.actions.startWork}</Button> : null}
-            {workOrder.status === 'in_progress' ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}
+            {!isStarted && preparationReady ? <p className="text-sm text-muted-foreground">Lista para ejecutar · el responsable asignado inicia el trabajo.</p> : null}
+            {canClose ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}
           </div>
         </CardContent>
       </Card>
@@ -453,7 +470,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   return <div className="space-y-6">
     <section className="flex flex-col gap-4 border-b border-border/70 pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm text-muted-foreground">{formatWorkOrderNumber(workOrder.work_order_number, locale)}</span><Badge variant="outline">{statusLabel(workOrder.status, t)}</Badge>{isHistorical ? <Badge variant="secondary">{t.historicalBadge}</Badge> : <Badge variant="outline">{t.operationalBadge}</Badge>}</div><h1 className="mt-2 text-3xl font-semibold tracking-tight">{workOrder.title || t.untitled}</h1><p className="mt-2 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || t.noAsset}</p></div>
-      {!isHistorical ? <div className="flex gap-2">{workOrder.status !== 'in_progress' && workOrder.status !== 'completed' ? <Button onClick={() => void patchOrder({ status: 'in_progress' })} disabled={!canEdit || !workOrder.assigned_person_id}><PlayCircle className="mr-2 h-4 w-4" />{t.actions.startWork}</Button> : null}{workOrder.status === 'in_progress' ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label={t.actions.moreActions}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem disabled={!canEdit} onClick={() => void patchOrder({ status: 'open' })}><RotateCcw className="mr-2 h-4 w-4" />{t.actions.reopen}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div> : null}
+      {!isHistorical ? <div className="flex gap-2">{canStart ? <Button onClick={() => void patchOrder({ status: 'in_progress' })}><PlayCircle className="mr-2 h-4 w-4" />{t.actions.startWork}</Button> : null}{canClose ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label={t.actions.moreActions}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem disabled><RotateCcw className="mr-2 h-4 w-4" />Cambios de estado protegidos</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div> : null}
     </section>
 
     {isHistorical ? <Card className="border-muted-foreground/20 bg-muted/20 shadow-none"><CardContent className="flex items-start gap-3 p-4"><History className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">{t.historicalCard.title}</p><p className="mt-1 text-sm text-muted-foreground">{t.historicalCard.description}</p></div></CardContent></Card> : null}
@@ -467,9 +484,9 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
 
     {!isHistorical ? <WorkOrderExecutionReadiness workOrderId={id} assignedToName={workOrder.assigned_to_name} status={workOrder.status} /> : null}
 
-    {!isHistorical ? <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.assigneeCard.title}</CardTitle></CardHeader><CardContent><div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end"><div className="space-y-2"><Label htmlFor="assignee">{t.assigneeCard.label}</Label><select id="assignee" value={workOrder.assigned_person_id || ''} disabled={!canEdit || workOrder.status === 'completed'} onChange={(event) => void patchOrder({ assigned_person_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="">{t.assigneeCard.unassigned}</option>{assignees.map((row: { id: string; full_name: string; role_title?: string | null }) => <option key={row.id} value={row.id}>{row.full_name}{row.role_title ? ` · ${row.role_title}` : ''}</option>)}</select></div><div className="pb-2 text-sm"><span className={workOrder.assigned_person_id ? 'text-foreground' : 'text-destructive'}>{workOrder.assigned_person_id ? t.assigneeCard.ready : t.assigneeCard.pending}</span></div></div></CardContent></Card> : null}
+    {!isHistorical ? <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.assigneeCard.title}</CardTitle></CardHeader><CardContent><div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end"><div className="space-y-2"><Label htmlFor="assignee">{t.assigneeCard.label}</Label><select id="assignee" value={workOrder.assigned_person_id || ''} disabled={!canAssign || workOrder.status === 'completed'} onChange={(event) => void patchOrder({ assigned_person_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="">{t.assigneeCard.unassigned}</option>{assignees.map((row: { id: string; full_name: string; role_title?: string | null }) => <option key={row.id} value={row.id}>{row.full_name}{row.role_title ? ` · ${row.role_title}` : ''}</option>)}</select></div><div className="pb-2 text-sm"><span className={workOrder.assigned_person_id ? 'text-foreground' : 'text-destructive'}>{workOrder.assigned_person_id ? t.assigneeCard.ready : t.assigneeCard.pending}</span></div></div></CardContent></Card> : null}
 
-    {!isHistorical ? <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.financial.title}</CardTitle></CardHeader><CardContent><div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end"><div className="space-y-2"><Label htmlFor="cost-center">{t.financial.label}</Label><select id="cost-center" value={workOrder.cost_center_id || ''} disabled={!canEdit} onChange={(event) => void patchOrder({ cost_center_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="">{t.financial.none}</option>{costCenters.map((row: { id: string; code: string; name: string }) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></div><div className="pb-2 text-sm"><span className={workOrder.cost_center_id ? 'text-foreground' : 'text-destructive'}>{workOrder.cost_center_id ? fill(t.financial.readyTemplate, { code: selectedCostCenter?.code || t.financial.readyDefault }) : t.financial.pending}</span></div></div></CardContent></Card> : null}
+    {!isHistorical ? <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.financial.title}</CardTitle></CardHeader><CardContent><div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end"><div className="space-y-2"><Label htmlFor="cost-center">{t.financial.label}</Label><select id="cost-center" value={workOrder.cost_center_id || ''} disabled={!canPlan} onChange={(event) => void patchOrder({ cost_center_id: event.target.value || null })} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="">{t.financial.none}</option>{costCenters.map((row: { id: string; code: string; name: string }) => <option key={row.id} value={row.id}>{row.code} · {row.name}</option>)}</select></div><div className="pb-2 text-sm"><span className={workOrder.cost_center_id ? 'text-foreground' : 'text-destructive'}>{workOrder.cost_center_id ? fill(t.financial.readyTemplate, { code: selectedCostCenter?.code || t.financial.readyDefault }) : t.financial.pending}</span></div></div></CardContent></Card> : null}
 
     <Card className="shadow-none"><CardHeader><CardTitle className="text-base">{t.intervention.title}</CardTitle></CardHeader><CardContent className={isHistorical ? '' : 'grid gap-5 lg:grid-cols-[1fr_320px]'}><div><p className="text-sm leading-6">{workOrder.description || t.intervention.noDescription}</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">{t.intervention.rootCause}</p><p className="mt-1 text-sm font-medium">{workOrder.root_cause || (isHistorical ? t.intervention.noEvidence : t.intervention.pendingClose)}</p></div><div><p className="text-xs text-muted-foreground">{t.intervention.preventiveAction}</p><p className="mt-1 text-sm font-medium">{workOrder.preventive_actions || (isHistorical ? t.intervention.noEvidence : t.intervention.pendingClose)}</p></div></div></div>{!isHistorical ? <WorkOrderTimer workOrderId={id} /> : null}</CardContent></Card>
 

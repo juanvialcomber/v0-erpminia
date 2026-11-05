@@ -44,8 +44,10 @@ test('maintenance execution reads the final cost source', () => {
   assert.match(executionRoute, /external_cost: cost\.effective_external_cost/);
 });
 
-test('final cost endpoint is tenant scoped', () => {
-  assert.match(finalCostRoute, /requireModuleAccess/);
+test('final cost endpoint is tenant scoped and respects OT functional read authority', () => {
+  assert.match(finalCostRoute, /getMaintenanceActorAuthority/);
+  assert.match(finalCostRoute, /requireAssignedMaintenanceExecution/);
+  assert.match(finalCostRoute, /!authority\.canReadAllWorkOrders && !assigned\.ok/);
   assert.match(finalCostRoute, /eq\('organization_id', context\.organizationId\)/);
   assert.match(finalCostRoute, /work_order_final_cost_v1/);
   assert.match(finalCostRoute, /work_order_closure_cost_snapshots/);

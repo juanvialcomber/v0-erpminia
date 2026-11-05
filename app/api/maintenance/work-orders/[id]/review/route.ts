@@ -2,9 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 
 // First production READY deployment enforcing the mechanic's fluid declaration.
  // This is a one-time historical cutoff, not an exemption for new OT closures.
@@ -22,24 +22,11 @@ function isLegacyFluidDeclarationExempt(
   return Number.isFinite(closedAt) && closedAt < FLUID_DECLARATION_REQUIRED_FROM;
 }
 
-async function getReviewerPerson(context: Awaited<ReturnType<typeof getOrganizationContext>>) {
-  if (!context.ok) return null;
-  const { data, error } = await context.supabase
-    .from('people')
-    .select('id,full_name')
-    .eq('organization_id', context.organizationId)
-    .eq('profile_id', context.userId)
-    .eq('employment_status', 'active')
-    .maybeSingle();
-  if (error || !data) return null;
-  return String(data.full_name || '') === 'Ariel López' ? data : null;
-}
-
 async function authorizeRead(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
-  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (accessLevel === 'ED') return context;
+  const authority = await getMaintenanceActorAuthority(context);
+  if (authority.canReadAllWorkOrders) return context;
   const assigned = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (!assigned.ok) return { ok: false as const, response: assigned.response };
   return context;
@@ -103,7 +90,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const hasValidFluidDeclaration = Boolean(fluidDeclaration && (fluidDeclaration.payload as any)?.declared_by_assigned_executor === true);
   const legacyFluidDeclarationExemption = isLegacyFluidDeclarationExempt(workOrder, fluidDeclaration, (fluidUsage || []).length);
-  const reviewer = await getReviewerPerson(context);
+  const authority = await getMaintenanceActorAuthority(context);
   return NextResponse.json({
     approvedInstallations: approvedInstallations || [],
     materialRequirementsCount: materialRequirementsCount || 0,
@@ -116,7 +103,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       reviewed_by_name: null,
       reviewed_at: null,
     },
-    canApprove: Boolean(reviewer)
+    canApprove: authority.canApprove
       && (hasValidFluidDeclaration || legacyFluidDeclarationExemption)
       && String(workOrder.status || '') === 'completed'
       && review?.status !== 'approved',
@@ -131,9 +118,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
   if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
-  const reviewer = await getReviewerPerson(context);
-  if (!reviewer) {
-    return NextResponse.json({ error: 'Ariel López debe revisar y aprobar la OT.' }, { status: 403 });
+  const authority = await getMaintenanceActorAuthority(context);
+  if (!authority.canApprove) {
+    return NextResponse.json({ error: 'Solo Ariel López o Mauricio Astudillo pueden revisar y aprobar la OT.' }, { status: 403 });
   }
 
   const { data: workOrder, error: workOrderError } = await context.supabase
@@ -173,7 +160,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (!legacyFluidDeclarationExemption && (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true)) {
     return NextResponse.json(
-      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
+      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel o Mauricio aprueben la OT.' },
       { status: 409 },
     );
   }

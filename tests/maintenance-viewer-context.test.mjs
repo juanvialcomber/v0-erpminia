@@ -8,8 +8,10 @@ const viewerMode = await fs.readFile('lib/maintenance/viewer-mode.ts', 'utf8');
 test('maintenance viewer context preserves canonical cargo and promotes assigned work to execution mode', () => {
   assert.match(route, /const baseMode = resolveMaintenanceViewerMode\(cargoName\)/);
   assert.match(route, /hasAssignedOperationalWork/);
-  assert.match(route, /hasAssignedOperationalWork \? 'execution' : baseMode/);
-  assert.match(route, /canEdit: accessLevel === 'ED' \|\| hasAssignedOperationalWork/);
+  assert.match(route, /hasAssignedOperationalWork && !authority\.canPlan \? 'execution' : baseMode/);
+  assert.match(route, /canEdit: authority\.canPlan \|\| hasAssignedOperationalWork/);
+  assert.match(route, /permissions: \{/);
+  assert.match(route, /canPlan: authority\.canPlan/);
   assert.doesNotMatch(route, /cargoName: mode === 'general' \? null : cargoName/);
 });
 
@@ -21,7 +23,7 @@ test('maintenance role routing stays explicit for every canonical maintenance ca
   assert.match(viewerMode, /jefe sostenibilidad/);
   assert.match(viewerMode, /return 'oversight'/);
   assert.match(viewerMode, /cargo\.startsWith\('mecánico'\)/);
-  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)/);
+  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)\) return 'planning'/);
   assert.match(viewerMode, /encargado de camionetas y camiones/);
   assert.match(viewerMode, /cargo === 'soldador'/);
 });

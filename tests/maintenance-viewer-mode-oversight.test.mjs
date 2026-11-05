@@ -9,12 +9,14 @@ test('cross-functional maintenance viewers resolve to oversight without inventin
   assert.match(viewerMode, /cargo === 'gerente operaciones' \|\| cargo === 'jefe sostenibilidad'\) return 'oversight'/);
   assert.match(viewerMode, /cargo === 'jefe de planificación'\) return 'planning'/);
   assert.match(viewerMode, /cargo === 'jefe departamento de mantenimiento'\) return 'leadership'/);
+  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)\) return 'planning'/);
   assert.match(viewerMode, /cargo\.startsWith\('mecánico'\)/);
 });
 
 test('viewer context preserves canonical cargo name and assigned execution capability', () => {
   assert.match(viewerContext, /cargoName,/);
   assert.match(viewerContext, /hasAssignedOperationalWork/);
-  assert.match(viewerContext, /canEdit: accessLevel === 'ED' \|\| hasAssignedOperationalWork/);
+  assert.match(viewerContext, /canEdit: authority\.canPlan \|\| hasAssignedOperationalWork/);
+  assert.match(viewerContext, /canPlan: authority\.canPlan/);
   assert.doesNotMatch(viewerContext, /mode === 'general' \? null : cargoName/);
 });

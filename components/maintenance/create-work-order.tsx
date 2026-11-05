@@ -153,6 +153,8 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
   const [meterUnit, setMeterUnit] = useState('hours');
   const [detectedAt, setDetectedAt] = useState(emergencyMode ? localDateTimeNow() : '');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingCreatedWorkOrderId, setPendingCreatedWorkOrderId] = useState<string | null>(null);
+  const [creationWarnings, setCreationWarnings] = useState<Array<{ step: string; message: string }>>([]);
   const submittingRef = useRef(false);
   const adminInteractionStartedAtRef = useRef<number | null>(null);
 
@@ -314,6 +316,15 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || t.createError);
+      const warnings = Array.isArray(payload?.creationWarnings) ? payload.creationWarnings : [];
+      if (payload?.creationComplete === false && warnings.length > 0) {
+        setPendingCreatedWorkOrderId(String(payload.data.id));
+        setCreationWarnings(warnings);
+        toast.warning('La OT quedó creada, pero faltan pasos por completar. Reintenta para completar la misma OT.');
+        return;
+      }
+      setPendingCreatedWorkOrderId(null);
+      setCreationWarnings([]);
       clearRequestId();
       toast.success(emergencyMode ? 'OTe registrada' : (reviewId ? t.toastLinked : t.toastCreated));
       router.push(`/dashboard/mantenimiento/ordenes-trabajo/${payload.data.id}`);
@@ -357,6 +368,21 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
       ) : null}
 
       {reviewError ? <StatePanel tone="error" title={t.loadReviewError} description={reviewError.message} className="min-h-0 py-5" /> : null}
+
+      {pendingCreatedWorkOrderId ? (
+        <StatePanel
+          tone="warning"
+          title="OT creada · faltan pasos por completar"
+          description={creationWarnings.map((warning) => warning.message).join(' · ') || 'Reintenta para completar la misma OT sin duplicarla.'}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void submit()} disabled={submitting}>Reintentar completar OT</Button>
+              <Button asChild variant="outline"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${pendingCreatedWorkOrderId}`}>Ver OT creada</Link></Button>
+            </div>
+          }
+          className="min-h-0 py-5"
+        />
+      ) : null}
 
       {reviewId && !reviewError ? (
         <Card className="shadow-none">
@@ -606,7 +632,7 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
           <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">{t.cancel}</Link></Button>
           <Button onClick={submit} disabled={submitting || isLoading || (!emergencySelfAssignOnly && assigneesLoading) || Boolean(error) || (!emergencySelfAssignOnly && Boolean(assigneeError)) || reviewLoading || Boolean(reviewError) || Boolean(review?.linked_work_order_id)}>
             {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            {submitting ? t.creating : emergencyMode ? 'Registrar OTe' : reviewId ? t.createAndResolve : t.create}
+            {submitting ? t.creating : pendingCreatedWorkOrderId ? 'Reintentar completar OT' : emergencyMode ? 'Registrar OTe' : reviewId ? t.createAndResolve : t.create}
           </Button>
         </div>
       </div>

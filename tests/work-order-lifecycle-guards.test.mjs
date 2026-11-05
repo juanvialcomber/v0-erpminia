@@ -25,7 +25,7 @@ test('work timer refuses play or resume without canonical assignee', async () =>
   assert.match(sql, /p_action in \('play', 'resume'\)[\s\S]*\('completed', 'closed', 'cancelled', 'canceled'\)/i);
 });
 
-test('timer mutation accepts module writers or the canonical assigned executor', async () => {
+test('timer mutation is reserved to the canonical assigned executor', async () => {
   const route = await readFile(timerRouteUrl, 'utf8');
 
   const postStart = route.indexOf('export async function POST');
@@ -33,27 +33,32 @@ test('timer mutation accepts module writers or the canonical assigned executor',
   const postSection = route.slice(postStart, getStart);
   const getSection = route.slice(getStart);
 
-  assert.match(postSection, /getModuleAccessLevel/);
   assert.match(postSection, /requireAssignedMaintenanceExecution/);
-  assert.match(postSection, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(postSection, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(postSection, /accessLevel\s*[!=]==?\s*['"]ED['"]/);
+  assert.match(getSection, /getMaintenanceActorAuthority/);
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
-test('legacy close endpoint reserves close to assigned executor and delegates terminal transition to canonical RPC', async () => {
+test('close endpoint reserves close to assigned executor and delegates the atomic transition to the timer-aware RPC', async () => {
   const route = await readFile(closeRouteUrl, 'utf8');
+  const atomic = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
 
   assert.match(route, /requireAssignedMaintenanceExecution/);
   assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(route, /accessLevel !== 'ED'/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /rpc\('close_work_order_with_timer_v3'/);
+  assert.match(atomic, /perform public\.close_work_order_safely\(p_work_order_id\)/);
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
 
-test('generic work-order completion already delegates to canonical RPC', async () => {
+test('generic work-order completion delegates to the same atomic close v3 path', async () => {
   const route = await readFile(workOrderRouteUrl, 'utf8');
 
   assert.match(route, /if \(body\.status === 'completed'\)/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.match(route, /rpc\('close_work_order_with_timer_v3'/);
+  assert.doesNotMatch(route, /rpc\('close_work_order_safely'/);
 });
 
 
@@ -76,4 +81,60 @@ test('planner work-order detail exposes a one-click edit action', async () => {
   assert.match(detail, /id="edit-work-order"/);
   assert.match(detail, /setEditOpen\(true\)/);
   assert.match(detail, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+});
+
+
+test('OT cancellation is timer-safe, reasoned and atomic', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../supabase/migrations/20261105223000_safe_ot_cancellation_v1.sql', import.meta.url), 'utf8');
+
+  assert.match(route, /body\.status === 'cancelled' \|\| body\.status === 'canceled'/);
+  assert.match(route, /cancel_work_order_safely_v1/);
+  assert.match(route, /cancel_reason/);
+  assert.match(detail, /Motivo de anulación/);
+  assert.match(detail, /cancel_reason: cancelReason\.trim\(\)/);
+  assert.match(migration, /coalesce\(v_wo\.timer_status, 'idle'\) in \('running', 'paused'\)/);
+  assert.match(migration, /perform public\.update_work_order_timer\(/);
+  assert.match(migration, /set status = 'cancelled'/);
+  assert.match(migration, /'work_order_cancelled'/);
+  assert.match(migration, /'reason', v_reason/);
+});
+
+
+test('every material OT edit is atomically auditable with previous and next values', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const migration = await readFile(new URL('../supabase/migrations/20261105231500_atomic_ot_edit_audit_v1.sql', import.meta.url), 'utf8');
+  assert.match(route, /rpc\('update_work_order_with_audit_v1'/);
+  assert.match(route, /p_actor_name: context\.userName \|\| context\.userEmail \|\| null/);
+  assert.match(route, /p_changes: updateData/);
+  assert.match(migration, /assigned_person_id','assigned_to_name','cost_center_id/);
+  assert.match(migration, /actual_duration_hours','root_cause','preventive_actions','meter_reading','meter_unit/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /'previous', v_previous->v_key/);
+  assert.match(migration, /'next', to_jsonb\(v_after\)->v_key/);
+  assert.match(migration, /'changed_fields', v_changed_fields/);
+  assert.match(migration, /'changes', v_change_details/);
+});
+
+
+test('active OT cannot regress from in_progress to open while execution may still be timed', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+
+  assert.match(route, /allowedStatuses = new Set\(\['open', 'in_progress', 'completed', 'cancelled', 'canceled'\]\)/);
+  assert.match(route, /currentStatus === 'in_progress' && requestedStatus === 'open'/);
+  assert.match(route, /Pausa el trabajo o anula la OT con un motivo/);
+  assert.doesNotMatch(detail, /patchOrder\(\{ status: 'open' \}\)/);
+  assert.match(detail, /Cambios de estado protegidos/);
+});
+
+
+test('operational OT cannot be hard-deleted and must be cancelled with reason', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const deleteStart = route.indexOf('export async function DELETE');
+  const deleteSection = route.slice(deleteStart);
+  assert.match(deleteSection, /Las OT operativas no se eliminan/);
+  assert.match(deleteSection, /required_action: 'cancel'/);
+  assert.doesNotMatch(deleteSection, /\.from\('maintenance_work_orders'\)\.delete\(/);
 });

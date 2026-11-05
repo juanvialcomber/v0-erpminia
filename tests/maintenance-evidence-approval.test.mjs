@@ -15,10 +15,10 @@ test('completed OT shows a durable evidence list', () => {
   assert.doesNotMatch(component, /evidence_tag/);
 });
 
-test('approval is explicitly limited to Ariel in the application route', () => {
+test('approval is explicitly limited to Ariel and Mauricio in the application route', () => {
   assert.match(reviewRoute, /Ariel López/);
-  assert.doesNotMatch(reviewRoute, /Mauricio Astudillo/);
-  assert.match(reviewRoute, /Ariel López debe revisar y aprobar la OT/);
+  assert.match(reviewRoute, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /Solo Ariel López o Mauricio Astudillo pueden revisar y aprobar la OT/);
   assert.match(reviewRoute, /approve_work_order_with_material_confirmation_v1/);
   assert.match(reviewRoute, /p_confirm_materials_installed/);
 });

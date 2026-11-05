@@ -97,6 +97,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
   const movements = Array.isArray(data?.movements) ? (data.movements as MovementRow[]) : [];
   const totals = data?.totals || {};
   const costs = (data?.costSummary || {}) as CostSummary;
+  const canEdit = Boolean(data?.canEdit);
 
   const filteredStock = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -195,7 +196,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Registros de trabajo abiertos</p><p className="mt-1 font-medium">{Number(costs.openLaborEntries || 0)}</p></div>
         </div>
 
-        <section className="space-y-4 rounded-lg border p-4">
+        {canEdit ? <section className="space-y-4 rounded-lg border p-4">
           <div><h3 className="font-medium">Entregar desde bodega</h3><p className="mt-1 text-sm text-muted-foreground">La entrega descuenta existencias y queda vinculada a esta orden.</p></div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2"><Label htmlFor={`part-search-${workOrderId}`}>Buscar repuesto</Label><Input id={`part-search-${workOrderId}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Código, nombre o ubicación" /></div>
@@ -208,7 +209,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
             })}
           </div>
           <div className="flex flex-wrap items-center gap-3"><Button onClick={deliver} disabled={submitting || !selectedPartId}>{submitting ? 'Entregando…' : 'Entregar a la orden'}</Button><Button variant="outline" onClick={() => void refreshAll()}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>{selectedPart ? <span className="text-sm text-muted-foreground">{selectedPart.part_name}</span> : null}</div>
-        </section>
+        </section> : null}
 
         {errorMessage ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{errorMessage}</div> : null}
 
@@ -221,7 +222,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
             const pending = Math.max(0, issued - installed - returned);
             const name = part.part?.part_name || part.part?.name || 'Repuesto';
             const code = part.part?.part_code || part.part?.product_code || 'Sin código';
-            return <div key={part.id} className="rounded-lg border p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{name}</p><Badge variant="outline">{code}</Badge>{pending === 0 ? <Badge variant="secondary">Confirmado</Badge> : <Badge variant="outline">{pending} pendiente{pending === 1 ? '' : 's'}</Badge>}</div><p className="mt-2 text-sm text-muted-foreground">Entregado: {issued} · Instalado: {installed} · Devuelto: {returned}</p><p className="mt-1 text-sm">Costo utilizado: {money(installed * Number(part.unit_cost || 0))}</p></div>{pending > 0 ? <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void updatePart(part, 'install')} disabled={workingId !== null}><CheckCircle2 className="mr-2 h-4 w-4" />{workingId === `install-${part.id}` ? 'Confirmando…' : 'Confirmar instalación'}</Button><Button size="sm" variant="outline" onClick={() => void updatePart(part, 'return')} disabled={workingId !== null}><RotateCcw className="mr-2 h-4 w-4" />{workingId === `return-${part.id}` ? 'Devolviendo…' : 'Devolver a bodega'}</Button></div> : null}</div></div>;
+            return <div key={part.id} className="rounded-lg border p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{name}</p><Badge variant="outline">{code}</Badge>{pending === 0 ? <Badge variant="secondary">Confirmado</Badge> : <Badge variant="outline">{pending} pendiente{pending === 1 ? '' : 's'}</Badge>}</div><p className="mt-2 text-sm text-muted-foreground">Entregado: {issued} · Instalado: {installed} · Devuelto: {returned}</p><p className="mt-1 text-sm">Costo utilizado: {money(installed * Number(part.unit_cost || 0))}</p></div>{pending > 0 && canEdit ? <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => void updatePart(part, 'install')} disabled={workingId !== null}><CheckCircle2 className="mr-2 h-4 w-4" />{workingId === `install-${part.id}` ? 'Confirmando…' : 'Confirmar instalación'}</Button><Button size="sm" variant="outline" onClick={() => void updatePart(part, 'return')} disabled={workingId !== null}><RotateCcw className="mr-2 h-4 w-4" />{workingId === `return-${part.id}` ? 'Devolviendo…' : 'Devolver a bodega'}</Button></div> : null}</div></div>;
           })}
         </section>
 

@@ -8,6 +8,7 @@ import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-orde
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
 import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
+import { getMaintenanceActorAuthority, getWorkOrderPermissions } from '@/lib/maintenance/work-order-authority';
 
 type WorkOrderPatchPayload = {
   status?: string;
@@ -23,6 +24,7 @@ type WorkOrderPatchPayload = {
   meter_reading?: number | string | null;
   meter_unit?: string | null;
   cost_center_id?: string | null;
+  cancel_reason?: string | null;
 };
 
 function progressFromStatus(status: string | null) {
@@ -137,12 +139,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (error) throw error;
     if (!data || isExplicitDemoRecord(data)) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
     const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
     const canExecuteAssigned = assignedExecution.ok && Boolean(data.created_by);
+    const authority = await getMaintenanceActorAuthority(context);
+    const permissions = getWorkOrderPermissions(authority, data);
 
-    if (!canReadModule && !canExecuteAssigned) {
+    if (!authority.canReadAllWorkOrders && !canExecuteAssigned) {
       return assignedExecution.ok
         ? NextResponse.json({ error: 'No tienes acceso a esta orden de trabajo' }, { status: 403 })
         : assignedExecution.response;
@@ -153,7 +155,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       loadCostSummary(context, id),
       loadCloseReadiness(context, id),
     ]);
-    const [costCenters, assignees] = canReadModule
+    const [costCenters, assignees] = permissions.canPlan
       ? await Promise.all([loadCostCenters(context), loadAssignees(context)])
       : [[], []];
     const recordScope = data.created_by ? 'operational' : 'historical';
@@ -162,8 +164,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       costCenters,
       assignees,
       closeReadiness,
-      canEdit: recordScope === 'operational' && (accessLevel === 'ED' || canExecuteAssigned),
-      assignedExecution: canExecuteAssigned,
+      canEdit: recordScope === 'operational' && (permissions.canEditOrder || permissions.canRecordExecution),
+      permissions,
+      assignedExecution: permissions.isAssignedExecutor,
       record_scope: recordScope,
       canonical: true,
     });
@@ -178,18 +181,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!context.ok) return context.response;
   const { id } = await params;
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const hasModuleWrite = accessLevel === 'ED';
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
+    const authority = await getMaintenanceActorAuthority(context);
+    const hasPlanningAuthority = authority.canPlan;
     const executionAccess = await requireAssignedMaintenanceExecution(context, id);
-    if (!hasModuleWrite && !executionAccess.ok) return executionAccess.response;
+    if (!hasPlanningAuthority && !executionAccess.ok) return executionAccess.response;
 
     const body = (await request.json()) as WorkOrderPatchPayload;
     const { data: currentOrderState, error: currentOrderStateError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('status,work_type,priority')
+      .select('status,title,description,work_type,priority,scheduled_date,assigned_person_id,assigned_to_name,cost_center_id,actual_duration_hours,root_cause,preventive_actions,meter_reading,meter_unit')
       .eq('id', id)
       .eq('organization_id', context.organizationId)
       .single();
@@ -199,6 +202,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (['completed', 'closed', 'cancelled', 'canceled'].includes(currentStatus)) {
       return NextResponse.json({ error: 'La OT ya está cerrada o anulada y no se puede modificar.' }, { status: 409 });
     }
+    if (body.status !== undefined) {
+      const requestedStatus = String(body.status || '').toLowerCase();
+      const allowedStatuses = new Set(['open', 'in_progress', 'completed', 'cancelled', 'canceled']);
+      if (!allowedStatuses.has(requestedStatus)) {
+        return NextResponse.json({ error: 'Estado de OT no válido.' }, { status: 400 });
+      }
+      if (currentStatus === 'in_progress' && requestedStatus === 'open') {
+        return NextResponse.json(
+          { error: 'Una OT en ejecución no puede volver a abierta. Pausa el trabajo o anula la OT con un motivo.' },
+          { status: 409 },
+        );
+      }
+    }
     if (currentWorkType === 'emergency') {
       if (body.work_type !== undefined && String(body.work_type || '').toLowerCase() !== 'emergency') {
         return NextResponse.json({ error: 'Una OTe no puede convertirse en una OT normal.' }, { status: 409 });
@@ -207,7 +223,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Una OTe conserva prioridad crítica.' }, { status: 409 });
       }
     }
-    if (currentStatus === 'in_progress' && hasModuleWrite) {
+    if (currentStatus === 'in_progress' && hasPlanningAuthority) {
       const structuralFields = ['work_type', 'priority', 'scheduled_date', 'assigned_person_id', 'cost_center_id']
         .filter((key) => (body as Record<string, unknown>)[key] !== undefined);
       if (structuralFields.length > 0) {
@@ -215,7 +231,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     const workshopScope = await resolveWorkshopHeadScope(context);
-    if (!hasModuleWrite) {
+    if (!hasPlanningAuthority) {
       const mutationKeys = Object.entries(body)
         .filter(([, value]) => value !== undefined)
         .map(([key]) => key);
@@ -250,63 +266,91 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }, { status: 409 });
       }
     }
-    if (body.status === 'completed') {
-      const { count: evidenceCount, error: evidenceError } = await context.supabase
-        .from('work_order_evidence_files')
-        .select('id', { head: true, count: 'exact' })
-        .eq('organization_id', context.organizationId)
-        .eq('work_order_id', id)
-        .eq('evidence_type', 'photo');
-      if (evidenceError) throw evidenceError;
-      if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
-
-      const { data: completionOrder, error: completionOrderError } = await context.supabase
+    if (body.status === 'cancelled' || body.status === 'canceled') {
+      if (!hasPlanningAuthority) {
+        return NextResponse.json({ error: 'Solo un usuario autorizado de mantenimiento puede anular una OT.' }, { status: 403 });
+      }
+      const cancelReason = String(body.cancel_reason || '').trim();
+      if (!cancelReason) {
+        return NextResponse.json({ error: 'Indica el motivo de anulación de la OT.' }, { status: 400 });
+      }
+      const { error: cancelError } = await context.supabase.rpc('cancel_work_order_safely_v1', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+        p_actor_id: context.userId,
+        p_actor_name: context.userName || context.userEmail || null,
+        p_reason: cancelReason,
+      });
+      if (cancelError) {
+        const status = cancelError.code === '22023' ? 400
+          : cancelError.code === '55000' ? 409
+            : cancelError.code === 'P0002' ? 404
+              : 500;
+        return NextResponse.json({ error: cancelError.message || 'No se pudo anular la orden de trabajo' }, { status });
+      }
+      const { data: cancelled, error: loadCancelledError } = await context.supabase
         .from('maintenance_work_orders')
-        .select('work_type')
+        .select('*')
         .eq('id', id)
         .eq('organization_id', context.organizationId)
         .single();
-      if (completionOrderError) throw completionOrderError;
-      const isGeneralWork = String(completionOrder?.work_type || '').toLowerCase() === 'general';
-      const rootCause = String(body.root_cause || '').trim();
-      const preventiveActions = String(body.preventive_actions || '').trim();
-      const actualHours = Number(body.actual_duration_hours);
-      if (!isGeneralWork && !rootCause) return NextResponse.json({ error: 'Registra la causa principal antes de completar la orden.' }, { status: 400 });
-      if (!isGeneralWork && !preventiveActions) return NextResponse.json({ error: 'Registra la acción preventiva antes de completar la orden.' }, { status: 400 });
-      if (!Number.isFinite(actualHours) || actualHours <= 0) return NextResponse.json({ error: 'Registra las horas reales utilizadas antes de completar la orden.' }, { status: 400 });
-      const costSummary = await loadCostSummary(context, id);
-      const blockers: string[] = [];
-      if (costSummary.pendingParts > 0) blockers.push(`${costSummary.pendingParts} repuesto${costSummary.pendingParts === 1 ? '' : 's'} pendiente${costSummary.pendingParts === 1 ? '' : 's'} de instalar o devolver`);
-      if (costSummary.openLaborEntries > 0) blockers.push(`${costSummary.openLaborEntries} registro${costSummary.openLaborEntries === 1 ? '' : 's'} de trabajo aún abierto${costSummary.openLaborEntries === 1 ? '' : 's'}`);
-      if (blockers.length > 0) return NextResponse.json({ error: `No se puede completar la orden: ${blockers.join(' y ')}.`, blockers, costSummary }, { status: 409 });
-      const closureData: Record<string, unknown> = { actual_duration_hours: actualHours, updated_at: new Date().toISOString() };
-      if (!isGeneralWork) {
-        closureData.root_cause = rootCause;
-        closureData.preventive_actions = preventiveActions;
+      if (loadCancelledError) throw loadCancelledError;
+      const [asset, costSummary] = await Promise.all([
+        loadCanonicalAsset(context, cancelled.canonical_asset_id || null),
+        loadCostSummary(context, id),
+      ]);
+      return NextResponse.json({ data: mapWorkOrder(cancelled, asset, costSummary) });
+    }
+
+    if (body.status === 'completed') {
+      // Every OT closure must use the same assigned-executor, timer, fluid and evidence transaction.
+      // Do not maintain a second completion path with weaker rules.
+      if (!executionAccess.ok) return executionAccess.response;
+
+      const normalizedHours = Number(body.actual_duration_hours);
+      const requestedHours = Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : null;
+      const { error: closeError } = await context.supabase.rpc('close_work_order_with_timer_v3', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+        p_actor_id: context.userId,
+        p_actor_name: context.userName || context.userEmail || null,
+        p_actual_duration_hours: requestedHours,
+        p_root_cause: body.root_cause === undefined ? null : body.root_cause,
+        p_preventive_actions: body.preventive_actions === undefined ? null : body.preventive_actions,
+      });
+      if (closeError) {
+        const status = ['55000', 'P0001'].includes(String(closeError.code || '')) ? 409
+          : closeError.code === '42501' ? 403
+            : closeError.code === 'P0002' ? 404
+              : 500;
+        return NextResponse.json({ error: closeError.message || 'No se pudo cerrar la orden de trabajo' }, { status });
       }
-      if (body.meter_reading !== undefined) closureData.meter_reading = body.meter_reading;
-      if (body.meter_unit !== undefined) closureData.meter_unit = body.meter_unit;
-      const { error: detailError } = await context.supabase.from('maintenance_work_orders').update(closureData).eq('id', id).eq('organization_id', context.organizationId);
-      if (detailError) throw detailError;
-      const { error: closeError } = await context.supabase.rpc('close_work_order_safely', { p_work_order_id: id });
-      if (closeError) throw closeError;
-      const { data: closed, error: loadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
+
+      const { data: closed, error: loadError } = await context.supabase
+        .from('maintenance_work_orders')
+        .select('*')
+        .eq('id', id)
+        .eq('organization_id', context.organizationId)
+        .single();
       if (loadError) throw loadError;
-      const asset = await loadCanonicalAsset(context, closed.canonical_asset_id || null);
+      const [asset, costSummary] = await Promise.all([
+        loadCanonicalAsset(context, closed.canonical_asset_id || null),
+        loadCostSummary(context, id),
+      ]);
       return NextResponse.json({ data: mapWorkOrder(closed, asset, costSummary) });
     }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (body.status) updateData.status = body.status;
-    if (hasModuleWrite && body.title !== undefined) {
+    if (hasPlanningAuthority && body.title !== undefined) {
       const title = String(body.title || '').trim();
       if (!title) return NextResponse.json({ error: 'El trabajo debe tener un nombre.' }, { status: 400 });
       updateData.title = title;
     }
-    if (hasModuleWrite && body.description !== undefined) updateData.description = body.description ? String(body.description).trim() : null;
-    if (hasModuleWrite && body.work_type !== undefined) updateData.work_type = String(body.work_type || '').trim() || null;
-    if (hasModuleWrite && body.priority !== undefined) updateData.priority = String(body.priority || '').trim() || null;
-    if (hasModuleWrite && body.scheduled_date !== undefined) updateData.scheduled_date = body.scheduled_date || null;
+    if (hasPlanningAuthority && body.description !== undefined) updateData.description = body.description ? String(body.description).trim() : null;
+    if (hasPlanningAuthority && body.work_type !== undefined) updateData.work_type = String(body.work_type || '').trim() || null;
+    if (hasPlanningAuthority && body.priority !== undefined) updateData.priority = String(body.priority || '').trim() || null;
+    if (hasPlanningAuthority && body.scheduled_date !== undefined) updateData.scheduled_date = body.scheduled_date || null;
     if (body.assigned_person_id !== undefined) {
       if (body.assigned_person_id) {
         const assignee = await resolveAssignee(context, body.assigned_person_id);
@@ -336,26 +380,34 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updateData.cost_center_id = nextCostCenterId;
     }
 
-    const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
-    if (error) throw error;
-    const changedFields = ['title','description','work_type','priority','scheduled_date','status']
-      .filter((key) => updateData[key] !== undefined);
-    if (changedFields.length > 0) {
-      const { error: eventError } = await context.supabase.from('work_order_events').insert({
-        organization_id: context.organizationId,
-        work_order_id: id,
-        canonical_asset_id: data.canonical_asset_id || null,
-        event_type: body.status === 'cancelled' ? 'work_order_cancelled' : 'work_order_updated',
-        event_at: new Date().toISOString(),
-        actor_id: context.authUserId,
-        source_table: 'maintenance_work_orders',
-        source_record_id: id,
-        summary: body.status === 'cancelled' ? 'Orden anulada por usuario autorizado' : 'Orden actualizada por usuario autorizado',
-        payload: { changed_fields: changedFields },
-      });
-      if (eventError) throw eventError;
+    delete updateData.updated_at;
+    const { error: updateError } = await context.supabase.rpc('update_work_order_with_audit_v1', {
+      p_organization_id: context.organizationId,
+      p_work_order_id: id,
+      p_actor_id: context.authUserId || context.userId,
+      p_actor_name: context.userName || context.userEmail || null,
+      p_changes: updateData,
+    });
+    if (updateError) {
+      const status = updateError.code === '22023' ? 400
+        : updateError.code === 'P0002' ? 404
+          : updateError.code === '55000' ? 409
+            : 500;
+      return NextResponse.json({ error: updateError.message || 'No se pudo actualizar la orden de trabajo' }, { status });
     }
-    const [asset, costSummary] = await Promise.all([loadCanonicalAsset(context, data.canonical_asset_id || null), loadCostSummary(context, id)]);
+
+    const { data, error: reloadError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('*')
+      .eq('id', id)
+      .eq('organization_id', context.organizationId)
+      .single();
+    if (reloadError) throw reloadError;
+
+    const [asset, costSummary] = await Promise.all([
+      loadCanonicalAsset(context, data.canonical_asset_id || null),
+      loadCostSummary(context, id),
+    ]);
     return NextResponse.json({ data: mapWorkOrder(data, asset, costSummary) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo';
@@ -364,23 +416,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
-  try {
-    const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
-    if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
-
-    const { count, error: countError } = await context.supabase.from('work_order_events').select('*', { head: true, count: 'exact' }).eq('organization_id', context.organizationId).eq('work_order_id', id);
-    if (countError) throw countError;
-    if ((count || 0) > 1) return NextResponse.json({ error: 'La orden ya tiene historial y no puede eliminarse. Cancélala en su lugar.' }, { status: 409 });
-    const { error } = await context.supabase.from('maintenance_work_orders').delete().eq('id', id).eq('organization_id', context.organizationId);
-    if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo eliminar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
+  const authority = await getMaintenanceActorAuthority(context);
+  if (!authority.canPlan) {
+    return NextResponse.json({ error: 'Solo una jefatura autorizada puede gestionar la anulación de una OT.' }, { status: 403 });
   }
+
+  const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
+  if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
+
+  return NextResponse.json(
+    {
+      error: 'Las OT operativas no se eliminan. Anúlala e indica el motivo para conservar la trazabilidad.',
+      required_action: 'cancel',
+    },
+    { status: 409 },
+  );
 }

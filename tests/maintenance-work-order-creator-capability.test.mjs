@@ -20,9 +20,11 @@ test('OT creation is capability based instead of hard-coded to Ariel or Mauricio
   assert.match(route, /getMaintenanceWorkOrderCreationCapability/);
 });
 
-test('viewer and creation endpoint share the same creation capability', () => {
-  assert.match(viewer, /getMaintenanceWorkOrderCreationCapability/);
-  assert.match(viewer, /creationCapability\.canCreate/);
+test('viewer and creation endpoint share the canonical creation capability through OT authority', () => {
+  assert.match(viewer, /getMaintenanceActorAuthority/);
+  assert.match(viewer, /authority\.canCreateWorkOrder/);
+  assert.match(viewer, /authority\.canCreateEmergencyWorkOrder/);
+  assert.match(route, /getMaintenanceWorkOrderCreationCapability/);
   assert.match(route, /creationCapability\.canCreate/);
 });
 

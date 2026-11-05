@@ -50,8 +50,51 @@ test('server stores private photo evidence and blocks closure without it', () =>
   assert.match(closeRoute, /Agrega al menos una foto como evidencia/);
 });
 
-test('dedicated closure terminates a running or paused timer before final close', () => {
-  assert.match(closeRoute, /\['running', 'paused'\]/);
-  assert.match(closeRoute, /p_action: 'terminate'/);
-  assert.match(closeRoute, /close_work_order_safely/);
+test('dedicated closure atomically terminates a running or paused timer before final close', async () => {
+  const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
+  assert.match(atomicMigration, /in \('running', 'paused'\)/);
+  assert.match(atomicMigration, /'terminate'/);
+  assert.match(atomicMigration, /perform public\.close_work_order_safely\(p_work_order_id\)/);
+});
+
+
+test('closure uses one atomic timer-aware RPC and never promotes wall-clock elapsed time to active duration', async () => {
+  const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
+  assert.doesNotMatch(closeRoute, /Date\.now\(\) - startTime\.getTime\(\)/);
+  assert.doesNotMatch(closeRoute, /equipment_availability/);
+  assert.doesNotMatch(closeRoute, /availabilityPercent/);
+  assert.match(closeRoute, /availability_state: 'not_derived_from_work_order_close'/);
+
+  assert.match(atomicMigration, /perform public\.update_work_order_timer\(/);
+  assert.match(atomicMigration, /perform public\.close_work_order_safely\(p_work_order_id\)/);
+  assert.match(atomicMigration, /v_effective_hours := greatest\(v_timer_hours, v_requested_hours\)/);
+  assert.doesNotMatch(atomicMigration, /start_date/);
+  assert.doesNotMatch(atomicMigration, /24 \* 60/);
+});
+
+test('failed safe close rolls back timer termination and closure detail mutation in the same database call', async () => {
+  const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
+  const terminateIndex = atomicMigration.indexOf("perform public.update_work_order_timer(");
+  const updateIndex = atomicMigration.indexOf("update public.maintenance_work_orders");
+  const closeIndex = atomicMigration.indexOf("perform public.close_work_order_safely(p_work_order_id)");
+  assert.ok(terminateIndex >= 0 && updateIndex > terminateIndex && closeIndex > updateIndex);
+  assert.match(atomicMigration, /Any exception raised there aborts this entire function call/);
+  assert.match(atomicMigration, /begin;/);
+  assert.match(atomicMigration, /commit;/);
+});
+
+
+test('final OT close serializes fluid and photo evidence and revalidates it inside the database transaction', async () => {
+  const atomicEvidence = await readFile(new URL('../supabase/migrations/20261105215500_atomic_ot_close_evidence_v3.sql', import.meta.url), 'utf8');
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
+  assert.match(atomicEvidence, /pg_advisory_xact_lock\(hashtextextended\(p_work_order_id::text, 9137\)\)/);
+  assert.match(atomicEvidence, /maintenance_fluid_usage_close_guard_lock/);
+  assert.match(atomicEvidence, /work_order_evidence_close_guard_lock/);
+  assert.match(atomicEvidence, /work_order_events_close_guard_lock/);
+  assert.match(atomicEvidence, /fluid_closure_declared/);
+  assert.match(atomicEvidence, /v_declared_usage_count <> v_usage_count/);
+  assert.match(atomicEvidence, /v_photo_count < 1/);
+  assert.match(atomicEvidence, /perform public\.close_work_order_with_timer_v2\(/);
 });

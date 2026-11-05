@@ -2,8 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
 type MaterialInput = {
   canonicalProductId: string;
@@ -13,19 +14,20 @@ type MaterialInput = {
 };
 
 export async function GET(request: NextRequest, contextRoute: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   try {
     const { id } = await contextRoute.params;
+    const authority = await getMaintenanceActorAuthority(context);
+    const assigned = await requireAssignedMaintenanceExecution(context, id);
+    if (!authority.canReadAllWorkOrders && !assigned.ok) return assigned.response;
     const { data, error } = await context.supabase.rpc('get_work_order_supply_status_v1', {
       p_organization_id: context.organizationId,
       p_work_order_id: id,
     });
     if (error) throw error;
-    return NextResponse.json({ data });
+    return NextResponse.json({ data, permissions: { canDefine: authority.canPlan, canIssue: authority.canPlan, canSendToPurchasing: authority.canPlan } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la cobertura de materiales';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -33,13 +35,13 @@ export async function GET(request: NextRequest, contextRoute: { params: Promise<
 }
 
 export async function POST(request: NextRequest, contextRoute: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   try {
     const { id } = await contextRoute.params;
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede definir materiales de la OT.' }, { status: 403 });
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
@@ -69,13 +71,13 @@ export async function POST(request: NextRequest, contextRoute: { params: Promise
 }
 
 export async function PUT(request: NextRequest, contextRoute: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
   try {
     const { id } = await contextRoute.params;
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canPlan) return NextResponse.json({ error: 'Solo una jefatura autorizada puede definir materiales de la OT.' }, { status: 403 });
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
