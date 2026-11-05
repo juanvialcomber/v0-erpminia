@@ -8,8 +8,8 @@ import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-orde
 type MaintenanceWorkOrderRow = {
   id: string;
   asset_id: string | null;
-  start_date: string | null;
   timer_status?: string | null;
+  total_timer_seconds?: number | string | null;
   actual_duration_hours?: number | string | null;
 };
 type CloseWorkOrderPayload = { actual_duration_hours?: number | string | null; root_cause?: string | null; preventive_actions?: string | null };
@@ -25,6 +25,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const executionAccess = await requireAssignedMaintenanceExecution(context, id);
     if (!executionAccess.ok) return executionAccess.response;
+
+    const body = (await request.json().catch(() => null)) as CloseWorkOrderPayload | null;
+    if (!body) return NextResponse.json({ error: 'Solicitud de cierre inválida.' }, { status: 400 });
 
     const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
       .from('work_order_events')
@@ -59,16 +62,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: currentFluidUsage, error: currentFluidUsageError } = await context.supabase
       .from('maintenance_fluid_usage_records')
-      .select('id,used_at')
+      .select('id,used_at,updated_at')
       .eq('organization_id', context.organizationId)
       .eq('work_order_id', id);
     if (currentFluidUsageError) throw currentFluidUsageError;
 
     const currentUsageCount = (currentFluidUsage || []).length;
     const declaredUsageCount = Number(fluidPayload.fluid_usage_count || 0);
-    if (currentUsageCount !== declaredUsageCount) {
+    const declarationAtMs = Date.parse(String(fluidDeclaration.event_at || ''));
+    const fluidChangedAfterDeclaration = (currentFluidUsage || []).some((row) => {
+      const changedAtMs = Date.parse(String(row.updated_at || row.used_at || ''));
+      return Number.isFinite(declarationAtMs) && Number.isFinite(changedAtMs) && changedAtMs > declarationAtMs;
+    });
+    const { data: currentWasteEvents, error: currentWasteError } = await context.supabase
+      .from('work_order_events')
+      .select('payload')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .eq('event_type', 'waste_generated');
+    if (currentWasteError) throw currentWasteError;
+    const currentUsageIds = new Set((currentFluidUsage || []).map((row) => String(row.id)));
+    const currentLinkedWasteCount = new Set(
+      (currentWasteEvents || [])
+        .map((event) => String((event.payload as any)?.source_fluid_usage_id || ''))
+        .filter((usageId) => usageId && currentUsageIds.has(usageId)),
+    ).size;
+    const declaredLinkedWasteCount = Number(fluidPayload.linked_waste_count || 0);
+    if (
+      currentUsageCount !== declaredUsageCount
+      || currentLinkedWasteCount !== declaredLinkedWasteCount
+      || fluidChangedAfterDeclaration
+    ) {
       return NextResponse.json(
-        { error: 'Los datos de aceites/fluidos cambiaron después de la confirmación. El mecánico debe revisar y confirmar nuevamente antes de cerrar.' },
+        { error: 'Los datos de aceites/fluidos o residuos cambiaron después de la confirmación. El mecánico debe revisar y confirmar nuevamente antes de cerrar.' },
         { status: 409 },
       );
     }
@@ -82,14 +108,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (evidenceError) throw evidenceError;
     if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
 
-    const { data: timerState, error: timerStateError } = await context.supabase
-      .from('maintenance_work_orders')
-      .select('timer_status')
-      .eq('organization_id', context.organizationId)
-      .eq('id', id)
-      .single();
+    const [{ data: timerState, error: timerStateError }, { data: closeReadiness, error: closeReadinessError }] = await Promise.all([
+      context.supabase
+        .from('maintenance_work_orders')
+        .select('timer_status')
+        .eq('organization_id', context.organizationId)
+        .eq('id', id)
+        .single(),
+      context.supabase
+        .from('work_order_close_readiness_v2')
+        .select('ready_to_close,next_action')
+        .eq('organization_id', context.organizationId)
+        .eq('work_order_id', id)
+        .maybeSingle(),
+    ]);
     if (timerStateError) throw timerStateError;
-    if (['running', 'paused'].includes(String(timerState.timer_status || ''))) {
+    if (closeReadinessError) throw closeReadinessError;
+    const activeTimer = ['running', 'paused'].includes(String(timerState.timer_status || ''));
+    const allowedTimerOnlyBlocker = activeTimer && closeReadiness?.next_action === 'record_actual_hours';
+    if (closeReadiness && !closeReadiness.ready_to_close && closeReadiness.next_action !== 'close_work_order' && !allowedTimerOnlyBlocker) {
+      return NextResponse.json(
+        {
+          error: 'La OT todavía tiene pasos pendientes antes del cierre.',
+          next_action: closeReadiness.next_action,
+        },
+        { status: 409 },
+      );
+    }
+    if (activeTimer) {
       const { error: terminateError } = await context.supabase.rpc('update_work_order_timer', {
         p_organization_id: context.organizationId,
         p_work_order_id: id,
@@ -101,26 +147,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (terminateError) throw terminateError;
     }
 
-    const body = (await request.json()) as CloseWorkOrderPayload;
     const { actual_duration_hours, root_cause, preventive_actions } = body;
     const { data: workOrder, error: woError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     const typedWorkOrder = workOrder as MaintenanceWorkOrderRow | null;
     if (woError || !typedWorkOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
-    let downtime = 0;
-    if (typedWorkOrder.start_date) {
-      const startTime = new Date(typedWorkOrder.start_date);
-      downtime = Math.max(0, (Date.now() - startTime.getTime()) / (1000 * 60 * 60));
-    }
-
     const normalizedHours = Number(actual_duration_hours);
-    const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
-    const effectiveHours = Math.max(
-      Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
-      Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-      downtime,
-    );
-    const closureData: Record<string, unknown> = { actual_duration_hours: effectiveHours, down_time_hours: downtime, updated_at: new Date().toISOString() };
+    const totalTimerSeconds = Number(typedWorkOrder.total_timer_seconds || 0);
+    const timerHours = Number.isFinite(totalTimerSeconds) && totalTimerSeconds > 0
+      ? totalTimerSeconds / 3600
+      : 0;
+    const effectiveHours = timerHours > 0
+      ? timerHours
+      : Number.isFinite(normalizedHours) && normalizedHours > 0
+        ? normalizedHours
+        : Number(typedWorkOrder.actual_duration_hours || 0);
+    const closureData: Record<string, unknown> = {
+      actual_duration_hours: effectiveHours,
+      updated_at: new Date().toISOString(),
+    };
     if (root_cause !== undefined) closureData.root_cause = root_cause;
     if (preventive_actions !== undefined) closureData.preventive_actions = preventive_actions;
 
@@ -136,22 +181,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { data: updatedOT, error: reloadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     if (reloadError) throw reloadError;
 
-    if (typedWorkOrder.asset_id) {
-      const today = new Date().toISOString().split('T')[0];
-      const availabilityPercent = Math.max(0, 100 - (downtime / 24) * 100);
-      const { error: availError } = await context.supabase.from('equipment_availability').upsert({
-        equipment_id: typedWorkOrder.asset_id,
-        date: today,
-        availability_percentage: availabilityPercent,
-        downtime_minutes: Math.round(downtime * 60),
-        total_minutes: 24 * 60,
-      }, { onConflict: 'equipment_id,date' });
-      if (availError) console.error('[maintenance] Availability update error:', availError);
-    }
-
-    return NextResponse.json({ data: updatedOT, mttr: effectiveHours, downtime_hours: downtime, availability_percentage: Math.max(0, 100 - (downtime / 24) * 100) });
+    return NextResponse.json({ data: updatedOT, actual_duration_hours: effectiveHours });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cerrar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const typed = error as { code?: string; message?: string };
+    const message = typed?.message || (error instanceof Error ? error.message : 'No se pudo cerrar la orden de trabajo');
+    const status = typed?.code === '55000' || typed?.code === 'P0001' || typed?.code === '23505' ? 409 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

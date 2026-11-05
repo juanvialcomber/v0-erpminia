@@ -2,11 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
-import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
-import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
 
 type WorkOrderPatchPayload = {
@@ -220,84 +218,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .filter(([, value]) => value !== undefined)
         .map(([key]) => key);
       const executionFields = new Set(['root_cause', 'preventive_actions', 'actual_duration_hours', 'meter_reading', 'meter_unit']);
-      const isStartOnly = mutationKeys.length === 1 && mutationKeys[0] === 'status' && body.status === 'in_progress';
       const isExecutionEvidenceOnly = mutationKeys.length > 0 && mutationKeys.every((key) => executionFields.has(key));
-      if (!isStartOnly && !isExecutionEvidenceOnly) {
+      if (!isExecutionEvidenceOnly) {
         return NextResponse.json(
-          { error: 'El ejecutor asignado sólo puede iniciar su OT y registrar evidencia de su propia ejecución.' },
+          { error: 'El ejecutor asignado sólo puede registrar evidencia de su propia ejecución desde este endpoint.' },
           { status: 403 },
         );
       }
     }
     if (body.status === 'in_progress') {
-      const releaseReadiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, id);
-      if (!releaseReadiness.ready) {
-        return NextResponse.json(
-          {
-            error: 'La OT no está preparada para ejecución.',
-            blockers: releaseReadiness.blockers,
-            emergencyBypass: releaseReadiness.emergencyBypass,
-          },
-          { status: 409 },
-        );
-      }
-
-      const other = await findOtherRunningWorkOrder(context, id);
-      if (other) {
-        return NextResponse.json({
-          error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
-          concurrentWorkOrderId: other.id,
-        }, { status: 409 });
-      }
+      return NextResponse.json(
+        {
+          error: 'El inicio de la OT debe realizarse desde el cronómetro para cambiar estado y tiempo en una sola transacción.',
+          canonical_start_endpoint: `/api/maintenance/work-orders/${id}/timer`,
+          canonical_start_action: 'play',
+        },
+        { status: 409 },
+      );
     }
     if (body.status === 'completed') {
-      const { count: evidenceCount, error: evidenceError } = await context.supabase
-        .from('work_order_evidence_files')
-        .select('id', { head: true, count: 'exact' })
-        .eq('organization_id', context.organizationId)
-        .eq('work_order_id', id)
-        .eq('evidence_type', 'photo');
-      if (evidenceError) throw evidenceError;
-      if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
-
-      const { data: completionOrder, error: completionOrderError } = await context.supabase
-        .from('maintenance_work_orders')
-        .select('work_type')
-        .eq('id', id)
-        .eq('organization_id', context.organizationId)
-        .single();
-      if (completionOrderError) throw completionOrderError;
-      const isGeneralWork = String(completionOrder?.work_type || '').toLowerCase() === 'general';
-      const rootCause = String(body.root_cause || '').trim();
-      const preventiveActions = String(body.preventive_actions || '').trim();
-      const actualHours = Number(body.actual_duration_hours);
-      if (!isGeneralWork && !rootCause) return NextResponse.json({ error: 'Registra la causa principal antes de completar la orden.' }, { status: 400 });
-      if (!isGeneralWork && !preventiveActions) return NextResponse.json({ error: 'Registra la acción preventiva antes de completar la orden.' }, { status: 400 });
-      if (!Number.isFinite(actualHours) || actualHours <= 0) return NextResponse.json({ error: 'Registra las horas reales utilizadas antes de completar la orden.' }, { status: 400 });
-      const costSummary = await loadCostSummary(context, id);
-      const blockers: string[] = [];
-      if (costSummary.pendingParts > 0) blockers.push(`${costSummary.pendingParts} repuesto${costSummary.pendingParts === 1 ? '' : 's'} pendiente${costSummary.pendingParts === 1 ? '' : 's'} de instalar o devolver`);
-      if (costSummary.openLaborEntries > 0) blockers.push(`${costSummary.openLaborEntries} registro${costSummary.openLaborEntries === 1 ? '' : 's'} de trabajo aún abierto${costSummary.openLaborEntries === 1 ? '' : 's'}`);
-      if (blockers.length > 0) return NextResponse.json({ error: `No se puede completar la orden: ${blockers.join(' y ')}.`, blockers, costSummary }, { status: 409 });
-      const closureData: Record<string, unknown> = { actual_duration_hours: actualHours, updated_at: new Date().toISOString() };
-      if (!isGeneralWork) {
-        closureData.root_cause = rootCause;
-        closureData.preventive_actions = preventiveActions;
-      }
-      if (body.meter_reading !== undefined) closureData.meter_reading = body.meter_reading;
-      if (body.meter_unit !== undefined) closureData.meter_unit = body.meter_unit;
-      const { error: detailError } = await context.supabase.from('maintenance_work_orders').update(closureData).eq('id', id).eq('organization_id', context.organizationId);
-      if (detailError) throw detailError;
-      const { error: closeError } = await context.supabase.rpc('close_work_order_safely', { p_work_order_id: id });
-      if (closeError) throw closeError;
-      const { data: closed, error: loadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
-      if (loadError) throw loadError;
-      const asset = await loadCanonicalAsset(context, closed.canonical_asset_id || null);
-      return NextResponse.json({ data: mapWorkOrder(closed, asset, costSummary) });
+      return NextResponse.json(
+        {
+          error: 'El cierre de la OT debe realizarse desde el flujo de cierre para validar cronómetro, fluidos, evidencia y trazabilidad.',
+          canonical_close_endpoint: `/api/maintenance/work-orders/${id}/close`,
+        },
+        { status: 409 },
+      );
+    }
+    if (body.status === 'cancelled' || body.status === 'canceled') {
+      return NextResponse.json(
+        {
+          error: 'La anulación de la OT debe registrar un motivo mediante su flujo canónico.',
+          canonical_cancel_endpoint: `/api/maintenance/work-orders/${id}/cancel`,
+        },
+        { status: 409 },
+      );
+    }
+    if (body.status === 'open' && currentStatus !== 'open') {
+      return NextResponse.json(
+        { error: 'Una OT que ya inició no puede volver a abierta.' },
+        { status: 409 },
+      );
+    }
+    if (body.status !== undefined) {
+      return NextResponse.json(
+        { error: 'El estado de la OT se administra mediante los flujos canónicos de inicio, cierre o anulación.' },
+        { status: 409 },
+      );
     }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (body.status) updateData.status = body.status;
     if (hasModuleWrite && body.title !== undefined) {
       const title = String(body.title || '').trim();
       if (!title) return NextResponse.json({ error: 'El trabajo debe tener un nombre.' }, { status: 400 });
@@ -338,19 +308,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
     if (error) throw error;
-    const changedFields = ['title','description','work_type','priority','scheduled_date','status']
+    const changedFields = ['title','description','work_type','priority','scheduled_date']
       .filter((key) => updateData[key] !== undefined);
     if (changedFields.length > 0) {
       const { error: eventError } = await context.supabase.from('work_order_events').insert({
         organization_id: context.organizationId,
         work_order_id: id,
         canonical_asset_id: data.canonical_asset_id || null,
-        event_type: body.status === 'cancelled' ? 'work_order_cancelled' : 'work_order_updated',
+        event_type: 'work_order_updated',
         event_at: new Date().toISOString(),
         actor_id: context.authUserId,
         source_table: 'maintenance_work_orders',
         source_record_id: id,
-        summary: body.status === 'cancelled' ? 'Orden anulada por usuario autorizado' : 'Orden actualizada por usuario autorizado',
+        summary: 'Orden actualizada por usuario autorizado',
         payload: { changed_fields: changedFields },
       });
       if (eventError) throw eventError;
@@ -358,29 +328,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const [asset, costSummary] = await Promise.all([loadCanonicalAsset(context, data.canonical_asset_id || null), loadCostSummary(context, id)]);
     return NextResponse.json({ data: mapWorkOrder(data, asset, costSummary) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const typed = error as { code?: string; message?: string };
+    const message = typed?.message || (error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo');
+    const status = typed?.code === '55000' || typed?.code === 'P0001' ? 409 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
-  const context = await getOrganizationContext(request);
-  if (!context.ok) return context.response;
-  const { id } = await params;
-  try {
-    const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
-    if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
-
-    const { count, error: countError } = await context.supabase.from('work_order_events').select('*', { head: true, count: 'exact' }).eq('organization_id', context.organizationId).eq('work_order_id', id);
-    if (countError) throw countError;
-    if ((count || 0) > 1) return NextResponse.json({ error: 'La orden ya tiene historial y no puede eliminarse. Cancélala en su lugar.' }, { status: 409 });
-    const { error } = await context.supabase.from('maintenance_work_orders').delete().eq('id', id).eq('organization_id', context.organizationId);
-    if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo eliminar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error: 'Las OT operacionales no se eliminan. Anula la OT con motivo para conservar su trazabilidad.',
+    },
+    { status: 405 },
+  );
 }

@@ -27,6 +27,8 @@ test('work order detail exposes linked active people only to module readers whil
   assert.match(dictionaries, /pending: 'Debe asignarse una persona operativa antes de iniciar\.'/);
 });
 
-test('desktop start is blocked until canonical responsibility exists', () => {
-  assert.match(page, /disabled=\{!canEdit \|\| !workOrder\.assigned_person_id\}/);
+test('planning view never starts execution on behalf of the assigned mechanic', () => {
+  assert.doesNotMatch(page, /patchOrder\(\{ status: 'in_progress' \}\)/);
+  assert.match(page, /El responsable asignado inicia la OT/);
+  assert.match(page, /Lista para que el responsable inicie/);
 });

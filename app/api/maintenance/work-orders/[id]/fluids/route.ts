@@ -148,106 +148,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!fluidName) return NextResponse.json({ error: 'Indica el fluido utilizado.' }, { status: 400 });
 
   const inventoryUnitsUsed = numberOrNull(body.inventory_units_used);
-  const { data, error } = await context.supabase
-    .from('maintenance_fluid_usage_records')
-    .insert({
-      organization_id: context.organizationId,
-      work_order_id: id,
-      canonical_asset_id: canonicalAssetId,
-      canonical_product_id: canonicalProductId,
-      fluid_name: fluidName,
-      quantity_liters: quantityLiters,
-      inventory_units_used: inventoryUnitsUsed && inventoryUnitsUsed > 0 ? inventoryUnitsUsed : null,
-      inventory_unit: inventoryUnit,
-      unit_cost_snapshot: unitCostSnapshot,
-      total_cost: totalCost,
-      cost_state: costState,
-      source_type: 'manual',
-      warehouse_code: warehouseCode,
-      validation_status: 'reported',
-      notes: body.notes ? String(body.notes).trim() : null,
-      created_by: context.authUserId,
-    })
-    .select('*')
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  let linkedWaste = null;
-  if (recoveredWasteLiters !== null) {
-    const wasteNames: Record<string, string> = {
-      used_oil: 'Aceite usado',
-      hydraulic_fluid: 'Fluido hidráulico usado',
-      coolant: 'Refrigerante / anticongelante usado',
-      brake_fluid: 'Líquido de frenos usado',
-    };
-    const { data: wasteData, error: wasteError } = await context.supabase
-      .from('maintenance_waste_records')
-      .insert({
-        organization_id: context.organizationId,
-        work_order_id: id,
-        canonical_asset_id: canonicalAssetId,
-        waste_code: linkedWasteCode,
-        waste_name: wasteNames[linkedWasteCode] || 'Residuo líquido usado',
-        classification: 'to_classify',
-        quantity: recoveredWasteLiters,
-        unit: 'L',
-        storage_location: body.waste_storage_location ? String(body.waste_storage_location).trim() : null,
-        notes: body.waste_notes ? String(body.waste_notes).trim() : null,
-        status: 'generated',
-        created_by: context.authUserId,
-        updated_by: context.authUserId,
-      })
-      .select('*')
-      .single();
-
-    if (wasteError) {
-      await context.supabase
-        .from('maintenance_fluid_usage_records')
-        .delete()
-        .eq('organization_id', context.organizationId)
-        .eq('id', data.id);
-      return NextResponse.json({ error: 'No se pudo vincular el residuo al uso de fluido.' }, { status: 500 });
-    }
-    linkedWaste = wasteData;
-
-    await context.supabase.from('work_order_events').insert({
-      organization_id: context.organizationId,
-      work_order_id: id,
-      canonical_asset_id: canonicalAssetId,
-      event_type: 'waste_generated',
-      event_at: new Date().toISOString(),
-      actor_id: context.authUserId,
-      actor_name: context.userName || context.userEmail || null,
-      source_table: 'maintenance_waste_records',
-      source_record_id: wasteData.id,
-      summary: 'Residuo líquido vinculado al uso de fluido',
-      payload: {
-        source_fluid_usage_id: data.id,
-        waste_code: linkedWasteCode,
-        quantity: recoveredWasteLiters,
-        unit: 'L',
-      },
-    });
-  }
-
-  await context.supabase.from('work_order_events').insert({
-    organization_id: context.organizationId,
-    work_order_id: id,
-    canonical_asset_id: canonicalAssetId,
-    event_type: 'fluid_usage_reported',
-    event_at: new Date().toISOString(),
-    actor_id: context.authUserId,
-    actor_name: context.userName || context.userEmail || null,
-    source_table: 'maintenance_fluid_usage_records',
-    source_record_id: data.id,
-    summary: 'Uso de fluido registrado',
-    payload: { fluid_name: fluidName, quantity_liters: quantityLiters, cost_state: costState },
+  const wasteNames: Record<string, string> = {
+    used_oil: 'Aceite usado',
+    hydraulic_fluid: 'Fluido hidráulico usado',
+    coolant: 'Refrigerante / anticongelante usado',
+    brake_fluid: 'Líquido de frenos usado',
+  };
+  const { data, error } = await context.supabase.rpc('record_work_order_fluid_usage_v1', {
+    p_organization_id: context.organizationId,
+    p_work_order_id: id,
+    p_canonical_asset_id: canonicalAssetId,
+    p_canonical_product_id: canonicalProductId,
+    p_fluid_name: fluidName,
+    p_quantity_liters: quantityLiters,
+    p_inventory_units_used: inventoryUnitsUsed && inventoryUnitsUsed > 0 ? inventoryUnitsUsed : null,
+    p_inventory_unit: inventoryUnit,
+    p_unit_cost_snapshot: unitCostSnapshot,
+    p_total_cost: totalCost,
+    p_cost_state: costState,
+    p_warehouse_code: warehouseCode,
+    p_notes: body.notes ? String(body.notes).trim() : null,
+    p_actor_id: context.authUserId,
+    p_actor_name: context.userName || context.userEmail || null,
+    p_recovered_waste_liters: recoveredWasteLiters,
+    p_waste_code: recoveredWasteLiters !== null ? linkedWasteCode : null,
+    p_waste_name: recoveredWasteLiters !== null ? (wasteNames[linkedWasteCode] || 'Residuo líquido usado') : null,
+    p_waste_storage_location: body.waste_storage_location ? String(body.waste_storage_location).trim() : null,
+    p_waste_notes: body.waste_notes ? String(body.waste_notes).trim() : null,
   });
 
+  if (error) {
+    const code = (error as { code?: string }).code;
+    const status = code === '22023' ? 400 : code === '55000' || code === 'P0001' ? 409 : 500;
+    return NextResponse.json({ error: error.message || 'No se pudo registrar el uso de fluido.' }, { status });
+  }
+
+  const fluid = (data as any)?.fluid || null;
+  const waste = (data as any)?.waste || null;
   return NextResponse.json({
-    data: { ...data, linked_waste: linkedWaste },
-    linkedWasteCreated: Boolean(linkedWaste),
+    data: fluid ? { ...fluid, linked_waste: waste } : null,
+    linkedWasteCreated: Boolean((data as any)?.linked_waste_created),
     inventoryMutated: false,
     note: 'El registro no descuenta stock de Bodega; la conciliación con movimientos se gestiona por separado.',
   }, { status: 201 });

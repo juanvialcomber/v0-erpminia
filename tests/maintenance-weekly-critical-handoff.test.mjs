@@ -87,7 +87,9 @@ test('critical suggestion never silently pauses work; changing active OT require
   assert.match(detail, /'Entró una OT más crítica'/);
   assert.match(detail, /toast.warning/);
   assert.match(timer, /findOtherRunningWorkOrder\(context, workOrderId\)/);
-  assert.match(status, /findOtherRunningWorkOrder\(context, id\)/);
+  assert.match(status, /canonical_start_endpoint/);
+  assert.match(status, /canonical_start_action: 'play'/);
+  assert.doesNotMatch(status, /findOtherRunningWorkOrder\(context, id\)/);
   assert.match(timer, /if \(action === 'pause' && !notes\)/);
   assert.match(timer, /status: 409/);
   assert.doesNotMatch(home, /\/timer/);

@@ -7,7 +7,15 @@ const migrationUrl = new URL(
   import.meta.url,
 );
 const closeRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/close/route.ts', import.meta.url);
+const timerCouplingMigrationUrl = new URL(
+  '../supabase/migrations/20261105180000_harden_ot_timer_status_coupling.sql',
+  import.meta.url,
+);
 const timerRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/timer/route.ts', import.meta.url);
+const atomicStartMigrationUrl = new URL(
+  '../supabase/migrations/20261105181000_atomic_ot_start_with_timer.sql',
+  import.meta.url,
+);
 const workOrderRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/route.ts', import.meta.url);
 
 test('database lifecycle guard requires canonical assignment for active and completed states', async () => {
@@ -25,7 +33,7 @@ test('work timer refuses play or resume without canonical assignee', async () =>
   assert.match(sql, /p_action in \('play', 'resume'\)[\s\S]*\('completed', 'closed', 'cancelled', 'canceled'\)/i);
 });
 
-test('timer mutation accepts module writers or the canonical assigned executor', async () => {
+test('timer mutation is restricted to the canonical assigned executor while readers retain GET access', async () => {
   const route = await readFile(timerRouteUrl, 'utf8');
 
   const postStart = route.indexOf('export async function POST');
@@ -33,9 +41,11 @@ test('timer mutation accepts module writers or the canonical assigned executor',
   const postSection = route.slice(postStart, getStart);
   const getSection = route.slice(getStart);
 
-  assert.match(postSection, /getModuleAccessLevel/);
   assert.match(postSection, /requireAssignedMaintenanceExecution/);
-  assert.match(postSection, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(postSection, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(postSection, /accessLevel !== 'ED'/);
+  assert.match(postSection, /getWorkOrderReleaseReadiness/);
+  assert.match(getSection, /getModuleAccessLevel/);
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
@@ -49,11 +59,33 @@ test('legacy close endpoint reserves close to assigned executor and delegates te
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
 
-test('generic work-order completion already delegates to canonical RPC', async () => {
+test('generic work-order PATCH cannot bypass the canonical close contract', async () => {
   const route = await readFile(workOrderRouteUrl, 'utf8');
 
   assert.match(route, /if \(body\.status === 'completed'\)/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /El cierre de la OT debe realizarse desde el flujo de cierre/);
+  assert.match(route, /canonical_close_endpoint/);
+  assert.doesNotMatch(route, /rpc\('close_work_order_safely'/);
+});
+
+test('database couples timer state to in-progress OT lifecycle', async () => {
+  const sql = await readFile(timerCouplingMigrationUrl, 'utf8');
+
+  assert.match(sql, /before update of status, timer_status/i);
+  assert.match(sql, /v_timer_status in \('running', 'paused'\)[\s\S]*v_status <> 'in_progress'/i);
+  assert.match(sql, /v_status in \('completed', 'closed', 'cancelled', 'canceled'\)[\s\S]*v_timer_status <> 'idle'/i);
+  assert.match(sql, /create unique index if not exists maintenance_one_running_timer_per_person_idx/i);
+  assert.match(sql, /where timer_status = 'running'[\s\S]*assigned_person_id is not null/i);
+});
+
+test('canonical close never derives downtime or availability from OT wall-clock time', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.doesNotMatch(route, /equipment_availability/);
+  assert.doesNotMatch(route, /availability_percentage/);
+  assert.doesNotMatch(route, /Date\.now\(\) - startTime\.getTime\(\)/);
+  assert.doesNotMatch(route, /down_time_hours:\s*downtime/);
+  assert.match(route, /actual_duration_hours: effectiveHours/);
 });
 
 
@@ -76,4 +108,46 @@ test('planner work-order detail exposes a one-click edit action', async () => {
   assert.match(detail, /id="edit-work-order"/);
   assert.match(detail, /setEditOpen\(true\)/);
   assert.match(detail, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+});
+
+test('timer endpoint maps database concurrency races to a user-level conflict', async () => {
+  const route = await readFile(timerRouteUrl, 'utf8');
+
+  assert.match(route, /error\?\.code === '23505'/);
+  assert.match(route, /otra OT con el cronómetro en ejecución/);
+});
+
+test('canonical close validates request and evidence stability before stopping the timer', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.match(route, /request\.json\(\)\.catch\(\(\) => null\)/);
+  assert.match(route, /fluidChangedAfterDeclaration/);
+  assert.match(route, /currentLinkedWasteCount/);
+  assert.match(route, /work_order_close_readiness_v2/);
+  assert.match(route, /La OT todavía tiene pasos pendientes antes del cierre/);
+  assert.ok(
+    route.indexOf("Solicitud de cierre inválida") < route.indexOf("p_action: 'terminate'"),
+    'request validation must happen before timer termination',
+  );
+});
+
+test('timer evidence is authoritative for actual OT duration when available', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.match(route, /total_timer_seconds/);
+  assert.match(route, /totalTimerSeconds \/ 3600/);
+  assert.match(route, /const effectiveHours = timerHours > 0/);
+});
+
+test('OT start is atomic with timer play at the database boundary', async () => {
+  const sql = await readFile(atomicStartMigrationUrl, 'utf8');
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+
+  assert.match(sql, /if p_action = 'play'/);
+  assert.match(sql, /v_next_work_order_status := 'in_progress'/);
+  assert.match(sql, /set status = v_next_work_order_status/);
+  assert.match(sql, /timer_status = v_new_status/);
+  assert.match(sql, /start_date = case[\s\S]*p_action = 'play'[\s\S]*coalesce\(start_date, v_now\)/i);
+  assert.match(route, /canonical_start_endpoint/);
+  assert.match(route, /canonical_start_action: 'play'/);
 });

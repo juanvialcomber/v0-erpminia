@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
+import { isAuthorizedMaintenanceReviewerName } from '@/lib/maintenance/work-order-review-access';
 
 // First production READY deployment enforcing the mechanic's fluid declaration.
  // This is a one-time historical cutoff, not an exemption for new OT closures.
@@ -32,7 +33,7 @@ async function getReviewerPerson(context: Awaited<ReturnType<typeof getOrganizat
     .eq('employment_status', 'active')
     .maybeSingle();
   if (error || !data) return null;
-  return String(data.full_name || '') === 'Ariel López' ? data : null;
+  return isAuthorizedMaintenanceReviewerName(data.full_name) ? data : null;
 }
 
 async function authorizeRead(request: NextRequest, workOrderId: string) {
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const reviewer = await getReviewerPerson(context);
   if (!reviewer) {
-    return NextResponse.json({ error: 'Ariel López debe revisar y aprobar la OT.' }, { status: 403 });
+    return NextResponse.json({ error: 'La OT debe ser revisada por un supervisor autorizado.' }, { status: 403 });
   }
 
   const { data: workOrder, error: workOrderError } = await context.supabase
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (!legacyFluidDeclarationExemption && (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true)) {
     return NextResponse.json(
-      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
+      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de la aprobación supervisora.' },
       { status: 409 },
     );
   }

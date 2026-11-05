@@ -4,6 +4,7 @@ import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/ap
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
+import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 
 const TIMER_ACTIONS = new Set(['play', 'pause', 'resume', 'terminate']);
 
@@ -11,6 +12,7 @@ function timerErrorResponse(error: { code?: string; message?: string } | null | 
   if (error?.code === 'P0002') return NextResponse.json({ ok: false, error: 'WO not found' }, { status: 404 });
   if (error?.code === '22023') return NextResponse.json({ ok: false, error: error.message || 'Invalid action' }, { status: 400 });
   if (error?.code === '55000') return NextResponse.json({ ok: false, error: error.message || 'Invalid timer transition' }, { status: 409 });
+  if (error?.code === '23505') return NextResponse.json({ ok: false, error: 'Ya existe otra OT con el cronómetro en ejecución para esta persona.' }, { status: 409 });
   return NextResponse.json({ ok: false, error: error?.message || 'Internal server error' }, { status: 500 });
 }
 
@@ -22,9 +24,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, workOrderId);
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
-  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
-  if (accessLevel !== 'ED' && !executionAccess.ok) return executionAccess.response;
+  if (!executionAccess.ok) return executionAccess.response;
 
   const body = (await request.json().catch(() => null)) as { action?: string; notes?: string | null } | null;
   const action = String(body?.action || '');
@@ -32,6 +33,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!TIMER_ACTIONS.has(action)) return NextResponse.json({ ok: false, error: 'Invalid action' }, { status: 400 });
   if (action === 'pause' && !notes) {
     return NextResponse.json({ ok: false, error: 'Debes indicar por qué pausas la orden de trabajo.' }, { status: 400 });
+  }
+
+  if (action === 'play') {
+    const readiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, workOrderId);
+    if (!readiness.ready) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'La OT no está preparada para ejecución.',
+          blockers: readiness.blockers,
+          emergencyBypass: readiness.emergencyBypass,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   if (action === 'play' || action === 'resume') {
@@ -70,7 +86,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id: workOrderId } = await params;
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const assignedExecution = await requireAssignedMaintenanceExecution(context, workOrderId);
-  if (accessLevel === 'SR' && !assignedExecution.ok) return assignedExecution.response;
+  const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
+  if (!canReadModule && !assignedExecution.ok) return assignedExecution.response;
 
   const { data: workOrder, error } = await context.supabase
     .from('maintenance_work_orders')
@@ -97,7 +114,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const totalMinutes = Math.floor(totalSeconds / 60);
   return NextResponse.json({
     ok: true,
-    canEdit: Boolean(workOrder.created_by) && (accessLevel === 'ED' || assignedExecution.ok),
+    canEdit: Boolean(workOrder.created_by) && assignedExecution.ok,
     record_scope: workOrder.created_by ? 'operational' : 'historical',
     current: {
       timer_status: workOrder.timer_status || 'idle',

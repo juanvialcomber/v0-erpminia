@@ -85,7 +85,10 @@ test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas
   assert.match(source, /\.eq\('created_by', context.authUserId \|\| context.userId\)/);
   assert.match(source, /workshopHeadCanAccessOrder\(workshop, order\)/);
   assert.match(source, /work_order_supervisor_reviews/);
-  assert.match(source, /\['Ariel López', 'Mauricio Astudillo'\]/);
+  assert.match(source, /isAuthorizedMaintenanceReviewerName/);
+  const reviewerAccess = read('lib/maintenance/work-order-review-access.ts');
+  assert.match(reviewerAccess, /Ariel López/);
+  assert.match(reviewerAccess, /Mauricio Astudillo/);
   assert.match(source, /if \(!reviewed.has\(order.id\)\)/);
   assert.match(source, /tasks.set\(order.id, toInboxTask/);
   assert.doesNotMatch(source, /\.insert\(|\.upsert\(|\.delete\(/);
