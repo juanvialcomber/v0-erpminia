@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, CalendarDays, Boxes, ChevronDown, CircleDollarSign, FileCheck, Gem, HelpCircle, Home, Leaf, LogOut, Menu, MessageSquare, ShieldCheck, ShoppingCart, Users, Wrench, X, Zap, type LucideIcon } from 'lucide-react';
+import { Activity, BarChart3, CalendarDays, Boxes, ChevronDown, CircleDollarSign, FileCheck, FileUp, Gem, HelpCircle, Home, Leaf, LogOut, Menu, MessageSquare, ShieldCheck, ShoppingCart, Users, Wrench, X, Zap, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,7 @@ const menuItems: MenuItem[] = [
   { itemKey: 'legal', href: '/dashboard/legal', icon: FileCheck, group: 'areas', moduleKey: 'legal_modulo', roles: ['superadmin','admin','manager'] },
   { itemKey: 'roles', href: '/dashboard/admin/roles', icon: ShieldCheck, group: 'admin', roles: ['superadmin','admin'] },
   { itemKey: 'users', href: '/dashboard/admin/users', icon: Users, group: 'admin', roles: ['superadmin','admin'] },
+  { itemKey: 'documentIntake', href: '/dashboard/documentos-gestion/ingesta', icon: FileUp, group: 'admin', roles: ['superadmin','admin'] },
   { itemKey: 'help', href: '/dashboard/guias', icon: HelpCircle, group: 'help', roles: allStandardRoles },
 ];
 const groupOrder: GroupKey[] = ['main','areas','admin','help'];
