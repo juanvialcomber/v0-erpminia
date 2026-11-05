@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 const flowItems = [
   { href: '/dashboard/compras/flujo', label: 'Comprar', step: 1 },
@@ -42,6 +43,8 @@ function isSupportActive(pathname: string, href: string) {
 
 export default function PurchasesLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { canEdit } = useModuleAccess();
+  const visibleSupportItems = supportItems.filter((item) => item.label !== 'Importar' || canEdit('fin_compras'));
 
   return (
     <div className="space-y-5">
@@ -79,7 +82,7 @@ export default function PurchasesLayout({ children }: { children: ReactNode }) {
               Soporte
             </span>
             <nav className="flex items-stretch" aria-label="Soporte de Compras">
-              {supportItems.map((item) => {
+              {visibleSupportItems.map((item) => {
                 const active = isSupportActive(pathname, item.href);
                 return (
                   <Link
