@@ -6,6 +6,7 @@ const workOrdersApi = fs.readFileSync('app/api/maintenance/work-orders/route.ts'
 const controlCenterApi = fs.readFileSync('app/api/maintenance/control-center/route.ts', 'utf8');
 const workOrdersPage = fs.readFileSync('components/maintenance/work-orders-queue.tsx', 'utf8');
 const dictionaries = fs.readFileSync('lib/i18n/dictionaries.ts', 'utf8');
+const historyApi = fs.readFileSync('app/api/maintenance/history/route.ts', 'utf8');
 
 test('work orders expose an explicit operational versus historical scope without mutating history', () => {
   assert.match(workOrdersApi, /created_by:\s*string \| null/);
@@ -33,4 +34,15 @@ test('daily work order workspace defaults to Motil operations and keeps history 
   assert.match(workOrdersPage, /viewFilter === 'historical'/);
   assert.match(dictionaries, /scope: \{ operational: 'Actuales', historical: 'Histórico', all: 'Todo' \}/);
   assert.match(dictionaries, /title: 'Próximos trabajos'/);
+});
+
+
+test('maintenance history is reconstructed from canonical closed work orders instead of the absent legacy history table', () => {
+  assert.match(historyApi, /from\('maintenance_work_orders'\)/);
+  assert.match(historyApi, /\.in\('status', \['completed', 'closed'\]\)/);
+  assert.match(historyApi, /from\('canonical_assets_current'\)/);
+  assert.match(historyApi, /from\('work_order_closure_cost_snapshots'\)/);
+  assert.match(historyApi, /source: 'maintenance_work_orders'/);
+  assert.doesNotMatch(historyApi, /from\('maintenance_history'\)/);
+  assert.doesNotMatch(historyApi, /from\('maintenance_assets'\)/);
 });
