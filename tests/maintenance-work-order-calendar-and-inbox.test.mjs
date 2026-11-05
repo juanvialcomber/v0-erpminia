@@ -72,7 +72,7 @@ test('execution/print registry and executive maintenance summary keep exact OT c
  assert.doesNotMatch(dashboard,/new Date\(order.scheduled_date\)/);
 });
 
-test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas', () => {
+test('Joaquin assigned orders and Ariel/Mauricio approval flow reach Mis tareas', () => {
   const api = read('app/api/actions/inbox/route.ts');
   const source = read('lib/maintenance/personal-work-order-inbox.ts');
   const ui = read('components/actions/actions-inbox.tsx');
@@ -85,8 +85,7 @@ test('Joaquin assigned orders and Ariel follow-up/approval flow reach Mis tareas
   assert.match(source, /\.eq\('created_by', context.authUserId \|\| context.userId\)/);
   assert.match(source, /workshopHeadCanAccessOrder\(workshop, order\)/);
   assert.match(source, /work_order_supervisor_reviews/);
-  assert.match(source, /full_name \|\| ''\) === 'Ariel López'/);
-  assert.doesNotMatch(source, /\['Ariel López', 'Mauricio Astudillo'\]/);
+  assert.match(source, /\['Ariel López', 'Mauricio Astudillo'\]\.includes/);
   assert.match(source, /if \(!reviewed.has\(order.id\)\)/);
   assert.match(source, /tasks.set\(order.id, toInboxTask/);
   assert.doesNotMatch(source, /\.insert\(|\.upsert\(|\.delete\(/);
