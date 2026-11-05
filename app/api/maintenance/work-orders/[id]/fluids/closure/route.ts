@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
@@ -62,8 +62,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const assigned = await requireAssignedMaintenanceExecution(context, id);
   if (!assigned.ok) {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    if (accessLevel !== 'ED') return assigned.response;
+    const authority = await getMaintenanceActorAuthority(context);
+    if (!authority.canReadAllWorkOrders) return assigned.response;
   }
 
   try {
