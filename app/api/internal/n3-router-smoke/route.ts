@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+// Preview-only end-to-end probe for the exact protected N3 Router deployment.
 export async function GET() {
   if (process.env.VERCEL_ENV !== 'preview') {
     return NextResponse.json({ error: 'PREVIEW_ONLY' }, { status: 404 });
