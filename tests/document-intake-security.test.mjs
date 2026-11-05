@@ -11,7 +11,7 @@ test('document intake remains private and backend-controlled', async () => {
   const migration = await readFile(migrationUrl, 'utf8');
 
   assert.match(api, /const BUCKET = 'document-intake'/);
-  assert.match(api, /resolveAuthContext\(request\)/);
+  assert.match(api, /requireAdmin\(request\)/);
   assert.match(api, /createSignedUploadUrl\(path\)/);
   assert.match(api, /path\.startsWith\('00_inbox\/'\)/);
   assert.match(migration, /values \('document-intake', 'document-intake', false\)/);
