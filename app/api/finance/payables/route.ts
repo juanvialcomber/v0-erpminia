@@ -13,18 +13,33 @@ export async function GET(request: NextRequest) {
   const [
     { data: payables, error: payablesError },
     { data: payments, error: paymentsError },
-    { data: anomalyCandidates, error: anomalyError },
   ] = await Promise.all([
     context.supabase.from('procurement_accounts_payable_v1').select('*').eq('organization_id', context.organizationId).order('due_date', { ascending: true, nullsFirst: true }),
     context.supabase.from('procurement_supplier_payments').select('id,organization_id,payable_id,amount,currency,payment_date,payment_reference,notes,recorded_at,reconciled_at,reconciliation_reference,reconciliation_notes').eq('organization_id', context.organizationId).order('payment_date', { ascending: false }),
-    context.supabase
+  ]);
+
+  const anomalyCandidates: Array<Record<string, any>> = [];
+  let anomalyError: unknown = null;
+  const anomalyPageSize = 1000;
+  const anomalyMaxRows = 20000;
+  for (let from = 0; from < anomalyMaxRows; from += anomalyPageSize) {
+    const { data, error } = await context.supabase
       .from('laudus_purchase_invoice_payment_status_service_v1')
       .select('purchase_invoice_external_id,doc_number,supplier_name,total_amount,currency,paid_amount,payment_count,last_payment_at,payment_status')
       .eq('organization_id', context.organizationId)
       .eq('currency', 'CLP')
       .eq('payment_status', 'paid')
-      .order('paid_amount', { ascending: false }),
-  ]);
+      .order('paid_amount', { ascending: false })
+      .range(from, from + anomalyPageSize - 1);
+
+    if (error) {
+      anomalyError = error;
+      break;
+    }
+    const page = data || [];
+    anomalyCandidates.push(...page);
+    if (page.length < anomalyPageSize) break;
+  }
 
   const observedLaudus: Array<Record<string, any>> = [];
   let observedLaudusError: unknown = null;
@@ -67,7 +82,7 @@ export async function GET(request: NextRequest) {
     !isUatValue(row.payment_reference) && !isUatValue(row.reconciliation_reference),
   );
 
-  const paymentReviewRows = anomalyError ? [] : (anomalyCandidates || [])
+  const paymentReviewRows = anomalyError ? [] : anomalyCandidates
     .filter((row) => Number(row.paid_amount || 0) > Number(row.total_amount || 0))
     .map((row) => {
       const totalAmount = Number(row.total_amount || 0);

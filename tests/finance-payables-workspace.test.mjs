@@ -83,3 +83,12 @@ test('treasury surfaces Laudus payment overapplications as read-only review evid
   assert.match(page,/Pago adicional parcial/);
   assert.match(page,/MOTIL no modifica estos pagos/);
 });
+
+
+test('Laudus payment review paginates beyond the default 1000 paid-invoice cap',()=>{
+  assert.match(route,/anomalyPageSize = 1000/);
+  assert.match(route,/anomalyMaxRows = 20000/);
+  assert.match(route,/\.range\(from, from \+ anomalyPageSize - 1\)/);
+  assert.match(route,/anomalyCandidates\.push\(\.\.\.page\)/);
+  assert.match(route,/if \(page\.length < anomalyPageSize\) break/);
+});
