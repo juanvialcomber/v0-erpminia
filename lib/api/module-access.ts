@@ -52,16 +52,22 @@ export type ModuleKey = (typeof MODULE_KEYS)[keyof typeof MODULE_KEYS];
 const ADMIN_BYPASS_ROLES = new Set(['admin', 'superadmin', 'super_admin']);
 export function isAdminRole(role?: string | null): boolean { return !!role && ADMIN_BYPASS_ROLES.has(role); }
 export type ModuleAccessMap = Record<string, AccessLevel>;
-export interface UserModuleAccess { hasCargo: boolean; access: ModuleAccessMap; }
+export interface UserModuleAccess { hasCargo: boolean; cargoId: string | null; cargoName: string | null; access: ModuleAccessMap; }
 
 export async function getUserModuleAccess(userId: string): Promise<UserModuleAccess> {
   const supabase = getSupabaseServerClient();
   const { data: profile } = await supabase.from('profiles').select('cargo_id').eq('id', userId).maybeSingle();
-  if (!profile?.cargo_id) return { hasCargo: false, access: {} };
-  const { data: rows } = await supabase.from('role_matrix').select('module_key, access_level').eq('cargo_id', profile.cargo_id);
+  const cargoId = profile?.cargo_id || null;
+  if (!cargoId) return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
+
+  const [{ data: rows }, { data: cargo }] = await Promise.all([
+    supabase.from('role_matrix').select('module_key, access_level').eq('cargo_id', cargoId),
+    supabase.from('cargos').select('name').eq('id', cargoId).maybeSingle(),
+  ]);
+
   const map: ModuleAccessMap = {};
   for (const row of rows ?? []) map[row.module_key as string] = row.access_level as AccessLevel;
-  return { hasCargo: true, access: map };
+  return { hasCargo: true, cargoId, cargoName: cargo?.name || null, access: map };
 }
 
 export async function getModuleAccessLevel(userId: string, role: string | null | undefined, moduleKey: ModuleKey): Promise<AccessLevel> {
