@@ -759,7 +759,7 @@ export async function POST(request: NextRequest) {
       await recordAdminInteractionTiming(context, request, createdOrder.id);
     }
 
-    if (creationWarnings.length > 0) {
+    if (creationWarnings.length > 0 && !idempotentReplay) {
       const { error: warningEventError } = await context.supabase.from('work_order_events').insert({
         organization_id: context.organizationId,
         work_order_id: createdOrder.id,
