@@ -65,5 +65,5 @@ test('closure queue scopes field technicians even when their module matrix is ED
   assert.match(closeQueue, /canBypassAssignedMaintenanceExecution/);
   assert.match(closeQueue, /assigned_person_id/);
   assert.match(closeQueue, /canEditAssigned = allowedWorkOrderIds\.length > 0/);
-  assert.match(closeQueue, /canEdit: accessLevel === 'ED' \|\| canEditAssigned/);
+  assert.match(closeQueue, /canEdit: canBypassAssignedMaintenanceExecution\(context, accessLevel\) \|\| canEditAssigned/);
 });
