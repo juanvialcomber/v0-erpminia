@@ -8,6 +8,7 @@ import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-orde
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
 import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
+import { getMaintenanceActorAuthority, getWorkOrderPermissions } from '@/lib/maintenance/work-order-authority';
 
 type WorkOrderPatchPayload = {
   status?: string;
@@ -142,6 +143,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
     const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
     const canExecuteAssigned = assignedExecution.ok && Boolean(data.created_by);
+    const authority = await getMaintenanceActorAuthority(context);
+    const permissions = getWorkOrderPermissions(authority, data);
 
     if (!canReadModule && !canExecuteAssigned) {
       return assignedExecution.ok
@@ -154,7 +157,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       loadCostSummary(context, id),
       loadCloseReadiness(context, id),
     ]);
-    const [costCenters, assignees] = canReadModule
+    const [costCenters, assignees] = permissions.canPlan
       ? await Promise.all([loadCostCenters(context), loadAssignees(context)])
       : [[], []];
     const recordScope = data.created_by ? 'operational' : 'historical';
@@ -163,8 +166,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       costCenters,
       assignees,
       closeReadiness,
-      canEdit: recordScope === 'operational' && (accessLevel === 'ED' || canExecuteAssigned),
-      assignedExecution: canExecuteAssigned,
+      canEdit: recordScope === 'operational' && (permissions.canEditOrder || permissions.canRecordExecution),
+      permissions,
+      assignedExecution: permissions.isAssignedExecutor,
       record_scope: recordScope,
       canonical: true,
     });
@@ -179,13 +183,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!context.ok) return context.response;
   const { id } = await params;
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const hasModuleWrite = accessLevel === 'ED';
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
+    const authority = await getMaintenanceActorAuthority(context);
+    const hasPlanningAuthority = authority.canPlan;
     const executionAccess = await requireAssignedMaintenanceExecution(context, id);
-    if (!hasModuleWrite && !executionAccess.ok) return executionAccess.response;
+    if (!hasPlanningAuthority && !executionAccess.ok) return executionAccess.response;
 
     const body = (await request.json()) as WorkOrderPatchPayload;
     const { data: currentOrderState, error: currentOrderStateError } = await context.supabase
@@ -221,7 +225,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Una OTe conserva prioridad crítica.' }, { status: 409 });
       }
     }
-    if (currentStatus === 'in_progress' && hasModuleWrite) {
+    if (currentStatus === 'in_progress' && hasPlanningAuthority) {
       const structuralFields = ['work_type', 'priority', 'scheduled_date', 'assigned_person_id', 'cost_center_id']
         .filter((key) => (body as Record<string, unknown>)[key] !== undefined);
       if (structuralFields.length > 0) {
@@ -229,7 +233,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     const workshopScope = await resolveWorkshopHeadScope(context);
-    if (!hasModuleWrite) {
+    if (!hasPlanningAuthority) {
       const mutationKeys = Object.entries(body)
         .filter(([, value]) => value !== undefined)
         .map(([key]) => key);
@@ -265,7 +269,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     if (body.status === 'cancelled' || body.status === 'canceled') {
-      if (!hasModuleWrite) {
+      if (!hasPlanningAuthority) {
         return NextResponse.json({ error: 'Solo un usuario autorizado de mantenimiento puede anular una OT.' }, { status: 403 });
       }
       const cancelReason = String(body.cancel_reason || '').trim();
@@ -340,15 +344,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (body.status) updateData.status = body.status;
-    if (hasModuleWrite && body.title !== undefined) {
+    if (hasPlanningAuthority && body.title !== undefined) {
       const title = String(body.title || '').trim();
       if (!title) return NextResponse.json({ error: 'El trabajo debe tener un nombre.' }, { status: 400 });
       updateData.title = title;
     }
-    if (hasModuleWrite && body.description !== undefined) updateData.description = body.description ? String(body.description).trim() : null;
-    if (hasModuleWrite && body.work_type !== undefined) updateData.work_type = String(body.work_type || '').trim() || null;
-    if (hasModuleWrite && body.priority !== undefined) updateData.priority = String(body.priority || '').trim() || null;
-    if (hasModuleWrite && body.scheduled_date !== undefined) updateData.scheduled_date = body.scheduled_date || null;
+    if (hasPlanningAuthority && body.description !== undefined) updateData.description = body.description ? String(body.description).trim() : null;
+    if (hasPlanningAuthority && body.work_type !== undefined) updateData.work_type = String(body.work_type || '').trim() || null;
+    if (hasPlanningAuthority && body.priority !== undefined) updateData.priority = String(body.priority || '').trim() || null;
+    if (hasPlanningAuthority && body.scheduled_date !== undefined) updateData.scheduled_date = body.scheduled_date || null;
     if (body.assigned_person_id !== undefined) {
       if (body.assigned_person_id) {
         const assignee = await resolveAssignee(context, body.assigned_person_id);
