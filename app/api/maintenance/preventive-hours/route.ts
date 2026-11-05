@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { applyStandardJobPlanToWorkOrder } from '@/lib/maintenance/apply-standard-job-plan';
+import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
 
 async function findApprovedPlanForSchedule(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }, scheduleId: string) {
   const { data: application, error: applicationError } = await context.supabase
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
+  const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
+  if (!creationCapability.canCreate) return NextResponse.json({ error: 'Tu cargo no puede planificar OT preventivas.' }, { status: 403 });
   try {
     const body = await request.json();
     const scheduleId = String(body?.scheduleId || '').trim();

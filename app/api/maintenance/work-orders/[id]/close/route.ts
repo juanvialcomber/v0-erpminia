@@ -115,10 +115,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const normalizedHours = Number(actual_duration_hours);
     const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
+    // Actual work duration must come from the tracked timer or an explicit
+    // executor-provided duration. Calendar downtime can include legitimate
+    // pauses (overnight, waiting for parts, shift handoff) and must never
+    // inflate mechanic labor time.
     const effectiveHours = Math.max(
       Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
       Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-      downtime,
     );
     const closureData: Record<string, unknown> = { actual_duration_hours: effectiveHours, down_time_hours: downtime, updated_at: new Date().toISOString() };
     if (root_cause !== undefined) closureData.root_cause = root_cause;
@@ -132,6 +135,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const status = closeError.code === '55000' || closeError.code === 'P0001' ? 409 : 500;
       return NextResponse.json({ error: closeError.message || 'No se pudo cerrar la orden de trabajo' }, { status });
     }
+
+    const { error: resubmitReviewError } = await context.supabase
+      .from('work_order_supervisor_reviews')
+      .update({ status: 'pending', resubmitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .eq('status', 'rejected');
+    if (resubmitReviewError) throw resubmitReviewError;
 
     const { data: updatedOT, error: reloadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     if (reloadError) throw reloadError;

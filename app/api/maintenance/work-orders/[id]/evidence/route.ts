@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, getModuleAccessLevel } from '@/lib/api/module-access';
-import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { canBypassAssignedMaintenanceExecution, requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
@@ -14,7 +14,7 @@ async function authorize(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (accessLevel === 'ED') return { ...context, executionPersonId: null as string | null };
+  if (canBypassAssignedMaintenanceExecution(context, accessLevel)) return { ...context, executionPersonId: null as string | null };
   const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (!executionAccess.ok) return { ok: false as const, response: executionAccess.response };
   return { ...context, executionPersonId: executionAccess.personId };

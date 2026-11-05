@@ -325,6 +325,39 @@ export function CreateWorkOrder({ locale, dictionary }: { locale: Locale; dictio
     }
   };
 
+  if (viewerContext && !emergencyMode && !Boolean(viewerContext.canCreateWorkOrder)) {
+    return (
+      <StatePanel
+        tone="warning"
+        title="Tu perfil no crea OT planificadas"
+        description={Boolean(viewerContext.canCreateEmergencyWorkOrder)
+          ? 'Puedes registrar una OTe de emergencia cuando exista una intervención inmediata.'
+          : 'Tu perfil puede ejecutar las OT asignadas, pero no crear nuevas órdenes.'}
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            {Boolean(viewerContext.canCreateEmergencyWorkOrder) ? (
+              <Button asChild><Link href="/dashboard/mantenimiento/ordenes-trabajo/create?mode=emergency">Registrar OTe</Link></Button>
+            ) : null}
+            <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Volver a mis órdenes</Link></Button>
+          </div>
+        )}
+        className="mx-auto max-w-3xl"
+      />
+    );
+  }
+
+  if (viewerContext && emergencyMode && !Boolean(viewerContext.canCreateEmergencyWorkOrder)) {
+    return (
+      <StatePanel
+        tone="warning"
+        title="Tu perfil no puede registrar OTe"
+        description="Vuelve a tus órdenes asignadas o solicita que una persona autorizada registre la emergencia."
+        actions={<Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Volver a mis órdenes</Link></Button>}
+        className="mx-auto max-w-3xl"
+      />
+    );
+  }
+
   return (
     <div
       className="mx-auto max-w-3xl space-y-5"

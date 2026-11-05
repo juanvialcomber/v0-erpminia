@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
-import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { canBypassAssignedMaintenanceExecution, requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
     let assignedExecutor = false;
-    if (accessLevel !== 'ED') {
+    if (!canBypassAssignedMaintenanceExecution(context, accessLevel)) {
       const executionAccess = await requireAssignedMaintenanceExecution(context, id);
       assignedExecutor = executionAccess.ok;
       if (accessLevel === 'SR' && !executionAccess.ok) return executionAccess.response;
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq('status', 'active')
       .maybeSingle();
     if (applicationError) throw applicationError;
-    const canEdit = scope === 'operational' && (accessLevel === 'ED' || assignedExecutor);
+    const canEdit = scope === 'operational' && (canBypassAssignedMaintenanceExecution(context, accessLevel) || assignedExecutor);
     if (!application?.plan_id) return NextResponse.json({ standardPlan: null, canEdit, record_scope: scope });
 
     const [{ data: plan, error: planError }, { data: steps, error: stepsError }, { data: materials, error: materialsError }, { data: execution, error: executionError }] = await Promise.all([
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    if (accessLevel !== 'ED') {
+    if (!canBypassAssignedMaintenanceExecution(context, accessLevel)) {
       const executionAccess = await requireAssignedMaintenanceExecution(context, id);
       if (!executionAccess.ok) return executionAccess.response;
     }

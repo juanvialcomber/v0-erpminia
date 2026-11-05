@@ -34,15 +34,17 @@ test('assigned executor does not require general maintenance edit access to read
   assert.match(workOrder, /actual_duration_hours/);
 });
 
-test('timer accepts module writers or assignee, but close is reserved to canonical assignee', () => {
-  assert.match(timer, /accessLevel !== 'ED' && !executionAccess\.ok/);
+test('timer keeps technician module writers scoped to canonical assignee, while close remains assigned only', () => {
+  assert.match(timer, /accessLevel !== 'ED' \\|\\| context\.role === 'tecnico'/);
   assert.match(close, /requireAssignedMaintenanceExecution/);
   assert.match(close, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(close, /accessLevel !== 'ED'/);
 });
 
 test('assigned executor capability is identity based, not hard-coded by cargo or person name', () => {
-  assert.doesNotMatch(access, /Joaquín|Ariel|Jefe de Taller|tecnico/);
+  const assignedIdentityHelper = access.split('export function canBypassAssignedMaintenanceExecution')[0];
+  assert.doesNotMatch(assignedIdentityHelper, /Joaquín|Ariel|Jefe de Taller|tecnico/);
+  assert.match(access, /context\.role !== 'tecnico'/);
   assert.match(access, /profile_id', context\.userId/);
   assert.match(access, /employment_status', 'active'/);
 });

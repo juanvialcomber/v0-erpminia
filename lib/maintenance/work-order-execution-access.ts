@@ -57,3 +57,11 @@ export async function requireAssignedMaintenanceExecution(
 
   return { ok: true as const, personId: person.id };
 }
+
+
+export function canBypassAssignedMaintenanceExecution(
+  context: OrganizationSuccessContext,
+  accessLevel: string | null | undefined,
+) {
+  return accessLevel === 'ED' && context.role !== 'tecnico';
+}

@@ -138,7 +138,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!data || isExplicitDemoRecord(data)) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
+    const isExecutionRole = context.role === 'tecnico';
+    const canReadModule = !isExecutionRole && (accessLevel === 'ED' || accessLevel === 'LEC');
     const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
     const canExecuteAssigned = assignedExecution.ok && Boolean(data.created_by);
 
@@ -162,7 +163,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       costCenters,
       assignees,
       closeReadiness,
-      canEdit: recordScope === 'operational' && (accessLevel === 'ED' || canExecuteAssigned),
+      canEdit: recordScope === 'operational' && (canExecuteAssigned || (accessLevel === 'ED' && !isExecutionRole)),
       assignedExecution: canExecuteAssigned,
       record_scope: recordScope,
       canonical: true,
@@ -179,7 +180,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   try {
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const hasModuleWrite = accessLevel === 'ED';
+    const hasModuleWrite = accessLevel === 'ED' && context.role !== 'tecnico';
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 

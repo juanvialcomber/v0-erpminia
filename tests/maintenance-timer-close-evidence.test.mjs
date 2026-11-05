@@ -6,6 +6,7 @@ const mobile = await readFile(new URL('../components/maintenance/mobile-work-ord
 const desktop = await readFile(new URL('../components/maintenance/work-order-timer.tsx', import.meta.url), 'utf8');
 const timerRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/timer/route.ts', import.meta.url), 'utf8');
 const closeRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/close/route.ts', import.meta.url), 'utf8');
+const reviewRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/review/route.ts', import.meta.url), 'utf8');
 const closeQueue = await readFile(new URL('../components/maintenance/progressive-work-order-close-queue.tsx', import.meta.url), 'utf8');
 const evidenceRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/evidence/route.ts', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/20261005193000_work_order_timer_seconds_and_closure_evidence.sql', import.meta.url), 'utf8');
@@ -54,4 +55,19 @@ test('dedicated closure terminates a running or paused timer before final close'
   assert.match(closeRoute, /\['running', 'paused'\]/);
   assert.match(closeRoute, /p_action: 'terminate'/);
   assert.match(closeRoute, /close_work_order_safely/);
+});
+
+
+test('paused calendar time never inflates mechanic execution duration at close', () => {
+  assert.match(closeRoute, /const effectiveHours = Math\.max\(/);
+  assert.match(closeRoute, /Number\.isFinite\(timerHours\)/);
+  const effectiveHoursBlock = closeRoute.match(/const effectiveHours = Math\.max\([\s\S]*?\n    \);/)?.[0] || '';
+  assert.ok(effectiveHoursBlock);
+  assert.doesNotMatch(effectiveHoursBlock, /downtime/);
+});
+
+test('completed OT can be approved by either canonical maintenance approver', () => {
+  assert.match(reviewRoute, /Ariel López/);
+  assert.match(reviewRoute, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /authorizedReviewers\.has/);
 });

@@ -25,7 +25,7 @@ test('work timer refuses play or resume without canonical assignee', async () =>
   assert.match(sql, /p_action in \('play', 'resume'\)[\s\S]*\('completed', 'closed', 'cancelled', 'canceled'\)/i);
 });
 
-test('timer mutation accepts module writers or the canonical assigned executor', async () => {
+test('timer mutation keeps mechanic execution scoped to the canonical assigned executor', async () => {
   const route = await readFile(timerRouteUrl, 'utf8');
 
   const postStart = route.indexOf('export async function POST');
@@ -35,7 +35,7 @@ test('timer mutation accepts module writers or the canonical assigned executor',
 
   assert.match(postSection, /getModuleAccessLevel/);
   assert.match(postSection, /requireAssignedMaintenanceExecution/);
-  assert.match(postSection, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(postSection, /accessLevel !== 'ED' \\|\\| context\.role === 'tecnico'/);
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 

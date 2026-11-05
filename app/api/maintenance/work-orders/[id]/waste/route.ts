@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
-import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { canBypassAssignedMaintenanceExecution, requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
 const allowedWasteCodes = new Set([
   'used_oil',
@@ -45,7 +45,7 @@ type WastePayload = {
 
 async function canWriteWaste(context: Awaited<ReturnType<typeof getOrganizationContext>> & { ok: true }, workOrderId: string) {
   const level = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (level === 'ED') return true;
+  if (canBypassAssignedMaintenanceExecution(context, level)) return true;
   const execution = await requireAssignedMaintenanceExecution(context, workOrderId);
   return execution.ok;
 }
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       data: data || [],
-      canEdit: Boolean(order.created_by) && (level === 'ED' || execution.ok),
+      canEdit: Boolean(order.created_by) && (canBypassAssignedMaintenanceExecution(context, level) || execution.ok),
       complianceCertified: false,
     });
   } catch (error) {
