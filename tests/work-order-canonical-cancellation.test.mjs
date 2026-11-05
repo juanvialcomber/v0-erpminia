@@ -6,6 +6,7 @@ const cancelRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/cancel/r
 const detailRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/route.ts', import.meta.url);
 const detailUiUrl = new URL('../components/maintenance/work-order-detail.tsx', import.meta.url);
 const migrationUrl = new URL('../supabase/migrations/20261105182000_canonical_ot_cancellation.sql', import.meta.url);
+const atomicCancelMigrationUrl = new URL('../supabase/migrations/20261105183000_atomic_ot_cancellation.sql', import.meta.url);
 
 test('OT cancellation has one reasoned canonical route', async () => {
   const [cancelRoute, detailRoute, ui, sql] = await Promise.all([
@@ -14,14 +15,22 @@ test('OT cancellation has one reasoned canonical route', async () => {
     readFile(detailUiUrl, 'utf8'),
     readFile(migrationUrl, 'utf8'),
   ]);
+  const atomicCancelSql = await readFile(atomicCancelMigrationUrl, 'utf8');
 
   assert.match(cancelRoute, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES, true\)/);
   assert.match(cancelRoute, /reason\.length < 5/);
-  assert.match(cancelRoute, /timer_status/);
-  assert.match(cancelRoute, /status: 'cancelled'/);
-  assert.match(cancelRoute, /cancellation_reason: reason/);
-  assert.match(cancelRoute, /event_type: 'work_order_cancelled'/);
-  assert.match(cancelRoute, /payload: \{ reason \}/);
+  assert.match(cancelRoute, /rpc\('cancel_work_order_safely'/);
+  assert.match(cancelRoute, /p_reason: reason/);
+  assert.match(cancelRoute, /p_actor_id: context\.authUserId/);
+  assert.doesNotMatch(cancelRoute, /\.update\(\{/);
+  assert.doesNotMatch(cancelRoute, /\.from\('work_order_events'\)\.insert/);
+
+  assert.match(atomicCancelSql, /for update/i);
+  assert.match(atomicCancelSql, /timer_status/i);
+  assert.match(atomicCancelSql, /set status = 'cancelled'/i);
+  assert.match(atomicCancelSql, /cancellation_reason = v_reason/i);
+  assert.match(atomicCancelSql, /insert into public\.work_order_events/i);
+  assert.match(atomicCancelSql, /'work_order_cancelled'/);
 
   assert.match(detailRoute, /canonical_cancel_endpoint/);
   assert.match(detailRoute, /Una OT que ya inició no puede volver a abierta/);
