@@ -22,6 +22,8 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/auth/login',
   '/api/auth/logout',
   '/api/integrations/greenapi/webhook',
+  // Service-to-service route validates N3URALIA_TAX_GROUPS_TOKEN in the handler.
+  '/api/integrations/n3uralia-tax/whatsapp-groups',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
