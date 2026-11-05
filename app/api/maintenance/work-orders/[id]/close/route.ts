@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const normalizedHours = Number(body.actual_duration_hours);
     const requestedHours = Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : null;
 
-    const { error: closeError } = await context.supabase.rpc('close_work_order_with_timer_v2', {
+    const { error: closeError } = await context.supabase.rpc('close_work_order_with_timer_v3', {
       p_organization_id: context.organizationId,
       p_work_order_id: id,
       p_actor_id: context.userId,
