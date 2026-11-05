@@ -23,9 +23,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, workOrderId);
   if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
-  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
-  if (accessLevel !== 'ED' && !executionAccess.ok) return executionAccess.response;
+  if (!executionAccess.ok) return executionAccess.response;
 
   const body = (await request.json().catch(() => null)) as { action?: string; notes?: string | null } | null;
   const action = String(body?.action || '');
@@ -98,7 +97,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const totalMinutes = Math.floor(totalSeconds / 60);
   return NextResponse.json({
     ok: true,
-    canEdit: Boolean(workOrder.created_by) && (accessLevel === 'ED' || assignedExecution.ok),
+    canEdit: Boolean(workOrder.created_by) && assignedExecution.ok,
     record_scope: workOrder.created_by ? 'operational' : 'historical',
     current: {
       timer_status: workOrder.timer_status || 'idle',
