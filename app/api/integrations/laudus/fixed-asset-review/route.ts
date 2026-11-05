@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 type ReviewDecision = 'confirm_candidate' | 'reject_candidate' | 'defer';
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
   if (!access.authorized) return access.response;
   if (!access.canWrite) return NextResponse.json({ error: 'No tienes permiso para registrar esta revisión.' }, { status: 403 });
 
