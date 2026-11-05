@@ -29,7 +29,7 @@ function PageHeaderDescription({ className, ...props }: React.ComponentProps<'p'
 }
 
 function PageHeaderActions({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="page-header-actions" className={cn('flex shrink-0 flex-wrap items-center gap-2 md:justify-end', className)} {...props} />
+  return <div data-slot="page-header-actions" className={cn('flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto md:justify-end [&>[data-slot=button]]:min-w-0 [&>[data-slot=button]]:flex-1 sm:[&>[data-slot=button]]:flex-none', className)} {...props} />
 }
 
 export {

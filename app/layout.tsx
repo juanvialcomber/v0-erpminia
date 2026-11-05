@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import { Geist, Geist_Mono, Manrope, Montserrat } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
@@ -13,6 +13,16 @@ const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono'
 const montserrat = Montserrat({ subsets: ['latin'], variable: '--font-montserrat', display: 'swap' });
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope', display: 'swap' });
 const PWA_COMPAT_METADATA = { manifest: '/manifest.webmanifest' } as const;
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#252525' },
+  ],
+};
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();

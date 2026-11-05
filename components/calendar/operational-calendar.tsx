@@ -120,14 +120,14 @@ export function OperationalCalendar({ locale, dictionary }: { locale: Locale; di
         </PageHeaderActions>
       </PageHeader>
 
-      <div className="grid divide-y rounded-lg border border-border bg-card sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+      <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card sm:grid-cols-4">
         {([
           [t.summary.open, summaryValue('total')],
           [t.summary.overdue, summaryValue('overdue')],
           [t.summary.today, summaryValue('today')],
           [t.summary.week, summaryValue('next_7_days')],
         ] as const).map(([label, value]) => (
-          <div key={String(label)} className="px-5 py-4">
+          <div key={String(label)} className="border-b border-r border-border px-4 py-3 last:border-r-0 sm:px-5 sm:py-4">
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
           </div>
@@ -143,7 +143,7 @@ export function OperationalCalendar({ locale, dictionary }: { locale: Locale; di
         </FilterToolbarGroup>
         <FilterToolbarActions>
           <Tabs value={view} onValueChange={(value) => setView(value as typeof view)}>
-            <TabsList>
+            <TabsList className="max-w-[calc(100vw-2rem)] justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <TabsTrigger value="all">{t.tabs.all}</TabsTrigger>
               <TabsTrigger value="overdue">{t.tabs.overdue}</TabsTrigger>
               <TabsTrigger value="today">{t.tabs.today}</TabsTrigger>
@@ -177,11 +177,11 @@ export function OperationalCalendar({ locale, dictionary }: { locale: Locale; di
                     <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{formatDate(task.date, dateLocale)}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-4 md:justify-end">
+                <div className="flex items-center justify-between gap-3 md:justify-end">
                   <span className={`text-xs font-medium ${task.overdue ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {task.overdue ? <AlertTriangle className="mr-1 inline h-3.5 w-3.5" /> : null}{relativeLabel(task.days_until, t)}
                   </span>
-                  <Button asChild variant="outline" size="sm"><Link href={task.href}>{t.openAction}<ArrowRight className="h-4 w-4" /></Link></Button>
+                  <Button asChild variant="outline" size="sm" className="shrink-0"><Link href={task.href}>{t.openAction}<ArrowRight className="h-4 w-4" /></Link></Button>
                 </div>
               </article>
             ))}
