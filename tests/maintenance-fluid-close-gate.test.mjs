@@ -38,14 +38,18 @@ test('mechanic must explicitly declare fluid and residue state', () => {
   assert.match(closeUi, /No se recuperó residuo/);
 });
 
-test('Ariel is the reviewer and sees mechanic fluid evidence before approval', () => {
-  assert.match(reviewRoute, /String\(data\.full_name \|\| ''\) === 'Ariel López'/);
-  assert.match(reviewRoute, /Ariel López debe revisar y aprobar la OT/);
+test('authorized supervisor sees mechanic fluid evidence before approval', () => {
+  const reviewerAccess = fs.readFileSync('lib/maintenance/work-order-review-access.ts','utf8');
+  assert.match(reviewRoute, /isAuthorizedMaintenanceReviewerName/);
+  assert.match(reviewerAccess, /Ariel López/);
+  assert.match(reviewerAccess, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /supervisor autorizado/);
   assert.match(reviewRoute, /fluid_closure_declared/);
   assert.match(reviewRoute, /declared_by_assigned_executor/);
   assert.match(reviewUi, /Aceites y residuos/);
   assert.match(reviewUi, /Registrado por mecánico/);
-  assert.match(reviewUi, /Ariel López revisa la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
+  assert.match(reviewUi, /Un supervisor autorizado revisa la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
+  assert.doesNotMatch(reviewUi, /Después Ariel podrá aprobarla/);
 });
 
 
@@ -88,7 +92,7 @@ test('already completed OT can receive an explicit late assigned-mechanic declar
   assert.doesNotMatch(closureRoute, /\.update\(\{\s*status:/);
 });
 
-test('legacy OT closed before policy READY can be approved by Ariel without invented fluid declaration', () => {
+test('legacy OT closed before policy READY can be approved by an authorized supervisor without invented fluid declaration', () => {
   assert.match(reviewRoute, /FLUID_DECLARATION_REQUIRED_FROM = Date\.parse\('2026-11-04T18:15:53\.252Z'\)/);
   assert.match(reviewRoute, /function isLegacyFluidDeclarationExempt/);
   assert.match(reviewRoute, /order\.status !== 'completed'/);
