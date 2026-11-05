@@ -100,7 +100,7 @@ function dedupeJournalRows(rows: JsonRow[]) {
     }
 
     for (const line of Array.isArray(row.lines) ? row.lines as JsonRow[] : []) {
-      const normalized = {
+      const normalized: JsonRow = {
         ...line,
         debit: normalizeNumberish(line?.debit),
         credit: normalizeNumberish(line?.credit),
