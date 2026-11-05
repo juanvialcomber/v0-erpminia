@@ -4,6 +4,7 @@ import { greenConfigured, greenRequest, GREEN_NO_STORE } from '@/lib/messages/gr
 import { normalizeGreenApiGroupDiscovery, isGreenApiGroupId } from '@/lib/messages/greenapi-group-discovery.mjs';
 
 export const dynamic = 'force-dynamic';
+// Token rotation redeploy marker: 2026-11-04.
 
 function authorized(request: NextRequest) {
   const expected = String(process.env.N3URALIA_TAX_GROUPS_TOKEN || '');
