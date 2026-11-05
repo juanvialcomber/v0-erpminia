@@ -57,7 +57,7 @@ export interface UserModuleAccess { hasCargo: boolean; cargoId: string | null; c
 export async function getUserModuleAccess(userId: string): Promise<UserModuleAccess> {
   const supabase = getSupabaseServerClient();
   const { data: profile } = await supabase.from('profiles').select('cargo_id').eq('id', userId).maybeSingle();
-  const cargoId = profile?.cargo_id || null;
+  const cargoId = profile && profile.cargo_id ? profile.cargo_id : null;
   if (!cargoId) return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
 
   const [{ data: rows }, { data: cargo }] = await Promise.all([
