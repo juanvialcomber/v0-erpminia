@@ -10,11 +10,19 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/h
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']);
 const MAX_BYTES = 20 * 1024 * 1024;
 const BUCKET = 'maintenance-work-order-evidence';
-async function authorize(request: NextRequest, workOrderId: string) {
+async function authorizeRead(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (accessLevel === 'ED') return { ...context, executionPersonId: null as string | null };
+  if (accessLevel === 'ED' || accessLevel === 'LEC') return { ...context, executionPersonId: null as string | null };
+  const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
+  if (!executionAccess.ok) return { ok: false as const, response: executionAccess.response };
+  return { ...context, executionPersonId: executionAccess.personId };
+}
+
+async function authorizeWrite(request: NextRequest, workOrderId: string) {
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context;
   const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (!executionAccess.ok) return { ok: false as const, response: executionAccess.response };
   return { ...context, executionPersonId: executionAccess.personId };
@@ -40,7 +48,7 @@ function normalizeMimeType(mimeType: string, extension: string) {
 }
 
 async function requireOpenOperationalWorkOrder(
-  context: Extract<Awaited<ReturnType<typeof authorize>>, { ok: true }>,
+  context: Extract<Awaited<ReturnType<typeof authorizeWrite>>, { ok: true }>,
   id: string,
 ) {
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
@@ -66,7 +74,7 @@ async function requireOpenOperationalWorkOrder(
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const context = await authorize(request, id);
+  const context = await authorizeRead(request, id);
   if (!context.ok) return context.response;
 
   const { data, error } = await context.supabase
@@ -98,7 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const context = await authorize(request, id);
+  const context = await authorizeWrite(request, id);
   if (!context.ok) return context.response;
 
   try {
