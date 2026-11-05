@@ -28,6 +28,7 @@ type TimerResponse = {
     timer_start_time?: string | null;
     total_seconds?: number;
     total_minutes?: number;
+    pending_review?: { unverified_seconds: number; credited_seconds_before: number } | null;
   };
   timeline?: Array<{
     event_type?: string;
@@ -63,7 +64,7 @@ const PAUSE_REASONS = [
 ] as const;
 
 const fetcher = async (url: string): Promise<TimerResponse> => {
-  const response = await fetch(url, { credentials: 'include' });
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
   if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar el estado del trabajo.');
   return payload as TimerResponse;
@@ -151,9 +152,13 @@ export function MobileWorkOrderFlow({
   const [showPauseForm, setShowPauseForm] = useState(false);
   const [pauseReason, setPauseReason] = useState('');
   const [pauseDetail, setPauseDetail] = useState('');
+  const [declaredHours, setDeclaredHours] = useState('0');
+  const [declaredMinutes, setDeclaredMinutes] = useState('0');
+  const [declaredNote, setDeclaredNote] = useState('');
   const timerStatus = data?.current?.timer_status || 'idle';
   const baseSeconds = Number(data?.current?.total_seconds ?? (Number(data?.current?.total_minutes || 0) * 60));
   const timerStartTime = data?.current?.timer_start_time || null;
+  const pendingTimerReview = data?.current?.pending_review || null;
   const lastPauseReason = timerStatus === 'paused'
     ? data?.timeline?.find((event) => event.event_type === 'timer_pause')?.payload?.notes || null
     : null;
@@ -175,6 +180,7 @@ export function MobileWorkOrderFlow({
     const response = await fetch(url, { credentials: 'include', ...options });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el cambio.');
+    return payload;
   }
 
   async function uploadEvidence(files: FileList | null) {
@@ -287,13 +293,35 @@ export function MobileWorkOrderFlow({
     setBusy(true);
     setMessage(null);
     try {
-      await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+      const saved = await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, notes: notes || null }),
       });
-      await mutate();
+      const expectedStatus = action === 'pause' ? 'paused' : 'running';
+      if (!saved?.ok || saved.timer_status !== expectedStatus) {
+        throw new Error('No se confirmó el estado del cronómetro. Vuelve a consultar antes de continuar.');
+      }
+      await mutate((previous) => ({
+        ...previous,
+        current: {
+          ...previous?.current,
+          timer_status: saved.timer_status,
+          timer_start_time: saved.timer_start_time || null,
+          total_seconds: Number(saved.total_seconds || 0),
+          total_minutes: Number(saved.total_minutes || 0),
+          pending_review: saved.review_required
+            ? { unverified_seconds: Number(saved.unverified_elapsed_seconds || 0), credited_seconds_before: Number(saved.total_seconds || 0) }
+            : null,
+        },
+      }), false);
+      void mutate();
       if (action === 'pause') {
+        if (saved.review_required) {
+          toast.warning('Pausa guardada. Tiempo sin verificar', { description: 'El contador quedó detenido. Indica el tiempo trabajado para continuar con el cierre.' });
+        } else {
+          toast.success('Pausa guardada', { description: 'El contador quedó detenido. No se acumulará tiempo mientras esté en pausa.' });
+        }
         setShowPauseForm(false);
         setPauseReason('');
         setPauseDetail('');
@@ -346,7 +374,39 @@ export function MobileWorkOrderFlow({
     }
   }
 
+  async function declareElapsed() {
+    const hours = Number(declaredHours);
+    const minutes = Number(declaredMinutes);
+    const elapsedSeconds = (hours * 60 + minutes) * 60;
+    if (!Number.isSafeInteger(elapsedSeconds) || hours < 0 || minutes < 0 || minutes > 59 ||
+        elapsedSeconds > Number(pendingTimerReview?.unverified_seconds || 0) || declaredNote.trim().length < 5) {
+      setMessage('Indica las horas y minutos efectivos de esta sesión y cómo los verificaste.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const saved = await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'declare_elapsed', elapsedSeconds, notes: declaredNote.trim() }),
+      });
+      if (!saved?.ok || saved.review_required) throw new Error('No se confirmó el tiempo de trabajo.');
+      await mutate();
+      toast.success('Tiempo efectivo declarado', { description: 'Se registró como declaración del mecánico, para revisión de jefatura.' });
+      setDeclaredNote('');
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'No se pudo declarar el tiempo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function finishWork() {
+    if (pendingTimerReview) {
+      setMessage('Primero declara el tiempo efectivo del tramo pendiente para poder cerrar esta OT.');
+      return;
+    }
     setBusy(true);
     setMessage(null);
     try {
@@ -484,8 +544,38 @@ export function MobileWorkOrderFlow({
             <div>
               <p className="text-xs text-muted-foreground">Tiempo registrado</p>
               <p className="font-mono text-4xl font-semibold tabular-nums">{duration(displaySeconds)}</p>
+              {timerStatus === 'paused' ? <p className="text-xs text-muted-foreground">Pausado · el tiempo no aumenta</p> : null}
             </div>
           </div>
+
+          {pendingTimerReview ? (
+            <div role="alert" className="space-y-3 rounded-lg border border-amber-500/50 p-3">
+              <p className="text-sm font-semibold">Pausa confirmada · tiempo por revisar</p>
+              <p className="text-sm text-muted-foreground">
+                Se detuvo un cronómetro que llevaba más de 16 horas activo. Ese tramo NO se sumó como horas trabajadas.
+                Indica el tiempo realmente trabajado desde el último inicio o reanudación.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-sm">Horas
+                  <input aria-label="Horas efectivas de sesión" type="number" min="0" step="1" value={declaredHours}
+                    onChange={(event) => setDeclaredHours(event.target.value)} className="mt-1 h-11 w-full rounded-md border bg-background px-3" />
+                </label>
+                <label className="text-sm">Minutos
+                  <input aria-label="Minutos efectivos de sesión" type="number" min="0" max="59" step="1" value={declaredMinutes}
+                    onChange={(event) => setDeclaredMinutes(event.target.value)} className="mt-1 h-11 w-full rounded-md border bg-background px-3" />
+                </label>
+              </div>
+              <label className="block text-sm">Cómo verificaste el tiempo
+                <textarea rows={2} maxLength={500} value={declaredNote}
+                  onChange={(event) => setDeclaredNote(event.target.value)}
+                  placeholder="Ej.: trabajo efectivo según registro de turno"
+                  className="mt-1 min-h-16 w-full rounded-md border bg-background p-3" />
+              </label>
+              <Button className="h-11 w-full" disabled={busy || declaredNote.trim().length < 5} onClick={() => void declareElapsed()}>
+                {busy ? 'Guardando...' : 'Registrar horas trabajadas'}
+              </Button>
+            </div>
+          ) : null}
 
           {status !== 'in_progress' ? (
             <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void startWork()}>
@@ -498,12 +588,19 @@ export function MobileWorkOrderFlow({
               {busy ? 'Iniciando...' : 'Reanudar trabajo'}
             </Button>
           ) : timerStatus === 'running' && !showPauseForm ? (
-            <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => { setMessage(null); setShowPauseForm(true); }}>
-              <CirclePause className="mr-2 h-5 w-5" />
-              Pausar trabajo
-            </Button>
+            <div className="space-y-2">
+              <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => { setMessage(null); setShowPauseForm(true); }}>
+                <CirclePause className="mr-2 h-5 w-5" />
+                Elegir motivo y pausar
+              </Button>
+              <Button size="lg" variant="outline" className="h-12 w-full text-sm" disabled={busy}
+                onClick={() => void timerAction('pause', 'Fin de jornada laboral')}>
+                {busy ? 'Guardando pausa...' : 'Pausar por fin de jornada'}
+              </Button>
+            </div>
           ) : timerStatus === 'running' && showPauseForm ? (
             <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground">El cronómetro seguirá activo hasta presionar «Confirmar pausa» y recibir la confirmación.</p>
               <label htmlFor="pause-reason" className="text-sm font-medium">Motivo de pausa</label>
               <select
                 id="pause-reason"
@@ -542,7 +639,7 @@ export function MobileWorkOrderFlow({
                   <p className="mt-1 text-sm font-medium">{lastPauseReason}</p>
                 </div>
               ) : null}
-              <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('resume')}>
+              <Button size="lg" className="h-14 w-full text-base" disabled={busy || Boolean(pendingTimerReview) || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('resume')}>
                 <CirclePlay className="mr-2 h-5 w-5" />
                 {busy ? 'Guardando...' : 'Reanudar trabajo'}
               </Button>
@@ -550,7 +647,7 @@ export function MobileWorkOrderFlow({
           )}
 
           {status === 'in_progress' ? (
-            <Button size="lg" variant="outline" className="h-14 w-full text-base" disabled={busy} onClick={() => void finishWork()}>
+            <Button size="lg" variant="outline" className="h-14 w-full text-base" disabled={busy || Boolean(pendingTimerReview)} onClick={() => void finishWork()}>
               <SquareStop className="mr-2 h-5 w-5" />
               Terminar y registrar evidencia
             </Button>
