@@ -7,11 +7,39 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 5000;
 
+type LaudusFixedAssetRow = {
+  external_id: string | null;
+  name: string | null;
+  acquisition_date: string | null;
+  retirement_date: string | null;
+  acquisition_cost: number | string | null;
+  useful_life: number | string | null;
+  realizable_value: number | string | null;
+  depreciation_type: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  serial_number: string | null;
+  supplier_name: string | null;
+  invoice_number: string | null;
+  location: string | null;
+  canonical_asset_id: string | null;
+  reconciliation_status: string | null;
+  synced_at: string | null;
+};
+
+type CanonicalAssetRow = {
+  id: string;
+  asset_code: string | null;
+  name: string | null;
+  operational_status: string | null;
+  criticality: string | null;
+};
+
 function hasText(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function reviewTier(row: Record<string, any>) {
+function reviewTier(row: LaudusFixedAssetRow) {
   if (hasText(row.serial_number)) return { key: 'physical_identifier', label: 'Serie disponible', rank: 3 };
   if (hasText(row.model) || hasText(row.manufacturer)) return { key: 'model_identifier', label: 'Marca / modelo', rank: 2 };
   return { key: 'source_reference_only', label: 'Referencia fuente', rank: 1 };
@@ -24,7 +52,7 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const rows: Array<Record<string, any>> = [];
+  const rows: LaudusFixedAssetRow[] = [];
   let sourceError: unknown = null;
 
   for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
@@ -40,7 +68,7 @@ export async function GET(request: NextRequest) {
       break;
     }
 
-    const page = data || [];
+    const page = (data || []) as LaudusFixedAssetRow[];
     rows.push(...page);
     if (page.length < PAGE_SIZE) break;
   }
@@ -56,7 +84,7 @@ export async function GET(request: NextRequest) {
       .map((row) => String(row.canonical_asset_id)),
   )];
 
-  const canonicalRows: Array<Record<string, any>> = [];
+  const canonicalRows: CanonicalAssetRow[] = [];
   for (let index = 0; index < matchedIds.length; index += 50) {
     const chunk = matchedIds.slice(index, index + 50);
     const { data, error } = await context.supabase
@@ -69,7 +97,7 @@ export async function GET(request: NextRequest) {
       console.error('[finance/laudus-fixed-assets-review:canonical]', error);
       return NextResponse.json({ error: 'No se pudo resolver activos canónicos vinculados' }, { status: 500 });
     }
-    canonicalRows.push(...(data || []));
+    canonicalRows.push(...((data || []) as CanonicalAssetRow[]));
   }
 
   const canonicalById = new Map(canonicalRows.map((row) => [String(row.id), row]));
