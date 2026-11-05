@@ -10,6 +10,7 @@ const closeUi = fs.readFileSync('components/maintenance/progressive-work-order-c
 const reviewRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/review/route.ts','utf8');
 const reviewUi = fs.readFileSync('components/maintenance/work-order-evidence-and-approval.tsx','utf8');
 const organizationContext = fs.readFileSync('lib/api/organization-context.ts','utf8');
+const authority = fs.readFileSync('lib/maintenance/work-order-authority.ts','utf8');
 
 test('only assigned mechanic can declare and close OT fluid data', () => {
   assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
@@ -39,7 +40,8 @@ test('mechanic must explicitly declare fluid and residue state', () => {
 });
 
 test('Ariel and Mauricio are reviewers and see mechanic fluid evidence before approval', () => {
-  assert.match(reviewRoute, /\['Ariel López', 'Mauricio Astudillo'\]\.includes/);
+  assert.match(authority, /\['Ariel López', 'Mauricio Astudillo'\]/);
+  assert.match(reviewRoute, /authority\.canApprove/);
   assert.match(reviewRoute, /Solo Ariel López o Mauricio Astudillo pueden revisar y aprobar la OT/);
   assert.match(reviewRoute, /fluid_closure_declared/);
   assert.match(reviewRoute, /declared_by_assigned_executor/);
