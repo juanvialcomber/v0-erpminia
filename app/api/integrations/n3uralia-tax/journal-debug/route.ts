@@ -44,10 +44,31 @@ export async function GET() {
       senderName:x?.senderName||null,
     }));
 
+  const webhookToken = process.env.GREENAPI_WEBHOOK_TOKEN?.trim();
+  let relayProbe:{status:number,body:string|null}|null=null;
+  if(webhookToken){
+    const probe = await fetch('https://neuralia2.vercel.app/api/whatsapp/webhook',{
+      method:'POST',
+      headers:{
+        authorization:`Bearer ${webhookToken}`,
+        'content-type':'application/json',
+      },
+      body:JSON.stringify({
+        typeWebhook:'stateInstanceChanged',
+        instanceData:{idInstance:Number(instance)},
+        stateInstance:'authorized',
+      }),
+      signal:AbortSignal.timeout(15000),
+      cache:'no-store',
+    });
+    relayProbe={status:probe.status,body:(await probe.text()).slice(0,300)};
+  }
+
   return NextResponse.json({
     ok: incoming.status===200 && outgoing.status===200,
     incomingStatus:incoming.status,
     outgoingStatus:outgoing.status,
+    relayProbe,
     incoming:project(incoming.items),
     outgoing:project(outgoing.items),
   },{headers:{'cache-control':'no-store'}});
