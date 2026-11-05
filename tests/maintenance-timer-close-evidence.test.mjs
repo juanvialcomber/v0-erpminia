@@ -84,3 +84,17 @@ test('failed safe close rolls back timer termination and closure detail mutation
   assert.match(atomicMigration, /begin;/);
   assert.match(atomicMigration, /commit;/);
 });
+
+
+test('final OT close serializes fluid and photo evidence and revalidates it inside the database transaction', async () => {
+  const atomicEvidence = await readFile(new URL('../supabase/migrations/20261105215500_atomic_ot_close_evidence_v3.sql', import.meta.url), 'utf8');
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
+  assert.match(atomicEvidence, /pg_advisory_xact_lock\(hashtextextended\(p_work_order_id::text, 9137\)\)/);
+  assert.match(atomicEvidence, /maintenance_fluid_usage_close_guard_lock/);
+  assert.match(atomicEvidence, /work_order_evidence_close_guard_lock/);
+  assert.match(atomicEvidence, /work_order_events_close_guard_lock/);
+  assert.match(atomicEvidence, /fluid_closure_declared/);
+  assert.match(atomicEvidence, /v_declared_usage_count <> v_usage_count/);
+  assert.match(atomicEvidence, /v_photo_count < 1/);
+  assert.match(atomicEvidence, /perform public\.close_work_order_with_timer_v2\(/);
+});
