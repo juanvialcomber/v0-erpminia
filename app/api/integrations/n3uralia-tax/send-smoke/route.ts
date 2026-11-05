@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { greenRequest } from '@/lib/messages/greenapi';
+import { NextRequest, NextResponse } from 'next/server';
+import { POST as sendAccountingMessage } from '@/app/api/integrations/n3uralia-tax/whatsapp-send/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,24 +9,22 @@ export async function GET() {
   }
 
   const chatId = String(process.env.N3URALIA_ACCOUNTING_WHATSAPP_GROUP_ID || '').trim();
-  if (!chatId) {
-    return NextResponse.json({ ok: false, error: 'group_not_configured' }, { status: 503 });
+  const token = String(process.env.N3URALIA_ACCOUNTING_SEND_TOKEN || '').trim();
+  if (!chatId || !token) {
+    return NextResponse.json({ ok: false, error: 'bridge_not_configured' }, { status: 503 });
   }
 
-  try {
-    const result = await greenRequest('sendMessage', {
+  const request = new NextRequest('https://motil.local/api/integrations/n3uralia-tax/whatsapp-send', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
       chatId,
-      message: 'Prueba del agente contable N3uralia: canal de respuesta operativo.',
-    });
+      message: 'Prueba E2E del puente contable N3uralia: autenticación y envío operativos.',
+    }),
+  });
 
-    return NextResponse.json({
-      ok: true,
-      idMessage: typeof result?.idMessage === 'string' ? result.idMessage : null,
-    }, { headers: { 'cache-control': 'no-store' } });
-  } catch (error) {
-    return NextResponse.json({
-      ok: false,
-      error: error instanceof Error ? error.message : 'send_failed',
-    }, { status: 503, headers: { 'cache-control': 'no-store' } });
-  }
+  return sendAccountingMessage(request);
 }
