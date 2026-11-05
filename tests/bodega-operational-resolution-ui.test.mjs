@@ -15,6 +15,10 @@ test('Bodega API exposes operational Laudus resolution without discarding source
   assert.match(route, /operational_stock_date/);
   assert.match(route, /bodega_stock_source_authority_service_v1/);
   assert.match(route, /laudusIsPrimary/);
+  assert.match(route, /blockingReviews/);
+  assert.match(route, /legacyMotilStale/);
+  assert.match(route, /operational_resolution', 'review'/);
+  assert.match(route, /operational_resolution', 'legacy_motil_stale'/);
 });
 
 test('Bodega UI explains reconciled stock states in operational language', async () => {
@@ -26,4 +30,8 @@ test('Bodega UI explains reconciled stock states in operational language', async
   assert.match(page, /Alineado/);
   assert.match(page, /Revisar evidencia/);
   assert.doesNotMatch(page, /operational_resolution === 'legacy_motil_stale'.*Difiere Laudus/);
+  assert.match(page, /bloqueantes/);
+  assert.match(page, /contrastes históricos MOTIL/);
+  assert.match(page, /Sin diferencias operacionales bloqueantes/);
+  assert.match(page, /no bloquean disponibilidad cuando Laudus es la fuente primaria/);
 });
