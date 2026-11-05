@@ -28,3 +28,13 @@ test('timer migration provides atomic state transitions and service-role-only ex
   assert.match(migration, /revoke all on function public\.update_work_order_timer[\s\S]*from authenticated/);
   assert.match(migration, /grant execute on function public\.update_work_order_timer[\s\S]*to service_role/);
 });
+
+
+test('database enforces one running OT timer per assigned executor under concurrency', async () => {
+  const hardening = await readFile(new URL('../supabase/migrations/20261105214500_one_running_ot_timer_per_assignee.sql', import.meta.url), 'utf8');
+  assert.match(hardening, /create unique index if not exists maintenance_work_orders_one_running_timer_per_assignee_idx/i);
+  assert.match(hardening, /organization_id, assigned_person_id/);
+  assert.match(hardening, /where timer_status = 'running'/);
+  assert.match(route, /error\?\.code === '23505'/);
+  assert.match(route, /otra OT con el cronómetro en ejecución/);
+});
