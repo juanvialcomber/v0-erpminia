@@ -9,6 +9,8 @@ type AuthUser = {
 
 type AccessIdentityResponse = {
   role?: string | null;
+  cargoId?: string | null;
+  cargoName?: string | null;
   user?: {
     id?: string | null;
     email?: string | null;
@@ -70,6 +72,7 @@ export function useAuth() {
 
         const payload = (await response.json()) as AccessIdentityResponse;
         const canonicalRole = payload.role || cookieIdentity.role || null;
+        const canonicalCargo = payload.cargoName || null;
         const canonicalEmail = payload.user?.email || cookieIdentity.email || null;
         const canonicalName = payload.user?.fullName || null;
         const canonicalId = payload.user?.id || null;
@@ -79,7 +82,7 @@ export function useAuth() {
           id: canonicalId,
           email: canonicalEmail,
           name: canonicalName,
-          cargo: cookieIdentity.cargo,
+          cargo: canonicalCargo || cookieIdentity.cargo,
         });
 
         if (canonicalRole && canonicalRole !== cookieIdentity.role) {
@@ -87,6 +90,9 @@ export function useAuth() {
         }
         if (canonicalEmail && canonicalEmail !== cookieIdentity.email) {
           document.cookie = `user_email=${encodeURIComponent(canonicalEmail)}; path=/; max-age=604800; samesite=lax`;
+        }
+        if (canonicalCargo && canonicalCargo !== cookieIdentity.cargo) {
+          document.cookie = `user_cargo=${encodeURIComponent(canonicalCargo)}; path=/; max-age=604800; samesite=lax`;
         }
       } catch (error) {
         if ((error as Error)?.name !== 'AbortError') {

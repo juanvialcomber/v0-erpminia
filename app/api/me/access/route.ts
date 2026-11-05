@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
   const admin = isAdminRole(auth.role);
   const organizationId = auth.organizationId || auth.user.organization_id || null;
+  const userAccess = await getUserModuleAccess(auth.user.id);
   const user = {
     id: auth.user.id,
     email: auth.user.email || null,
@@ -22,7 +23,9 @@ export async function GET(request: NextRequest) {
   if (admin) {
     return NextResponse.json({
       isAdmin: true,
-      hasCargo: false,
+      hasCargo: userAccess.hasCargo,
+      cargoId: userAccess.cargoId,
+      cargoName: userAccess.cargoName,
       role: auth.role || null,
       organizationId,
       source: auth.source,
@@ -31,11 +34,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const { hasCargo, access } = await getUserModuleAccess(auth.user.id);
+  const { hasCargo, cargoId, cargoName, access } = userAccess;
 
   return NextResponse.json({
     isAdmin: false,
     hasCargo,
+    cargoId,
+    cargoName,
     role: auth.role || null,
     organizationId,
     source: auth.source,

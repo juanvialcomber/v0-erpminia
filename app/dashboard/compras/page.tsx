@@ -89,18 +89,18 @@ export default function ComprasPage() {
         sources={[
           sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Solicitudes, recepciones, facturas y matching operacional.' }),
           sourceStatus.source('canonical', { key: 'canonical', label: 'Base canónica', state: 'pending', detail: 'Órdenes de compra y proveedores conciliados.' }),
-          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Pendiente de habilitación comercial de API.' }),
+          sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando sincronización del ERP.' }),
           { key: 'sii', label: 'SII / DTE', state: 'updated', detail: 'Evidencia fiscal disponible cuando existe un DTE importado.' },
         ]}
       />
 
       <DataReceptionReadiness
-        description="Compras ya separa evidencia canónica y operación. Cuando Laudus sincronice, las OC, proveedores, facturas y pagos entrarán como fuente reconciliable sin reemplazar decisiones humanas."
+        description="Compras separa evidencia canónica y operación. Laudus aporta OC, proveedores, facturas y pagos como fuente reconciliable sin reemplazar decisiones humanas."
         items={[
           { label: 'Órdenes y proveedores', ready: true, detail: 'Modelo canónico disponible.' },
           { label: 'Recepciones y facturas', ready: true, detail: 'Flujo operacional disponible.' },
           { label: 'Revisión de diferencias', ready: true, detail: 'Three-way match y excepciones existentes.' },
-          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'review' ? 'Hay datos recibidos que requieren revisión.' : 'Esperando acceso y primera sincronización.' },
+          { label: 'Laudus', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'ERP de compras y proveedores sincronizado.' : sourceStatus.state('laudus') === 'syncing' ? 'Sincronización Laudus en curso.' : sourceStatus.state('laudus') === 'review' ? 'La última sincronización o sus datos requieren revisión.' : sourceStatus.state('laudus') === 'offline' ? 'Conector Laudus desactivado.' : 'Verificando estado del conector Laudus.' },
         ]}
       />
 

@@ -136,10 +136,10 @@ async function isFinanceManager(profileId: string): Promise<boolean> {
 }
 function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
-  if (path === '/dashboard' || path.startsWith('/dashboard/finanzas')) return true;
-  if (path === '/dashboard/compras') return true;
-  if (path.startsWith('/dashboard/compras/')) return true;
   if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
+  if (path === '/api/actions/inbox' || path === '/api/data-sources/status') return readOnly;
+  if (path.startsWith('/api/procurement/')) return readOnly;
+  if (path === '/api/pipeline/operational') return readOnly;
 
   const financeIntegrationRoutes = new Set([
     '/api/integrations/laudus/finance-control',
@@ -153,6 +153,13 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (financeIntegrationRoutes.has(path)) {
     return path === '/api/integrations/laudus/finance-review-feedback' ? true : readOnly;
   }
+
+  const procurementIntegrationRoutes = new Set([
+    '/api/integrations/laudus/procurement-readiness',
+    '/api/integrations/laudus/procurement-reconciliation',
+    '/api/integrations/laudus/supplier-resolution-queue',
+  ]);
+  if (procurementIntegrationRoutes.has(path)) return readOnly;
 
   const financeValueRoutes = new Set([
     '/api/value/finance-baseline',
@@ -310,10 +317,11 @@ async function proxyRequest(request: NextRequest) {
   }
 
   const isAuthenticated = Boolean(user || customSession);
-  // Apply the cargo-specific guard before the general API authorization shortcut.
-  // This also rejects non-finance dashboard URLs rather than relying on hidden navigation.
+  // Keep the finance-manager API boundary narrow, but let dashboard access be
+  // decided by the canonical role_matrix guard below. This avoids contradicting
+  // explicit LEC/ED grants for Bodega, Compras or Mantenimiento.
   const accessIdentityId = customSession?.user.id || user?.id;
-  if (accessIdentityId && (pathname.startsWith('/api/') || pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+  if (accessIdentityId && (pathname.startsWith('/api/') || pathname.startsWith('/admin') || pathname.startsWith('/setup'))) {
     try {
       if (await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method)) {
         if (pathname.startsWith('/api/')) {

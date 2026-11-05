@@ -21,3 +21,18 @@ test('read-only Laudus evidence routes remain GET-only while Daniel LEC routes a
   assert.doesNotMatch(proxy,/path === '\/api\/value\/scorecard'/);
   assert.doesNotMatch(proxy,/path === '\/dashboard\/valor'/);
 });
+
+
+test('finance manager transversal read APIs are allowed while writes remain endpoint-governed',()=>{
+  assert.match(proxy,/path === '\/api\/actions\/inbox'/);
+  assert.match(proxy,/path === '\/api\/data-sources\/status'/);
+  assert.match(proxy,/path\.startsWith\('\/api\/procurement\/'\)\) return readOnly/);
+  assert.match(proxy,/path === '\/api\/pipeline\/operational'\) return readOnly/);
+  assert.match(proxy,/procurementIntegrationRoutes/);
+  assert.match(proxy,/procurement-reconciliation/);
+});
+
+test('dashboard access is delegated to canonical role_matrix instead of the finance-only guard',()=>{
+  assert.match(proxy,/let dashboard access be[\s\S]*canonical role_matrix guard/);
+  assert.doesNotMatch(proxy,/pathname\.startsWith\('\/dashboard'\).*isFinanceManager/);
+});

@@ -43,6 +43,7 @@ test('award controls require an explicit human decision before issuing a purchas
 
 test('pipeline normalizes the legacy purchasing route to the canonical flow', async () => {
   const source = await readFile(boardRoutePath, 'utf8');
+  assert.match(source, /requireModuleAccess\(request, MODULE_KEYS\.FIN_COMPRAS\)/);
   assert.match(source, /item\.next_action_href === '\/dashboard\/abastecimiento'/);
   assert.match(source, /'\/dashboard\/compras\/flujo'/);
 });
