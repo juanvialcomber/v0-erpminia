@@ -14,6 +14,7 @@ export type MaintenanceActorAuthority = {
   canCreateEmergencyWorkOrder: boolean;
   emergencySelfAssignOnly: boolean;
   canApprove: boolean;
+  canReadAllWorkOrders: boolean;
 };
 
 export async function getMaintenanceActorAuthority(
@@ -21,6 +22,9 @@ export async function getMaintenanceActorAuthority(
 ): Promise<MaintenanceActorAuthority> {
   const creation = await getMaintenanceWorkOrderCreationCapability(context);
   const canPlan = creation.canCreate || isAdminRole(context.role);
+
+  const canApprove = OT_APPROVER_NAMES.has(String(creation.personName || ''));
+  const canReadAllWorkOrders = canPlan || canApprove || creation.accessLevel === 'LEC';
 
   return {
     personId: creation.personId,
@@ -31,7 +35,8 @@ export async function getMaintenanceActorAuthority(
     canCreateWorkOrder: creation.canCreate || isAdminRole(context.role),
     canCreateEmergencyWorkOrder: creation.canCreateEmergency || isAdminRole(context.role),
     emergencySelfAssignOnly: creation.emergencySelfAssignOnly && !isAdminRole(context.role),
-    canApprove: OT_APPROVER_NAMES.has(String(creation.personName || '')),
+    canApprove,
+    canReadAllWorkOrders,
   };
 }
 
