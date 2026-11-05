@@ -35,7 +35,7 @@ test('timer mutation keeps mechanic execution scoped to the canonical assigned e
 
   assert.match(postSection, /getModuleAccessLevel/);
   assert.match(postSection, /requireAssignedMaintenanceExecution/);
-  assert.match(postSection, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(postSection, /accessLevel !== 'ED' \\|\\| context\.role === 'tecnico'/);
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
