@@ -7,6 +7,10 @@ const migrationUrl = new URL(
   import.meta.url,
 );
 const closeRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/close/route.ts', import.meta.url);
+const timerCouplingMigrationUrl = new URL(
+  '../supabase/migrations/20261105180000_harden_ot_timer_status_coupling.sql',
+  import.meta.url,
+);
 const timerRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/timer/route.ts', import.meta.url);
 const workOrderRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/route.ts', import.meta.url);
 
@@ -49,11 +53,31 @@ test('legacy close endpoint reserves close to assigned executor and delegates te
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
 
-test('generic work-order completion already delegates to canonical RPC', async () => {
+test('generic work-order PATCH cannot bypass the canonical close contract', async () => {
   const route = await readFile(workOrderRouteUrl, 'utf8');
 
   assert.match(route, /if \(body\.status === 'completed'\)/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /El cierre de la OT debe realizarse desde el flujo de cierre/);
+  assert.match(route, /canonical_close_endpoint/);
+  assert.doesNotMatch(route, /rpc\('close_work_order_safely'/);
+});
+
+test('database couples timer state to in-progress OT lifecycle', async () => {
+  const sql = await readFile(timerCouplingMigrationUrl, 'utf8');
+
+  assert.match(sql, /before update of status, timer_status/i);
+  assert.match(sql, /v_timer_status in \('running', 'paused'\)[\s\S]*v_status <> 'in_progress'/i);
+  assert.match(sql, /v_status in \('completed', 'closed', 'cancelled', 'canceled'\)[\s\S]*v_timer_status <> 'idle'/i);
+});
+
+test('canonical close never derives downtime or availability from OT wall-clock time', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.doesNotMatch(route, /equipment_availability/);
+  assert.doesNotMatch(route, /availability_percentage/);
+  assert.doesNotMatch(route, /Date\.now\(\) - startTime\.getTime\(\)/);
+  assert.doesNotMatch(route, /down_time_hours:\s*downtime/);
+  assert.match(route, /actual_duration_hours: effectiveHours/);
 });
 
 
