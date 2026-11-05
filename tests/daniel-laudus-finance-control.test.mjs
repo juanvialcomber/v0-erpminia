@@ -239,3 +239,17 @@ test('Finance Assets candidate decisions remain ED-only', () => {
   const route = fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
   assert.match(route, /export async function POST[\s\S]*requireModuleAccess\(request, MODULE_KEYS\.FIN_FINANZAS, true\)/);
 });
+
+
+test('Daniel finance manager can read finance calendar, documents and Laudus asset review without broadening writes', () => {
+  const proxy = fs.readFileSync('proxy.ts','utf8');
+  assert.match(proxy, /path === '\/api\/calendar\/operational'/);
+  assert.match(proxy, /path === '\/api\/documents\/list' \|\| path === '\/api\/documents\/stats'/);
+  assert.match(proxy, /path === '\/api\/integrations\/laudus\/fixed-asset-review'/);
+  assert.match(proxy, /return readOnly/);
+});
+
+test('Laudus fixed asset review decisions remain ED-only', () => {
+  const route = fs.readFileSync('app/api/integrations/laudus/fixed-asset-review/route.ts','utf8');
+  assert.match(route, /export async function POST[\s\S]*requireModuleAccess\(request, MODULE_KEYS\.FIN_FINANZAS, true\)/);
+});
