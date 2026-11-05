@@ -372,8 +372,6 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
 
       {inboxUnavailable ? <StatePanel tone="warning" title={t.roleUnresolvedTitle} description={t.roleUnresolvedDescription} /> : null}
 
-      {mode === 'management' && !personaKey ? <HomeDecisionPriorities dictionary={dictionary} locale={locale} /> : null}
-
       {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} coverageAvailable={inbox.data?.coverageAvailable} /> : null}
 
       {personaKey === 'daniel_finance' ? <LaudusFinanceStatusStrip compact /> : null}
@@ -411,6 +409,8 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
           </div>
         ))}
       </section> : null}
+
+      {mode === 'management' && !personaKey ? <HomeDecisionPriorities dictionary={dictionary} locale={locale} /> : null}
 
       <section className="space-y-3">
         <div><h2 className="text-lg font-semibold">{t.shortcutsTitle}</h2><p className="text-sm text-muted-foreground">{t.shortcutsSubtitle}</p></div>
