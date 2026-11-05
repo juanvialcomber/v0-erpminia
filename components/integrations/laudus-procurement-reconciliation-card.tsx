@@ -39,7 +39,7 @@ const fetcher = async (url: string): Promise<Payload> => {
 const pct = (part: number, total: number) =>
   total ? `${((part / total) * 100).toLocaleString('es-CL', { maximumFractionDigits: 1 })}%` : '0%';
 
-export function LaudusProcurementReconciliationCard() {
+export function LaudusProcurementReconciliationCard({ canEdit = false }: { canEdit?: boolean }) {
   const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/procurement-reconciliation',
     fetcher,
@@ -96,9 +96,13 @@ export function LaudusProcurementReconciliationCard() {
           Vista determinística. La aplicación requiere acción humana y sólo completa campos faltantes; nunca sobrescribe valores existentes ni escribe en Laudus.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button size="sm" onClick={applyBatch} disabled={applying || !data?.summary.fullyResolvable}>
-            {applying ? 'Aplicando…' : 'Aplicar 25 resolubles'}
-          </Button>
+          {canEdit ? (
+            <Button size="sm" onClick={applyBatch} disabled={applying || !data?.summary.fullyResolvable}>
+              {applying ? 'Aplicando…' : 'Aplicar 25 resolubles'}
+            </Button>
+          ) : (
+            <span className="text-xs font-medium text-muted-foreground">Solo lectura</span>
+          )}
           <span className="text-xs text-muted-foreground">Cada OC se revalida dentro de la transacción antes de modificar MOTIL.</span>
         </div>
       </div>
