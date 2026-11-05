@@ -70,9 +70,8 @@ test('weekly maintenance plan reuses scheduled work and readiness instead of cre
 });
 
 
-test('personal inbox never assigns an impossible OT approval action to Mauricio', async () => {
+test('personal inbox assigns OT approval actions to Ariel and Mauricio only', async () => {
   const inbox = await readFile(new URL('../lib/maintenance/personal-work-order-inbox.ts', import.meta.url), 'utf8');
-  assert.match(inbox, /full_name \|\| ''\) === 'Ariel López'/);
-  assert.doesNotMatch(inbox, /\['Ariel López', 'Mauricio Astudillo'\]\.includes/);
-  assert.match(inbox, /only Ariel can approve an OT/);
+  assert.match(inbox, /\['Ariel López', 'Mauricio Astudillo'\]\.includes/);
+  assert.match(inbox, /canonical OT approvers/);
 });
