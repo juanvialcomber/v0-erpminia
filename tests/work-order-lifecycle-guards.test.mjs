@@ -46,16 +46,18 @@ test('close endpoint reserves close to assigned executor and delegates the atomi
   assert.match(route, /requireAssignedMaintenanceExecution/);
   assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(route, /accessLevel !== 'ED'/);
-  assert.match(route, /rpc\('close_work_order_with_timer_v2'/);
+  assert.match(route, /rpc\('close_work_order_with_timer_v3'/);
   assert.match(atomic, /perform public\.close_work_order_safely\(p_work_order_id\)/);
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
 
-test('generic work-order completion already delegates to canonical RPC', async () => {
+test('generic work-order completion delegates to the same atomic close v3 path', async () => {
   const route = await readFile(workOrderRouteUrl, 'utf8');
 
   assert.match(route, /if \(body\.status === 'completed'\)/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.match(route, /rpc\('close_work_order_with_timer_v3'/);
+  assert.doesNotMatch(route, /rpc\('close_work_order_safely'/);
 });
 
 
