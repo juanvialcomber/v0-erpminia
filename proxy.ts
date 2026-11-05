@@ -28,6 +28,7 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/integrations/n3uralia-tax/whatsapp-send',
   '/api/integrations/n3uralia-tax/rotate-webhook-token',
   '/api/integrations/n3uralia-tax/verify-webhook-e2e',
+  '/api/integrations/n3uralia-tax/motil-relay-probe',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
