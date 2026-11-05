@@ -51,3 +51,14 @@ test('payables workspace reduces overdue review by supplier concentration',()=>{
   assert.match(page,/Prioriza revisión por proveedor antes de recorrer factura por factura/);
   assert.match(page,/No implica prioridad automática de pago ni evaluación de riesgo del proveedor/);
 });
+
+
+test('treasury exposes Laudus open exposure as read-only evidence without creating actionable MOTIL payables',()=>{
+  assert.match(route,/laudus_purchase_invoice_payment_status_service_v1/);
+  assert.match(route,/observedPayables/);
+  assert.match(route,/readOnly: true/);
+  assert.match(route,/No constituye una CxP aprobada en MOTIL ni habilita pagos/);
+  assert.match(page,/CxP visible desde Laudus/);
+  assert.match(page,/Laudus · sólo lectura/);
+  assert.match(page,/No se puede registrar pago desde estas partidas hasta que la obligación sea promovida y aprobada en MOTIL/);
+});
