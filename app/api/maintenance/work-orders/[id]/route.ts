@@ -322,8 +322,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const [asset, costSummary] = await Promise.all([loadCanonicalAsset(context, data.canonical_asset_id || null), loadCostSummary(context, id)]);
     return NextResponse.json({ data: mapWorkOrder(data, asset, costSummary) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const typed = error as { code?: string; message?: string };
+    const message = typed?.message || (error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo');
+    const status = typed?.code === '55000' || typed?.code === 'P0001' ? 409 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 
