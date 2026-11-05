@@ -38,9 +38,9 @@ test('mechanic must explicitly declare fluid and residue state', () => {
   assert.match(closeUi, /No se recuperó residuo/);
 });
 
-test('Ariel is the reviewer and sees mechanic fluid evidence before approval', () => {
+test('Ariel or Mauricio can review mechanic fluid evidence before approval', () => {
   assert.match(reviewRoute, /String\(data\.full_name \|\| ''\) === 'Ariel López'/);
-  assert.match(reviewRoute, /Ariel López debe revisar y aprobar la OT/);
+  assert.match(reviewRoute, /Ariel López o Mauricio Astudillo deben revisar y aprobar la OT/);
   assert.match(reviewRoute, /fluid_closure_declared/);
   assert.match(reviewRoute, /declared_by_assigned_executor/);
   assert.match(reviewUi, /Aceites y residuos/);
@@ -88,7 +88,7 @@ test('already completed OT can receive an explicit late assigned-mechanic declar
   assert.doesNotMatch(closureRoute, /\.update\(\{\s*status:/);
 });
 
-test('legacy OT closed before policy READY can be approved by Ariel without invented fluid declaration', () => {
+test('legacy OT closed before policy READY can be approved by authorized reviewers without invented fluid declaration', () => {
   assert.match(reviewRoute, /FLUID_DECLARATION_REQUIRED_FROM = Date\.parse\('2026-11-04T18:15:53\.252Z'\)/);
   assert.match(reviewRoute, /function isLegacyFluidDeclarationExempt/);
   assert.match(reviewRoute, /order\.status !== 'completed'/);
