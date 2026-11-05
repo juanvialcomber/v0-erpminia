@@ -8,7 +8,7 @@ const viewerMode = await fs.readFile('lib/maintenance/viewer-mode.ts', 'utf8');
 test('maintenance viewer context preserves canonical cargo and promotes assigned work to execution mode', () => {
   assert.match(route, /const baseMode = resolveMaintenanceViewerMode\(cargoName\)/);
   assert.match(route, /hasAssignedOperationalWork/);
-  assert.match(route, /hasAssignedOperationalWork \? 'execution' : baseMode/);
+  assert.match(route, /hasAssignedOperationalWork && !authority\.canPlan \? 'execution' : baseMode/);
   assert.match(route, /canEdit: authority\.canPlan \|\| hasAssignedOperationalWork/);
   assert.match(route, /permissions: \{/);
   assert.match(route, /canPlan: authority\.canPlan/);
