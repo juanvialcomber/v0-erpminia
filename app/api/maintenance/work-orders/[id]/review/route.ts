@@ -40,7 +40,7 @@ async function authorizeRead(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (accessLevel === 'ED') return context;
+  if (accessLevel === 'ED' && context.role !== 'tecnico') return context;
   const assigned = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (!assigned.ok) return { ok: false as const, response: assigned.response };
   return context;
