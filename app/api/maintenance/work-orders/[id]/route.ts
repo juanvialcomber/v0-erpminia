@@ -190,7 +190,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = (await request.json()) as WorkOrderPatchPayload;
     const { data: currentOrderState, error: currentOrderStateError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('status,work_type,priority')
+      .select('status,title,description,work_type,priority,scheduled_date,assigned_person_id,assigned_to_name,cost_center_id,actual_duration_hours,root_cause,preventive_actions,meter_reading,meter_unit')
       .eq('id', id)
       .eq('organization_id', context.organizationId)
       .single();
@@ -367,20 +367,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
     if (error) throw error;
-    const changedFields = ['title','description','work_type','priority','scheduled_date','status']
-      .filter((key) => updateData[key] !== undefined);
+    const auditableFields = [
+      'status', 'title', 'description', 'work_type', 'priority', 'scheduled_date',
+      'assigned_person_id', 'assigned_to_name', 'cost_center_id',
+      'actual_duration_hours', 'root_cause', 'preventive_actions', 'meter_reading', 'meter_unit',
+    ];
+    const changedFields = auditableFields.filter((key) =>
+      updateData[key] !== undefined
+      && String((currentOrderState as Record<string, unknown>)[key] ?? '') !== String(data[key] ?? '')
+    );
     if (changedFields.length > 0) {
+      const changes = Object.fromEntries(changedFields.map((key) => [
+        key,
+        {
+          previous: (currentOrderState as Record<string, unknown>)[key] ?? null,
+          next: data[key] ?? null,
+        },
+      ]));
       const { error: eventError } = await context.supabase.from('work_order_events').insert({
         organization_id: context.organizationId,
         work_order_id: id,
         canonical_asset_id: data.canonical_asset_id || null,
-        event_type: body.status === 'cancelled' ? 'work_order_cancelled' : 'work_order_updated',
+        event_type: 'work_order_updated',
         event_at: new Date().toISOString(),
         actor_id: context.authUserId,
+        actor_name: context.userName || context.userEmail || null,
         source_table: 'maintenance_work_orders',
         source_record_id: id,
-        summary: body.status === 'cancelled' ? 'Orden anulada por usuario autorizado' : 'Orden actualizada por usuario autorizado',
-        payload: { changed_fields: changedFields },
+        summary: 'Orden actualizada por usuario autorizado',
+        payload: { changed_fields: changedFields, changes },
       });
       if (eventError) throw eventError;
     }
