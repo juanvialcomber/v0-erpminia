@@ -4,6 +4,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
+const OBSERVED_PAYABLES_PAGE_SIZE = 1000;
+const OBSERVED_PAYABLES_MAX_ROWS = 5000;
+
+async function fetchObservedLaudusPayables(
+  supabase: Awaited<ReturnType<typeof getOrganizationContext>> extends { ok: true; supabase: infer T } ? T : never,
+  organizationId: string,
+) {
+  const rows: Array<Record<string, any>> = [];
+
+  for (let from = 0; from < OBSERVED_PAYABLES_MAX_ROWS; from += OBSERVED_PAYABLES_PAGE_SIZE) {
+    const to = from + OBSERVED_PAYABLES_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,currency,paid_amount,outstanding_amount,payment_count,last_payment_at,payment_status')
+      .eq('organization_id', organizationId)
+      .eq('currency', 'CLP')
+      .in('payment_status', ['unpaid', 'partially_paid'])
+      .gt('outstanding_amount', 0)
+      .order('due_date', { ascending: true, nullsFirst: true })
+      .range(from, to);
+
+    if (error) return { data: rows, error };
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < OBSERVED_PAYABLES_PAGE_SIZE) break;
+  }
+
+  return { data: rows, error: null };
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
   if (!access.authorized) return access.response;
@@ -17,14 +47,7 @@ export async function GET(request: NextRequest) {
   ] = await Promise.all([
     context.supabase.from('procurement_accounts_payable_v1').select('*').eq('organization_id', context.organizationId).order('due_date', { ascending: true, nullsFirst: true }),
     context.supabase.from('procurement_supplier_payments').select('id,organization_id,payable_id,amount,currency,payment_date,payment_reference,notes,recorded_at,reconciled_at,reconciliation_reference,reconciliation_notes').eq('organization_id', context.organizationId).order('payment_date', { ascending: false }),
-    context.supabase
-      .from('laudus_purchase_invoice_payment_status_service_v1')
-      .select('purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,currency,paid_amount,outstanding_amount,payment_count,last_payment_at,payment_status')
-      .eq('organization_id', context.organizationId)
-      .eq('currency', 'CLP')
-      .in('payment_status', ['unpaid', 'partially_paid'])
-      .gt('outstanding_amount', 0)
-      .order('due_date', { ascending: true, nullsFirst: true }),
+    fetchObservedLaudusPayables(context.supabase, context.organizationId),
   ]);
   if (payablesError || paymentsError) {
     console.error('[finance/payables]', payablesError || paymentsError);
