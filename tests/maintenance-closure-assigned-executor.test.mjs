@@ -61,8 +61,8 @@ test('closure HTTP routes preserve assigned-executor capability', () => {
   assert.match(runtimeRoute, /requireAssignedMaintenanceExecution/);
 });
 
-test('closure queue becomes editable and scoped for a non-ED assigned executor', () => {
-  assert.match(closeQueue, /accessLevel !== 'ED'/);
+test('closure queue scopes field technicians even when their module matrix is ED', () => {
+  assert.match(closeQueue, /canBypassAssignedMaintenanceExecution/);
   assert.match(closeQueue, /assigned_person_id/);
   assert.match(closeQueue, /canEditAssigned = allowedWorkOrderIds\.length > 0/);
   assert.match(closeQueue, /canEdit: accessLevel === 'ED' \|\| canEditAssigned/);
