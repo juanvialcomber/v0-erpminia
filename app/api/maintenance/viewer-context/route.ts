@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
 import { resolveWorkshopHeadScope } from '@/lib/maintenance/workshop-site-scope';
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest) {
     const canCreateWorkOrder = authority.canCreateWorkOrder;
     const canCreateEmergencyWorkOrder = authority.canCreateEmergencyWorkOrder;
 
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
     let hasAssignedOperationalWork = false;
     if (creatorPerson?.id) {
       const { count, error: assignedError } = await context.supabase
@@ -60,7 +58,7 @@ export async function GET(request: NextRequest) {
       hasAssignedOperationalWork = (count || 0) > 0;
     }
 
-    const mode = accessLevel === 'ED' ? baseMode : hasAssignedOperationalWork ? 'execution' : baseMode;
+    const mode = hasAssignedOperationalWork && !authority.canPlan ? 'execution' : baseMode;
 
     return NextResponse.json({
       mode,
