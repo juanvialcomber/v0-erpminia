@@ -136,6 +136,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: closeError.message || 'No se pudo cerrar la orden de trabajo' }, { status });
     }
 
+    const { error: resubmitReviewError } = await context.supabase
+      .from('work_order_supervisor_reviews')
+      .update({ status: 'pending', resubmitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .eq('status', 'rejected');
+    if (resubmitReviewError) throw resubmitReviewError;
+
     const { data: updatedOT, error: reloadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     if (reloadError) throw reloadError;
 
