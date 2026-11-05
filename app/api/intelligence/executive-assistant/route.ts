@@ -48,6 +48,7 @@ async function callN3RouterFallback(instructions: string, input: string) {
   const token = process.env.N3_MODEL_ROUTER_MOTIL_TOKEN?.trim();
   if (!url || !token) throw new Error('N3 Model Router fallback no está configurado');
 
+  // Trusted Sources keeps the protected N3 Router private while allowing this preview service call.
   const oidcToken = process.env.VERCEL_OIDC_TOKEN?.trim();
   const response = await fetch(url, {
     method: 'POST',
