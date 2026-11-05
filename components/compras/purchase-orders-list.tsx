@@ -46,12 +46,14 @@ export function PurchaseOrdersList() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [scope, setScope] = useState<'current' | 'history'>('current');
 
   const params = new URLSearchParams({
     page: String(page),
     pageSize: String(pageSize),
     ...(search && { search }),
     ...(status && { status }),
+    scope,
   });
 
   const { data, isLoading, error } = useSWR(
@@ -69,11 +71,21 @@ export function PurchaseOrdersList() {
       <CardHeader>
         <CardTitle>Órdenes de Compra</CardTitle>
         <CardDescription>
-          {pagination.total} órdenes de compra importadas · {pagination.totalPages > 0 ? `Página ${page + 1} de ${pagination.totalPages}` : ''}
+          {scope === 'current' ? 'Compras vigentes y operación actual.' : 'Archivo histórico importado; no representa compras vigentes.'}
+          {pagination.totalPages > 0 ? ` · Página ${page + 1} de ${pagination.totalPages}` : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Select value={scope} onValueChange={(v) => { setScope(v as 'current' | 'history'); setPage(0); }}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Vigentes</SelectItem>
+              <SelectItem value="history">Histórico</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input

@@ -82,6 +82,8 @@ export async function GET(request: NextRequest) {
       suppliers,
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
       source: 'public.canonical_suppliers_v1',
+      dataClass: 'historical_baseline',
+      warning: 'Directorio base importado el 4-ago-2026; Laudus se mantiene como fuente ERP separada hasta conciliación.',
       canonical: true,
     });
   } catch (error) {
