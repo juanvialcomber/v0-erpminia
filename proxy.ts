@@ -153,6 +153,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (financeIntegrationRoutes.has(path)) {
     return path === '/api/integrations/laudus/finance-review-feedback' ? true : readOnly;
   }
+  if (path === '/api/integrations/laudus/fixed-asset-review') return true;
 
   const financeValueRoutes = new Set([
     '/api/value/finance-baseline',
@@ -174,6 +175,8 @@ function financeManagerAllowed(path: string, method: string): boolean {
 
   if (path.startsWith('/api/finance/')) return false;
   if (path.startsWith('/api/compras/')) return readOnly;
+  if (path === '/api/calendar/operational') return readOnly;
+  if (path === '/api/documents/list' || path === '/api/documents/stats') return readOnly;
   if (path === '/api/cost-centers' || path.startsWith('/api/cost-centers/')) return true;
   return false;
 }
