@@ -23,6 +23,7 @@ type WorkOrderPatchPayload = {
   meter_reading?: number | string | null;
   meter_unit?: string | null;
   cost_center_id?: string | null;
+  cancel_reason?: string | null;
 };
 
 function progressFromStatus(status: string | null) {
@@ -250,6 +251,42 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }, { status: 409 });
       }
     }
+    if (body.status === 'cancelled' || body.status === 'canceled') {
+      if (!hasModuleWrite) {
+        return NextResponse.json({ error: 'Solo un usuario autorizado de mantenimiento puede anular una OT.' }, { status: 403 });
+      }
+      const cancelReason = String(body.cancel_reason || '').trim();
+      if (!cancelReason) {
+        return NextResponse.json({ error: 'Indica el motivo de anulación de la OT.' }, { status: 400 });
+      }
+      const { error: cancelError } = await context.supabase.rpc('cancel_work_order_safely_v1', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+        p_actor_id: context.userId,
+        p_actor_name: context.userName || context.userEmail || null,
+        p_reason: cancelReason,
+      });
+      if (cancelError) {
+        const status = cancelError.code === '22023' ? 400
+          : cancelError.code === '55000' ? 409
+            : cancelError.code === 'P0002' ? 404
+              : 500;
+        return NextResponse.json({ error: cancelError.message || 'No se pudo anular la orden de trabajo' }, { status });
+      }
+      const { data: cancelled, error: loadCancelledError } = await context.supabase
+        .from('maintenance_work_orders')
+        .select('*')
+        .eq('id', id)
+        .eq('organization_id', context.organizationId)
+        .single();
+      if (loadCancelledError) throw loadCancelledError;
+      const [asset, costSummary] = await Promise.all([
+        loadCanonicalAsset(context, cancelled.canonical_asset_id || null),
+        loadCostSummary(context, id),
+      ]);
+      return NextResponse.json({ data: mapWorkOrder(cancelled, asset, costSummary) });
+    }
+
     if (body.status === 'completed') {
       // Every OT closure must use the same assigned-executor, timer, fluid and evidence transaction.
       // Do not maintain a second completion path with weaker rules.
