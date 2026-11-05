@@ -180,25 +180,18 @@ export default function DocumentIntakePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-5">
+      <header className="flex flex-col gap-3 border-b border-border/70 pb-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Documentación</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">Ingesta documental</h1>
-          <p className="mt-2 max-w-3xl text-muted-foreground">
-            Recibe originales desde el Windows Server, Laudus o las áreas. Los archivos entran a una bandeja privada antes de clasificarse y vincularse a MOTIL.
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Ingesta documental</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Sube archivos o carpetas y conserva fuente, área y ruta original antes de clasificarlos en MOTIL.
           </p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/dashboard/documentos-gestion">Volver a control documental</Link>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/dashboard/documentos-gestion">Control documental</Link>
         </Button>
       </header>
-
-      <div className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
-        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Recibidos</p><p className="mt-1 text-2xl font-semibold">{data?.stats?.total || 0}</p></div>
-        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Por clasificar</p><p className="mt-1 text-2xl font-semibold">{data?.stats?.pending || 0}</p></div>
-        <div className="bg-card p-4"><p className="text-xs text-muted-foreground">Procesados</p><p className="mt-1 text-2xl font-semibold">{data?.stats?.processed || 0}</p></div>
-      </div>
 
       <Card>
         <CardContent className="space-y-5 pt-6">
@@ -222,7 +215,7 @@ export default function DocumentIntakePage() {
           </div>
 
           <div
-            className="rounded-lg border border-dashed p-8 text-center transition-colors hover:bg-muted/30"
+            className="rounded-lg border border-dashed p-6 text-center transition-colors hover:bg-muted/30 md:p-7"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
@@ -289,6 +282,12 @@ export default function DocumentIntakePage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
+        <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Recibidos</p><p className="mt-1 text-xl font-semibold">{data?.stats?.total || 0}</p></div>
+        <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Por clasificar</p><p className="mt-1 text-xl font-semibold">{data?.stats?.pending || 0}</p></div>
+        <div className="bg-card p-3"><p className="text-xs text-muted-foreground">Procesados</p><p className="mt-1 text-xl font-semibold">{data?.stats?.processed || 0}</p></div>
+      </div>
 
       <section className="space-y-3">
         <div>
