@@ -30,6 +30,8 @@ const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sa
 
 type Payable = { id:string; invoice_number:string; supplier_name:string; approved_amount:number; paid_amount:number; outstanding_amount:number; due_date?:string|null; days_to_due?:number|null; status:string; currency:string };
 type Payment = { id:string; payable_id:string; amount:number; currency:string; payment_date:string; payment_reference?:string|null; notes?:string|null; reconciled_at?:string|null; reconciliation_reference?:string|null; reconciliation_notes?:string|null };
+type ObservedPayable = { purchase_invoice_external_id:string; doc_number?:string|null; supplier_name?:string|null; issued_date?:string|null; due_date?:string|null; total_amount:number; currency:string; paid_amount:number; outstanding_amount:number; payment_count:number; last_payment_at?:string|null; payment_status:string };
+type ObservedPayables = { source:string; readOnly:boolean; openItems:number; openAmountClp:number; partiallyPaidItems:number; unpaidItems:number; items:ObservedPayable[]; semantics:string };
 type DialogMode = 'due' | 'pay' | 'reconcile' | null;
 
 export default function PayablesPage() {
@@ -50,6 +52,7 @@ export default function PayablesPage() {
   const payables: Payable[] = data?.payables || [];
   const payments: Payment[] = data?.payments || [];
   const canEdit = data?.canEdit === true;
+  const observedPayables: ObservedPayables | null = data?.observedPayables || null;
 
   const outstandingByCurrency = useMemo(() => {
     const totals = new Map<string, number>();
@@ -150,6 +153,50 @@ export default function PayablesPage() {
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
     <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card>
+
+    {observedPayables && observedPayables.openItems > 0 ? (
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición observada</p>
+              <CardTitle className="mt-1">CxP visible desde Laudus</CardTitle>
+              <CardDescription>{observedPayables.semantics}</CardDescription>
+            </div>
+            <Badge variant="outline">Laudus · sólo lectura</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Saldo abierto</p>
+              <p className="mt-1 text-xl font-semibold">{money(observedPayables.openAmountClp, 'CLP')}</p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Facturas abiertas</p>
+              <p className="mt-1 text-xl font-semibold">{number(observedPayables.openItems)}</p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Parciales · impagas</p>
+              <p className="mt-1 text-xl font-semibold">{number(observedPayables.partiallyPaidItems)} · {number(observedPayables.unpaidItems)}</p>
+            </div>
+          </div>
+          <div className="divide-y rounded-lg border">
+            {observedPayables.items.slice(0, 12).map((row) => (
+              <div key={row.purchase_invoice_external_id} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_140px_120px] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{row.supplier_name || 'Proveedor por revisar'} · Factura {row.doc_number || 's/n'}</p>
+                  <p className="text-xs text-muted-foreground">{row.payment_status === 'partially_paid' ? 'Pago parcial' : 'Impaga'}{row.due_date ? ` · vence ${String(row.due_date).slice(0,10)}` : ''}</p>
+                </div>
+                <p className="text-xs text-muted-foreground sm:text-right">Pagado {money(row.paid_amount, row.currency || 'CLP')}</p>
+                <p className="text-sm font-semibold tabular-nums sm:text-right">{money(row.outstanding_amount, row.currency || 'CLP')}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">No se puede registrar pago desde estas partidas hasta que la obligación sea promovida y aprobada en MOTIL.</p>
+        </CardContent>
+      </Card>
+    ) : null}
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">CxP MOTIL pendientes</p>{outstandingByCurrency.length ? <div className="mt-1 space-y-1">{outstandingByCurrency.map(([currency,value]) => <p key={currency} className="text-xl font-semibold">{money(value,currency)}</p>)}</div> : <p className="mt-1 text-2xl font-semibold">0</p>}</CardContent></Card>
