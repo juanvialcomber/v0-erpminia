@@ -2,14 +2,16 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
+import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
+  const authority = await getMaintenanceActorAuthority(context);
+  const assigned = await requireAssignedMaintenanceExecution(context, id);
+  if (!authority.canReadAllWorkOrders && !assigned.ok) return assigned.response;
 
   try {
     const [{ data: cost, error: costError }, { data: snapshots, error: snapshotError }] = await Promise.all([
