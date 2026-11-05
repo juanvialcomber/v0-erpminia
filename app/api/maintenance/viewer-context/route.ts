@@ -11,43 +11,15 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const { data: profile, error: profileError } = await context.supabase
-      .from('profiles')
-      .select('cargo_id')
-      .eq('id', context.userId)
-      .eq('organization_id', context.organizationId)
-      .maybeSingle();
-    if (profileError) throw profileError;
-
-    let cargoName: string | null = null;
-    if (profile?.cargo_id) {
-      const { data: cargo, error: cargoError } = await context.supabase
-        .from('cargos')
-        .select('name')
-        .eq('id', profile.cargo_id)
-        .maybeSingle();
-      if (cargoError) throw cargoError;
-      cargoName = cargo?.name || null;
-    }
-
-    const baseMode = resolveMaintenanceViewerMode(cargoName);
-
-    const { data: creatorPerson, error: creatorPersonError } = await context.supabase
-      .from('people')
-      .select('id,full_name')
-      .eq('organization_id', context.organizationId)
-      .eq('profile_id', context.userId)
-      .eq('employment_status', 'active')
-      .maybeSingle();
-    if (creatorPersonError) throw creatorPersonError;
-
     const authority = await getMaintenanceActorAuthority(context);
+    const cargoName = authority.cargoName;
+    const baseMode = resolveMaintenanceViewerMode(cargoName);
     const workshopScope = await resolveWorkshopHeadScope(context);
     const canCreateWorkOrder = authority.canCreateWorkOrder;
     const canCreateEmergencyWorkOrder = authority.canCreateEmergencyWorkOrder;
 
     let hasAssignedOperationalWork = false;
-    if (creatorPerson?.id) {
+    if (authority.personId) {
       const { count, error: assignedError } = await context.supabase
         .from('maintenance_work_orders')
         .select('id', { head: true, count: 'exact' })
