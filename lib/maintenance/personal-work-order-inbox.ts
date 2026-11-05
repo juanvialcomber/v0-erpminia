@@ -61,11 +61,11 @@ function toInboxTask(
   const scheduled = dateKey ? `Programada: ${formatWorkOrderDate(dateKey)}` : 'Sin fecha de programación';
   const title = kind === 'approval' ? `Aprobar cierre · ${number}`
     : kind === 'execution' ? `${order.status === 'in_progress' ? 'Continuar' : 'Ejecutar'} · ${number}`
-    : `Supervisar ejecución · ${number}`;
+    : `Intervenir atraso · ${number}`;
   const evidenceSummary = [
     order.title || 'Orden de mantenimiento',
     kind === 'approval' ? 'Ejecución finalizada; pendiente de aprobación'
-      : kind === 'followup' ? `Asignada a ${order.assigned_to_name || 'responsable por confirmar'}`
+      : kind === 'followup' ? `Ejecución vencida · asignada a ${order.assigned_to_name || 'responsable por confirmar'}`
       : 'Asignada a tu usuario',
     scheduled,
   ].join(' · ');
@@ -83,7 +83,7 @@ function toInboxTask(
     status: kind === 'approval' ? 'pending' : String(order.status || 'open'),
     responsibility: kind === 'followup' ? 'support' : 'owner',
     role_action: kind === 'approval' ? 'Revisar y aprobar evidencia' : kind === 'execution'
-      ? 'Ejecutar trabajo asignado' : 'Dar seguimiento a la programación',
+      ? 'Ejecutar trabajo asignado' : 'Reprogramar, destrabar o confirmar nueva fecha con el responsable',
     occurred_at: order.created_at ? `${order.created_at.replace(' ', 'T')}Z` : null,
     due_at: kind === 'approval' || !dateKey ? null : `${dateKey}T23:59:59Z`,
     escalation_at: null,
@@ -91,6 +91,51 @@ function toInboxTask(
     urgency_state: overdue ? 'overdue' : todayOrTomorrow || kind === 'approval' ? 'due_soon' : 'pending',
   };
 }
+function planningExceptionTask(
+  context: OrganizationSuccessContext,
+  cargoId: string,
+  cargoName: string,
+  orders: Order[],
+  today: string,
+): PersonalMaintenanceTask | null {
+  const overdue = orders.filter((order) => {
+    const dateKey = normalizeWorkOrderDateKey(order.scheduled_date);
+    return Boolean(dateKey && dateKey < today && order.status !== 'in_progress');
+  });
+  if (!overdue.length) return null;
+
+  const earliestDate = overdue
+    .map((order) => normalizeWorkOrderDateKey(order.scheduled_date))
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] || null;
+  const assignees = Array.from(new Set(overdue.map((order) => order.assigned_to_name).filter(Boolean))).slice(0, 3);
+  const critical = overdue.some((order) => String(order.priority || '').toLowerCase() === 'critical');
+
+  return {
+    organization_id: context.organizationId,
+    cargo_id: cargoId,
+    cargo_name: cargoName,
+    task_key: 'maintenance_planning:overdue_not_started',
+    domain: 'maintenance',
+    severity: critical ? 'critical' : 'warning',
+    priority_score: critical ? 92 : 82,
+    title: `${overdue.length} OT vencida${overdue.length === 1 ? '' : 's'} sin iniciar`,
+    evidence_summary: [
+      `${overdue.length} OT del plan superaron su fecha y siguen abiertas`,
+      assignees.length ? `Responsables: ${assignees.join(', ')}` : null,
+      'Revisar programación; no implica ejecutar personalmente cada OT',
+    ].filter(Boolean).join(' · '),
+    status: 'pending',
+    responsibility: 'support',
+    role_action: 'Reprogramar, destrabar o confirmar nueva fecha con el responsable',
+    occurred_at: overdue.map((order) => order.created_at).filter(Boolean).sort()[0] || null,
+    due_at: earliestDate ? `${earliestDate}T23:59:59Z` : null,
+    escalation_at: null,
+    age_hours: null,
+    urgency_state: 'overdue',
+  };
+}
+
 function todayPlusOne(today: string) {
   const date = new Date(`${today}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + 1);
@@ -166,10 +211,21 @@ export async function loadPersonalMaintenanceTasks(
 
   const now = chileTodayDateKey();
   const tasks = new Map<string, PersonalMaintenanceTask>();
-  for (const order of created) {
+
+  // Planning ownership is not the same as personal execution.
+  // Created OTs stay in the weekly plan unless they become a real exception.
+  const overdueInProgress = created.filter((order) => {
+    const dateKey = normalizeWorkOrderDateKey(order.scheduled_date);
+    return order.status === 'in_progress' && Boolean(dateKey && dateKey < now);
+  });
+  for (const order of overdueInProgress) {
     tasks.set(order.id, toInboxTask(context, cargoId, cargoName, order, 'followup', now));
   }
-  // A person's own assignment takes precedence over merely having created the OT.
+
+  const planningException = planningExceptionTask(context, cargoId, cargoName, created, now);
+  if (planningException) tasks.set(planningException.task_key, planningException);
+
+  // A person's own assignment takes precedence over planning/follow-up signals.
   for (const order of assigned) {
     tasks.set(order.id, toInboxTask(context, cargoId, cargoName, order, 'execution', now));
   }
