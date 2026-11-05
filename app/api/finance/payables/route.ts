@@ -13,19 +13,34 @@ export async function GET(request: NextRequest) {
   const [
     { data: payables, error: payablesError },
     { data: payments, error: paymentsError },
-    { data: observedLaudus, error: observedLaudusError },
   ] = await Promise.all([
     context.supabase.from('procurement_accounts_payable_v1').select('*').eq('organization_id', context.organizationId).order('due_date', { ascending: true, nullsFirst: true }),
     context.supabase.from('procurement_supplier_payments').select('id,organization_id,payable_id,amount,currency,payment_date,payment_reference,notes,recorded_at,reconciled_at,reconciliation_reference,reconciliation_notes').eq('organization_id', context.organizationId).order('payment_date', { ascending: false }),
-    context.supabase
+  ]);
+
+  const observedLaudus: Array<Record<string, any>> = [];
+  let observedLaudusError: unknown = null;
+  const observedPageSize = 1000;
+  const observedMaxRows = 5000;
+  for (let from = 0; from < observedMaxRows; from += observedPageSize) {
+    const { data, error } = await context.supabase
       .from('laudus_purchase_invoice_payment_status_service_v1')
       .select('purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,currency,paid_amount,outstanding_amount,payment_count,last_payment_at,payment_status')
       .eq('organization_id', context.organizationId)
       .eq('currency', 'CLP')
       .in('payment_status', ['unpaid', 'partially_paid'])
       .gt('outstanding_amount', 0)
-      .order('due_date', { ascending: true, nullsFirst: true }),
-  ]);
+      .order('due_date', { ascending: true, nullsFirst: true })
+      .range(from, from + observedPageSize - 1);
+
+    if (error) {
+      observedLaudusError = error;
+      break;
+    }
+    const page = data || [];
+    observedLaudus.push(...page);
+    if (page.length < observedPageSize) break;
+  }
   if (payablesError || paymentsError) {
     console.error('[finance/payables]', payablesError || paymentsError);
     return NextResponse.json({ payables: [], payments: [], observedPayables: null, canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
@@ -41,7 +56,7 @@ export async function GET(request: NextRequest) {
     !isUatValue(row.payment_reference) && !isUatValue(row.reconciliation_reference),
   );
 
-  const observedRows = observedLaudusError ? [] : (observedLaudus || []);
+  const observedRows = observedLaudusError ? [] : observedLaudus;
   const observedSummary = observedRows.reduce(
     (summary, row) => {
       const amount = Number(row.outstanding_amount || 0);
