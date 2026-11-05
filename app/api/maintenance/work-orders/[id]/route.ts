@@ -378,41 +378,34 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       updateData.cost_center_id = nextCostCenterId;
     }
 
-    const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
-    if (error) throw error;
-    const auditableFields = [
-      'status', 'title', 'description', 'work_type', 'priority', 'scheduled_date',
-      'assigned_person_id', 'assigned_to_name', 'cost_center_id',
-      'actual_duration_hours', 'root_cause', 'preventive_actions', 'meter_reading', 'meter_unit',
-    ];
-    const changedFields = auditableFields.filter((key) =>
-      updateData[key] !== undefined
-      && String((currentOrderState as Record<string, unknown>)[key] ?? '') !== String(data[key] ?? '')
-    );
-    if (changedFields.length > 0) {
-      const changes = Object.fromEntries(changedFields.map((key) => [
-        key,
-        {
-          previous: (currentOrderState as Record<string, unknown>)[key] ?? null,
-          next: data[key] ?? null,
-        },
-      ]));
-      const { error: eventError } = await context.supabase.from('work_order_events').insert({
-        organization_id: context.organizationId,
-        work_order_id: id,
-        canonical_asset_id: data.canonical_asset_id || null,
-        event_type: 'work_order_updated',
-        event_at: new Date().toISOString(),
-        actor_id: context.authUserId,
-        actor_name: context.userName || context.userEmail || null,
-        source_table: 'maintenance_work_orders',
-        source_record_id: id,
-        summary: 'Orden actualizada por usuario autorizado',
-        payload: { changed_fields: changedFields, changes },
-      });
-      if (eventError) throw eventError;
+    delete updateData.updated_at;
+    const { error: updateError } = await context.supabase.rpc('update_work_order_with_audit_v1', {
+      p_organization_id: context.organizationId,
+      p_work_order_id: id,
+      p_actor_id: context.authUserId || context.userId,
+      p_actor_name: context.userName || context.userEmail || null,
+      p_changes: updateData,
+    });
+    if (updateError) {
+      const status = updateError.code === '22023' ? 400
+        : updateError.code === 'P0002' ? 404
+          : updateError.code === '55000' ? 409
+            : 500;
+      return NextResponse.json({ error: updateError.message || 'No se pudo actualizar la orden de trabajo' }, { status });
     }
-    const [asset, costSummary] = await Promise.all([loadCanonicalAsset(context, data.canonical_asset_id || null), loadCostSummary(context, id)]);
+
+    const { data, error: reloadError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('*')
+      .eq('id', id)
+      .eq('organization_id', context.organizationId)
+      .single();
+    if (reloadError) throw reloadError;
+
+    const [asset, costSummary] = await Promise.all([
+      loadCanonicalAsset(context, data.canonical_asset_id || null),
+      loadCostSummary(context, id),
+    ]);
     return NextResponse.json({ data: mapWorkOrder(data, asset, costSummary) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo actualizar la orden de trabajo';
