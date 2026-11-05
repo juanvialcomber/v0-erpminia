@@ -251,48 +251,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
     }
     if (body.status === 'completed') {
-      const { count: evidenceCount, error: evidenceError } = await context.supabase
-        .from('work_order_evidence_files')
-        .select('id', { head: true, count: 'exact' })
-        .eq('organization_id', context.organizationId)
-        .eq('work_order_id', id)
-        .eq('evidence_type', 'photo');
-      if (evidenceError) throw evidenceError;
-      if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
+      // Every OT closure must use the same assigned-executor, timer, fluid and evidence transaction.
+      // Do not maintain a second completion path with weaker rules.
+      if (!executionAccess.ok) return executionAccess.response;
 
-      const { data: completionOrder, error: completionOrderError } = await context.supabase
+      const normalizedHours = Number(body.actual_duration_hours);
+      const requestedHours = Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : null;
+      const { error: closeError } = await context.supabase.rpc('close_work_order_with_timer_v3', {
+        p_organization_id: context.organizationId,
+        p_work_order_id: id,
+        p_actor_id: context.userId,
+        p_actor_name: context.userName || context.userEmail || null,
+        p_actual_duration_hours: requestedHours,
+        p_root_cause: body.root_cause === undefined ? null : body.root_cause,
+        p_preventive_actions: body.preventive_actions === undefined ? null : body.preventive_actions,
+      });
+      if (closeError) {
+        const status = ['55000', 'P0001'].includes(String(closeError.code || '')) ? 409
+          : closeError.code === '42501' ? 403
+            : closeError.code === 'P0002' ? 404
+              : 500;
+        return NextResponse.json({ error: closeError.message || 'No se pudo cerrar la orden de trabajo' }, { status });
+      }
+
+      const { data: closed, error: loadError } = await context.supabase
         .from('maintenance_work_orders')
-        .select('work_type')
+        .select('*')
         .eq('id', id)
         .eq('organization_id', context.organizationId)
         .single();
-      if (completionOrderError) throw completionOrderError;
-      const isGeneralWork = String(completionOrder?.work_type || '').toLowerCase() === 'general';
-      const rootCause = String(body.root_cause || '').trim();
-      const preventiveActions = String(body.preventive_actions || '').trim();
-      const actualHours = Number(body.actual_duration_hours);
-      if (!isGeneralWork && !rootCause) return NextResponse.json({ error: 'Registra la causa principal antes de completar la orden.' }, { status: 400 });
-      if (!isGeneralWork && !preventiveActions) return NextResponse.json({ error: 'Registra la acción preventiva antes de completar la orden.' }, { status: 400 });
-      if (!Number.isFinite(actualHours) || actualHours <= 0) return NextResponse.json({ error: 'Registra las horas reales utilizadas antes de completar la orden.' }, { status: 400 });
-      const costSummary = await loadCostSummary(context, id);
-      const blockers: string[] = [];
-      if (costSummary.pendingParts > 0) blockers.push(`${costSummary.pendingParts} repuesto${costSummary.pendingParts === 1 ? '' : 's'} pendiente${costSummary.pendingParts === 1 ? '' : 's'} de instalar o devolver`);
-      if (costSummary.openLaborEntries > 0) blockers.push(`${costSummary.openLaborEntries} registro${costSummary.openLaborEntries === 1 ? '' : 's'} de trabajo aún abierto${costSummary.openLaborEntries === 1 ? '' : 's'}`);
-      if (blockers.length > 0) return NextResponse.json({ error: `No se puede completar la orden: ${blockers.join(' y ')}.`, blockers, costSummary }, { status: 409 });
-      const closureData: Record<string, unknown> = { actual_duration_hours: actualHours, updated_at: new Date().toISOString() };
-      if (!isGeneralWork) {
-        closureData.root_cause = rootCause;
-        closureData.preventive_actions = preventiveActions;
-      }
-      if (body.meter_reading !== undefined) closureData.meter_reading = body.meter_reading;
-      if (body.meter_unit !== undefined) closureData.meter_unit = body.meter_unit;
-      const { error: detailError } = await context.supabase.from('maintenance_work_orders').update(closureData).eq('id', id).eq('organization_id', context.organizationId);
-      if (detailError) throw detailError;
-      const { error: closeError } = await context.supabase.rpc('close_work_order_safely', { p_work_order_id: id });
-      if (closeError) throw closeError;
-      const { data: closed, error: loadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
       if (loadError) throw loadError;
-      const asset = await loadCanonicalAsset(context, closed.canonical_asset_id || null);
+      const [asset, costSummary] = await Promise.all([
+        loadCanonicalAsset(context, closed.canonical_asset_id || null),
+        loadCostSummary(context, id),
+      ]);
       return NextResponse.json({ data: mapWorkOrder(closed, asset, costSummary) });
     }
 
