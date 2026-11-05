@@ -8,7 +8,6 @@ import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-orde
 type MaintenanceWorkOrderRow = {
   id: string;
   asset_id: string | null;
-  start_date: string | null;
   timer_status?: string | null;
   actual_duration_hours?: number | string | null;
 };
@@ -107,20 +106,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const typedWorkOrder = workOrder as MaintenanceWorkOrderRow | null;
     if (woError || !typedWorkOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
-    let downtime = 0;
-    if (typedWorkOrder.start_date) {
-      const startTime = new Date(typedWorkOrder.start_date);
-      downtime = Math.max(0, (Date.now() - startTime.getTime()) / (1000 * 60 * 60));
-    }
-
     const normalizedHours = Number(actual_duration_hours);
     const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
     const effectiveHours = Math.max(
       Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
       Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-      downtime,
     );
-    const closureData: Record<string, unknown> = { actual_duration_hours: effectiveHours, down_time_hours: downtime, updated_at: new Date().toISOString() };
+    const closureData: Record<string, unknown> = {
+      actual_duration_hours: effectiveHours,
+      updated_at: new Date().toISOString(),
+    };
     if (root_cause !== undefined) closureData.root_cause = root_cause;
     if (preventive_actions !== undefined) closureData.preventive_actions = preventive_actions;
 
@@ -136,20 +131,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { data: updatedOT, error: reloadError } = await context.supabase.from('maintenance_work_orders').select('*').eq('id', id).eq('organization_id', context.organizationId).single();
     if (reloadError) throw reloadError;
 
-    if (typedWorkOrder.asset_id) {
-      const today = new Date().toISOString().split('T')[0];
-      const availabilityPercent = Math.max(0, 100 - (downtime / 24) * 100);
-      const { error: availError } = await context.supabase.from('equipment_availability').upsert({
-        equipment_id: typedWorkOrder.asset_id,
-        date: today,
-        availability_percentage: availabilityPercent,
-        downtime_minutes: Math.round(downtime * 60),
-        total_minutes: 24 * 60,
-      }, { onConflict: 'equipment_id,date' });
-      if (availError) console.error('[maintenance] Availability update error:', availError);
-    }
-
-    return NextResponse.json({ data: updatedOT, mttr: effectiveHours, downtime_hours: downtime, availability_percentage: Math.max(0, 100 - (downtime / 24) * 100) });
+    return NextResponse.json({ data: updatedOT, actual_duration_hours: effectiveHours });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cerrar la orden de trabajo';
     return NextResponse.json({ error: message }, { status: 500 });
