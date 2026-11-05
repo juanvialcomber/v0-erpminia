@@ -50,7 +50,7 @@ export function useAuth() {
       if (cookieIdentity.email || cookieIdentity.role || cookieIdentity.cargo) {
         setUser({
           email: cookieIdentity.email,
-          cargo: canonicalCargo || cookieIdentity.cargo,
+          cargo: cookieIdentity.cargo,
         });
         setRole(cookieIdentity.role);
       }
@@ -82,7 +82,7 @@ export function useAuth() {
           id: canonicalId,
           email: canonicalEmail,
           name: canonicalName,
-          cargo: cookieIdentity.cargo,
+          cargo: canonicalCargo || cookieIdentity.cargo,
         });
 
         if (canonicalRole && canonicalRole !== cookieIdentity.role) {
