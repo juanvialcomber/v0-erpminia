@@ -26,12 +26,15 @@ export async function GET(request:NextRequest){
   .select('id,source_kind,source_id,canonical_asset_id,title,description,work_type,priority,scheduled_date,planned_duration_hours,assigned_person_id,decision_status,revision,approved_at,linked_work_order_id,review_note')
   .eq('organization_id',context.organizationId).limit(250);
  if(error)return NextResponse.json({error:error.message},{status:500});
- return NextResponse.json({decisions:data||[],canWrite:access.canWrite});
+ const creationCapability=await getMaintenanceWorkOrderCreationCapability(context);
+ return NextResponse.json({decisions:data||[],canWrite:access.canWrite && creationCapability.canCreate});
 }
 export async function POST(request:NextRequest){
  const access=await requireModuleAccess(request,MODULE_KEYS.MANT_OPERACIONES,true);
  if(!access.authorized)return access.response;
  const context=await getOrganizationContext(request);if(!context.ok)return context.response;
+ const creationCapability=await getMaintenanceWorkOrderCreationCapability(context);
+ if(!creationCapability.canCreate)return NextResponse.json({error:'Tu cargo no puede editar ni aprobar planificación de mantenimiento'},{status:403});
  try{
  const input=await request.json() as DecisionInput;
  const action=input.action==='approve'?'approve':'save';
@@ -82,8 +85,6 @@ export async function POST(request:NextRequest){
  if(hours!==null&&(!Number.isFinite(Number(hours))||Number(hours)<0||Number(hours)>240))return NextResponse.json({error:'Horas inválidas'},{status:400});
  if(person&&(!UUID.test(person)))return NextResponse.json({error:'Responsable inválido'},{status:400});
  if(action==='approve'){
-  const capability=await getMaintenanceWorkOrderCreationCapability(context);
-  if(!capability.canCreate)return NextResponse.json({error:'Tu cargo no puede aprobar la generación de OT'},{status:403});
   if(!person||(!sourceAssetId&&workType!=='general'))return NextResponse.json({error:'Vincula un equipo canónico y asigna un ejecutor antes de aprobar'},{status:409});
   if(!plannedDate)return NextResponse.json({error:'Define una fecha para aprobar'},{status:409});
   const {data:assignee,error}=await context.supabase.from('people').select('id').eq('organization_id',context.organizationId).eq('id',person).eq('employment_status','active').not('profile_id','is',null).maybeSingle();
