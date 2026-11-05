@@ -1,5 +1,6 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { GREEN_NO_STORE, greenRequest, validWebhookToken } from '@/lib/messages/greenapi';
+import { GREEN_NO_STORE, greenRequest } from '@/lib/messages/greenapi';
 import { isGreenApiGroupId } from '@/lib/messages/greenapi-group-discovery.mjs';
 
 export const dynamic = 'force-dynamic';
@@ -8,11 +9,18 @@ function configuredGroupId() {
   return String(process.env.N3URALIA_ACCOUNTING_WHATSAPP_GROUP_ID || '').trim();
 }
 
+function validInternalToken(candidate: string | null) {
+  const expected = String(process.env.N3URALIA_ACCOUNTING_SEND_TOKEN || '');
+  if (!expected || !candidate || candidate.length > 1024) return false;
+  const a = createHash('sha256').update(candidate).digest();
+  const b = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
 export async function POST(request: NextRequest) {
   const bearerToken = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() || null;
-  const headerToken = request.headers.get('x-greenapi-token');
 
-  if (![bearerToken, headerToken].some((token) => validWebhookToken(token))) {
+  if (!validInternalToken(bearerToken)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401, headers: GREEN_NO_STORE });
   }
 
