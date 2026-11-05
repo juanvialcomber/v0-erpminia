@@ -100,6 +100,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const context = await authorize(request, id);
   if (!context.ok) return context.response;
+  const execution = await requireAssignedMaintenanceExecution(context, id);
+  if (!execution.ok) return execution.response;
 
   try {
     const workOrderCheck = await requireOpenOperationalWorkOrder(context, id);
