@@ -11,11 +11,18 @@ export function greenConfigured() {
     Boolean(process.env.GREENAPI_API_URL?.trim());
 }
 export function validWebhookToken(candidate: string | null): boolean {
-  const expected = process.env.GREENAPI_WEBHOOK_TOKEN;
-  if (!expected || expected.length < 32 || !candidate || candidate.length > 1024) return false;
-  const a = createHash('sha256').update(candidate).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
+  if (!candidate || candidate.length > 1024) return false;
+  const expectedTokens = [
+    process.env.GREENAPI_WEBHOOK_TOKEN,
+    process.env.GREENAPI_WEBHOOK_TOKEN_NEXT,
+  ].filter((value): value is string => Boolean(value && value.length >= 32));
+
+  if (!expectedTokens.length) return false;
+  const candidateHash = createHash('sha256').update(candidate).digest();
+  return expectedTokens.some((expected) => {
+    const expectedHash = createHash('sha256').update(expected).digest();
+    return timingSafeEqual(candidateHash, expectedHash);
+  });
 }
 export async function greenRequest(method: string, payload: Record<string, unknown> = {}) {
   if (!greenConfigured()) throw new Error('Green API no configurada');
