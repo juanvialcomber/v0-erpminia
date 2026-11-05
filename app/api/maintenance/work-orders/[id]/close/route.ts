@@ -4,12 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { resolveRecordedWorkHours } from '@/lib/maintenance/recorded-work-time.mjs';
 
 type MaintenanceWorkOrderRow = {
   id: string;
   asset_id: string | null;
   start_date: string | null;
   timer_status?: string | null;
+  total_timer_seconds?: number | null;
+  total_timer_minutes?: number | null;
   actual_duration_hours?: number | string | null;
 };
 type CloseWorkOrderPayload = { actual_duration_hours?: number | string | null; root_cause?: string | null; preventive_actions?: string | null };
@@ -84,11 +87,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: timerState, error: timerStateError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('timer_status')
+      .select('timer_status,timer_start_time')
       .eq('organization_id', context.organizationId)
       .eq('id', id)
       .single();
     if (timerStateError) throw timerStateError;
+    if (timerState.timer_status === 'running' && timerState.timer_start_time) {
+      const elapsedSeconds = (Date.now() - new Date(timerState.timer_start_time).getTime()) / 1000;
+      if (Number.isFinite(elapsedSeconds) && elapsedSeconds >= 16 * 60 * 60) {
+        return NextResponse.json({
+          error: 'El cronómetro sigue activo desde hace 16 horas o más. Detén la OT y solicita una corrección supervisada del tiempo antes de cerrar; no se contabilizará automáticamente el período no verificado.',
+          timer_review_required: true,
+        }, { status: 409 });
+      }
+    }
     if (['running', 'paused'].includes(String(timerState.timer_status || ''))) {
       const { error: terminateError } = await context.supabase.rpc('update_work_order_timer', {
         p_organization_id: context.organizationId,
@@ -113,13 +125,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       downtime = Math.max(0, (Date.now() - startTime.getTime()) / (1000 * 60 * 60));
     }
 
-    const normalizedHours = Number(actual_duration_hours);
-    const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
-    const effectiveHours = Math.max(
-      Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
-      Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-      downtime,
-    );
+    // Tiempo de ejecución y detención del activo son métricas diferentes.
+    // Nunca sumar tiempo de noche/pausa al trabajo efectivo ni permitir que
+    // una declaración manual sobrescriba un cronómetro ya registrado.
+    const effectiveHours = resolveRecordedWorkHours({
+      totalTimerSeconds: typedWorkOrder.total_timer_seconds,
+      totalTimerMinutes: typedWorkOrder.total_timer_minutes,
+      manualHours: actual_duration_hours,
+      storedHours: typedWorkOrder.actual_duration_hours,
+    });
     const closureData: Record<string, unknown> = { actual_duration_hours: effectiveHours, down_time_hours: downtime, updated_at: new Date().toISOString() };
     if (root_cause !== undefined) closureData.root_cause = root_cause;
     if (preventive_actions !== undefined) closureData.preventive_actions = preventive_actions;
