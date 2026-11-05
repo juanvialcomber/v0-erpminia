@@ -20,4 +20,6 @@ test('OT inbox and approval endpoint share one reviewer authority contract', asy
   assert.match(route, /isAuthorizedMaintenanceReviewerName/);
   assert.doesNotMatch(route, /String\(data\.full_name \|\| ''\) === 'Ariel López'/);
   assert.match(route, /supervisor autorizado/);
+  assert.match(route, /aprobación supervisora/);
+  assert.doesNotMatch(route, /antes de que Ariel apruebe/);
 });
