@@ -60,6 +60,8 @@ test('app namespace carries chrome copy for both locales', () => {
   // es
   assert.match(dict, /home: 'Inicio'/);
   assert.match(dict, /'ordenes-trabajo': 'Órdenes de trabajo'/);
+  assert.match(dict, /create: 'Crear'/);
+  assert.doesNotMatch(dict, /create: 'Create'/);
   assert.match(dict, /superadmin: 'Administrador general'/);
   assert.match(dict, /signOut: 'Cerrar sesión'/);
   assert.match(dict, /openUserMenu: 'Abrir menú de usuario'/);
