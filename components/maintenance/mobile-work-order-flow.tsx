@@ -591,7 +591,7 @@ export function MobileWorkOrderFlow({
             <div className="space-y-2">
               <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => { setMessage(null); setShowPauseForm(true); }}>
                 <CirclePause className="mr-2 h-5 w-5" />
-                Elegir motivo y pausar
+                Pausar trabajo
               </Button>
               <Button size="lg" variant="outline" className="h-12 w-full text-sm" disabled={busy}
                 onClick={() => void timerAction('pause', 'Fin de jornada laboral')}>
