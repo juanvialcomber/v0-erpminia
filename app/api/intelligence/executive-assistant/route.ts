@@ -576,7 +576,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error ?? 'unknown');
     const configurationError = detail.includes('OPENAI_API_KEY');
-    const httpStatus = configurationError ? 503 : 500;
+    const quotaError = /no credits remaining|insufficient_quota|quota.*exceeded|billing/i.test(detail);
+    const httpStatus = configurationError || quotaError ? 503 : 500;
     await recordCoreRuntimeError({
       db: context.supabase,
       organizationId: context.organizationId,
@@ -589,7 +590,11 @@ export async function POST(request: NextRequest) {
     });
     console.error('[executive-assistant] request failed', { detail });
     return NextResponse.json({
-      error: configurationError ? 'El servicio de IA no está configurado en este entorno.' : 'No fue posible construir la síntesis ejecutiva.',
+      error: configurationError
+        ? 'El servicio de IA no está configurado en este entorno.'
+        : quotaError
+          ? 'El servicio de IA está temporalmente sin capacidad disponible. Los datos operacionales permanecen intactos.'
+          : 'No fue posible construir la síntesis ejecutiva.',
     }, { status: httpStatus });
   }
 }
