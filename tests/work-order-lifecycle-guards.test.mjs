@@ -111,3 +111,15 @@ test('every material OT edit is auditable with previous and next values', async 
   assert.match(route, /payload: \{ changed_fields: changedFields, changes \}/);
   assert.match(route, /actor_name: context\.userName \|\| context\.userEmail \|\| null/);
 });
+
+
+test('active OT cannot regress from in_progress to open while execution may still be timed', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+
+  assert.match(route, /allowedStatuses = new Set\(\['open', 'in_progress', 'completed', 'cancelled', 'canceled'\]\)/);
+  assert.match(route, /currentStatus === 'in_progress' && requestedStatus === 'open'/);
+  assert.match(route, /Pausa el trabajo o anula la OT con un motivo/);
+  assert.doesNotMatch(detail, /patchOrder\(\{ status: 'open' \}\)/);
+  assert.match(detail, /Cambios de estado protegidos/);
+});
