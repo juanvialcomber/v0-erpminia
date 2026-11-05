@@ -445,9 +445,183 @@ test('single-source exact candidates preserve verified absence across internal a
   assert.match(api,/internalMasterVerification/);
   assert.match(api,/exactSingleVerifiedAbsentInternalMasters/);
   assert.match(api,/no_exact_counterpart/);
-  assert.match(candidates,/0 contrapartes en canónico, mantenimiento y planificación/);
+  assert.match(candidates,/0 contrapartes exactas en 3 maestros internos/);
   assert.match(candidates,/verificadas en 3 maestros internos/);
   assert.match(stage,/candidate_internal_master_search_verified/);
   assert.match(stage,/purchase_cost_center_evidence/);
   assert.match(stage,/purchase_description_exact_plate/);
+});
+
+
+test('Daniel assets page separates depreciation source from Laudus fixed assets',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/depreciationCoverage/);
+  assert.match(review,/withCurrentDepreciation/);
+  assert.match(review,/withBookValue/);
+  assert.match(review,/withRemainingLife/);
+  assert.match(review,/linkedCanonical/);
+  assert.match(page,/Depreciación y Laudus/);
+  assert.match(page,/Depreciación del período/);
+  assert.match(page,/Activos fijos Laudus/);
+  assert.match(page,/Laudus ↔ MOTIL/);
+  assert.match(page,/Costo adquisición Laudus/);
+  assert.match(page,/valor libro, depreciación, seguro y costo de adquisición son magnitudes distintas/);
+});
+
+test('depreciation coverage keeps an explicit zero state when source is absent',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/depreciationCoverage:\s*\{\s*rows: 0,/s);
+  assert.match(review,/withCurrentDepreciation: 0/);
+  assert.match(review,/withBookValue: 0/);
+  assert.match(review,/linkedCanonical: 0/);
+});
+
+
+test('Daniel fixed asset panel shows Laudus freshness from the fixed-asset sync itself',()=>{
+  const control=fs.readFileSync('lib/integrations/laudus/finance-control.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(control,/laudus_fixed_assets/);
+  assert.match(control,/latestFixedAssetsSync/);
+  assert.match(control,/latestSync: latestFixedAssetsSync/);
+  assert.match(page,/Última sincronización:/);
+  assert.match(page,/fixedAssets\?\.latestSync/);
+});
+
+
+test('depreciation reconciliation counts are live, not frozen import metadata',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/linkedCanonicalAssetIds/);
+  assert.match(review,/linkedRows = depreciationCoverage\.linkedCanonical/);
+  assert.match(review,/linkedAssets = depreciationCoverage\.linkedCanonicalAssets/);
+  assert.doesNotMatch(review,/const linkedRows = Number\(stage\.identity_linked_rows/);
+  assert.match(page,/Filas conciliadas/);
+  assert.match(page,/activos únicos con identidad verificada/);
+});
+
+
+test('finance reconciliation separates actionable backlog from finance-only terminal rows',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/reconciliation_terminal_state/);
+  assert.match(review,/finance_only_non_asset/);
+  assert.match(review,/actionableRows/);
+  assert.match(review,/terminalRows/);
+  assert.match(review,/terminalByReason/);
+  assert.match(page,/Pendiente operacional/);
+  assert.match(page,/Cerrado financiero/);
+  assert.match(page,/no requiere Ficha 360/);
+});
+
+
+test('finance reconciliation treats CAPEX context as terminal, not actionable backlog',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  assert.match(review,/finance_only_non_asset/);
+  assert.match(review,/finance_only_capex_context/);
+  assert.match(review,/\.includes\(String\(row\.source_payload\?\.reconciliation_terminal_state/);
+});
+
+
+test('Daniel reconciliation uses live staging for depreciation and insurance counts',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/linkedRowsByAsset/);
+  assert.match(review,/const sourceRows = depreciationCoverage\.rows/);
+  assert.match(review,/insuranceRows/);
+  assert.match(review,/insuranceLinkedAssetIds/);
+  assert.match(review,/insuranceStructuredCandidates/);
+  assert.doesNotMatch(review,/identity_linked_rows \|\| 0/);
+  assert.match(page,/Equipos por revisar/);
+  assert.match(page,/Sin estructura/);
+});
+
+
+test('Daniel finance cockpit separates classified reconciliation debt from raw backlog',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/classifiedRows/);
+  assert.match(review,/hasExplicitClassification/);
+  assert.match(review,/candidate_review_status/);
+  assert.match(page,/Clasificado \/ en revisión/);
+  assert.match(page,/Backlog realmente crudo/);
+  assert.match(page,/Equipos por revisar/);
+});
+
+
+test('candidate review queue includes structured serial/family candidates and reuses existing reviews',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/asset_candidate_key/);
+  assert.match(api,/asset_candidate_family_key/);
+  assert.match(api,/exact_source_serial_single/);
+  assert.match(api,/exact_serial_in_description/);
+  assert.match(api,/insurance_asset_candidate:/);
+  assert.match(api,/depreciation_asset_candidate:/);
+  assert.match(api,/insurance_asset_family:/);
+  assert.match(api,/possibleIssueKeys/);
+  assert.match(api,/reviewByCandidateKey/);
+});
+
+
+test('Daniel cockpit separates equipment candidates from facility candidates',()=>{
+  const review=fs.readFileSync('app/api/finance/asset-reconciliation-review/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(review,/facilityCandidateRows/);
+  assert.match(review,/facilityCandidateGroups/);
+  assert.match(review,/assetCandidateRows/);
+  assert.match(review,/assetCandidateGroups/);
+  assert.match(page,/Equipos por revisar/);
+  assert.match(page,/Instalaciones por revisar/);
+});
+
+
+test('candidate review API handles an empty candidate set without invalid IN query',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/if \(reviewIssueKeys\.length > 0\)/);
+  assert.match(api,/let reviewRows: any\[\] = \[\]/);
+});
+
+
+test('candidate review surfaces duplicate risk before asset creation',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(api,/candidate_duplicate_risk/);
+  assert.match(api,/duplicateRiskCandidates/);
+  assert.match(api,/priority: duplicateRisk \? -1/);
+  assert.match(page,/Posible duplicado/);
+  assert.match(page,/antes de crear una nueva/);
+});
+
+
+test('candidate verification copy reflects the three masters actually checked',()=>{
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/candidatas/page.tsx','utf8');
+  assert.match(page,/0 contrapartes exactas en 3 maestros internos/);
+  assert.doesNotMatch(page,/canónico, mantenimiento y planificación/);
+});
+
+
+test('facility review workspace keeps multi-unit families separate from 1:1 installations',()=>{
+  const api=fs.readFileSync('app/api/finance/facility-candidates/route.ts','utf8');
+  const page=fs.readFileSync('app/dashboard/finanzas/activos/instalaciones/page.tsx','utf8');
+  const cockpit=fs.readFileSync('app/dashboard/finanzas/activos/page.tsx','utf8');
+  assert.match(api,/multi_unit_family/);
+  assert.match(api,/Esta vista es de revisión\. No crea, fusiona ni modifica Fichas 360/);
+  assert.match(page,/Requiere desagregar/);
+  assert.match(page,/No crear Ficha 360 hasta separar unidades con evidencia/);
+  assert.match(page,/Instalación 1:1/);
+  assert.match(cockpit,/\/dashboard\/finanzas\/activos\/instalaciones/);
+  assert.match(cockpit,/Revisar instalaciones/);
+});
+
+
+test('candidate review API reuses finance asset candidate reviews after reclassification',()=>{
+  const api=fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(api,/finance_asset_candidate:/);
+});
+
+
+test('facility review API excludes non-facility scopes even when a group key is present',()=>{
+  const api=fs.readFileSync('app/api/finance/facility-candidates/route.ts','utf8');
+  assert.match(api,/\['single_facility', 'multi_unit_family'\]\.includes/);
+  assert.match(api,/facility_candidate_scope/);
 });
