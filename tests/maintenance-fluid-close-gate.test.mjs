@@ -39,13 +39,13 @@ test('mechanic must explicitly declare fluid and residue state', () => {
 });
 
 test('Ariel or Mauricio can review mechanic fluid evidence before approval', () => {
-  assert.match(reviewRoute, /String\(data\.full_name \|\| ''\) === 'Ariel López'/);
+  assert.match(reviewRoute, /new Set\(\['Ariel López', 'Mauricio Astudillo'\]\)/);
   assert.match(reviewRoute, /Ariel López o Mauricio Astudillo deben revisar y aprobar la OT/);
   assert.match(reviewRoute, /fluid_closure_declared/);
   assert.match(reviewRoute, /declared_by_assigned_executor/);
   assert.match(reviewUi, /Aceites y residuos/);
   assert.match(reviewUi, /Registrado por mecánico/);
-  assert.match(reviewUi, /Ariel López revisa la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
+  assert.match(reviewUi, /Ariel López o Mauricio Astudillo revisan la evidencia, los aceites\/fluidos y el residuo declarado por el mecánico/);
 });
 
 
