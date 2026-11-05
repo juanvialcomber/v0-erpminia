@@ -47,9 +47,33 @@ test('journal staging normalizes blank or non-numeric debit and credit values be
 });
 
 
-test('journal staging deduplicates repeated Laudus journalEntryId values before RPC',()=>{
+test('journal staging groups repeated journalEntryId rows while preserving every accounting line',()=>{
   assert.match(sync,/function dedupeJournalRows/);
   assert.match(sync,/new Map<string, JsonRow>/);
-  assert.match(sync,/byId\.set\(id, normalizeJournalRow\(row\)\)/);
-  assert.match(sync,/duplicatesRemoved/);
+  assert.match(sync,/const lineMap = new Map/);
+  assert.match(sync,/lines_lineId/);
+  assert.match(sync,/lines_account_accountNumber/);
+  assert.match(sync,/lines_costCenter_costCenterId/);
+  assert.match(sync,/lines: \[\.\.\.lineMap\.values\(\)\]/);
+});
+
+
+test('waybill sync preserves flattened Laudus supplier warehouse and item rows',()=>{
+  assert.match(sync,/row\.supplier_supplierId/);
+  assert.match(sync,/row\.supplier_VATId/);
+  assert.match(sync,/row\.warehouse_warehouseId/);
+  assert.match(sync,/hasFlattenedItem/);
+  assert.match(sync,/row\.items_itemId/);
+  assert.match(sync,/row\.items_product_sku/);
+  assert.match(sync,/row\.items_quantity/);
+});
+
+
+test('waybill recovery debt stays explicit until supplier warehouse and lines are recovered',()=>{
+  const recoveryMigration = fs.readFileSync('supabase/migrations/20261104140500_expose_laudus_waybills_service.sql','utf8');
+  assert.match(recoveryMigration,/laudus_waybill_recovery_summary_v1/);
+  assert.match(recoveryMigration,/missing_supplier/);
+  assert.match(recoveryMigration,/missing_warehouse/);
+  assert.match(recoveryMigration,/missing_lines/);
+  assert.match(recoveryMigration,/future_dates/);
 });

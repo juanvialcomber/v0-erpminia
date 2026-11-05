@@ -51,3 +51,17 @@ test('payables workspace reduces overdue review by supplier concentration',()=>{
   assert.match(page,/Prioriza revisión por proveedor antes de recorrer factura por factura/);
   assert.match(page,/No implica prioridad automática de pago ni evaluación de riesgo del proveedor/);
 });
+
+
+test('Laudus payables exposure remains read only and separate from MOTIL operational payables',()=>{
+  const sourceRoute = fs.readFileSync('app/api/finance/laudus-payables-exposure/route.ts','utf8');
+  assert.match(sourceRoute,/laudus_accounts_payable_service_v1/);
+  assert.match(sourceRoute,/sourcePayableIsNotMotilOperationalPayable: true/);
+  assert.match(sourceRoute,/canonicalMutationExecuted: false/);
+  assert.match(sourceRoute,/laudusMutationExecuted: false/);
+  assert.doesNotMatch(sourceRoute,/\.insert\(/);
+  assert.doesNotMatch(sourceRoute,/\.update\(/);
+  assert.doesNotMatch(sourceRoute,/\.upsert\(/);
+  assert.match(page,/Exposición Laudus/);
+  assert.match(page,/Obligaciones fuente por migrar a control MOTIL/);
+});

@@ -393,6 +393,23 @@ export async function runLaudusReadOnlySmokeTest() {
 
   const targets: Array<{ key: string; path: string; query: LaudusListQuery }> = [
     {
+      key: 'customers',
+      path: '/sales/customers/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: ['customerId','legalName','VATId'],
+      },
+    },
+    {
+      key: 'salesOrders',
+      path: '/sales/orders/list',
+      query: {
+        options: { offset: 0, limit: 1 },
+        fields: ['salesOrderId','issuedDate','customer.name'],
+        orderBy: [{ field: 'issuedDate', direction: 'DESC' }],
+      },
+    },
+    {
       key: 'products',
       path: '/production/products/list',
       query: { options: { offset: 0, limit: 1 }, fields: ['productId','SKU','description','unitOfMeasure'] },
@@ -475,7 +492,7 @@ export async function runLaudusReadOnlySmokeTest() {
 
   return {
     authenticated: true,
-    calls: 10,
+    calls: 12,
     persisted: false,
     results,
   };

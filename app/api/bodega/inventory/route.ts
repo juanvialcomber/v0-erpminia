@@ -20,6 +20,11 @@ type CanonicalInventoryRow = {
   warehouse_code: string | null;
 };
 
+type OperationalStockRow = {
+  sku: string | null;
+  operational_quantity: number | string | null;
+};
+
 type InventoryRow = {
   id: string;
   sku?: string | null;
@@ -133,19 +138,65 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[v0] canonical inventory error:', error);
     } else if (data && data.length > 0) {
-      const inventory = (data as CanonicalInventoryRow[]).map((item) => ({
+      const canonicalRows = data as CanonicalInventoryRow[];
+      const pageSkus = canonicalRows
+        .map((item) => String(item.sku || '').trim().toUpperCase())
+        .filter(Boolean);
+
+      let operationalBySku = new Map<string, OperationalStockRow>();
+      if (pageSkus.length > 0) {
+        const operationalRows: OperationalStockRow[] = [];
+        const skuBatchSize = 50;
+        let operationalQueryFailed = false;
+
+        for (let i = 0; i < pageSkus.length; i += skuBatchSize) {
+          const skuBatch = pageSkus.slice(i, i + skuBatchSize);
+          const { data: operationalData, error: operationalError } = await supabase
+            .from('bodega_inventory_operational_service_v1')
+            .select('sku,operational_quantity')
+            .eq('organization_id', orgId)
+            .in('sku', skuBatch);
+
+          if (operationalError) {
+            operationalQueryFailed = true;
+            console.error('[v0] Laudus operational inventory error:', operationalError);
+            break;
+          }
+
+          operationalRows.push(...((operationalData || []) as OperationalStockRow[]));
+        }
+
+        if (!operationalQueryFailed) {
+          operationalBySku = new Map(
+            operationalRows
+              .filter((row) => row.sku)
+              .map((row) => [String(row.sku).trim().toUpperCase(), row] as const),
+          );
+        }
+      }
+
+      const inventory = canonicalRows.map((item) => {
+        const operational = item.sku
+          ? operationalBySku.get(String(item.sku).trim().toUpperCase())
+          : undefined;
+        const quantity = operational?.operational_quantity != null
+          ? toNumber(operational.operational_quantity)
+          : toNumber(item.quantity);
+
+        return {
         id: item.id,
         sku: String(item.sku || ''),
         name: String(item.name || item.sku || ''),
         category: String(item.category || 'Otros'),
-        quantity: toNumber(item.quantity),
-        quantity_available: toNumber(item.quantity),
+        quantity,
+        quantity_available: quantity,
         quantity_reserved: 0,
         min_stock: toNumber(item.min_stock),
         max_stock: toNumber(item.max_stock),
         unit_cost: toNumber(item.unit_cost),
         description: String(item.description || item.warehouse_code || ''),
-      }));
+      };
+      });
 
       return NextResponse.json({
         inventory,
@@ -155,6 +206,7 @@ export async function GET(request: NextRequest) {
           total: count || 0,
           totalPages: Math.ceil((count || 0) / validPageSize),
         },
+        dataSource: operationalBySku.size > 0 ? 'laudus_operational' : 'canonical_fallback',
       });
     }
   }

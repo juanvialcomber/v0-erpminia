@@ -88,3 +88,12 @@ test('known stock cron provides a budgeted fallback for accounting backfill',()=
   assert.match(stockRoute,/after\(async \(\) =>/);
   assert.match(stockRoute,/accounting backfill fallback completed/);
 });
+
+
+test('accounting backfill aggregates flattened journal lines instead of dropping same-entry rows',()=>{
+  assert.match(backfill,/const lineMap = new Map/);
+  assert.match(backfill,/lines_lineId/);
+  assert.match(backfill,/lines_account_accountNumber/);
+  assert.match(backfill,/lines_costCenter_costCenterId/);
+  assert.match(backfill,/lines: \[\.\.\.lineMap\.values\(\)\]/);
+});

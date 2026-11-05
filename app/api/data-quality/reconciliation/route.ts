@@ -14,6 +14,8 @@ type Issue = {
   label: string;
   detail: string;
   href: string;
+  action_label?: string;
+  action_href?: string;
 };
 
 function text(value: unknown) { return String(value ?? '').trim(); }
@@ -273,6 +275,284 @@ export async function GET(request: NextRequest) {
       }
     } catch {
       // Warehouse staging is optional until Laudus warehouse intake exists.
+    }
+
+    try {
+      const supplierBridge = await fetchAll((from, to) => context.supabase
+        .from('laudus_supplier_bridge_candidates_service_v1')
+        .select('supplier_name_key,display_name,purchase_order_count,candidate_count,resolution_status,resolution_method')
+        .eq('organization_id', context.organizationId)
+        .in('resolution_status', ['unresolved', 'ambiguous'])
+        .range(from, to));
+
+      for (const row of supplierBridge) {
+        addIssue(issues, {
+          issue_key: `laudus_supplier_bridge:${text(row.supplier_name_key)}`,
+          entity_type: 'supplier',
+          entity_id: null,
+          issue_type: 'laudus_supplier_identity',
+          field_name: null,
+          severity: norm(row.resolution_status) === 'ambiguous' ? 'critical' : 'warning',
+          label: `${text(row.display_name) || 'Proveedor Laudus'} · identidad pendiente`,
+          detail: `${Number(row.purchase_order_count || 0).toLocaleString('es-CL')} OC afectadas. Método: ${text(row.resolution_method) || 'sin resolución'}. Acción MOTIL: resolver identidad tributaria/canónica y reutilizarla en todas las OC históricas.`,
+          href: '/dashboard/compras',
+          action_label: 'Resolver proveedor',
+          action_href: '/dashboard/compras/proveedores-360',
+        });
+      }
+    } catch {
+      // Supplier bridge is optional until deployed.
+    }
+
+    try {
+      const poCostCenterRows = await fetchAll((from, to) => context.supabase
+        .from('purchase_order_reconciliation_preview_service_v1')
+        .select('purchase_order_id,order_number,supplier_name,cost_center_resolution_status,parsed_line_cost_center_code,distinct_line_cost_centers')
+        .eq('organization_id', context.organizationId)
+        .in('cost_center_resolution_status', ['unknown_code', 'multi_line_review', 'unresolved'])
+        .range(from, to));
+
+      for (const row of poCostCenterRows) {
+        const status = text(row.cost_center_resolution_status);
+        addIssue(issues, {
+          issue_key: `laudus_po_cost_center:${row.purchase_order_id}`,
+          entity_type: 'purchase_order',
+          entity_id: row.purchase_order_id || null,
+          issue_type: 'laudus_cost_center_resolution',
+          field_name: 'cost_center',
+          severity: status === 'multi_line_review' ? 'critical' : 'warning',
+          label: `${text(row.order_number) || 'OC histórica'} · centro de costo`,
+          detail: status === 'unknown_code'
+            ? `Código ${text(row.parsed_line_cost_center_code) || 'no identificado'} no existe en el maestro canónico. Acción MOTIL: mapear o crear una referencia canónica con evidencia.`
+            : status === 'multi_line_review'
+              ? `${Number(row.distinct_line_cost_centers || 0)} centros en líneas y al menos una asignación no reconocida. Acción MOTIL: revisar sólo las líneas dudosas; preservar las válidas.`
+              : 'OC histórica sin centro de costo informado. Acción MOTIL: recuperar evidencia o dejar ausencia explícita.',
+          href: '/dashboard/compras',
+          action_label: 'Revisar centro',
+          action_href: '/dashboard/compras',
+        });
+      }
+    } catch {
+      // Historical PO reconciliation is optional until deployed.
+    }
+
+    try {
+      const [
+        { count: pendingAssets, error: assetError },
+        { count: overduePayables, error: payableError },
+        accountingResult,
+        accountingTotalResult,
+        bankResult,
+        dteResult,
+      ] = await Promise.all([
+        context.supabase
+          .from('laudus_fixed_assets_service_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .eq('reconciliation_status', 'pending'),
+        context.supabase
+          .from('laudus_accounts_payable_service_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId)
+          .gt('outstanding_amount', 0)
+          .lt('due_date', new Date().toISOString().slice(0, 10)),
+        context.supabase
+          .from('laudus_accounting_management_summary_v1')
+          .select('entries_with_lines,line_rows,with_account,with_currency,with_cost_center,with_description,with_document')
+          .eq('organization_id', context.organizationId)
+          .maybeSingle(),
+        context.supabase
+          .from('laudus_accounting_entries_service_v1')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', context.organizationId),
+        context.supabase
+          .from('laudus_bank_statements_service_v1')
+          .select('bank_account_external_id,date_from,date_to,opening_balance,closing_balance')
+          .eq('organization_id', context.organizationId),
+        context.supabase
+          .from('laudus_dtes_service_v1')
+          .select('issued_date,issuer_tax_id,receiver_tax_id')
+          .eq('organization_id', context.organizationId),
+      ]);
+      if (assetError) throw assetError;
+      if (payableError) throw payableError;
+      if (accountingResult.error) throw accountingResult.error;
+      if (accountingTotalResult.error) throw accountingTotalResult.error;
+      if (bankResult.error) throw bankResult.error;
+      if (dteResult.error) throw dteResult.error;
+
+      if ((pendingAssets || 0) > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:fixed_assets_pending',
+          entity_type: 'asset',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: `${Number(pendingAssets || 0).toLocaleString('es-CL')} activos Laudus sin identidad MOTIL resuelta`,
+          detail: 'Brecha de reemplazo. Acción MOTIL: conciliar activo contable con Activo 360, separar activos operacionales/no operacionales y conservar costo, fecha, vida útil y depreciación como evidencia financiera.',
+          href: '/dashboard/mantenimiento/equipos',
+          action_label: 'Conciliar activos',
+          action_href: '/dashboard/mantenimiento/equipos',
+        });
+      }
+
+      if ((overduePayables || 0) > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:overdue_payables',
+          entity_type: 'invoice',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: 'due_date',
+          severity: 'critical',
+          label: `${Number(overduePayables || 0).toLocaleString('es-CL')} obligaciones Laudus vencidas con saldo`,
+          detail: 'Brecha financiera operativa. Acción MOTIL: llevar cada obligación a Finanzas con factura, proveedor, vencimiento, saldo, estado de pago y acción humana; no marcar pagada por inferencia.',
+          href: '/dashboard/compras/facturas',
+          action_label: 'Revisar vencidas',
+          action_href: '/dashboard/compras/facturas',
+        });
+      }
+
+      const accountingSummary = accountingResult.data;
+      const accountingTotal = Number(accountingTotalResult.count || 0);
+      const accountingWithLines = Number(accountingSummary?.entries_with_lines || 0);
+      const accountingMissingLineCoverage = Math.max(accountingTotal - accountingWithLines, 0);
+      if (accountingTotal > 0 && accountingMissingLineCoverage > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:accounting_line_coverage',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'warning',
+          label: `${accountingMissingLineCoverage.toLocaleString('es-CL')} asientos Laudus sin líneas de gestión recuperadas`,
+          detail: `MOTIL conserva ${accountingTotal.toLocaleString('es-CL')} asientos fuente y ${accountingWithLines.toLocaleString('es-CL')} ya tienen líneas recuperadas. Acción MOTIL: completar el backfill de líneas antes de usar la historia incompleta para centros de costo, cuentas o análisis gerencial.`,
+          href: '/dashboard/finanzas',
+          action_label: 'Completar contabilidad',
+          action_href: '/dashboard/finanzas',
+        });
+      }
+
+      const bankRows = bankResult.data || [];
+      const bankMissingAccounts = bankRows.filter((row) => !text(row.bank_account_external_id)).length;
+      const bankMissingBalances = bankRows.filter((row) => row.opening_balance == null || row.closing_balance == null).length;
+      if (bankRows.length < 5 || bankMissingAccounts > 0 || bankMissingBalances > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:bank_statement_coverage',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: 'Cobertura bancaria Laudus insuficiente para conciliación',
+          detail: `Sólo ${bankRows.length.toLocaleString('es-CL')} extractos disponibles; ${bankMissingAccounts.toLocaleString('es-CL')} sin cuenta bancaria y ${bankMissingBalances.toLocaleString('es-CL')} sin saldos completos. Acción MOTIL: conectar fuente bancaria/canonizar extractos antes de retirar la conciliación manual.`,
+          href: '/dashboard/finanzas',
+          action_label: 'Resolver bancos',
+          action_href: '/dashboard/finanzas',
+        });
+      }
+
+      const dteRows = dteResult.data || [];
+      const dteMissingParty = dteRows.filter((row) => !text(row.issuer_tax_id) || !text(row.receiver_tax_id)).length;
+      if (dteRows.length < 10 || dteMissingParty > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:dte_coverage',
+          entity_type: 'invoice',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: 'Cobertura DTE Laudus incompleta',
+          detail: `Sólo ${dteRows.length.toLocaleString('es-CL')} DTE disponibles y ${dteMissingParty.toLocaleString('es-CL')} sin emisor/receptor completo. Acción MOTIL: usar una fuente fiscal/DTE completa y reconciliarla con facturas antes de depender de MOTIL para cierre tributario.`,
+          href: '/dashboard/compras/facturas',
+          action_label: 'Completar DTE',
+          action_href: '/dashboard/compras/facturas',
+        });
+      }
+    } catch {
+      // Finance/asset replacement coverage remains optional until source views are available.
+    }
+
+    try {
+      const recovery = await context.supabase
+        .from('laudus_waybill_recovery_summary_v1')
+        .select('waybills_total,missing_supplier,missing_warehouse,missing_lines,future_dates,latest_sync_at')
+        .eq('organization_id', context.organizationId)
+        .maybeSingle();
+
+      if (recovery.error) throw recovery.error;
+      const row = recovery.data;
+      const missingLines = Number(row?.missing_lines || 0);
+      const missingSupplier = Number(row?.missing_supplier || 0);
+      const missingWarehouse = Number(row?.missing_warehouse || 0);
+      const futureDates = Number(row?.future_dates || 0);
+
+      if (missingLines > 0 || missingSupplier > 0 || missingWarehouse > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:waybill_recovery_debt',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'laudus_replacement_gap',
+          field_name: null,
+          severity: 'critical',
+          label: `${Math.max(missingLines, missingSupplier, missingWarehouse).toLocaleString('es-CL')} guías Laudus requieren recuperación`,
+          detail: `De ${Number(row?.waybills_total || 0).toLocaleString('es-CL')} guías, ${missingLines.toLocaleString('es-CL')} están sin líneas, ${missingSupplier.toLocaleString('es-CL')} sin proveedor y ${missingWarehouse.toLocaleString('es-CL')} sin bodega. Acción MOTIL: reingestar sólo la ventana afectada con el normalizador corregido y mantener la deuda abierta hasta cobertura cero.`,
+          href: '/dashboard/calidad-datos/reemplazo-laudus',
+          action_label: 'Recuperar guías',
+          action_href: '/dashboard/calidad-datos/reemplazo-laudus',
+        });
+      }
+
+      if (futureDates > 0) {
+        addIssue(issues, {
+          issue_key: 'laudus_systemic:waybill_future_dates',
+          entity_type: 'external_source',
+          entity_id: null,
+          issue_type: 'source_conflict',
+          field_name: 'issued_date',
+          severity: 'critical',
+          label: `${futureDates.toLocaleString('es-CL')} guía Laudus con fecha futura`,
+          detail: 'La condición permanece como evidencia de calidad hasta que deje de aparecer en la fuente. No se promueve como recepción física ni se corrige automáticamente.',
+          href: '/dashboard/calidad-datos/reemplazo-laudus',
+          action_label: 'Revisar evidencia',
+          action_href: '/dashboard/calidad-datos/reemplazo-laudus',
+        });
+      }
+    } catch {
+      // Waybill recovery projection is optional until its migration is deployed.
+    }
+
+    try {
+      const negativeLaudusPositions = await fetchAll((from, to) => context.supabase
+        .from('laudus_negative_stock_positions_service_v1')
+        .select('canonical_product_id,sku,description,unit_of_measure,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
+        .eq('organization_id', context.organizationId)
+        .range(from, to));
+
+      for (const row of negativeLaudusPositions) {
+        const sku = text(row.sku);
+        const warehouseCode = text(row.warehouse_external_id);
+        if (!sku || !warehouseCode) continue;
+        const quantity = Number(row.warehouse_stock);
+        const quantityLabel = Number.isFinite(quantity) ? quantity.toLocaleString('es-CL') : '—';
+        const unit = text(row.unit_of_measure);
+        const warehouse = [warehouseCode, text(row.warehouse_name)].filter(Boolean).join(' · ');
+        const sourceAt = text(row.source_date_to || row.synced_at);
+
+        addIssue(issues, {
+          issue_key: `laudus_negative_stock:${norm(sku)}:${warehouseCode}`,
+          entity_type: 'inventory',
+          entity_id: row.canonical_product_id || null,
+          issue_type: 'global_negative_stock',
+          field_name: 'quantity',
+          severity: 'critical',
+          label: `${sku} · ${text(row.description) || 'Stock Laudus negativo'}`,
+          detail: `Laudus reporta ${quantityLabel}${unit ? ' ' + unit : ''} en ${warehouse || 'bodega sin identificar'}. Requiere revisar Kardex, movimientos, recepciones, consumos o conteos; MOTIL no corrige el saldo automáticamente.${sourceAt ? ' Evidencia fuente: ' + sourceAt + '.' : ''}`,
+          href: '/dashboard/bodega?status=negative',
+        });
+      }
+    } catch {
+      // Negative Laudus stock projection is optional until its service view is deployed.
     }
 
     const productIds = new Set(products.map((row) => row.id));

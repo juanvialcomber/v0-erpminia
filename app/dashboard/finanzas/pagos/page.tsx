@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { MotilBankStatementIntakeCard } from '@/components/finance/motil-bank-statement-intake-card';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -34,6 +35,7 @@ type DialogMode = 'due' | 'pay' | 'reconcile' | null;
 
 export default function PayablesPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/finance/payables', fetcher);
+  const { data: laudusExposure, error: laudusExposureError } = useSWR('/api/finance/laudus-payables-exposure', fetcher, { revalidateOnFocus: false, refreshInterval: 900000 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
@@ -149,6 +151,8 @@ export default function PayablesPage() {
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
+    {laudusExposure ? <Card className="shadow-none"><CardHeader><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición Laudus</p><CardTitle className="mt-1">Obligaciones fuente por migrar a control MOTIL</CardTitle><CardDescription>Lectura ERP. No crea CxP MOTIL ni registra pagos automáticamente.</CardDescription></div><Badge variant="outline">{Number(laudusExposure.summary?.overdue || 0).toLocaleString('es-CL')} vencidas</Badge></div></CardHeader><CardContent><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Abiertas</p><p className="mt-1 text-lg font-semibold">{Number(laudusExposure.summary?.open || 0).toLocaleString('es-CL')}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Vencidas</p><p className="mt-1 text-lg font-semibold">{Number(laudusExposure.summary?.overdue || 0).toLocaleString('es-CL')}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Pago parcial</p><p className="mt-1 text-lg font-semibold">{Number(laudusExposure.summary?.partiallyPaid || 0).toLocaleString('es-CL')}</p></div></div><p className="mt-3 text-xs text-muted-foreground">Acción MOTIL: conciliar factura, proveedor, vencimiento y saldo antes de promover una obligación a Tesorería. Una CxP Laudus no se considera CxP operacional MOTIL por defecto.</p></CardContent></Card> : laudusExposureError ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">No se pudo cargar la exposición Laudus. Tesorería MOTIL sigue operando con sus propias obligaciones canónicas.</div> : null}
+
     <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card>
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -198,6 +202,8 @@ export default function PayablesPage() {
       {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que Laudus no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
+
+    <MotilBankStatementIntakeCard />
 
     <Card className="shadow-none"><CardHeader><CardTitle>Pagos y conciliación</CardTitle><CardDescription>La conciliación no reconoce gasto; confirma la salida de caja con referencia trazable.</CardDescription></CardHeader><CardContent className="space-y-3">
       {!payments.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay pagos registrados.</p> : null}

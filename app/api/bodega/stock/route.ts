@@ -19,6 +19,13 @@ type CanonicalInventoryRow = {
   warehouse_code: string | null;
 };
 
+type OperationalStockRow = {
+  sku: string | null;
+  operational_quantity: number | string | null;
+  operational_resolution: string | null;
+  laudus_synced_at: string | null;
+};
+
 type PriceBenchmarkRow = {
   product_code: string | null;
   is_fuel: boolean | null;
@@ -127,7 +134,7 @@ function referenceFor(code: string | null, benchmarks: Map<string, PriceBenchmar
   };
 }
 
-async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string } | null> {
+async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string; stockSource: string } | null> {
   const pageSize = 1000;
   let start = 0;
   const rows: CanonicalInventoryRow[] = [];
@@ -149,6 +156,36 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
 
   if (rows.length === 0) return null;
 
+  const operationalRows: OperationalStockRow[] = [];
+  let operationalStart = 0;
+  let operationalAvailable = true;
+
+  while (true) {
+    const { data, error } = await context.supabase
+      .from('bodega_inventory_operational_service_v1')
+      .select('sku,operational_quantity,operational_resolution,laudus_synced_at')
+      .eq('organization_id', context.organizationId)
+      .order('sku')
+      .range(operationalStart, operationalStart + pageSize - 1);
+
+    if (error) {
+      operationalAvailable = false;
+      console.error('[bodega/stock:laudus-operational]', error);
+      break;
+    }
+
+    const batch = Array.isArray(data) ? (data as OperationalStockRow[]) : [];
+    operationalRows.push(...batch);
+    if (batch.length < pageSize) break;
+    operationalStart += pageSize;
+  }
+
+  const operationalBySku = new Map(
+    operationalRows
+      .filter((row) => row.sku)
+      .map((row) => [String(row.sku).trim().toUpperCase(), row] as const),
+  );
+
   let benchmarks = new Map<string, PriceBenchmarkRow>();
   let pricingWarning: string | undefined;
   try {
@@ -159,7 +196,14 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
   }
 
   const items: WarehouseStockItem[] = rows.map((row) => {
-    const quantityOnHand = Number(row.quantity || 0);
+    const operational = row.sku
+      ? operationalBySku.get(String(row.sku).trim().toUpperCase())
+      : undefined;
+    const quantityOnHand = Number(
+      operationalAvailable && operational?.operational_quantity != null
+        ? operational.operational_quantity
+        : row.quantity || 0,
+    );
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
     const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
@@ -191,7 +235,12 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
   };
 
-  return { items, summary, ...(pricingWarning ? { pricingWarning } : {}) };
+  return {
+    items,
+    summary,
+    stockSource: operationalAvailable ? 'laudus_operational' : 'canonical_fallback',
+    ...(pricingWarning ? { pricingWarning } : {}),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -201,7 +250,7 @@ export async function GET(request: NextRequest) {
   try {
     if (orgHasCanonicalData(context.organizationId)) {
       const canonical = await buildCanonicalStock(context);
-      if (canonical) return NextResponse.json({ ...canonical, dataSource: 'canonical' });
+      if (canonical) return NextResponse.json({ ...canonical, dataSource: canonical.stockSource });
     }
 
     const { data: stock, error } = await context.supabase

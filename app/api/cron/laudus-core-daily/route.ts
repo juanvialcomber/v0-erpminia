@@ -10,6 +10,7 @@ import {
   syncLaudusAccountingEntries,
   syncLaudusPurchaseWaybills,
 } from '@/lib/integrations/laudus/journal-waybill-sync';
+import { syncLaudusInvoiceTraceEvidence } from '@/lib/integrations/laudus/invoice-trace-sync';
 
 type DomainResult = {
   domain: string;
@@ -17,7 +18,7 @@ type DomainResult = {
   result?: unknown;
 };
 
-const CORE_CALL_BUDGET = 20;
+const CORE_CALL_BUDGET = 30;
 const MONTHLY_RESERVE_FRACTION = 0.10;
 
 async function readBudgetGuard(db: any, organizationId: string) {
@@ -133,6 +134,7 @@ export async function GET(request: NextRequest) {
       await run('bank_statements', () => syncLaudusBankStatements(organizationId, db));
       await run('accounting_entries', () => syncLaudusAccountingEntries(organizationId, db));
       await run('purchase_waybills', () => syncLaudusPurchaseWaybills(organizationId, db));
+      await run('invoice_trace_evidence', () => syncLaudusInvoiceTraceEvidence(db, organizationId));
 
       return results;
     });

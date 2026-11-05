@@ -31,3 +31,13 @@ test('closing a review requires a written rationale', () => {
   assert.match(route, /status !== 'open' && !resolutionNote/);
   assert.match(route, /Debes registrar el fundamento de la decisión/);
 });
+
+
+test('current Laudus negative stock joins the same review queue without mutating stock', () => {
+  assert.match(route, /laudus_negative_stock_positions_service_v1/);
+  assert.match(route, /laudus_negative_stock:\$\{norm\(sku\)\}:\$\{warehouseCode\}/);
+  assert.match(route, /global_negative_stock/);
+  assert.match(route, /MOTIL no corrige el saldo automáticamente/);
+  assert.doesNotMatch(route, /laudus_negative_stock_positions_service_v1[\s\S]{0,1200}\.update\(/);
+  assert.doesNotMatch(route, /laudus_negative_stock_positions_service_v1[\s\S]{0,1200}\.upsert\(/);
+});

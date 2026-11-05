@@ -35,7 +35,9 @@ type Payload = {
     comparedProducts: number;
     alignedProducts: number;
     quantityMismatches: number;
+    legacySnapshotMismatches: number;
     missingInMotilNonzero: number;
+    laudusOnlyCurrent: number;
     laudusOnlyZero: number;
     negativeProducts: number;
     negativeWarehouses: number;
@@ -218,10 +220,10 @@ export function LaudusInventoryReadinessCard() {
         </div>
         <div className="bg-card p-4">
           <GitCompareArrows className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
+          <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.legacySnapshotMismatches + data.laudus.laudusOnlyCurrent)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Registros absorbidos desde una fuente más nueva</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL · ${count(data.laudus.stockRows)} posiciones ERP`}
+            {isLoading || !data ? '—' : `${count(data.laudus.legacySnapshotMismatches)} con snapshot MOTIL antiguo · ${count(data.laudus.laudusOnlyCurrent)} sólo vigentes en Laudus`}
           </p>
         </div>
         <div className="bg-card p-4">
@@ -340,7 +342,7 @@ export function LaudusInventoryReadinessCard() {
             <p className="mt-1 text-xs text-muted-foreground">
               {isLoading || !data
                 ? 'Verificando conciliación.'
-                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.quantityMismatches)} difieren · ${count(data.laudus.missingInMotilNonzero)} tienen saldo Laudus y no están en existencias MOTIL.`}
+                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.legacySnapshotMismatches)} usan snapshot MOTIL histórico · ${count(data.laudus.laudusOnlyCurrent)} están sólo en Laudus vigente.`}
             </p>
           </div>
         </div>
