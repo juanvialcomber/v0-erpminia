@@ -416,11 +416,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
+  const authority = await getMaintenanceActorAuthority(context);
+  if (!authority.canPlan) {
+    return NextResponse.json({ error: 'Solo una jefatura autorizada puede gestionar la anulación de una OT.' }, { status: 403 });
+  }
 
   const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
   if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
