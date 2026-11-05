@@ -68,3 +68,11 @@ test('weekly maintenance plan reuses scheduled work and readiness instead of cre
   assert.doesNotMatch(control, /insert\(/);
   assert.doesNotMatch(control, /upsert\(/);
 });
+
+
+test('personal inbox never assigns an impossible OT approval action to Mauricio', async () => {
+  const inbox = await readFile(new URL('../lib/maintenance/personal-work-order-inbox.ts', import.meta.url), 'utf8');
+  assert.match(inbox, /full_name \|\| ''\) === 'Ariel López'/);
+  assert.doesNotMatch(inbox, /\['Ariel López', 'Mauricio Astudillo'\]\.includes/);
+  assert.match(inbox, /only Ariel can approve an OT/);
+});
