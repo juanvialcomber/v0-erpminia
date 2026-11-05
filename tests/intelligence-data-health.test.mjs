@@ -62,3 +62,10 @@ test('N3 Router fallback sends Vercel Trusted Sources token when available', asy
   assert.match(route, /VERCEL_OIDC_TOKEN/);
   assert.match(route, /x-vercel-trusted-oidc-idp-token/);
 });
+
+test('N3 Router fallback supports a branch-scoped Vercel protection bypass', async () => {
+  const route = await readFile(new URL('../app/api/intelligence/executive-assistant/route.ts', import.meta.url), 'utf8');
+
+  assert.match(route, /N3_MODEL_ROUTER_BYPASS_SECRET/);
+  assert.match(route, /x-vercel-protection-bypass/);
+});
