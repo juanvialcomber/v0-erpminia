@@ -11,11 +11,13 @@ const wasteRoute = await readFile(new URL('../app/api/maintenance/work-orders/[i
 const offlineRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/offline-notes/route.ts', import.meta.url), 'utf8');
 const planRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/standard-plan/route.ts', import.meta.url), 'utf8');
 const closeQueueRoute = await readFile(new URL('../app/api/maintenance/work-order-close-queue/route.ts', import.meta.url), 'utf8');
+const reviewRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/review/route.ts', import.meta.url), 'utf8');
 const executionRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/execution/route.ts', import.meta.url), 'utf8');
 
 test('mechanic ED matrix does not bypass assigned executor boundary after reassignment', () => {
   assert.match(helper, /accessLevel === 'ED' && context\.role !== 'tecnico'/);
   assert.match(detailRoute, /const isExecutionRole = context\.role === 'tecnico'/);
+  assert.match(detailRoute, /const canReadModule = !isExecutionRole/);
   assert.match(detailRoute, /accessLevel === 'ED' && !isExecutionRole/);
   assert.match(detailRoute, /const hasModuleWrite = accessLevel === 'ED' && context\.role !== 'tecnico'/);
   assert.match(timerRoute, /accessLevel !== 'ED' \|\| context\.role === 'tecnico'/);
@@ -23,6 +25,7 @@ test('mechanic ED matrix does not bypass assigned executor boundary after reassi
   for (const route of [evidenceRoute, runtimeRoute, wasteRoute, offlineRoute, planRoute, closeQueueRoute]) {
     assert.match(route, /canBypassAssignedMaintenanceExecution/);
   }
+  assert.match(reviewRoute, /accessLevel === 'ED' && context\.role !== 'tecnico'/);
   assert.match(executionRoute, /context\.role === 'tecnico'/);
   assert.match(executionRoute, /requireAssignedMaintenanceExecution/);
 });
