@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
-import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { canBypassAssignedMaintenanceExecution, requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { resolveWorkshopHeadScope, workshopHeadCanAccessOrder } from '@/lib/maintenance/workshop-site-scope';
 
 export async function POST(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       }
     }
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    if (accessLevel !== 'ED') {
+    if (!canBypassAssignedMaintenanceExecution(context, accessLevel)) {
       const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
       if (!executionAccess.ok) return executionAccess.response;
     }
