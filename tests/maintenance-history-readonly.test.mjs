@@ -41,7 +41,7 @@ test('work-order detail API and UI expose historical scope without operational c
   const page = await readFile('components/maintenance/work-order-detail.tsx', 'utf8');
   const dictionaries = await readFile('lib/i18n/dictionaries.ts', 'utf8');
   assert.match(api, /record_scope: row\.created_by \? 'operational' : 'historical'/);
-  assert.match(api, /canEdit: recordScope === 'operational' && \(accessLevel === 'ED' \|\| canExecuteAssigned\)/);
+  assert.match(api, /canEdit: recordScope === 'operational' && \(permissions\.canEditOrder \|\| permissions\.canRecordExecution\)/);
   assert.match(page, /!isHistorical \? <>/);
   assert.match(dictionaries, /title: 'Histórico importado · solo lectura'/);
   assert.match(dictionaries, /No puede iniciarse, reabrirse, cerrarse, temporizarse/);
