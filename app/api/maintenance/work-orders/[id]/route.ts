@@ -218,11 +218,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .filter(([, value]) => value !== undefined)
         .map(([key]) => key);
       const executionFields = new Set(['root_cause', 'preventive_actions', 'actual_duration_hours', 'meter_reading', 'meter_unit']);
-      const isStartOnly = mutationKeys.length === 1 && mutationKeys[0] === 'status' && body.status === 'in_progress';
       const isExecutionEvidenceOnly = mutationKeys.length > 0 && mutationKeys.every((key) => executionFields.has(key));
-      if (!isStartOnly && !isExecutionEvidenceOnly) {
+      if (!isExecutionEvidenceOnly) {
         return NextResponse.json(
-          { error: 'El ejecutor asignado sólo puede iniciar su OT y registrar evidencia de su propia ejecución.' },
+          { error: 'El ejecutor asignado sólo puede registrar evidencia de su propia ejecución desde este endpoint.' },
           { status: 403 },
         );
       }
@@ -258,6 +257,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.status === 'open' && currentStatus !== 'open') {
       return NextResponse.json(
         { error: 'Una OT que ya inició no puede volver a abierta.' },
+        { status: 409 },
+      );
+    }
+    if (body.status !== undefined) {
+      return NextResponse.json(
+        { error: 'El estado de la OT se administra mediante los flujos canónicos de inicio, cierre o anulación.' },
         { status: 409 },
       );
     }
