@@ -10,7 +10,8 @@ test('the coarse maintenance role guard delegates offline note POSTs to scoped e
   assert.match(org, /timer\|close\|evidence\|standard-plan\|offline-notes/);
   assert.match(route, /requireAssignedMaintenanceExecution/);
   assert.match(route, /requireOperationalMaintenanceWorkOrder/);
-  assert.match(route, /getModuleAccessLevel/);
+  assert.match(route, /requireAssignedMaintenanceExecution/);
+  assert.match(route, /if \(!assigned\.ok\) return assigned\.response/);
   assert.match(route, /\.eq\('organization_id', organizationId\)/);
 });
 
