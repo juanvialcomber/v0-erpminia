@@ -86,7 +86,7 @@ export function LaudusFixedAssetsReview(){
 
     <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={Link2} label="Vinculados" value={number(data.summary.matched)} detail="Con contraparte canónica verificada" />
-      <Metric icon={ScanSearch} label="Pendientes activos" value={number(data.summary.activePending)} detail={number(data.summary.activePendingWithSerial)+' con serie · '+number(data.summary.activePendingWithModel)+' con marca/modelo'} />
+      <Metric icon={ScanSearch} label="Pendientes sin retiro" value={number(data.summary.activePending)} detail={number(data.summary.activePendingWithSerial)+' con serie · '+number(data.summary.activePendingWithModel)+' con marca/modelo'} />
       <Metric icon={CircleAlert} label="Conflictos" value={number(data.summary.conflict)} detail="Requieren decisión humana; no se sobreescriben" />
       <Metric icon={Database} label="Pendientes históricos" value={number(data.summary.retiredPending)} detail="Con retiro informado en la fuente" />
     </div>
@@ -104,7 +104,7 @@ export function LaudusFixedAssetsReview(){
             <h3 className="text-sm font-semibold">Prioridad de conciliación</h3>
             <p className="mt-1 text-xs text-muted-foreground">Primero serie física; después marca/modelo; finalmente referencia documental.</p>
           </div>
-          <Badge variant="secondary">{number(data.summary.activePending)} por resolver</Badge>
+          <Badge variant="secondary">{number(data.summary.activePending)} sin retiro por revisar</Badge>
         </div>
         <div className="divide-y border-t">
           {data.reviewRows.slice(0,12).map((row)=>{
