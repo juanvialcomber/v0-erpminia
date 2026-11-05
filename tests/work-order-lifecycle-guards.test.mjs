@@ -68,6 +68,8 @@ test('database couples timer state to in-progress OT lifecycle', async () => {
   assert.match(sql, /before update of status, timer_status/i);
   assert.match(sql, /v_timer_status in \('running', 'paused'\)[\s\S]*v_status <> 'in_progress'/i);
   assert.match(sql, /v_status in \('completed', 'closed', 'cancelled', 'canceled'\)[\s\S]*v_timer_status <> 'idle'/i);
+  assert.match(sql, /create unique index if not exists maintenance_one_running_timer_per_person_idx/i);
+  assert.match(sql, /where timer_status = 'running'[\s\S]*assigned_person_id is not null/i);
 });
 
 test('canonical close never derives downtime or availability from OT wall-clock time', async () => {
@@ -100,4 +102,11 @@ test('planner work-order detail exposes a one-click edit action', async () => {
   assert.match(detail, /id="edit-work-order"/);
   assert.match(detail, /setEditOpen\(true\)/);
   assert.match(detail, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+});
+
+test('timer endpoint maps database concurrency races to a user-level conflict', async () => {
+  const route = await readFile(timerRouteUrl, 'utf8');
+
+  assert.match(route, /error\?\.code === '23505'/);
+  assert.match(route, /otra OT con el cronómetro en ejecución/);
 });
