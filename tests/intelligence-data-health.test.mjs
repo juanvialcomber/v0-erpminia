@@ -43,3 +43,15 @@ test('executive assistant degrades quota exhaustion as service unavailable', asy
   assert.match(route, /configurationError \|\| quotaError \? 503 : 500/);
   assert.match(observability, /return 'ai_quota_exhausted'/);
 });
+
+test('executive assistant uses bounded N3 Model Router fallback', async () => {
+  const route = await readFile(new URL('../app/api/intelligence/executive-assistant/route.ts', import.meta.url), 'utf8');
+
+  assert.match(route, /task_class: 'motil-executive-assistant'/);
+  assert.match(route, /capability: 'long-context'/);
+  assert.match(route, /N3_MODEL_ROUTER_URL/);
+  assert.match(route, /N3_MODEL_ROUTER_MOTIL_TOKEN/);
+  assert.match(route, /x-n3-service-token/);
+  assert.match(route, /return await callN3RouterFallback/);
+  assert.doesNotMatch(route, /OPENROUTER_API_KEY/);
+});
