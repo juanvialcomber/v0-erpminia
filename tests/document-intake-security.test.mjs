@@ -39,3 +39,14 @@ test('document intake UI hashes files and uses signed uploads rather than public
   assert.match(page, /Laudus/);
   assert.doesNotMatch(page, /getPublicUrl/);
 });
+
+
+test('document intake supports whole-folder selection and preserves relative paths', async () => {
+  const page = await readFile(pageUrl, 'utf8');
+
+  assert.match(page, /setAttribute\('webkitdirectory', ''\)/);
+  assert.match(page, /file\.webkitRelativePath \|\| file\.name/);
+  assert.match(page, /Seleccionar carpeta/);
+  assert.match(page, /relativeDirectory/);
+  assert.match(page, /effectiveSourcePath/);
+});
