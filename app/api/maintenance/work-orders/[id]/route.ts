@@ -200,6 +200,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (['completed', 'closed', 'cancelled', 'canceled'].includes(currentStatus)) {
       return NextResponse.json({ error: 'La OT ya está cerrada o anulada y no se puede modificar.' }, { status: 409 });
     }
+    if (body.status !== undefined) {
+      const requestedStatus = String(body.status || '').toLowerCase();
+      const allowedStatuses = new Set(['open', 'in_progress', 'completed', 'cancelled', 'canceled']);
+      if (!allowedStatuses.has(requestedStatus)) {
+        return NextResponse.json({ error: 'Estado de OT no válido.' }, { status: 400 });
+      }
+      if (currentStatus === 'in_progress' && requestedStatus === 'open') {
+        return NextResponse.json(
+          { error: 'Una OT en ejecución no puede volver a abierta. Pausa el trabajo o anula la OT con un motivo.' },
+          { status: 409 },
+        );
+      }
+    }
     if (currentWorkType === 'emergency') {
       if (body.work_type !== undefined && String(body.work_type || '').toLowerCase() !== 'emergency') {
         return NextResponse.json({ error: 'Una OTe no puede convertirse en una OT normal.' }, { status: 409 });
