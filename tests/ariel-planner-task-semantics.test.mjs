@@ -10,13 +10,13 @@ test('planner inbox is exception-driven instead of mirroring every created OT',(
   assert.match(personal,/order\.status === 'in_progress'.*dateKey && dateKey < now/s);
   assert.match(personal,/maintenance_planning:overdue_not_started/);
   assert.match(personal,/OT vencida\$\{overdue\.length === 1 \? '' : 's'\} sin iniciar/);
-  assert.match(personal,/Reprogramar, destrabar o confirmar nueva fecha con el responsable/);
+  assert.match(personal,/Revisar vigencia del plan y reprogramar sólo si la fecha ya no corresponde/);
   assert.doesNotMatch(personal,/for \(const order of created\) \{\s*tasks\.set\(order\.id, toInboxTask/s);
 });
 
 test('planner exceptions are owned actions without implying personal execution',()=>{
   assert.match(personal,/responsibility: 'owner'/);
-  assert.match(personal,/Revisar programación; no implica ejecutar personalmente cada OT/);
+  assert.match(personal,/Siguen siendo trabajo planificado; revisar vigencia de fecha y reprogramar sólo si corresponde/);
   assert.match(personal,/Intervenir atraso/);
 });
 
