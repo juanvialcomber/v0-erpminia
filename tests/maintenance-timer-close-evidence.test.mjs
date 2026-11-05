@@ -61,7 +61,9 @@ test('dedicated closure terminates a running or paused timer before final close'
 test('paused calendar time never inflates mechanic execution duration at close', () => {
   assert.match(closeRoute, /const effectiveHours = Math\.max\(/);
   assert.match(closeRoute, /Number\.isFinite\(timerHours\)/);
-  assert.doesNotMatch(closeRoute, /effectiveHours = Math\.max\([\s\S]*?downtime,[\s\S]*?\);/);
+  const effectiveHoursBlock = closeRoute.match(/const effectiveHours = Math\.max\([\s\S]*?\n    \);/)?.[0] || '';
+  assert.ok(effectiveHoursBlock);
+  assert.doesNotMatch(effectiveHoursBlock, /downtime/);
 });
 
 test('completed OT can be approved by either canonical maintenance approver', () => {
