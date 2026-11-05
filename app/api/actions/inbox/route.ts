@@ -103,6 +103,10 @@ function resolveTaskRoute(task: RoleTask, reviewRoutes: Map<string, ReviewRouteR
     return `/dashboard/mantenimiento/ordenes-trabajo/${rawId}`;
   }
 
+  if (kind === 'maintenance_planning' && rawId === 'overdue_not_started' && rest.length === 0) {
+    return '/dashboard/mantenimiento/eam';
+  }
+
   if (kind === 'maintenance_review' && rawId && rest.length === 0 && UUID_PATTERN.test(rawId)) {
     const priority = task.severity === 'critical' ? 'critical' : 'high';
     return `/dashboard/mantenimiento/ordenes-trabajo/create?reviewId=${rawId}&workType=corrective&priority=${priority}`;
@@ -337,9 +341,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No se pudo cargar tu bandeja operacional' }, { status: 500 });
   }
 
-  const baseRows = [...(actionableResult.data || []), ...(escalationResult.data || []), ...personalWorkOrderTasks] as unknown as Array<
+  let baseRows = [...(actionableResult.data || []), ...(escalationResult.data || []), ...personalWorkOrderTasks] as unknown as Array<
     Omit<RoleTask, 'personal_status' | 'snoozed_until' | 'visible_now' | 'actions' | 'module_route' | 'urgency_label' | 'responsibility_label'>
   >;
+
+  // A general/workshop OT may legitimately exist without a canonical asset.
+  // Do not turn that into a false "missing_asset" task for the planner.
+  const missingAssetSupportIds = Array.from(new Set(
+    baseRows
+      .filter((task) => task.responsibility === 'support')
+      .filter((task) => task.task_key.startsWith('work_order:'))
+      .filter((task) => /missing_asset/i.test(String(task.evidence_summary || '')))
+      .map((task) => task.task_key.split(':')[1])
+      .filter((value): value is string => Boolean(value && UUID_PATTERN.test(value)))
+  ));
+
+  if (missingAssetSupportIds.length) {
+    const { data: nonAssetGeneralOrders, error: nonAssetGeneralError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('id,work_type,canonical_asset_id')
+      .eq('organization_id', context.organizationId)
+      .in('id', missingAssetSupportIds);
+
+    if (nonAssetGeneralError) {
+      console.warn('[role-task-inbox] missing-asset exception lookup failed; preserving source tasks', nonAssetGeneralError);
+    } else {
+      const ignorableIds = new Set(
+        (nonAssetGeneralOrders || [])
+          .filter((order: any) => !order.canonical_asset_id && String(order.work_type || '').toLowerCase() === 'general')
+          .map((order: any) => String(order.id)),
+      );
+      if (ignorableIds.size) {
+        baseRows = baseRows.filter((task) => {
+          if (!task.task_key.startsWith('work_order:')) return true;
+          const workOrderId = task.task_key.split(':')[1];
+          return !ignorableIds.has(workOrderId);
+        });
+      }
+    }
+  }
 
   const [stateResult, catalogResult] = await Promise.all([
     context.supabase
