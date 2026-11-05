@@ -81,6 +81,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   if (action === 'play' || action === 'resume') {
+    const { data: lastReview, error: lastReviewError } = await context.supabase
+      .from('work_order_events')
+      .select('event_type')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', workOrderId)
+      .in('event_type', ['timer_pause_review_required', 'timer_duration_declared'])
+      .order('event_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastReviewError) return timerErrorResponse(lastReviewError);
+    if (lastReview?.event_type === 'timer_pause_review_required') {
+      return NextResponse.json({ ok: false, error: 'Primero registra las horas realmente trabajadas del tramo que quedó pendiente al pausar.' }, { status: 409 });
+    }
     try {
       const other = await findOtherRunningWorkOrder(context, workOrderId);
       if (other) {
