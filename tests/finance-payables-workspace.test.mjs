@@ -62,3 +62,12 @@ test('treasury exposes Laudus open exposure as read-only evidence without creati
   assert.match(page,/Laudus · sólo lectura/);
   assert.match(page,/No se puede registrar pago desde estas partidas hasta que la obligación sea promovida y aprobada en MOTIL/);
 });
+
+
+test('Laudus observed payables summary paginates beyond Supabase default 1000 row cap',()=>{
+  assert.match(route,/OBSERVED_PAYABLES_PAGE_SIZE = 1000/);
+  assert.match(route,/OBSERVED_PAYABLES_MAX_ROWS = 5000/);
+  assert.match(route,/\.range\(from, to\)/);
+  assert.match(route,/if \(page\.length < OBSERVED_PAYABLES_PAGE_SIZE\) break/);
+  assert.match(route,/items: observedRows\.slice\(0, 50\)/);
+});
