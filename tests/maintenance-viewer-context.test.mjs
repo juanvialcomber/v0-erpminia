@@ -9,7 +9,9 @@ test('maintenance viewer context preserves canonical cargo and promotes assigned
   assert.match(route, /const baseMode = resolveMaintenanceViewerMode\(cargoName\)/);
   assert.match(route, /hasAssignedOperationalWork/);
   assert.match(route, /hasAssignedOperationalWork \? 'execution' : baseMode/);
-  assert.match(route, /canEdit: accessLevel === 'ED' \|\| hasAssignedOperationalWork/);
+  assert.match(route, /canEdit: authority\.canPlan \|\| hasAssignedOperationalWork/);
+  assert.match(route, /permissions: \{/);
+  assert.match(route, /canPlan: authority\.canPlan/);
   assert.doesNotMatch(route, /cargoName: mode === 'general' \? null : cargoName/);
 });
 
