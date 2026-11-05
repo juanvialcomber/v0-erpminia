@@ -259,18 +259,11 @@ export function MobileWorkOrderFlow({
     setBusy(true);
     setMessage(null);
     try {
-      await request(`/api/maintenance/work-orders/${workOrderId}`, {
-        method: 'PATCH',
+      await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'in_progress' }),
+        body: JSON.stringify({ action: 'play' }),
       });
-      if (timerStatus === 'idle') {
-        await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'play' }),
-        });
-      }
       await Promise.all([onWorkOrderChange(), mutate()]);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo iniciar el trabajo.');
