@@ -135,6 +135,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     warehouseCode = product.warehouse_code || warehouseCode;
 
     const inventoryUnitsUsed = numberOrNull(body.inventory_units_used);
+    const normalizedUnit = String(inventoryUnit || '').toLowerCase();
+    if (unitCostSnapshot !== null && normalizedUnit.includes('litro')) {
+      totalCost = quantityLiters * unitCostSnapshot;
+      costState = 'derived';
+    } else if (unitCostSnapshot !== null && inventoryUnitsUsed !== null && inventoryUnitsUsed > 0) {
+      totalCost = inventoryUnitsUsed * unitCostSnapshot;
+      costState = 'derived';
+    }
+  }
+
+  if (!fluidName) return NextResponse.json({ error: 'Indica el fluido utilizado.' }, { status: 400 });
+
+  const inventoryUnitsUsed = numberOrNull(body.inventory_units_used);
   const wasteNames: Record<string, string> = {
     used_oil: 'Aceite usado',
     hydraulic_fluid: 'Fluido hidráulico usado',
