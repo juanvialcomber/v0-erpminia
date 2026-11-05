@@ -99,3 +99,15 @@ test('OT cancellation is timer-safe, reasoned and atomic', async () => {
   assert.match(migration, /'work_order_cancelled'/);
   assert.match(migration, /'reason', v_reason/);
 });
+
+
+test('every material OT edit is auditable with previous and next values', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  assert.match(route, /assigned_person_id', 'assigned_to_name', 'cost_center_id'/);
+  assert.match(route, /actual_duration_hours', 'root_cause', 'preventive_actions', 'meter_reading', 'meter_unit'/);
+  assert.match(route, /const changes = Object\.fromEntries/);
+  assert.match(route, /previous:/);
+  assert.match(route, /next:/);
+  assert.match(route, /payload: \{ changed_fields: changedFields, changes \}/);
+  assert.match(route, /actor_name: context\.userName \|\| context\.userEmail \|\| null/);
+});
