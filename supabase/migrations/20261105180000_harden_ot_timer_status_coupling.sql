@@ -45,3 +45,9 @@ create trigger maintenance_work_orders_lifecycle_assignment_guard
 before update of status, timer_status on public.maintenance_work_orders
 for each row
 execute function public.enforce_work_order_lifecycle_assignment();
+
+-- UI checks concurrent work, but the database is the final authority against races/two tabs.
+create unique index if not exists maintenance_one_running_timer_per_person_idx
+  on public.maintenance_work_orders (organization_id, assigned_person_id)
+  where timer_status = 'running'
+    and assigned_person_id is not null;
