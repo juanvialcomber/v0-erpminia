@@ -11,7 +11,8 @@ test('Ariel planner cargo has explicit creation capability with ED permission an
   assert.match(capability, /cargo === 'jefe de planificación'/);
   assert.match(capability, /Boolean\(person\?\.id\) && accessLevel === 'ED'/);
   assert.match(context, /canCreateWorkOrder/);
-  assert.match(context, /creationCapability\.canCreate/);
+  assert.match(context, /getMaintenanceActorAuthority/);
+  assert.match(context, /authority\.canCreateWorkOrder/);
 });
 
 test('manual work-order creation requires assignee and date, with equipment or explicit general workshop work', () => {
