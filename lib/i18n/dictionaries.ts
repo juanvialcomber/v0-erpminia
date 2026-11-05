@@ -381,6 +381,7 @@ export const dictionaries = {
           'centros-costos': 'Centros de costos',
           mantenimiento: 'Mantenimiento',
           'ordenes-trabajo': 'Órdenes de trabajo',
+          create: 'Crear',
           planificacion: 'Planificación preventiva',
           bitacora: 'Bitácora',
           movil: 'Operación en terreno',
