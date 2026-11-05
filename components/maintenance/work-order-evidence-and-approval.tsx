@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ function formatDate(value?: string | null) {
 
 export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrderId: string; status?: string | null }) {
   const evidence = useSWR(`/api/maintenance/work-orders/${workOrderId}/evidence`, fetcher);
-  const review = useSWR(status === 'completed' ? `/api/maintenance/work-orders/${workOrderId}/review` : null, fetcher);
+  const review = useSWR(`/api/maintenance/work-orders/${workOrderId}/review`, fetcher);
   const fluidClosureEvidence = useSWR(status === 'completed' ? `/api/maintenance/work-orders/${workOrderId}/fluids/closure` : null, fetcher);
 
   const photos = evidence.data?.evidence || [];
@@ -31,9 +31,12 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const primaryPhoto = photos.find((photo: { id: string }) => photo.id === selectedPhotoId) || photos[0];
   const currentReview = review.data?.review;
   const canApprove = Boolean(review.data?.canApprove);
+  const canReject = Boolean(review.data?.canReject);
   const legacyFluidDeclarationExemption = Boolean(review.data?.legacyFluidDeclarationExemption);
   const [confirmMaterialsInstalled, setConfirmMaterialsInstalled] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectionNote, setRejectionNote] = useState('');
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [fluidUsedChoice, setFluidUsedChoice] = useState<'yes' | 'no' | ''>('');
   const [fluidWasteChoice, setFluidWasteChoice] = useState<'linked' | 'none_recovered' | ''>('');
@@ -59,7 +62,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmMaterialsInstalled }),
+        body: JSON.stringify({ action: 'approve', confirmMaterialsInstalled }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'No se pudo aprobar la OT.');
@@ -68,6 +71,30 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
       setApprovalError(error instanceof Error ? error.message : 'No se pudo aprobar la OT.');
     } finally {
       setApproving(false);
+    }
+  };
+
+  const rejectForCorrection = async () => {
+    const note = rejectionNote.trim();
+    if (note.length < 5) return setApprovalError('Indica qué debe corregir el mecánico.');
+    setRejecting(true);
+    setApprovalError(null);
+    try {
+      const response = await fetch(`/api/maintenance/work-orders/${workOrderId}/review`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', note }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo devolver la OT.');
+      setRejectionNote('');
+      await review.mutate();
+      window.location.reload();
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : 'No se pudo devolver la OT.');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -102,6 +129,25 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
 
   return (
     <div className="space-y-4">
+      {currentReview?.status === 'rejected' ? (
+        <Card className="border-amber-500/40 bg-amber-500/5 shadow-none">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4" />Corrección solicitada</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm font-medium">{currentReview.last_rejection_note || currentReview.decision_note || 'La supervisión solicitó corregir esta OT.'}</p>
+            <p className="text-xs text-muted-foreground">{currentReview.last_rejected_by_name || currentReview.reviewed_by_name || 'Supervisor'} · {formatDate(currentReview.last_rejected_at || currentReview.reviewed_at)}</p>
+            <p className="text-sm text-muted-foreground">La OT volvió al ejecutor asignado. Corrige la información o evidencia indicada y vuelve a cerrar para reenviarla a revisión.</p>
+          </CardContent>
+        </Card>
+      ) : currentReview?.status === 'pending' && currentReview?.resubmitted_at && currentReview?.last_rejection_note ? (
+        <Card className="border-blue-500/30 bg-blue-500/5 shadow-none">
+          <CardContent className="p-4">
+            <p className="flex items-center gap-2 text-sm font-medium"><RotateCcw className="h-4 w-4" />Corregida y reenviada</p>
+            <p className="mt-1 text-xs text-muted-foreground">Reenviada {formatDate(currentReview.resubmitted_at)} · rechazo anterior: {currentReview.last_rejection_note}</p>
+          </CardContent>
+        </Card>
+      ) : null}
       <Card className="shadow-none">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Evidencia fotográfica</CardTitle>
@@ -241,7 +287,17 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 <span>Confirmo que los {materialLines} repuestos requeridos fueron instalados. La regularización de bodega queda pendiente.</span>
               </label> : null}
               {approvalError ? <p role="alert" className="text-sm text-destructive">{approvalError}</p> : null}
-              <Button onClick={() => void approve()} disabled={approving || (materialLines > 0 && !confirmMaterialsInstalled)}><CheckCircle2 className="mr-2 h-4 w-4" />{approving ? 'Aprobando…' : 'Aprobar OT'}</Button>
+              <div className="space-y-2">
+                <Button onClick={() => void approve()} disabled={approving || rejecting || (materialLines > 0 && !confirmMaterialsInstalled)}><CheckCircle2 className="mr-2 h-4 w-4" />{approving ? 'Aprobando…' : 'Aprobar OT'}</Button>
+                {canReject ? (
+                  <div className="space-y-2 rounded-md border p-3">
+                    <Input value={rejectionNote} onChange={(event) => setRejectionNote(event.target.value)} placeholder="Qué debe corregir el mecánico" aria-label="Motivo de rechazo de OT" />
+                    <Button type="button" variant="outline" onClick={() => void rejectForCorrection()} disabled={rejecting || approving || rejectionNote.trim().length < 5}>
+                      <RotateCcw className="mr-2 h-4 w-4" />{rejecting ? 'Devolviendo…' : 'Devolver para corregir'}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
             </div> : null}
           </CardContent>
         </Card>
