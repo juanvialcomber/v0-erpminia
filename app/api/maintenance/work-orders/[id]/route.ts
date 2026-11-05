@@ -139,14 +139,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (error) throw error;
     if (!data || isExplicitDemoRecord(data)) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
     const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
     const canExecuteAssigned = assignedExecution.ok && Boolean(data.created_by);
     const authority = await getMaintenanceActorAuthority(context);
     const permissions = getWorkOrderPermissions(authority, data);
 
-    if (!canReadModule && !canExecuteAssigned) {
+    if (!authority.canReadAllWorkOrders && !canExecuteAssigned) {
       return assignedExecution.ok
         ? NextResponse.json({ error: 'No tienes acceso a esta orden de trabajo' }, { status: 403 })
         : assignedExecution.response;
