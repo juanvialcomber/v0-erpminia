@@ -13,9 +13,17 @@ export async function GET(request: NextRequest) {
   const [
     { data: payables, error: payablesError },
     { data: payments, error: paymentsError },
+    { data: anomalyCandidates, error: anomalyError },
   ] = await Promise.all([
     context.supabase.from('procurement_accounts_payable_v1').select('*').eq('organization_id', context.organizationId).order('due_date', { ascending: true, nullsFirst: true }),
     context.supabase.from('procurement_supplier_payments').select('id,organization_id,payable_id,amount,currency,payment_date,payment_reference,notes,recorded_at,reconciled_at,reconciliation_reference,reconciliation_notes').eq('organization_id', context.organizationId).order('payment_date', { ascending: false }),
+    context.supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('purchase_invoice_external_id,doc_number,supplier_name,total_amount,currency,paid_amount,payment_count,last_payment_at,payment_status')
+      .eq('organization_id', context.organizationId)
+      .eq('currency', 'CLP')
+      .eq('payment_status', 'paid')
+      .order('paid_amount', { ascending: false }),
   ]);
 
   const observedLaudus: Array<Record<string, any>> = [];
@@ -43,7 +51,10 @@ export async function GET(request: NextRequest) {
   }
   if (payablesError || paymentsError) {
     console.error('[finance/payables]', payablesError || paymentsError);
-    return NextResponse.json({ payables: [], payments: [], observedPayables: null, canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
+    return NextResponse.json({ payables: [], payments: [], observedPayables: null, paymentReview: null, canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
+  }
+  if (anomalyError) {
+    console.error('[finance/payables:laudus-payment-review]', anomalyError);
   }
   if (observedLaudusError) {
     console.error('[finance/payables:laudus-observed]', observedLaudusError);
@@ -54,6 +65,38 @@ export async function GET(request: NextRequest) {
   );
   const visiblePayments = (payments || []).filter((row) =>
     !isUatValue(row.payment_reference) && !isUatValue(row.reconciliation_reference),
+  );
+
+  const paymentReviewRows = anomalyError ? [] : (anomalyCandidates || [])
+    .filter((row) => Number(row.paid_amount || 0) > Number(row.total_amount || 0))
+    .map((row) => {
+      const totalAmount = Number(row.total_amount || 0);
+      const paidAmount = Number(row.paid_amount || 0);
+      const excessAmount = paidAmount - totalAmount;
+      return {
+        ...row,
+        total_amount: totalAmount,
+        paid_amount: paidAmount,
+        excess_amount: excessAmount,
+        review_reason: Math.abs(paidAmount - (2 * totalAmount)) <= 0.005 ? 'exact_double_total' : 'additional_partial_excess',
+      };
+    })
+    .sort((a, b) => Number(b.excess_amount || 0) - Number(a.excess_amount || 0));
+
+  const paymentReviewSummary = paymentReviewRows.reduce(
+    (summary, row) => {
+      summary.itemCount += 1;
+      summary.excessAmountClp += Number(row.excess_amount || 0);
+      if (row.review_reason === 'exact_double_total') {
+        summary.exactDoubleCount += 1;
+        summary.exactDoubleAmountClp += Number(row.excess_amount || 0);
+      } else {
+        summary.additionalPartialCount += 1;
+        summary.additionalPartialAmountClp += Number(row.excess_amount || 0);
+      }
+      return summary;
+    },
+    { itemCount: 0, excessAmountClp: 0, exactDoubleCount: 0, exactDoubleAmountClp: 0, additionalPartialCount: 0, additionalPartialAmountClp: 0 },
   );
 
   const observedRows = observedLaudusError ? [] : observedLaudus;
@@ -78,6 +121,13 @@ export async function GET(request: NextRequest) {
       ...observedSummary,
       items: observedRows.slice(0, 50),
       semantics: 'Exposición financiera observada en Laudus. No constituye una CxP aprobada en MOTIL ni habilita pagos.',
+    },
+    paymentReview: {
+      source: 'Laudus',
+      readOnly: true,
+      ...paymentReviewSummary,
+      rows: paymentReviewRows.slice(0, 20),
+      semantics: 'Aplicaciones de pago en Laudus superiores al total nominal de la factura. Requieren revisión documental antes de cualquier ajuste.',
     },
     canEdit: access.canWrite,
   });
