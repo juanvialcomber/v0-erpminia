@@ -134,9 +134,67 @@ async function isFinanceManager(profileId: string): Promise<boolean> {
   if (linkedError) throw linkedError;
   return linked.status === 'active' && linked.cargo_id === FINANCE_MANAGER_CARGO_ID;
 }
+
+async function financeManagerMatrixAllowed(identityId: string, path: string, method: string): Promise<boolean> {
+  const moduleKeys = path.startsWith('/api/maintenance/')
+    ? ['mant_operaciones', 'mant_gerencial', 'mant_recursos', 'mant_documentos']
+    : path.startsWith('/api/bodega/')
+      ? ['bodega_inventario', 'bodega_documentos']
+      : null;
+  if (!moduleKeys) return false;
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Missing permission lookup configuration');
+
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  let profileId = identityId;
+  let { data: profile, error: profileError } = await admin
+    .from('profiles')
+    .select('id,cargo_id,status')
+    .eq('id', profileId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+
+  if (!profile) {
+    const { data: link, error: linkError } = await admin
+      .from('auth_profile_identity_links')
+      .select('profile_id')
+      .eq('auth_user_id', identityId)
+      .maybeSingle();
+    if (linkError) throw linkError;
+    if (!link?.profile_id) return false;
+    profileId = link.profile_id;
+    const linked = await admin
+      .from('profiles')
+      .select('id,cargo_id,status')
+      .eq('id', profileId)
+      .maybeSingle();
+    if (linked.error) throw linked.error;
+    profile = linked.data;
+  }
+
+  if (!profile?.cargo_id || profile.status !== 'active') return false;
+
+  const { data: accessRows, error: accessError } = await admin
+    .from('role_matrix')
+    .select('module_key,access_level')
+    .eq('cargo_id', profile.cargo_id)
+    .in('module_key', moduleKeys);
+  if (accessError) throw accessError;
+
+  const readOnly = ['GET', 'HEAD', 'OPTIONS'].includes(method);
+  return (accessRows ?? []).some((row) =>
+    readOnly
+      ? row.access_level === 'ED' || row.access_level === 'LEC'
+      : row.access_level === 'ED'
+  );
+}
+
 function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
-  if (path.startsWith('/api/auth/') || path.startsWith('/api/me/')) return true;
+  if (path.startsWith('/api/auth/') || path === '/api/me' || path.startsWith('/api/me/')) return true;
   if (path === '/api/actions/inbox' || path === '/api/data-sources/status') return readOnly;
   if (path.startsWith('/api/procurement/')) return readOnly;
   if (path === '/api/pipeline/operational') return readOnly;
@@ -323,7 +381,7 @@ async function proxyRequest(request: NextRequest) {
   const accessIdentityId = customSession?.user.id || user?.id;
   if (accessIdentityId && (pathname.startsWith('/api/') || pathname.startsWith('/admin') || pathname.startsWith('/setup'))) {
     try {
-      if (await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method)) {
+      if (await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method) && !(await financeManagerMatrixAllowed(accessIdentityId, pathname, request.method))) {
         if (pathname.startsWith('/api/')) {
           return withSecurityHeaders(NextResponse.json({ error: 'Acceso restringido al área de Finanzas' }, { status: 403 }));
         }
