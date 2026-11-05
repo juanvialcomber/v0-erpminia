@@ -229,6 +229,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         );
       }
     }
+    if (body.status === 'in_progress' && !executionAccess.ok) {
+      return NextResponse.json(
+        { error: 'Sólo el responsable asignado puede iniciar la ejecución de la OT.' },
+        { status: 403 },
+      );
+    }
     if (body.status === 'in_progress') {
       const releaseReadiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, id);
       if (!releaseReadiness.ready) {
