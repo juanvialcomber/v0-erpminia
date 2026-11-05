@@ -27,6 +27,7 @@ const PUBLIC_API_ROUTES = new Set([
   // Service-to-service accounting reply bridge validates GREENAPI_WEBHOOK_TOKEN in the handler.
   '/api/integrations/n3uralia-tax/whatsapp-send',
   '/api/integrations/n3uralia-tax/rotate-webhook-token',
+  '/api/integrations/n3uralia-tax/verify-webhook-e2e',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
