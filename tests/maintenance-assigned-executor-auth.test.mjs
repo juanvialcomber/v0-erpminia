@@ -23,10 +23,10 @@ test('non-elevated maintenance users are restricted to their assigned person ide
   assert.match(access, /Sólo la persona asignada puede ejecutar esta orden de trabajo/);
 });
 
-test('assigned executor does not require general maintenance edit access to read or start own OT', () => {
-  assert.match(workOrder, /getModuleAccessLevel/);
+test('assigned executor does not require planning authority to read or start own OT', () => {
+  assert.match(workOrder, /getMaintenanceActorAuthority/);
   assert.match(workOrder, /canExecuteAssigned/);
-  assert.match(workOrder, /if \(!hasModuleWrite\)/);
+  assert.match(workOrder, /if \(!hasPlanningAuthority\)/);
   assert.match(workOrder, /isStartOnly/);
   assert.match(workOrder, /isExecutionEvidenceOnly/);
   assert.match(workOrder, /root_cause/);
@@ -34,8 +34,10 @@ test('assigned executor does not require general maintenance edit access to read
   assert.match(workOrder, /actual_duration_hours/);
 });
 
-test('timer accepts module writers or assignee, but close is reserved to canonical assignee', () => {
-  assert.match(timer, /accessLevel !== 'ED' && !executionAccess\.ok/);
+test('timer and close are reserved to the canonical assigned executor', () => {
+  assert.match(timer, /requireAssignedMaintenanceExecution/);
+  assert.match(timer, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(timer.slice(timer.indexOf('export async function POST'), timer.indexOf('export async function GET')), /accessLevel\s*[!=]==?\s*['"]ED['"]/);
   assert.match(close, /requireAssignedMaintenanceExecution/);
   assert.match(close, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(close, /accessLevel !== 'ED'/);
