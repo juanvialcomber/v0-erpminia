@@ -81,7 +81,7 @@ function toInboxTask(
     title: `${title} · ${order.title || 'Trabajo programado'}`,
     evidence_summary: evidenceSummary,
     status: kind === 'approval' ? 'pending' : String(order.status || 'open'),
-    responsibility: kind === 'followup' ? 'support' : 'owner',
+    responsibility: 'owner',
     role_action: kind === 'approval' ? 'Revisar y aprobar evidencia' : kind === 'execution'
       ? 'Ejecutar trabajo asignado' : 'Reprogramar, destrabar o confirmar nueva fecha con el responsable',
     occurred_at: order.created_at ? `${order.created_at.replace(' ', 'T')}Z` : null,
@@ -126,7 +126,7 @@ function planningExceptionTask(
       'Revisar programación; no implica ejecutar personalmente cada OT',
     ].filter(Boolean).join(' · '),
     status: 'pending',
-    responsibility: 'support',
+    responsibility: 'owner',
     role_action: 'Reprogramar, destrabar o confirmar nueva fecha con el responsable',
     occurred_at: overdue.map((order) => order.created_at).filter(Boolean).sort()[0] || null,
     due_at: earliestDate ? `${earliestDate}T23:59:59Z` : null,
