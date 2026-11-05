@@ -55,3 +55,10 @@ test('executive assistant uses bounded N3 Model Router fallback', async () => {
   assert.match(route, /return await callN3RouterFallback/);
   assert.doesNotMatch(route, /OPENROUTER_API_KEY/);
 });
+
+test('N3 Router fallback sends Vercel Trusted Sources token when available', async () => {
+  const route = await readFile(new URL('../app/api/intelligence/executive-assistant/route.ts', import.meta.url), 'utf8');
+
+  assert.match(route, /VERCEL_OIDC_TOKEN/);
+  assert.match(route, /x-vercel-trusted-oidc-idp-token/);
+});
