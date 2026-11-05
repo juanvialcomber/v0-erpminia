@@ -18,15 +18,14 @@ const items = [
 
 export default function DocumentManagementLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const focusedIntake = pathname === '/dashboard/documentos-gestion/ingesta';
+
+  if (focusedIntake) return <>{children}</>;
 
   return (
     <div className="space-y-5">
       <section className="border-b border-border pb-4">
-        <div className="mb-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gestión documental</p>
-          <p className="mt-1 text-sm text-muted-foreground">Vigencia, aprobación, respaldo y trazabilidad de documentos y contratos.</p>
-        </div>
-        <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="Navegación de gestión documental">
+        <nav className="flex flex-wrap gap-2" aria-label="Navegación de gestión documental">
           {items.map((item) => {
             const Icon = item.icon;
             const active = item.href === '/dashboard/documentos-gestion'

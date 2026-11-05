@@ -37,7 +37,8 @@ function badgeVariant(status: HealthStatus): 'default' | 'destructive' | 'outlin
 function metricValue(metric: Metric) {
   if (metric.value === null || metric.value === undefined || metric.value === '') return 'Sin dato';
   if (typeof metric.value === 'number') return metric.value.toLocaleString('es-CL');
-  if (/^\d{4}-\d{2}-\d{2}/.test(metric.value)) return new Date(`${metric.value}T00:00:00`).toLocaleDateString('es-CL');
+  if (/^\d{4}-\d{2}-\d{2}T/.test(metric.value)) return new Date(metric.value).toLocaleString('es-CL');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(metric.value)) return new Date(`${metric.value}T00:00:00`).toLocaleDateString('es-CL');
   return metric.value;
 }
 

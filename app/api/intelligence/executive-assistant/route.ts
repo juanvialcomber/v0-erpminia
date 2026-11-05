@@ -43,36 +43,79 @@ function extractResponseText(payload: any) {
   return typeof payload?.output_text === 'string' ? payload.output_text.trim() : '';
 }
 
+async function callN3RouterFallback(instructions: string, input: string) {
+  const url = process.env.N3_MODEL_ROUTER_URL?.trim();
+  const token = process.env.N3_MODEL_ROUTER_MOTIL_TOKEN?.trim();
+  if (!url || !token) throw new Error('N3 Model Router fallback no está configurado');
+
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN?.trim();
+  const bypassSecret = process.env.N3_MODEL_ROUTER_BYPASS_SECRET?.trim();
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-n3-service-token': token,
+      ...(oidcToken ? { 'x-vercel-trusted-oidc-idp-token': oidcToken } : {}),
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+    },
+    body: JSON.stringify({
+      task_class: 'motil-executive-assistant',
+      capability: 'long-context',
+      system: instructions,
+      input,
+    }),
+    cache: 'no-store',
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.text) {
+    throw new Error(payload?.error || `N3 Model Router respondió ${response.status}`);
+  }
+  return {
+    text: String(payload.text),
+    model: String(payload.model || 'z-ai/glm-5.3-flash'),
+    responseId: payload.responseId || null,
+  };
+}
+
 async function callModel(instructions: string, input: string) {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY no está configurada en el servidor');
   const models = Array.from(new Set([
     process.env.OPENAI_OPERATIONAL_ASSISTANT_MODEL?.trim(),
     'gpt-5.6',
     'gpt-5.6-terra',
     'gpt-5.6-luna',
   ].filter(Boolean))) as string[];
-  let lastError = 'No hay un modelo disponible';
+  let lastError = apiKey ? 'No hay un modelo OpenAI disponible' : 'OPENAI_API_KEY no está configurada en el servidor';
 
-  for (const model of models) {
-    const response = await fetch(OPENAI_RESPONSES_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, instructions, input, reasoning: { effort: 'medium' }, max_output_tokens: 2600 }),
-      cache: 'no-store',
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      const detail = payload?.error?.message || `OpenAI respondió ${response.status}`;
-      lastError = detail;
-      if (/invalid model|model.*not.*found|does not exist|not permitted|not available/i.test(detail)) continue;
-      throw new Error(detail);
+  if (apiKey) {
+    for (const model of models) {
+      const response = await fetch(OPENAI_RESPONSES_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, instructions, input, reasoning: { effort: 'medium' }, max_output_tokens: 2600 }),
+        cache: 'no-store',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const detail = payload?.error?.message || `OpenAI respondió ${response.status}`;
+        lastError = detail;
+        if (/invalid model|model.*not.*found|does not exist|not permitted|not available/i.test(detail)) continue;
+        if (/no credits remaining|insufficient_quota|quota.*exceeded|billing|upstream|fetch failed|ECONN|ETIMEDOUT/i.test(detail)) break;
+        throw new Error(detail);
+      }
+      const text = extractResponseText(payload);
+      if (text) return { text, model: payload?.model || model, responseId: payload?.id || null };
+      lastError = 'OpenAI no devolvió texto utilizable';
+      break;
     }
-    const text = extractResponseText(payload);
-    if (!text) throw new Error('OpenAI no devolvió texto utilizable');
-    return { text, model: payload?.model || model, responseId: payload?.id || null };
   }
-  throw new Error(lastError);
+
+  try {
+    return await callN3RouterFallback(instructions, input);
+  } catch (fallbackError) {
+    const fallbackDetail = fallbackError instanceof Error ? fallbackError.message : String(fallbackError ?? 'unknown');
+    throw new Error(`${lastError}; fallback N3: ${fallbackDetail}`);
+  }
 }
 
 type ToolRef = { name: string; mode: 'read' };
@@ -576,7 +619,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error ?? 'unknown');
     const configurationError = detail.includes('OPENAI_API_KEY');
-    const httpStatus = configurationError ? 503 : 500;
+    const quotaError = /no credits remaining|insufficient_quota|quota.*exceeded|billing/i.test(detail);
+    const httpStatus = configurationError || quotaError ? 503 : 500;
     await recordCoreRuntimeError({
       db: context.supabase,
       organizationId: context.organizationId,
@@ -589,7 +633,11 @@ export async function POST(request: NextRequest) {
     });
     console.error('[executive-assistant] request failed', { detail });
     return NextResponse.json({
-      error: configurationError ? 'El servicio de IA no está configurado en este entorno.' : 'No fue posible construir la síntesis ejecutiva.',
+      error: configurationError
+        ? 'El servicio de IA no está configurado en este entorno.'
+        : quotaError
+          ? 'El servicio de IA está temporalmente sin capacidad disponible. Los datos operacionales permanecen intactos.'
+          : 'No fue posible construir la síntesis ejecutiva.',
     }, { status: httpStatus });
   }
 }

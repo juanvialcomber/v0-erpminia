@@ -27,12 +27,12 @@ export function DataSourceAttentionBanner() {
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {affected.map((source) => source.label).join(' · ')}
-              {reviewCount > 0 ? ` · ${reviewCount} revisión${reviewCount === 1 ? '' : 'es'}` : ''}
+              {reviewCount > 0 ? ` · ${reviewCount} ${reviewCount === 1 ? 'revisión' : 'revisiones'}` : ''}
             </p>
           </div>
         </div>
-        <Link href="/dashboard/calidad-datos" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline">
-          Revisar
+        <Link href="/dashboard/calidad-datos" className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md border border-amber-500/35 bg-background px-3 text-xs font-semibold text-foreground transition-colors hover:bg-amber-500/10">
+          Revisar ahora
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>

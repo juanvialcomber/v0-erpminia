@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
       hseExternalInspections,
       legalCases,
       financePayables,
+      aiCoreErrors,
     ] = await Promise.all([
       productionAllowed ? context.supabase.from('production_canonical_package_quality_v1').select('status').eq('organization_id', org) : emptyRows(),
       productionAllowed ? context.supabase.from('production_material_movements').select('movement_date').eq('organization_id', org).order('movement_date', { ascending: false }).limit(1) : emptyRows(),
@@ -90,14 +91,65 @@ export async function GET(request: NextRequest) {
       hseAllowed ? context.supabase.from('inspecciones_externas').select('id').eq('organization_id', org) : emptyRows(),
       legalAllowed ? context.supabase.from('legal_cases').select('id,status,legal_owner,due_at,source_type,source_id').eq('organization_id', org) : emptyRows(),
       financeAllowed ? context.supabase.from('procurement_accounts_payable').select('id,status,due_date,invoice_id,supplier_id').eq('organization_id', org) : emptyRows(),
+      access.admin
+        ? context.supabase
+            .from('motil_ai_core_errors')
+            .select('domain,failure_phase,error_code,http_status,created_at')
+            .eq('organization_id', org)
+            .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+            .order('created_at', { ascending: false })
+            .limit(200)
+        : emptyRows(),
     ] as Promise<QueryResult>[]);
 
-    const failures = [productionChecks, transportLatest, metallurgyLatest, drillingLatest, drillingQueue, inventoryOverview, inventorySnapshot, workOrders, poQuality, procurementExceptions, laudusProcurementHealth, exceptionCenter, activeMaintenanceAssets, deterministicReconciliation, reviewRequiredReconciliation, rawMeterRows, meterObservations, hseDocuments, hseCommitments, hseInternalInspections, hseExternalInspections, legalCases, financePayables]
+    const failures = [productionChecks, transportLatest, metallurgyLatest, drillingLatest, drillingQueue, inventoryOverview, inventorySnapshot, workOrders, poQuality, procurementExceptions, laudusProcurementHealth, exceptionCenter, activeMaintenanceAssets, deterministicReconciliation, reviewRequiredReconciliation, rawMeterRows, meterObservations, hseDocuments, hseCommitments, hseInternalInspections, hseExternalInspections, legalCases, financePayables, aiCoreErrors]
       .map((result: QueryResult) => result.error)
       .filter(Boolean);
     if (failures.length) throw failures[0];
 
     const domains: any[] = [];
+
+    if (access.admin) {
+      const aiErrors = aiCoreErrors.data || [];
+      const now = Date.now();
+      const errors24h = aiErrors.filter((row: any) => {
+        const created = new Date(row.created_at).getTime();
+        return Number.isFinite(created) && now - created <= 86400000;
+      });
+      const errors7d = aiErrors.length;
+      const lastError = aiErrors[0]?.created_at || null;
+      const criticalCodes = new Set(['ai_configuration_missing', 'canonical_source_contract_failure']);
+      const critical24h = errors24h.filter((row: any) => criticalCodes.has(String(row.error_code || ''))).length;
+      const intelligenceStatus: HealthStatus = critical24h > 0 || errors24h.length >= 5
+        ? 'critical'
+        : errors24h.length > 0 || errors7d > 0
+          ? 'watch'
+          : 'healthy';
+      const latestCode = aiErrors[0]?.error_code || null;
+
+      domains.push({
+        key: 'intelligence',
+        label: 'Inteligencia MOTIL',
+        status: intelligenceStatus,
+        headline: errors24h.length > 0
+          ? `${errors24h.length} error(es) del Intelligence Core en las últimas 24 h`
+          : errors7d > 0
+            ? `Sin errores en 24 h · ${errors7d} registrado(s) en los últimos 7 días`
+            : 'Sin errores del Intelligence Core registrados en los últimos 7 días',
+        metrics: [
+          { label: 'Errores · 24 h', value: errors24h.length },
+          { label: 'Errores · 7 días', value: errors7d },
+          { label: 'Último error', value: lastError },
+          { label: 'Último código', value: latestCode },
+        ],
+        action: intelligenceStatus === 'critical'
+          ? 'Revisar configuración, contrato de fuente o disponibilidad del modelo antes de confiar en respuestas ejecutivas.'
+          : intelligenceStatus === 'watch'
+            ? 'Mantener observación hasta completar 7 días sin errores; no afecta por sí solo los datos canónicos.'
+            : 'Sin acción prioritaria. Mantener observabilidad del Intelligence Core.',
+        href: '/dashboard/decisiones',
+      });
+    }
 
     if (productionAllowed) {
       const transportDate = transportLatest.data?.[0]?.movement_date || null;
