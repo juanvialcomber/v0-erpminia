@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
@@ -68,9 +68,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!context.ok) return context.response;
 
   const { id: workOrderId } = await params;
-  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
+  const authority = await getMaintenanceActorAuthority(context);
   const assignedExecution = await requireAssignedMaintenanceExecution(context, workOrderId);
-  if (accessLevel === 'SR' && !assignedExecution.ok) return assignedExecution.response;
+  if (!authority.canReadAllWorkOrders && !assignedExecution.ok) return assignedExecution.response;
 
   const { data: workOrder, error } = await context.supabase
     .from('maintenance_work_orders')
