@@ -9,6 +9,7 @@ test('cross-functional maintenance viewers resolve to oversight without inventin
   assert.match(viewerMode, /cargo === 'gerente operaciones' \|\| cargo === 'jefe sostenibilidad'\) return 'oversight'/);
   assert.match(viewerMode, /cargo === 'jefe de planificación'\) return 'planning'/);
   assert.match(viewerMode, /cargo === 'jefe departamento de mantenimiento'\) return 'leadership'/);
+  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)\) return 'planning'/);
   assert.match(viewerMode, /cargo\.startsWith\('mecánico'\)/);
 });
 
