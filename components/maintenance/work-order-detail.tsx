@@ -5,11 +5,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import useSWR from 'swr';
-import { CheckCircle2, History, MoreHorizontal, Pencil, PlayCircle, RotateCcw } from 'lucide-react';
+import { CheckCircle2, History, MoreHorizontal, Pencil, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -91,6 +90,9 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   const [editOpen, setEditOpen] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelMessage, setCancelMessage] = useState('');
+  const [cancelBusy, setCancelBusy] = useState(false);
   const saveInFlight = useRef(false);
   const costCenters = data?.costCenters || [];
   const assignees = data?.assignees || [];
@@ -142,6 +144,31 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
     }
   };
 
+  const cancelOrder = async () => {
+    const reason = cancelReason.trim();
+    if (reason.length < 5) {
+      setCancelMessage('Indica el motivo de la anulación (mínimo 5 caracteres).');
+      return;
+    }
+    setCancelBusy(true);
+    setCancelMessage('');
+    try {
+      const response = await fetch(`/api/maintenance/work-orders/${id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || 'No se pudo anular la OT.');
+      await mutate();
+    } catch (error) {
+      setCancelMessage(error instanceof Error ? error.message : 'No se pudo anular la OT.');
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
   if (isLoading || viewerLoading) {
     return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-lg bg-muted" />)}</div>;
   }
@@ -161,7 +188,10 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{workOrder.title || t.untitled}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || (workOrder.work_type === 'general' ? 'Trabajo general del taller' : t.noAsset)}</p>
         </header>
-        <p className="text-sm text-muted-foreground">Esta OT se conserva en el historial y ya no puede ejecutarse.</p>
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">Esta OT se conserva en el historial y ya no puede ejecutarse.</p>
+          {workOrder.cancellation_reason ? <p className="text-sm"><span className="font-medium">Motivo:</span> {workOrder.cancellation_reason}</p> : null}
+        </div>
         <details className="rounded-lg border bg-card">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Historial de la OT</summary>
           <div className="border-t p-4"><EntityTimeline entity="work_order" id={id} limit={50} /></div>
@@ -329,7 +359,12 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <div className="border-t p-4">
           <details>
             <summary className="cursor-pointer text-sm text-muted-foreground">Anular OT</summary>
-            <div className="mt-3 flex items-center justify-between gap-4 rounded-md border p-3"><p className="text-sm text-muted-foreground">La OT quedará en el historial y no podrá ejecutarse.</p><Button type="button" variant="destructive" onClick={() => void patchOrder({ status: 'cancelled' })}>Confirmar anulación</Button></div>
+            <div className="mt-3 space-y-3 rounded-md border p-3">
+              <p className="text-sm text-muted-foreground">La OT quedará en el historial y no podrá ejecutarse. El motivo queda registrado como evidencia de la decisión.</p>
+              <Textarea value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Motivo de la anulación" rows={2} maxLength={500} />
+              {cancelMessage ? <p role="alert" className="text-sm text-destructive">{cancelMessage}</p> : null}
+              <Button type="button" variant="destructive" disabled={cancelBusy || cancelReason.trim().length < 5} onClick={() => void cancelOrder()}>{cancelBusy ? 'Anulando…' : 'Confirmar anulación'}</Button>
+            </div>
           </details>
         </div>
       </details> : null}
@@ -453,7 +488,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   return <div className="space-y-6">
     <section className="flex flex-col gap-4 border-b border-border/70 pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm text-muted-foreground">{formatWorkOrderNumber(workOrder.work_order_number, locale)}</span><Badge variant="outline">{statusLabel(workOrder.status, t)}</Badge>{isHistorical ? <Badge variant="secondary">{t.historicalBadge}</Badge> : <Badge variant="outline">{t.operationalBadge}</Badge>}</div><h1 className="mt-2 text-3xl font-semibold tracking-tight">{workOrder.title || t.untitled}</h1><p className="mt-2 text-sm text-muted-foreground">{formatAssetIdentity(workOrder.asset_name, workOrder.asset_code) || t.noAsset}</p></div>
-      {!isHistorical ? <div className="flex gap-2">{workOrder.status !== 'in_progress' && workOrder.status !== 'completed' ? <Badge variant="secondary">El responsable asignado inicia la OT</Badge> : null}{workOrder.status === 'in_progress' ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}<DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" size="icon" aria-label={t.actions.moreActions}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem disabled={!canEdit} onClick={() => void patchOrder({ status: 'open' })}><RotateCcw className="mr-2 h-4 w-4" />{t.actions.reopen}</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div> : null}
+      {!isHistorical ? <div className="flex gap-2">{workOrder.status !== 'in_progress' && workOrder.status !== 'completed' ? <Badge variant="secondary">El responsable asignado inicia la OT</Badge> : null}{workOrder.status === 'in_progress' ? <Button asChild><Link href={`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${id}`}><CheckCircle2 className="mr-2 h-4 w-4" />{t.actions.continueClose}</Link></Button> : null}</div> : null}
     </section>
 
     {isHistorical ? <Card className="border-muted-foreground/20 bg-muted/20 shadow-none"><CardContent className="flex items-start gap-3 p-4"><History className="mt-0.5 h-5 w-5 text-muted-foreground" /><div><p className="font-medium">{t.historicalCard.title}</p><p className="mt-1 text-sm text-muted-foreground">{t.historicalCard.description}</p></div></CardContent></Card> : null}
