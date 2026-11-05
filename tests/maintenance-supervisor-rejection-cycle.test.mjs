@@ -47,3 +47,12 @@ test('UI exposes correction reason and explicit return action', () => {
   assert.match(component, /Corregida y reenviada/);
   assert.match(component, /Motivo de rechazo de OT/);
 });
+
+
+test('rejected OT resubmission is atomic with closure transition', () => {
+  assert.match(migration, /resubmit_rejected_work_order_review_on_close_v1/);
+  assert.match(migration, /after update of status on public\.maintenance_work_orders/i);
+  assert.match(migration, /status = 'pending'/);
+  assert.match(migration, /status = 'rejected'/);
+  assert.match(migration, /work_order_resubmitted_for_review/);
+});
