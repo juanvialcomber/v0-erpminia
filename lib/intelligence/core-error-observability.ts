@@ -25,6 +25,7 @@ function errorMessage(error: unknown) {
 export function classifyCoreRuntimeError(error: unknown) {
   const detail = errorMessage(error);
   if (/OPENAI_API_KEY/i.test(detail)) return 'ai_configuration_missing';
+  if (/no credits remaining|insufficient_quota|quota.*exceeded|billing/i.test(detail)) return 'ai_quota_exhausted';
   if (/invalid model|model.*not.*found|does not exist|not permitted|not available/i.test(detail)) return 'ai_model_unavailable';
   if (/OpenAI respondi[oó]|responses api|upstream|fetch failed|ECONN|ETIMEDOUT/i.test(detail)) return 'ai_upstream_failure';
   if (/PGRST|schema cache|relation .* does not exist|column .* does not exist/i.test(detail)) return 'canonical_source_contract_failure';
