@@ -123,3 +123,13 @@ test('active OT cannot regress from in_progress to open while execution may stil
   assert.doesNotMatch(detail, /patchOrder\(\{ status: 'open' \}\)/);
   assert.match(detail, /Cambios de estado protegidos/);
 });
+
+
+test('operational OT cannot be hard-deleted and must be cancelled with reason', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const deleteStart = route.indexOf('export async function DELETE');
+  const deleteSection = route.slice(deleteStart);
+  assert.match(deleteSection, /Las OT operativas no se eliminan/);
+  assert.match(deleteSection, /required_action: 'cancel'/);
+  assert.doesNotMatch(deleteSection, /\.from\('maintenance_work_orders'\)\.delete\(/);
+});
