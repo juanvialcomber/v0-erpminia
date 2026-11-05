@@ -148,4 +148,62 @@ revoke all on function public.reject_work_order_supervisor_review_v1(uuid,uuid,u
 grant execute on function public.reject_work_order_supervisor_review_v1(uuid,uuid,uuid,text)
   to service_role;
 
+
+create or replace function public.resubmit_rejected_work_order_review_on_close_v1()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $function$
+declare
+  v_review public.work_order_supervisor_reviews%rowtype;
+  v_now timestamptz := now();
+begin
+  if new.status = 'completed' and old.status is distinct from 'completed' then
+    update public.work_order_supervisor_reviews
+    set status = 'pending',
+        resubmitted_at = v_now,
+        updated_at = v_now
+    where organization_id = new.organization_id
+      and work_order_id = new.id
+      and status = 'rejected'
+    returning * into v_review;
+
+    if found then
+      insert into public.work_order_events(
+        organization_id, work_order_id, canonical_asset_id, event_type, event_at,
+        actor_id, actor_name, source_table, source_record_id, summary, payload
+      ) values (
+        new.organization_id, new.id, new.canonical_asset_id,
+        'work_order_resubmitted_for_review', v_now,
+        public.current_application_user_id(), null,
+        'public.work_order_supervisor_reviews', v_review.id::text,
+        'OT corregida y reenviada a supervisión',
+        jsonb_build_object(
+          'status','pending',
+          'resubmitted_at',v_now,
+          'last_rejection_note',v_review.last_rejection_note,
+          'rejection_count',v_review.rejection_count
+        )
+      );
+    end if;
+  end if;
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_resubmit_rejected_work_order_review_on_close_v1
+  on public.maintenance_work_orders;
+
+create trigger trg_resubmit_rejected_work_order_review_on_close_v1
+after update of status on public.maintenance_work_orders
+for each row
+execute function public.resubmit_rejected_work_order_review_on_close_v1();
+
+revoke all on function public.resubmit_rejected_work_order_review_on_close_v1()
+  from public, anon, authenticated;
+grant execute on function public.resubmit_rejected_work_order_review_on_close_v1()
+  to service_role;
+
 commit;
