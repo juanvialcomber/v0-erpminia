@@ -229,32 +229,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         );
       }
     }
-    if (body.status === 'in_progress' && !executionAccess.ok) {
-      return NextResponse.json(
-        { error: 'Sólo el responsable asignado puede iniciar la ejecución de la OT.' },
-        { status: 403 },
-      );
-    }
     if (body.status === 'in_progress') {
-      const releaseReadiness = await getWorkOrderReleaseReadiness(context.supabase, context.organizationId, id);
-      if (!releaseReadiness.ready) {
-        return NextResponse.json(
-          {
-            error: 'La OT no está preparada para ejecución.',
-            blockers: releaseReadiness.blockers,
-            emergencyBypass: releaseReadiness.emergencyBypass,
-          },
-          { status: 409 },
-        );
-      }
-
-      const other = await findOtherRunningWorkOrder(context, id);
-      if (other) {
-        return NextResponse.json({
-          error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
-          concurrentWorkOrderId: other.id,
-        }, { status: 409 });
-      }
+      return NextResponse.json(
+        {
+          error: 'El inicio de la OT debe realizarse desde el cronómetro para cambiar estado y tiempo en una sola transacción.',
+          canonical_start_endpoint: `/api/maintenance/work-orders/${id}/timer`,
+          canonical_start_action: 'play',
+        },
+        { status: 409 },
+      );
     }
     if (body.status === 'completed') {
       return NextResponse.json(
