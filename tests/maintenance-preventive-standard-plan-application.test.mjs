@@ -34,8 +34,9 @@ test('standard plan application preserves existing material requirements', () =>
   assert.match(apply, /createdRequirements/);
 });
 
-test('work order standard plan endpoint is maintenance authorized and tenant scoped', () => {
-  assert.match(planApi, /MODULE_KEYS\.MANT_OPERACIONES/);
+test('work order standard plan endpoint is functionally authorized and tenant scoped', () => {
+  assert.match(planApi, /getMaintenanceActorAuthority/);
+  assert.match(planApi, /requireAssignedMaintenanceExecution/);
   assert.match(planApi, /eq\('organization_id', context\.organizationId\)/);
   assert.match(planApi, /work_order_id/);
   assert.match(planApi, /maintenance_standard_job_plan_steps/);
