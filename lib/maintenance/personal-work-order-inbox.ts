@@ -3,6 +3,7 @@ import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { isMaintenanceWorkOrderCreatorCargo } from '@/lib/maintenance/work-order-create-access';
 import { resolveWorkshopHeadScope, workshopHeadCanAccessOrder } from '@/lib/maintenance/workshop-site-scope';
 import { chileTodayDateKey, formatWorkOrderDate, normalizeWorkOrderDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
+import { isAuthorizedMaintenanceReviewerName } from '@/lib/maintenance/work-order-review-access';
 
 // Personal OT assignments are generated on read from canonical work orders.
 // Never create synthetic task records or expose other organizations' assignments.
@@ -114,8 +115,8 @@ export async function loadPersonalMaintenanceTasks(
   const workshop = await resolveWorkshopHeadScope(context);
   const canFollowup = accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName);
   // Production review endpoint allows precisely these active reviewers, not all technicians with ED.
-  const canApprove = accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(
-    String((person as Person | null)?.full_name || ''),
+  const canApprove = accessLevel === 'ED' && isAuthorizedMaintenanceReviewerName(
+    (person as Person | null)?.full_name,
   );
 
   if (!person?.id && !canFollowup && !canApprove) return [];
