@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
-import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
 import { resolveWorkshopHeadScope } from '@/lib/maintenance/workshop-site-scope';
 
@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     if (creatorPersonError) throw creatorPersonError;
 
-    const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
+    const authority = await getMaintenanceActorAuthority(context);
     const workshopScope = await resolveWorkshopHeadScope(context);
-    const canCreateWorkOrder = creationCapability.canCreate;
-    const canCreateEmergencyWorkOrder = creationCapability.canCreateEmergency;
+    const canCreateWorkOrder = authority.canCreateWorkOrder;
+    const canCreateEmergencyWorkOrder = authority.canCreateEmergencyWorkOrder;
 
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
     let hasAssignedOperationalWork = false;
@@ -67,12 +67,18 @@ export async function GET(request: NextRequest) {
       // Used only to namespace local IndexedDB drafts on shared devices.
       offlineScope: `${context.organizationId}:${context.userId}`,
       cargoName,
-      canEdit: accessLevel === 'ED' || hasAssignedOperationalWork,
+      canEdit: authority.canPlan || hasAssignedOperationalWork,
+      permissions: {
+        canPlan: authority.canPlan,
+        canCreateWorkOrder,
+        canCreateEmergencyWorkOrder,
+        canApprove: authority.canApprove,
+      },
       canCreateWorkOrder,
       canCreateEmergencyWorkOrder,
-      emergencySelfAssignOnly: creationCapability.emergencySelfAssignOnly,
-      personId: creationCapability.personId,
-      personName: creationCapability.personName,
+      emergencySelfAssignOnly: authority.emergencySelfAssignOnly,
+      personId: authority.personId,
+      personName: authority.personName,
       hasAssignedOperationalWork,
       workshopSite: workshopScope.isWorkshopHead ? workshopScope.site : null,
     });
