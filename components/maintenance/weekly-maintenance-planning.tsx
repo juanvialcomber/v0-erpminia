@@ -93,6 +93,13 @@ function readingText(row: WeeklyDecision) {
 
 export function WeeklyMaintenancePlanning() {
   const { data, error, isLoading, mutate } = useSWR<WeeklyResponse>('/api/planning/maintenance', fetcher, { revalidateOnFocus: false });
+  const { data: viewerContext } = useSWR('/api/maintenance/viewer-context', async (url: string) => {
+    const response = await apiFetch(url);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar tu contexto de mantenimiento.');
+    return payload;
+  }, { revalidateOnFocus: false });
+  const canPlanMaintenance = viewerContext?.canCreateWorkOrder === true;
   const rows = data?.weeklyDecisions || [];
   const summary = data?.weeklySummary;
 
@@ -109,7 +116,7 @@ export function WeeklyMaintenancePlanning() {
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar</Button>
         <Button variant="outline" asChild><Link href="/dashboard/mantenimiento/areas">Estado de áreas</Link></Button>
-        <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Planes estándar</Link></Button>
+        {canPlanMaintenance ? <Button asChild><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Planes estándar</Link></Button> : null}
       </div>
     </header>
 
@@ -169,7 +176,7 @@ export function WeeklyMaintenancePlanning() {
             </div>
 
             <div className="flex flex-col gap-2 min-w-0">
-              {!row.scheduledWorkOrder && row.sourceRowId && row.canonicalAssetId && row.evidenceFreshness !== 'stale' && <ArielPlanningEditor sourceKind="preventive_priority" sourceId={row.sourceRowId} title={row.interval ? `Mantención ${row.interval} ${row.meterUnit || 'h'} · ${row.assetName || 'Equipo'}` : 'Mantención preventiva'} scheduledDate={null} plannedHours={row.standardPlan?.estimatedDurationHours ?? null} priority={row.priority?.startsWith('P1')?'critical':row.priority?.startsWith('P2')?'high':'medium'} workType="preventive" canonicalAssetId={row.canonicalAssetId} onFinished={()=>void mutate()}/>}
+              {canPlanMaintenance && !row.scheduledWorkOrder && row.sourceRowId && row.canonicalAssetId && row.evidenceFreshness !== 'stale' && <ArielPlanningEditor sourceKind="preventive_priority" sourceId={row.sourceRowId} title={row.interval ? `Mantención ${row.interval} ${row.meterUnit || 'h'} · ${row.assetName || 'Equipo'}` : 'Mantención preventiva'} scheduledDate={null} plannedHours={row.standardPlan?.estimatedDurationHours ?? null} priority={row.priority?.startsWith('P1')?'critical':row.priority?.startsWith('P2')?'high':'medium'} workType="preventive" canonicalAssetId={row.canonicalAssetId} onFinished={()=>void mutate()}/>}
               {row.scheduledWorkOrder ? <Button asChild size="sm"><Link href={`/dashboard/mantenimiento/ordenes-trabajo/${row.scheduledWorkOrder.id}`}><CalendarDays className="mr-2 h-4 w-4"/>Abrir OT</Link></Button>
                 : row.state === 'stale_evidence' ? <Button asChild size="sm" variant="outline"><Link href={`/dashboard/mantenimiento/horometros?asset=${encodeURIComponent(row.canonicalAssetId || '')}`}><RefreshCw className="mr-2 h-4 w-4"/>Actualizar lectura</Link></Button>
                 : row.standardPlan?.status === 'proposed' ? <Button asChild size="sm"><Link href="/dashboard/mantenimiento/planes-estandar"><Wrench className="mr-2 h-4 w-4"/>Revisar plan</Link></Button>
