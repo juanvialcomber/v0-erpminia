@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           .in('sku', positionSkus)
       : Promise.resolve({ data: [], error: null } as any);
 
-    const [reconciliationResult, operationalResult, dieselLaudusResult, dieselOperationalResult, reconciliationSummaryResult, authorityResult] = await Promise.all([
+    const [reconciliationResult, operationalResult, dieselLaudusResult, dieselOperationalResult, reconciliationSummaryResult, authorityResult, blockingOperationalResult, legacyContrastResult] = await Promise.all([
       reconciliationPromise,
       operationalPromise,
       context.supabase
@@ -108,9 +108,19 @@ export async function GET(request: NextRequest) {
         .select('authority_state,authority_reason,latest_laudus_stock_sync,latest_laudus_stock_date,latest_email_stock_cutoff,latest_email_pending_reconciliation,latest_whatsapp_stock_evidence,whatsapp_stock_evidence_since_laudus')
         .eq('organization_id', organizationId)
         .maybeSingle(),
+      context.supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'review'),
+      context.supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select('sku', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('operational_resolution', 'legacy_motil_stale'),
     ]);
 
-    const reconciliationError = reconciliationResult.error || operationalResult.error || dieselLaudusResult.error || dieselOperationalResult.error || reconciliationSummaryResult.error || authorityResult.error;
+    const reconciliationError = reconciliationResult.error || operationalResult.error || dieselLaudusResult.error || dieselOperationalResult.error || reconciliationSummaryResult.error || authorityResult.error || blockingOperationalResult.error || legacyContrastResult.error;
     if (reconciliationError) throw reconciliationError;
 
     const authority = authorityResult.data || null;
@@ -191,6 +201,11 @@ export async function GET(request: NextRequest) {
         operationalResolution: dieselOperational?.operational_resolution ?? null,
       } : null,
       reconciliationSummary: summary,
+      operationalDifferenceSummary: {
+        blockingReviews: Number(blockingOperationalResult.count || 0),
+        legacyMotilStale: Number(legacyContrastResult.count || 0),
+        authorityState: authority?.authority_state || 'review_laudus_unavailable',
+      },
       sourceAuthority: authority ? {
         state: authority.authority_state,
         reason: authority.authority_reason,

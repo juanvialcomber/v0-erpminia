@@ -10,11 +10,11 @@ test('bodega meeting summary exposes state differences and decision',()=>{
   assert.match(page,/>Diferencias</);
   assert.match(page,/>Decisión</);
   assert.match(page,/Laudus es la fuente primaria de stock/);
-  assert.match(page,/saldos negativos por conciliar/);
+  assert.match(page,/Sin diferencias operacionales bloqueantes/);
 });
 
 test('bodega summary preserves human reconciliation boundary',()=>{
-  assert.match(page,/antes de ajustar stock, comprometer disponibilidad o disparar compras/);
+  assert.match(page,/contrastes legacy se conservan como evidencia histórica/);
   assert.match(page,/reconciliationSummary/);
   assert.match(page,/No se reemplaza una conciliación ausente por cero/);
 });
