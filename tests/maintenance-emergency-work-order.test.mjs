@@ -81,3 +81,12 @@ test('OTe detection is visible with time in the canonical entity timeline', () =
   assert.match(timeline, /emergency_detected: 'Emergencia detectada'/);
   assert.match(timeline, /timeStyle: 'short'/);
 });
+
+
+test('field executors do not see planned OT creation UI', () => {
+  assert.match(createUi, /Tu perfil no crea OT planificadas/);
+  assert.match(createUi, /viewerContext\.canCreateWorkOrder/);
+  assert.match(createUi, /viewerContext\.canCreateEmergencyWorkOrder/);
+  assert.match(createUi, /Registrar OTe/);
+  assert.match(createUi, /Volver a mis órdenes/);
+});
