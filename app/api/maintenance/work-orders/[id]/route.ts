@@ -248,9 +248,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         { status: 409 },
       );
     }
+    if (body.status === 'cancelled' || body.status === 'canceled') {
+      return NextResponse.json(
+        {
+          error: 'La anulación de la OT debe registrar un motivo mediante su flujo canónico.',
+          canonical_cancel_endpoint: `/api/maintenance/work-orders/${id}/cancel`,
+        },
+        { status: 409 },
+      );
+    }
+    if (body.status === 'open' && currentStatus !== 'open') {
+      return NextResponse.json(
+        { error: 'Una OT que ya inició no puede volver a abierta.' },
+        { status: 409 },
+      );
+    }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
-    if (body.status) updateData.status = body.status;
     if (hasModuleWrite && body.title !== undefined) {
       const title = String(body.title || '').trim();
       if (!title) return NextResponse.json({ error: 'El trabajo debe tener un nombre.' }, { status: 400 });
@@ -291,19 +305,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { data, error } = await context.supabase.from('maintenance_work_orders').update(updateData).eq('id', id).eq('organization_id', context.organizationId).select('*').single();
     if (error) throw error;
-    const changedFields = ['title','description','work_type','priority','scheduled_date','status']
+    const changedFields = ['title','description','work_type','priority','scheduled_date']
       .filter((key) => updateData[key] !== undefined);
     if (changedFields.length > 0) {
       const { error: eventError } = await context.supabase.from('work_order_events').insert({
         organization_id: context.organizationId,
         work_order_id: id,
         canonical_asset_id: data.canonical_asset_id || null,
-        event_type: body.status === 'cancelled' ? 'work_order_cancelled' : 'work_order_updated',
+        event_type: 'work_order_updated',
         event_at: new Date().toISOString(),
         actor_id: context.authUserId,
         source_table: 'maintenance_work_orders',
         source_record_id: id,
-        summary: body.status === 'cancelled' ? 'Orden anulada por usuario autorizado' : 'Orden actualizada por usuario autorizado',
+        summary: 'Orden actualizada por usuario autorizado',
         payload: { changed_fields: changedFields },
       });
       if (eventError) throw eventError;
@@ -318,24 +332,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
-  if (!access.authorized) return access.response;
-  const context = await getOrganizationContext(request);
-  if (!context.ok) return context.response;
-  const { id } = await params;
-  try {
-    const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
-    if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
-
-    const { count, error: countError } = await context.supabase.from('work_order_events').select('*', { head: true, count: 'exact' }).eq('organization_id', context.organizationId).eq('work_order_id', id);
-    if (countError) throw countError;
-    if ((count || 0) > 1) return NextResponse.json({ error: 'La orden ya tiene historial y no puede eliminarse. Cancélala en su lugar.' }, { status: 409 });
-    const { error } = await context.supabase.from('maintenance_work_orders').delete().eq('id', id).eq('organization_id', context.organizationId);
-    if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo eliminar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error: 'Las OT operacionales no se eliminan. Anula la OT con motivo para conservar su trazabilidad.',
+    },
+    { status: 405 },
+  );
 }
