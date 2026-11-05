@@ -71,3 +71,15 @@ test('Laudus observed payables summary reads beyond the default 1000 row cap wit
   assert.match(route,/if \(page\.length < observedPageSize\) break/);
   assert.match(route,/items: observedRows\.slice\(0, 50\)/);
 });
+
+
+test('treasury surfaces Laudus payment overapplications as read-only review evidence',()=>{
+  assert.match(route,/paymentReview/);
+  assert.match(route,/exact_double_total/);
+  assert.match(route,/additional_partial_excess/);
+  assert.match(route,/Requieren revisión documental antes de cualquier ajuste/);
+  assert.match(page,/Aplicaciones de pago por revisar/);
+  assert.match(page,/Duplicado exacto/);
+  assert.match(page,/Pago adicional parcial/);
+  assert.match(page,/MOTIL no modifica estos pagos/);
+});
