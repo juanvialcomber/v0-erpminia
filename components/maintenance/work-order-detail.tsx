@@ -91,6 +91,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
   const [editOpen, setEditOpen] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const saveInFlight = useRef(false);
   const costCenters = data?.costCenters || [];
   const assignees = data?.assignees || [];
@@ -329,7 +330,16 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <div className="border-t p-4">
           <details>
             <summary className="cursor-pointer text-sm text-muted-foreground">Anular OT</summary>
-            <div className="mt-3 flex items-center justify-between gap-4 rounded-md border p-3"><p className="text-sm text-muted-foreground">La OT quedará en el historial y no podrá ejecutarse.</p><Button type="button" variant="destructive" onClick={() => void patchOrder({ status: 'cancelled' })}>Confirmar anulación</Button></div>
+            <div className="mt-3 space-y-3 rounded-md border p-3">
+              <p className="text-sm text-muted-foreground">La OT quedará en el historial, el cronómetro activo se cerrará y no podrá volver a ejecutarse.</p>
+              <div className="space-y-2">
+                <Label htmlFor="cancel-reason">Motivo de anulación</Label>
+                <Input id="cancel-reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Ej.: trabajo reemplazado, equipo fuera de alcance, OT duplicada" />
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" variant="destructive" disabled={!cancelReason.trim()} onClick={() => void patchOrder({ status: 'cancelled', cancel_reason: cancelReason.trim() })}>Confirmar anulación</Button>
+              </div>
+            </div>
           </details>
         </div>
       </details> : null}
