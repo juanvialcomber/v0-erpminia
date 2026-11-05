@@ -55,3 +55,30 @@ test('dedicated closure terminates a running or paused timer before final close'
   assert.match(closeRoute, /p_action: 'terminate'/);
   assert.match(closeRoute, /close_work_order_safely/);
 });
+
+
+test('closure uses one atomic timer-aware RPC and never promotes wall-clock elapsed time to active duration', async () => {
+  const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
+  assert.match(closeRoute, /close_work_order_with_timer_v2/);
+  assert.doesNotMatch(closeRoute, /Date\.now\(\) - startTime\.getTime\(\)/);
+  assert.doesNotMatch(closeRoute, /equipment_availability/);
+  assert.doesNotMatch(closeRoute, /availabilityPercent/);
+  assert.match(closeRoute, /availability_state: 'not_derived_from_work_order_close'/);
+
+  assert.match(atomicMigration, /perform public\.update_work_order_timer\(/);
+  assert.match(atomicMigration, /perform public\.close_work_order_safely\(p_work_order_id\)/);
+  assert.match(atomicMigration, /v_effective_hours := greatest\(v_timer_hours, v_requested_hours\)/);
+  assert.doesNotMatch(atomicMigration, /start_date/);
+  assert.doesNotMatch(atomicMigration, /24 \* 60/);
+});
+
+test('failed safe close rolls back timer termination and closure detail mutation in the same database call', async () => {
+  const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
+  const terminateIndex = atomicMigration.indexOf("perform public.update_work_order_timer(");
+  const updateIndex = atomicMigration.indexOf("update public.maintenance_work_orders");
+  const closeIndex = atomicMigration.indexOf("perform public.close_work_order_safely(p_work_order_id)");
+  assert.ok(terminateIndex >= 0 && updateIndex > terminateIndex && closeIndex > updateIndex);
+  assert.match(atomicMigration, /Any exception raised there aborts this entire function call/);
+  assert.match(atomicMigration, /begin;/);
+  assert.match(atomicMigration, /commit;/);
+});
