@@ -32,10 +32,10 @@ test('Bodega UI explains reconciled stock states in operational language', async
 test('Bodega API includes nonzero Laudus-only stock as bounded operational positions', async () => {
   const route = await readFile(routePath, 'utf8');
 
-  assert.match(route, /eq\\('reconciliation_state', 'missing_in_motil'\\)/);
-  assert.match(route, /neq\\('operational_quantity', 0\\)/);
+  assert.match(route, /eq\('reconciliation_state', 'missing_in_motil'\)/);
+  assert.match(route, /neq\('operational_quantity', 0\)/);
   assert.match(route, /missingOperationalPositions/);
   assert.match(route, /canonical_product_id/);
   assert.match(route, /effective_source: 'laudus'/);
-  assert.match(route, /missingOperationalPositions\\]\\.slice\\(0, 200\\)/);
+  assert.match(route, /missingOperationalPositions\]\.slice\(0, 200\)/);
 });
