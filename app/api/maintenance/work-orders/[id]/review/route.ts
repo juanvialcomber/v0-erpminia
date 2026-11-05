@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
@@ -26,8 +25,8 @@ function isLegacyFluidDeclarationExempt(
 async function authorizeRead(request: NextRequest, workOrderId: string) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
-  const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-  if (accessLevel === 'ED') return context;
+  const authority = await getMaintenanceActorAuthority(context);
+  if (authority.canReadAllWorkOrders) return context;
   const assigned = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (!assigned.ok) return { ok: false as const, response: assigned.response };
   return context;
