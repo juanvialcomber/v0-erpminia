@@ -19,6 +19,8 @@ const CONTENT_SECURITY_POLICY = [
 
 const PUBLIC_API_ROUTES = new Set([
   '/api/health',
+  // Preview-only synthetic connectivity probe; handler returns 404 outside preview.
+  '/api/internal/n3-router-smoke',
   '/api/auth/login',
   '/api/auth/logout',
   '/api/integrations/greenapi/webhook',
