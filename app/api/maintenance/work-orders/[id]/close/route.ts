@@ -85,6 +85,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (evidenceError) throw evidenceError;
     if ((evidenceCount || 0) < 1) return NextResponse.json({ error: 'Agrega al menos una foto como evidencia antes de cerrar la OT.' }, { status: 409 });
 
+    // Una pausa prolongada conserva solo tiempo confirmado hasta que el
+    // ejecutor declare las horas reales de la sesión no verificada.
+    const { data: latestTimerReview, error: timerReviewError } = await context.supabase
+      .from('work_order_events')
+      .select('event_type')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .in('event_type', ['timer_pause_review_required', 'timer_duration_declared'])
+      .order('event_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (timerReviewError) throw timerReviewError;
+    if (latestTimerReview?.event_type === 'timer_pause_review_required') {
+      return NextResponse.json({
+        error: 'Antes de cerrar, declara el tiempo efectivamente trabajado en el tramo prolongado. Las horas nocturnas no se incorporarán automáticamente.',
+        timer_review_required: true,
+      }, { status: 409 });
+    }
+
     const { data: timerState, error: timerStateError } = await context.supabase
       .from('maintenance_work_orders')
       .select('timer_status,timer_start_time')
