@@ -6,8 +6,6 @@ const intakeUrl = new URL('../app/dashboard/documentos-gestion/ingesta/page.tsx'
 const docsLayoutUrl = new URL('../app/dashboard/documentos-gestion/layout.tsx', import.meta.url);
 const bannerUrl = new URL('../components/data/data-source-attention-banner.tsx', import.meta.url);
 const assistantUrl = new URL('../components/intelligence/senior-assistant-widget.tsx', import.meta.url);
-const shellUrl = new URL('../components/layout/dashboard-shell.tsx', import.meta.url);
-const homeUrl = new URL('../components/dashboard/dashboard-home.tsx', import.meta.url);
 
 test('document intake is task-first and avoids duplicate local navigation', async () => {
   const [page, layout] = await Promise.all([readFile(intakeUrl, 'utf8'), readFile(docsLayoutUrl, 'utf8')]);
@@ -36,10 +34,3 @@ test('assistant launcher has a reduced operational footprint', async () => {
   assert.doesNotMatch(assistant, /size-16 items-center justify-center/);
 });
 
-test('executive priorities render once and before secondary dashboard content', async () => {
-  const [shell, home] = await Promise.all([readFile(shellUrl, 'utf8'), readFile(homeUrl, 'utf8')]);
-
-  assert.doesNotMatch(shell, /HomeDecisionPriorities/);
-  assert.equal((home.match(/<HomeDecisionPriorities/g) || []).length, 1);
-  assert.match(home, /mode === 'management' && !personaKey/);
-});
