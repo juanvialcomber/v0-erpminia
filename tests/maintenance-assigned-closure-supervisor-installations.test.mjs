@@ -5,6 +5,7 @@ import test from 'node:test';
 const migration = await readFile(new URL('../supabase/migrations/20261009141000_defer_material_reconciliation_until_supervisor_approval.sql', import.meta.url), 'utf8');
 const closeRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/close/route.ts', import.meta.url), 'utf8');
 const reviewRoute = await readFile(new URL('../app/api/maintenance/work-orders/[id]/review/route.ts', import.meta.url), 'utf8');
+const authority = await readFile(new URL('../lib/maintenance/work-order-authority.ts', import.meta.url), 'utf8');
 const reviewComponent = await readFile(new URL('../components/maintenance/work-order-evidence-and-approval.tsx', import.meta.url), 'utf8');
 
 test('Joaquin or other assigned executor can close the work without installing materials or approving it', () => {
@@ -17,9 +18,10 @@ test('Joaquin or other assigned executor can close the work without installing m
 });
 
 test('Ariel and Mauricio are the application reviewers and explicitly confirm installed materials', () => {
-  assert.match(reviewRoute, /getReviewerPerson/);
-  assert.match(reviewRoute, /Ariel López/);
-  assert.match(reviewRoute, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /getMaintenanceActorAuthority/);
+  assert.match(reviewRoute, /authority\.canApprove/);
+  assert.match(authority, /Ariel López/);
+  assert.match(authority, /Mauricio Astudillo/);
   assert.match(reviewRoute, /Solo Ariel López o Mauricio Astudillo pueden revisar y aprobar la OT/);
   assert.match(reviewRoute, /p_confirm_materials_installed/);
   assert.match(reviewComponent, /confirmMaterialsInstalled/);
