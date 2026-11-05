@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
@@ -5,7 +7,7 @@ import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-o
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
 
-const TIMER_ACTIONS = new Set(['play', 'pause', 'resume', 'terminate']);
+const TIMER_ACTIONS = new Set(['play', 'pause', 'resume', 'terminate', 'declare_elapsed']);
 
 function timerErrorResponse(error: { code?: string; message?: string } | null | undefined) {
   if (error?.code === 'P0002') return NextResponse.json({ ok: false, error: 'WO not found' }, { status: 404 });
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const executionAccess = await requireAssignedMaintenanceExecution(context, workOrderId);
   if (accessLevel !== 'ED' && !executionAccess.ok) return executionAccess.response;
 
-  const body = (await request.json().catch(() => null)) as { action?: string; notes?: string | null } | null;
+  const body = (await request.json().catch(() => null)) as { action?: string; notes?: string | null; elapsedSeconds?: number } | null;
   const action = String(body?.action || '');
   const notes = body?.notes?.trim() || null;
   if (!TIMER_ACTIONS.has(action)) return NextResponse.json({ ok: false, error: 'Invalid action' }, { status: 400 });
@@ -34,7 +36,65 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ ok: false, error: 'Debes indicar por qué pausas la orden de trabajo.' }, { status: 400 });
   }
 
+  if (action === 'declare_elapsed') {
+    const elapsedSeconds = Number(body?.elapsedSeconds);
+    if (!Number.isSafeInteger(elapsedSeconds) || elapsedSeconds < 0 || !notes || notes.length < 5) {
+      return NextResponse.json({ ok: false, error: 'Indica las horas y minutos efectivos, y explica cómo los verificaste.' }, { status: 400 });
+    }
+    const { data: declared, error: declarationError } = await context.supabase.rpc('declare_overlong_work_order_elapsed_time', {
+      p_organization_id: context.organizationId,
+      p_work_order_id: workOrderId,
+      p_actor_id: context.userId,
+      p_actor_name: context.userName || context.userEmail || null,
+      p_elapsed_seconds: elapsedSeconds,
+      p_notes: notes,
+    });
+    if (declarationError) return timerErrorResponse(declarationError);
+    return NextResponse.json(declared, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  if (action === 'pause' || action === 'terminate') {
+    const { data: running, error: readError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('timer_status,timer_start_time')
+      .eq('id', workOrderId)
+      .eq('organization_id', context.organizationId)
+      .single();
+    if (readError) return timerErrorResponse(readError);
+    if (running.timer_status === 'running' && running.timer_start_time) {
+      const elapsedSeconds = (Date.now() - new Date(running.timer_start_time).getTime()) / 1000;
+      if (Number.isFinite(elapsedSeconds) && elapsedSeconds >= 16 * 60 * 60) {
+        if (action === 'terminate') {
+          return NextResponse.json({ ok: false, error: 'Hay una sesión de 16 horas o más sin pausa confirmada. Primero registra una pausa y declara el tiempo efectivo; no se cobrará la noche como trabajo.', timer_review_required: true }, { status: 409 });
+        }
+        const { data: safePause, error: pauseError } = await context.supabase.rpc('pause_overlong_work_order_timer_for_review', {
+          p_organization_id: context.organizationId,
+          p_work_order_id: workOrderId,
+          p_actor_id: context.userId,
+          p_actor_name: context.userName || context.userEmail || null,
+          p_notes: notes,
+        });
+        if (pauseError) return timerErrorResponse(pauseError);
+        return NextResponse.json(safePause, { headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
+  }
+
   if (action === 'play' || action === 'resume') {
+    const { data: lastReview, error: lastReviewError } = await context.supabase
+      .from('work_order_events')
+      .select('event_type')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', workOrderId)
+      .in('event_type', ['timer_pause_review_required', 'timer_duration_declared'])
+      .order('event_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastReviewError) return timerErrorResponse(lastReviewError);
+    if (lastReview?.event_type === 'timer_pause_review_required') {
+      return NextResponse.json({ ok: false, error: 'Primero registra las horas realmente trabajadas del tramo que quedó pendiente al pausar.' }, { status: 409 });
+    }
     try {
       const other = await findOtherRunningWorkOrder(context, workOrderId);
       if (other) {
@@ -60,7 +120,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   if (error) return timerErrorResponse(error);
-  return NextResponse.json(data);
+  return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -93,6 +153,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   if (timelineError) return NextResponse.json({ ok: false, error: timelineError.message || 'No se pudo cargar el historial del temporizador' }, { status: 500 });
 
+  const { data: latestReview, error: reviewError } = await context.supabase
+    .from('work_order_events')
+    .select('event_type,payload')
+    .eq('organization_id', context.organizationId)
+    .eq('work_order_id', workOrderId)
+    .in('event_type', ['timer_pause_review_required', 'timer_duration_declared'])
+    .order('event_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (reviewError) return timerErrorResponse(reviewError);
+  const pendingReview = latestReview?.event_type === 'timer_pause_review_required'
+    ? {
+        unverified_seconds: Number(latestReview.payload?.unverified_elapsed_seconds || 0),
+        credited_seconds_before: Number(latestReview.payload?.credited_seconds_before || 0),
+      }
+    : null;
+
   const totalSeconds = Math.max(Number(workOrder.total_timer_seconds || 0), Number(workOrder.total_timer_minutes || 0) * 60);
   const totalMinutes = Math.floor(totalSeconds / 60);
   return NextResponse.json({
@@ -105,7 +183,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       total_seconds: totalSeconds,
       total_minutes: totalMinutes,
       total_hours: Math.round((totalSeconds / 3600) * 1000) / 1000,
+      pending_review: pendingReview,
     },
     timeline: timeline || [],
-  });
+  }, { headers: { 'Cache-Control': 'no-store' } });
 }
