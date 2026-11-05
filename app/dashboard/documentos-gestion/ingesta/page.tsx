@@ -14,6 +14,7 @@ type QueueStatus = 'ready' | 'hashing' | 'uploading' | 'done' | 'duplicate' | 'e
 type QueueItem = {
   id: string;
   file: File;
+  relativePath: string;
   status: QueueStatus;
   message?: string;
 };
@@ -67,6 +68,7 @@ export default function DocumentIntakePage() {
   const [sourcePath, setSourcePath] = useState('');
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const { data, mutate } = useSWR('/api/documents/intake', fetcher, { revalidateOnFocus: false });
 
   const pendingCount = useMemo(() => queue.filter((item) => item.status === 'ready' || item.status === 'error').length, [queue]);
@@ -75,10 +77,14 @@ export default function DocumentIntakePage() {
     const incoming = Array.from(files);
     const accepted = incoming.filter((file) => file.size > 0 && file.size <= 50 * 1024 * 1024);
     setQueue((current) => {
-      const keys = new Set(current.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`));
+      const keys = new Set(current.map((item) => `${item.relativePath}:${item.file.size}:${item.file.lastModified}`));
       const next = accepted
-        .filter((file) => !keys.has(`${file.name}:${file.size}:${file.lastModified}`))
-        .map((file) => ({ id: crypto.randomUUID(), file, status: 'ready' as const }));
+        .map((file) => {
+          const relativePath = file.webkitRelativePath || file.name;
+          return { file, relativePath };
+        })
+        .filter(({ file, relativePath }) => !keys.has(`${relativePath}:${file.size}:${file.lastModified}`))
+        .map(({ file, relativePath }) => ({ id: crypto.randomUUID(), file, relativePath, status: 'ready' as const }));
       return [...current, ...next];
     });
   }, []);
@@ -92,6 +98,11 @@ export default function DocumentIntakePage() {
       patchItem(item.id, { status: 'hashing', message: 'Calculando hash…' });
       const sha256 = await sha256File(item.file);
 
+      const relativeDirectory = item.relativePath.includes('/')
+        ? item.relativePath.split('/').slice(0, -1).join('/')
+        : '';
+      const effectiveSourcePath = [sourcePath.trim(), relativeDirectory].filter(Boolean).join('/');
+
       const prepareResponse = await fetch('/api/documents/intake', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -104,7 +115,7 @@ export default function DocumentIntakePage() {
           sha256,
           source,
           area,
-          sourcePath,
+          sourcePath: effectiveSourcePath,
         }),
       });
       const prepared = await prepareResponse.json().catch(() => null);
@@ -142,7 +153,7 @@ export default function DocumentIntakePage() {
           sha256,
           source,
           area,
-          sourcePath,
+          sourcePath: effectiveSourcePath,
         }),
       });
       const confirmed = await confirmResponse.json().catch(() => null);
@@ -220,11 +231,29 @@ export default function DocumentIntakePage() {
           >
             <UploadCloud className="mx-auto h-10 w-10 text-primary" />
             <p className="mt-3 font-medium">Arrastra documentos aquí</p>
-            <p className="mt-1 text-sm text-muted-foreground">O selecciona varios archivos. Máximo 50 MB por archivo.</p>
+            <p className="mt-1 text-sm text-muted-foreground">También puedes seleccionar una carpeta completa y conservar su estructura. Máximo 50 MB por archivo.</p>
             <input ref={inputRef} type="file" multiple className="hidden" onChange={(event) => event.target.files && addFiles(event.target.files)} />
-            <Button type="button" variant="outline" className="mt-4" onClick={() => inputRef.current?.click()} disabled={running}>
-              <FileUp className="mr-2 h-4 w-4" />Seleccionar archivos
-            </Button>
+            <input
+              ref={(node) => {
+                folderInputRef.current = node;
+                if (node) {
+                  node.setAttribute('webkitdirectory', '');
+                  node.setAttribute('directory', '');
+                }
+              }}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(event) => event.target.files && addFiles(event.target.files)}
+            />
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={running}>
+                <FileUp className="mr-2 h-4 w-4" />Seleccionar archivos
+              </Button>
+              <Button type="button" onClick={() => folderInputRef.current?.click()} disabled={running}>
+                <UploadCloud className="mr-2 h-4 w-4" />Seleccionar carpeta
+              </Button>
+            </div>
           </div>
 
           {queue.length > 0 && (
@@ -233,7 +262,7 @@ export default function DocumentIntakePage() {
                 <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.file.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(item.file.size)}{item.message ? ` · ${item.message}` : ''}</p>
+                    <p className="truncate text-xs text-muted-foreground">{item.relativePath !== item.file.name ? `${item.relativePath} · ` : ''}{formatBytes(item.file.size)}{item.message ? ` · ${item.message}` : ''}</p>
                   </div>
                   {item.status === 'hashing' || item.status === 'uploading' ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
                   {item.status === 'done' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : null}
