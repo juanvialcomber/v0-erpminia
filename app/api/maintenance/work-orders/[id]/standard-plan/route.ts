@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
+import { getMaintenanceActorAuthority } from '@/lib/maintenance/work-order-authority';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 
@@ -12,10 +12,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
+    const authority = await getMaintenanceActorAuthority(context);
     const executionAccess = await requireAssignedMaintenanceExecution(context, id);
     const assignedExecutor = executionAccess.ok;
-    if (accessLevel === 'SR' && !assignedExecutor) return executionAccess.response;
+    if (!authority.canReadAllWorkOrders && !assignedExecutor) return executionAccess.response;
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
     if (scope === 'missing') return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
