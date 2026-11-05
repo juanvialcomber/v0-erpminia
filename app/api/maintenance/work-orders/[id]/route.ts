@@ -426,18 +426,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
-  try {
-    const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
-    if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
-    const { count, error: countError } = await context.supabase.from('work_order_events').select('*', { head: true, count: 'exact' }).eq('organization_id', context.organizationId).eq('work_order_id', id);
-    if (countError) throw countError;
-    if ((count || 0) > 1) return NextResponse.json({ error: 'La orden ya tiene historial y no puede eliminarse. Cancélala en su lugar.' }, { status: 409 });
-    const { error } = await context.supabase.from('maintenance_work_orders').delete().eq('id', id).eq('organization_id', context.organizationId);
-    if (error) throw error;
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo eliminar la orden de trabajo';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
+  if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
+
+  return NextResponse.json(
+    {
+      error: 'Las OT operativas no se eliminan. Anúlala e indica el motivo para conservar la trazabilidad.',
+      required_action: 'cancel',
+    },
+    { status: 409 },
+  );
 }
