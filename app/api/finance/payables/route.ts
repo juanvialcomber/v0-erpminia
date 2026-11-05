@@ -10,13 +10,28 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  const [{ data: payables, error: payablesError }, { data: payments, error: paymentsError }] = await Promise.all([
+  const [
+    { data: payables, error: payablesError },
+    { data: payments, error: paymentsError },
+    { data: observedLaudus, error: observedLaudusError },
+  ] = await Promise.all([
     context.supabase.from('procurement_accounts_payable_v1').select('*').eq('organization_id', context.organizationId).order('due_date', { ascending: true, nullsFirst: true }),
     context.supabase.from('procurement_supplier_payments').select('id,organization_id,payable_id,amount,currency,payment_date,payment_reference,notes,recorded_at,reconciled_at,reconciliation_reference,reconciliation_notes').eq('organization_id', context.organizationId).order('payment_date', { ascending: false }),
+    context.supabase
+      .from('laudus_purchase_invoice_payment_status_service_v1')
+      .select('purchase_invoice_external_id,doc_number,supplier_name,issued_date,due_date,total_amount,currency,paid_amount,outstanding_amount,payment_count,last_payment_at,payment_status')
+      .eq('organization_id', context.organizationId)
+      .eq('currency', 'CLP')
+      .in('payment_status', ['unpaid', 'partially_paid'])
+      .gt('outstanding_amount', 0)
+      .order('due_date', { ascending: true, nullsFirst: true }),
   ]);
   if (payablesError || paymentsError) {
     console.error('[finance/payables]', payablesError || paymentsError);
-    return NextResponse.json({ payables: [], payments: [], canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
+    return NextResponse.json({ payables: [], payments: [], observedPayables: null, canEdit: access.canWrite, error: 'No se pudo cargar cuentas por pagar' }, { status: 500 });
+  }
+  if (observedLaudusError) {
+    console.error('[finance/payables:laudus-observed]', observedLaudusError);
   }
   const isUatValue = (value: unknown) => typeof value === 'string' && /^UAT-/i.test(value.trim());
   const visiblePayables = (payables || []).filter((row) =>
@@ -26,7 +41,31 @@ export async function GET(request: NextRequest) {
     !isUatValue(row.payment_reference) && !isUatValue(row.reconciliation_reference),
   );
 
-  return NextResponse.json({ payables: visiblePayables, payments: visiblePayments, canEdit: access.canWrite });
+  const observedRows = observedLaudusError ? [] : (observedLaudus || []);
+  const observedSummary = observedRows.reduce(
+    (summary, row) => {
+      const amount = Number(row.outstanding_amount || 0);
+      summary.openItems += 1;
+      summary.openAmountClp += Number.isFinite(amount) ? amount : 0;
+      if (row.payment_status === 'partially_paid') summary.partiallyPaidItems += 1;
+      if (row.payment_status === 'unpaid') summary.unpaidItems += 1;
+      return summary;
+    },
+    { openItems: 0, openAmountClp: 0, partiallyPaidItems: 0, unpaidItems: 0 },
+  );
+
+  return NextResponse.json({
+    payables: visiblePayables,
+    payments: visiblePayments,
+    observedPayables: {
+      source: 'Laudus',
+      readOnly: true,
+      ...observedSummary,
+      items: observedRows.slice(0, 50),
+      semantics: 'Exposición financiera observada en Laudus. No constituye una CxP aprobada en MOTIL ni habilita pagos.',
+    },
+    canEdit: access.canWrite,
+  });
 }
 
 export async function POST(request: NextRequest) {
