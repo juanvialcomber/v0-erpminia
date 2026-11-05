@@ -162,6 +162,16 @@ function financeManagerAllowed(path: string, method: string): boolean {
 
   const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
   if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
+
+  const financeAssetRoutes = new Set([
+    '/api/finance/asset-economics',
+    '/api/finance/asset-reconciliation-review',
+    '/api/finance/laudus-fixed-assets-review',
+    '/api/finance/asset-register',
+    '/api/finance/missing-asset-candidates',
+  ]);
+  if (financeAssetRoutes.has(path)) return true;
+
   if (path.startsWith('/api/finance/')) return false;
   if (path.startsWith('/api/compras/')) return readOnly;
   if (path === '/api/cost-centers' || path.startsWith('/api/cost-centers/')) return true;
