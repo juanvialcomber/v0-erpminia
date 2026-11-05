@@ -15,6 +15,7 @@ test('cross-functional maintenance viewers resolve to oversight without inventin
 test('viewer context preserves canonical cargo name and assigned execution capability', () => {
   assert.match(viewerContext, /cargoName,/);
   assert.match(viewerContext, /hasAssignedOperationalWork/);
-  assert.match(viewerContext, /canEdit: accessLevel === 'ED' \|\| hasAssignedOperationalWork/);
+  assert.match(viewerContext, /canEdit: authority\.canPlan \|\| hasAssignedOperationalWork/);
+  assert.match(viewerContext, /canPlan: authority\.canPlan/);
   assert.doesNotMatch(viewerContext, /mode === 'general' \? null : cargoName/);
 });
