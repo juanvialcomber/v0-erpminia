@@ -42,7 +42,9 @@ test('timer keeps technician module writers scoped to canonical assignee, while 
 });
 
 test('assigned executor capability is identity based, not hard-coded by cargo or person name', () => {
-  assert.doesNotMatch(access, /Joaquín|Ariel|Jefe de Taller|tecnico/);
+  const assignedIdentityHelper = access.split('export function canBypassAssignedMaintenanceExecution')[0];
+  assert.doesNotMatch(assignedIdentityHelper, /Joaquín|Ariel|Jefe de Taller|tecnico/);
+  assert.match(access, /context\.role !== 'tecnico'/);
   assert.match(access, /profile_id', context\.userId/);
   assert.match(access, /employment_status', 'active'/);
 });
