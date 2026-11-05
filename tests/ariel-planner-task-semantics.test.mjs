@@ -9,7 +9,7 @@ test('planner inbox is exception-driven instead of mirroring every created OT',(
   assert.match(personal,/Created OTs stay in the weekly plan unless they become a real exception/);
   assert.match(personal,/order\.status === 'in_progress'.*dateKey && dateKey < now/s);
   assert.match(personal,/maintenance_planning:overdue_not_started/);
-  assert.match(personal,/OT vencida\$\{overdue\.length === 1 \? '' : 's'\} sin iniciar/);
+  assert.match(personal,/OT planificada\\$\\{overdue\\.length === 1 \\? '' : 's'\\} pendiente/);
   assert.match(personal,/Revisar vigencia del plan y reprogramar sólo si la fecha ya no corresponde/);
   assert.doesNotMatch(personal,/for \(const order of created\) \{\s*tasks\.set\(order\.id, toInboxTask/s);
 });
