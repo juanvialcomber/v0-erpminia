@@ -696,31 +696,96 @@ export async function POST(request: NextRequest) {
       throw new Error('No se pudo reservar un número único para la orden de trabajo. Intenta nuevamente.');
     }
 
-    if(approvedDecision){
-      const {error:decisionError}=await context.supabase.from('maintenance_planning_decisions').update({decision_status:'generated',linked_work_order_id:createdOrder.id,generated_by:context.authUserId,generated_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',approvedDecision.id).eq('organization_id',context.organizationId).eq('decision_status','approved');
-      if(decisionError)throw decisionError;
-    }
-    if(planningDecisionId){
-      const {data:sourceDecision,error:sourceError}=await context.supabase.from('maintenance_planning_decisions').select('source_kind,source_id').eq('id',planningDecisionId).eq('organization_id',context.organizationId).single();
-      if(sourceError)throw sourceError;
-      if(sourceDecision.source_kind==='official_weekly'){
-        const {error:linkedSourceError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:createdOrder.id,updated_at:new Date().toISOString()}).eq('id',sourceDecision.source_id).eq('organization_id',context.organizationId);
-        if(linkedSourceError)throw linkedSourceError;
+    const creationWarnings: Array<{ step: string; message: string }> = [];
+    const runCreationStep = async (step: string, action: () => Promise<void>) => {
+      try {
+        await action();
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'No se pudo completar este paso';
+        console.error('[maintenance/work-orders:post-create:' + step + ']', cause);
+        creationWarnings.push({ step, message });
       }
+    };
+
+    if (approvedDecision) {
+      await runCreationStep('planning_decision_link', async () => {
+        const { error: decisionError } = await context.supabase
+          .from('maintenance_planning_decisions')
+          .update({
+            decision_status: 'generated',
+            linked_work_order_id: createdOrder.id,
+            generated_by: context.authUserId,
+            generated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', approvedDecision.id)
+          .eq('organization_id', context.organizationId)
+          .eq('decision_status', 'approved');
+        if (decisionError) throw decisionError;
+      });
     }
-    await recordRequestedMaterials(context, createdOrder, requestedMaterials);
-    await recordStructuredMaterials(context, createdOrder.id, materials);
+
+    if (planningDecisionId) {
+      await runCreationStep('weekly_source_link', async () => {
+        const { data: sourceDecision, error: sourceError } = await context.supabase
+          .from('maintenance_planning_decisions')
+          .select('source_kind,source_id')
+          .eq('id', planningDecisionId)
+          .eq('organization_id', context.organizationId)
+          .single();
+        if (sourceError) throw sourceError;
+        if (sourceDecision.source_kind === 'official_weekly') {
+          const { error: linkedSourceError } = await context.supabase
+            .from('planning_weekly_work_items')
+            .update({ linked_work_order_id: createdOrder.id, updated_at: new Date().toISOString() })
+            .eq('id', sourceDecision.source_id)
+            .eq('organization_id', context.organizationId);
+          if (linkedSourceError) throw linkedSourceError;
+        }
+      });
+    }
+
+    await runCreationStep('requested_materials_note', () =>
+      recordRequestedMaterials(context, createdOrder, requestedMaterials));
+    await runCreationStep('structured_materials', () =>
+      recordStructuredMaterials(context, createdOrder.id, materials));
     if (isEmergencyWork) {
-      await recordEmergencyDetection(context, createdOrder, detectedAtIso);
+      await runCreationStep('emergency_detection', () =>
+        recordEmergencyDetection(context, createdOrder, detectedAtIso));
     }
+
     if (!idempotentReplay) {
       await recordCreationScopeContext(context, request, createdOrder, generalWorkConfirmed);
       await recordAdminInteractionTiming(context, request, createdOrder.id);
     }
+
+    if (creationWarnings.length > 0) {
+      const { error: warningEventError } = await context.supabase.from('work_order_events').insert({
+        organization_id: context.organizationId,
+        work_order_id: createdOrder.id,
+        canonical_asset_id: createdOrder.canonical_asset_id,
+        event_type: 'work_order_creation_followup_required',
+        event_at: new Date().toISOString(),
+        actor_id: context.authUserId,
+        source_table: 'maintenance_work_orders',
+        source_record_id: createdOrder.id,
+        summary: 'OT creada con pasos posteriores pendientes de completar',
+        payload: {
+          creation_request_id: creationRequestId,
+          warnings: creationWarnings,
+          retry_safe: true,
+        },
+      });
+      if (warningEventError) console.error('[maintenance/work-orders:create-warning-event]', warningEventError);
+    }
+
     return NextResponse.json(
       {
         data: mapWorkOrder(createdOrder, asset),
         idempotentReplay,
+        creationComplete: creationWarnings.length === 0,
+        creationWarnings,
+        retrySafe: true,
       },
       { status: idempotentReplay ? 200 : 201 },
     );
