@@ -2,11 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
-import { findOtherRunningWorkOrder } from '@/lib/maintenance/other-running-work-order';
-import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle } from '@/lib/maintenance/workshop-site-scope';
 
 type WorkOrderPatchPayload = {
