@@ -111,31 +111,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'start') {
-    const now = new Date().toISOString();
-    const { error: updateError } = await context.supabase
-      .from('maintenance_work_orders')
-      .update({ status: 'in_progress', start_date: workOrder.start_date || now, updated_at: now })
-      .eq('id', workOrderId)
-      .eq('organization_id', context.organizationId)
-      .eq('assigned_person_id', person.id);
-
-    if (updateError) return NextResponse.json({ error: 'No se pudo iniciar la OT.' }, { status: 500 });
-
-    await context.supabase.from('work_order_events').insert({
-      organization_id: context.organizationId,
-      work_order_id: workOrderId,
-      canonical_asset_id: workOrder.canonical_asset_id,
-      event_type: 'field_started',
-      event_at: now,
-      actor_id: context.userId,
-      actor_name: person.full_name || context.userName || context.userEmail,
-      source_table: 'maintenance_work_orders',
-      source_record_id: workOrderId,
-      summary: 'Trabajo iniciado en terreno.',
-      payload: {},
-    });
-
-    return NextResponse.json({ ok: true, status: 'in_progress' });
+    return NextResponse.json(
+      {
+        error: 'Inicia la OT desde su flujo canónico para validar preparación, conflictos y cronómetro.',
+        href: `/dashboard/mantenimiento/ordenes-trabajo/${workOrderId}`,
+      },
+      { status: 409 },
+    );
   }
 
   if (action === 'note') {
