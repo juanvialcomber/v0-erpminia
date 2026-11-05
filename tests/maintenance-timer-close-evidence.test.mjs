@@ -52,7 +52,7 @@ test('server stores private photo evidence and blocks closure without it', () =>
 
 test('dedicated closure atomically terminates a running or paused timer before final close', async () => {
   const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
-  assert.match(closeRoute, /close_work_order_with_timer_v2/);
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
   assert.match(atomicMigration, /in \('running', 'paused'\)/);
   assert.match(atomicMigration, /'terminate'/);
   assert.match(atomicMigration, /perform public\.close_work_order_safely\(p_work_order_id\)/);
@@ -61,7 +61,7 @@ test('dedicated closure atomically terminates a running or paused timer before f
 
 test('closure uses one atomic timer-aware RPC and never promotes wall-clock elapsed time to active duration', async () => {
   const atomicMigration = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
-  assert.match(closeRoute, /close_work_order_with_timer_v2/);
+  assert.match(closeRoute, /close_work_order_with_timer_v3/);
   assert.doesNotMatch(closeRoute, /Date\.now\(\) - startTime\.getTime\(\)/);
   assert.doesNotMatch(closeRoute, /equipment_availability/);
   assert.doesNotMatch(closeRoute, /availabilityPercent/);
