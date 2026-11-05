@@ -16,10 +16,10 @@ test('Joaquin or other assigned executor can close the work without installing m
   assert.doesNotMatch(closeRoute, /approve_work_order_with_material_confirmation_v1/);
 });
 
-test('Ariel is the application reviewer and explicitly confirms installed materials', () => {
+test('Ariel or Mauricio are application reviewers and explicitly confirm installed materials', () => {
   assert.match(reviewRoute, /getReviewerPerson/);
-  assert.match(reviewRoute, /Ariel López debe revisar y aprobar la OT/);
-  assert.doesNotMatch(reviewRoute, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /Ariel López o Mauricio Astudillo deben revisar y aprobar la OT/);
+  assert.match(reviewRoute, /Mauricio Astudillo/);
   assert.match(reviewRoute, /p_confirm_materials_installed/);
   assert.match(reviewComponent, /confirmMaterialsInstalled/);
   assert.match(migration, /warehouse_reconciliation_status text not null default 'pending'/);
