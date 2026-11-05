@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireAdmin } from '@/lib/api/guard';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -26,10 +26,11 @@ function isSha256(value: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await resolveAuthContext(request);
-  if (!auth?.organizationId) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const admin = await requireAdmin(request);
+  if (!admin.authorized || !admin.user || !admin.organizationId) {
+    return admin.response || NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
   }
+  const auth = { user: admin.user, organizationId: admin.organizationId };
 
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
@@ -58,10 +59,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await resolveAuthContext(request);
-  if (!auth?.organizationId) {
-    return NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
+  const admin = await requireAdmin(request);
+  if (!admin.authorized || !admin.user || !admin.organizationId) {
+    return admin.response || NextResponse.json({ error: 'No autorizado.' }, { status: 401 });
   }
+  const auth = { user: admin.user, organizationId: admin.organizationId };
 
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== 'object') {
