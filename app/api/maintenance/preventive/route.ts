@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { resolveWorkshopHeadScope, workshopSiteFromRoleTitle, workshopSiteFromKnownLocation } from '@/lib/maintenance/workshop-site-scope';
+import { getMaintenanceWorkOrderCreationCapability } from '@/lib/maintenance/work-order-create-access';
 
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request); if (!context.ok) return context.response;
+  const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
+  if (!creationCapability.canCreate) return NextResponse.json({ error: 'Tu cargo no puede administrar pautas preventivas.' }, { status: 403 });
   try {
     const body = await request.json();
     const assetId = String(body.assetId || ''); const taskName = String(body.taskName || '').trim(); const nextScheduledDate = String(body.nextScheduledDate || '');
@@ -101,6 +104,8 @@ export async function PATCH(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request); if (!context.ok) return context.response;
+  const creationCapability = await getMaintenanceWorkOrderCreationCapability(context);
+  if (!creationCapability.canCreate) return NextResponse.json({ error: 'Tu cargo no puede administrar pautas preventivas.' }, { status: 403 });
   try {
     const body = await request.json(); const scheduleId = String(body.scheduleId || ''); const action = String(body.action || '');
     if (!scheduleId) return NextResponse.json({ error: 'Plan no identificado.' }, { status: 400 });
