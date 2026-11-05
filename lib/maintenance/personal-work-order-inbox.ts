@@ -114,9 +114,9 @@ export async function loadPersonalMaintenanceTasks(
   const workshop = await resolveWorkshopHeadScope(context);
   const canFollowup = accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName);
   // Keep personal approval tasks aligned with the production review endpoint.
-  // Mauricio may supervise closure state elsewhere, but only Ariel can approve an OT.
+  // Ariel and Mauricio are the canonical OT approvers in application and database authority.
   const canApprove = accessLevel === 'ED'
-    && String((person as Person | null)?.full_name || '') === 'Ariel López';
+    && ['Ariel López', 'Mauricio Astudillo'].includes(String((person as Person | null)?.full_name || ''));
 
   if (!person?.id && !canFollowup && !canApprove) return [];
   const emptyResult: { data: Order[]; error: null } = { data: [], error: null };
