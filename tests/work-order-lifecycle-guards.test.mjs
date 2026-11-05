@@ -81,3 +81,21 @@ test('planner work-order detail exposes a one-click edit action', async () => {
   assert.match(detail, /setEditOpen\(true\)/);
   assert.match(detail, /scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
 });
+
+
+test('OT cancellation is timer-safe, reasoned and atomic', async () => {
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+  const detail = await readFile(new URL('../components/maintenance/work-order-detail.tsx', import.meta.url), 'utf8');
+  const migration = await readFile(new URL('../supabase/migrations/20261105223000_safe_ot_cancellation_v1.sql', import.meta.url), 'utf8');
+
+  assert.match(route, /body\.status === 'cancelled' \|\| body\.status === 'canceled'/);
+  assert.match(route, /cancel_work_order_safely_v1/);
+  assert.match(route, /cancel_reason/);
+  assert.match(detail, /Motivo de anulación/);
+  assert.match(detail, /cancel_reason: cancelReason\.trim\(\)/);
+  assert.match(migration, /coalesce\(v_wo\.timer_status, 'idle'\) in \('running', 'paused'\)/);
+  assert.match(migration, /perform public\.update_work_order_timer\(/);
+  assert.match(migration, /set status = 'cancelled'/);
+  assert.match(migration, /'work_order_cancelled'/);
+  assert.match(migration, /'reason', v_reason/);
+});
