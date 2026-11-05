@@ -113,10 +113,10 @@ export async function loadPersonalMaintenanceTasks(
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const workshop = await resolveWorkshopHeadScope(context);
   const canFollowup = accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName);
-  // Production review endpoint allows precisely these active reviewers, not all technicians with ED.
-  const canApprove = accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(
-    String((person as Person | null)?.full_name || ''),
-  );
+  // Keep personal approval tasks aligned with the production review endpoint.
+  // Mauricio may supervise closure state elsewhere, but only Ariel can approve an OT.
+  const canApprove = accessLevel === 'ED'
+    && String((person as Person | null)?.full_name || '') === 'Ariel López';
 
   if (!person?.id && !canFollowup && !canApprove) return [];
   const emptyResult: { data: Order[]; error: null } = { data: [], error: null };
