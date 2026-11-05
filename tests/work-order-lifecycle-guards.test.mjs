@@ -101,15 +101,19 @@ test('OT cancellation is timer-safe, reasoned and atomic', async () => {
 });
 
 
-test('every material OT edit is auditable with previous and next values', async () => {
+test('every material OT edit is atomically auditable with previous and next values', async () => {
   const route = await readFile(workOrderRouteUrl, 'utf8');
-  assert.match(route, /assigned_person_id', 'assigned_to_name', 'cost_center_id'/);
-  assert.match(route, /actual_duration_hours', 'root_cause', 'preventive_actions', 'meter_reading', 'meter_unit'/);
-  assert.match(route, /const changes = Object\.fromEntries/);
-  assert.match(route, /previous:/);
-  assert.match(route, /next:/);
-  assert.match(route, /payload: \{ changed_fields: changedFields, changes \}/);
-  assert.match(route, /actor_name: context\.userName \|\| context\.userEmail \|\| null/);
+  const migration = await readFile(new URL('../supabase/migrations/20261105231500_atomic_ot_edit_audit_v1.sql', import.meta.url), 'utf8');
+  assert.match(route, /rpc\('update_work_order_with_audit_v1'/);
+  assert.match(route, /p_actor_name: context\.userName \|\| context\.userEmail \|\| null/);
+  assert.match(route, /p_changes: updateData/);
+  assert.match(migration, /assigned_person_id','assigned_to_name','cost_center_id/);
+  assert.match(migration, /actual_duration_hours','root_cause','preventive_actions','meter_reading','meter_unit/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /'previous', v_previous->v_key/);
+  assert.match(migration, /'next', to_jsonb\(v_after\)->v_key/);
+  assert.match(migration, /'changed_fields', v_changed_fields/);
+  assert.match(migration, /'changes', v_change_details/);
 });
 
 
