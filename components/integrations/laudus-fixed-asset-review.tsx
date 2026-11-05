@@ -45,6 +45,7 @@ type ReviewRow = {
 
 type Payload = {
   readOnly: boolean;
+  canReview: boolean;
   summary: {
     laudusAssets: number;
     canonicalAssets: number;
@@ -133,7 +134,7 @@ export function LaudusFixedAssetReview() {
   const current = rows[safeIndex] || null;
 
   const decide = async (decision: 'confirm_candidate' | 'reject_candidate' | 'defer') => {
-    if (!current || saving) return;
+    if (!current || saving || !data?.canReview) return;
     setSaving(true);
     try {
       const response = await fetch('/api/integrations/laudus/fixed-asset-review', {
@@ -311,20 +312,22 @@ export function LaudusFixedAssetReview() {
           <div className="border-t px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Decisión</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Registra una decisión trazable. Confirmar no modifica automáticamente el activo canónico ni escribe en Laudus.
+              {data?.canReview
+                ? 'Registra una decisión trazable. Confirmar no modifica automáticamente el activo canónico ni escribe en Laudus.'
+                : 'Puedes revisar la evidencia, pero tu acceso es de lectura y no permite registrar decisiones.'}
             </p>
             <Input
               value={rationale}
               onChange={(event) => setRationale(event.target.value)}
               className="mt-3"
               placeholder="Observación opcional para Finanzas"
-              disabled={saving}
+              disabled={saving || !data?.canReview}
             />
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 size="sm"
                 onClick={() => decide('confirm_candidate')}
-                disabled={saving || !current.candidate.assetId}
+                disabled={saving || !data?.canReview || !current.candidate.assetId}
               >
                 Confirmar candidato
               </Button>
@@ -332,7 +335,7 @@ export function LaudusFixedAssetReview() {
                 size="sm"
                 variant="outline"
                 onClick={() => decide('reject_candidate')}
-                disabled={saving}
+                disabled={saving || !data?.canReview}
               >
                 Rechazar
               </Button>
@@ -340,7 +343,7 @@ export function LaudusFixedAssetReview() {
                 size="sm"
                 variant="ghost"
                 onClick={() => decide('defer')}
-                disabled={saving}
+                disabled={saving || !data?.canReview}
               >
                 Diferir
               </Button>
