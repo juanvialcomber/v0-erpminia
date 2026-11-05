@@ -20,6 +20,13 @@ type CanonicalInventoryRow = {
   warehouse_code: string | null;
 };
 
+type LaudusInventoryRow = {
+  sku: string | null;
+  laudus_stock: number | string | null;
+  laudus_synced_at: string | null;
+  reconciliation_state: string | null;
+};
+
 type InventoryRow = {
   id: string;
   sku?: string | null;
@@ -40,6 +47,85 @@ type InventoryRow = {
 function toNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function applyStockAuthority(
+  supabase: ReturnType<typeof getSupabaseServerClient>,
+  organizationId: string | null | undefined,
+  rows: InventoryRow[],
+) {
+  if (!organizationId || rows.length === 0) {
+    return { rows, dataSource: 'motil-canonical', authorityState: 'review_laudus_unavailable' };
+  }
+
+  const { data: authority, error: authorityError } = await supabase
+    .from('bodega_stock_source_authority_service_v1')
+    .select('authority_state,authority_reason,latest_laudus_stock_sync')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  if (authorityError || authority?.authority_state !== 'laudus_primary') {
+    return {
+      rows,
+      dataSource: 'motil-canonical',
+      authorityState: authority?.authority_state || 'review_laudus_unavailable',
+      authorityReason: authority?.authority_reason || null,
+      latestLaudusStockSync: authority?.latest_laudus_stock_sync || null,
+    };
+  }
+
+  const skus = [...new Set(rows.map((row) => String(row.sku || '').trim().toUpperCase()).filter(Boolean))];
+  if (skus.length === 0) {
+    return {
+      rows,
+      dataSource: 'motil-canonical',
+      authorityState: authority.authority_state,
+      authorityReason: authority.authority_reason || null,
+      latestLaudusStockSync: authority.latest_laudus_stock_sync || null,
+    };
+  }
+
+  const { data: laudusRows, error: laudusError } = await supabase
+    .from('laudus_inventory_reconciliation_service_v1')
+    .select('sku,laudus_stock,laudus_synced_at,reconciliation_state')
+    .eq('organization_id', organizationId)
+    .in('sku', skus);
+
+  if (laudusError) {
+    return {
+      rows,
+      dataSource: 'motil-canonical',
+      authorityState: 'review_laudus_unavailable',
+      authorityReason: 'No fue posible leer el stock Laudus para esta página.',
+      latestLaudusStockSync: authority.latest_laudus_stock_sync || null,
+    };
+  }
+
+  const bySku = new Map(
+    ((laudusRows || []) as LaudusInventoryRow[])
+      .filter((row) => row.sku)
+      .map((row) => [String(row.sku).trim().toUpperCase(), row]),
+  );
+
+  const effectiveRows = rows.map((row) => {
+    const laudus = bySku.get(String(row.sku || '').trim().toUpperCase());
+    if (!laudus || laudus.laudus_stock == null) return row;
+    return {
+      ...row,
+      quantity: Number(laudus.laudus_stock),
+      stock_source: 'laudus',
+      laudus_synced_at: laudus.laudus_synced_at,
+      reconciliation_state: laudus.reconciliation_state,
+    } as InventoryRow;
+  });
+
+  return {
+    rows: effectiveRows,
+    dataSource: 'laudus-primary',
+    authorityState: authority.authority_state,
+    authorityReason: authority.authority_reason || null,
+    latestLaudusStockSync: authority.latest_laudus_stock_sync || null,
+  };
 }
 
 function mapInventoryItem(item: InventoryRow) {
@@ -133,7 +219,18 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[v0] canonical inventory error:', error);
     } else if (data && data.length > 0) {
-      const inventory = (data as CanonicalInventoryRow[]).map((item) => ({
+      const authority = await applyStockAuthority(
+        supabase,
+        orgId,
+        (data as CanonicalInventoryRow[]).map((item) => ({
+          ...item,
+          quantity: item.quantity == null ? null : Number(item.quantity),
+          min_stock: item.min_stock == null ? null : Number(item.min_stock),
+          max_stock: item.max_stock == null ? null : Number(item.max_stock),
+          unit_cost: item.unit_cost == null ? null : Number(item.unit_cost),
+        })),
+      );
+      const inventory = authority.rows.map((item) => ({
         id: item.id,
         sku: String(item.sku || ''),
         name: String(item.name || item.sku || ''),
@@ -149,6 +246,12 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         inventory,
+        dataSource: authority.dataSource,
+        sourceAuthority: {
+          state: authority.authorityState,
+          reason: authority.authorityReason || null,
+          latestLaudusStockSync: authority.latestLaudusStockSync || null,
+        },
         pagination: {
           page: validPage,
           pageSize: validPageSize,
@@ -198,15 +301,25 @@ export async function GET(request: NextRequest) {
 
   if (!canonicalResult.error) {
     const total = canonicalResult.count || 0;
+    const authority = await applyStockAuthority(
+      supabase,
+      orgId,
+      (canonicalResult.data as InventoryRow[] | null) || [],
+    );
     return NextResponse.json({
-      inventory: (canonicalResult.data as InventoryRow[] | null)?.map(mapInventoryItem) || [],
+      inventory: authority.rows.map(mapInventoryItem),
       pagination: {
         page: validPage,
         pageSize: validPageSize,
         total,
         totalPages: Math.ceil(total / validPageSize),
       },
-      dataSource: 'canonical',
+      dataSource: authority.dataSource,
+      sourceAuthority: {
+        state: authority.authorityState,
+        reason: authority.authorityReason || null,
+        latestLaudusStockSync: authority.latestLaudusStockSync || null,
+      },
     });
   }
 
