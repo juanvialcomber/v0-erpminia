@@ -39,13 +39,15 @@ test('timer mutation accepts module writers or the canonical assigned executor',
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
-test('legacy close endpoint reserves close to assigned executor and delegates terminal transition to canonical RPC', async () => {
+test('close endpoint reserves close to assigned executor and delegates the atomic transition to the timer-aware RPC', async () => {
   const route = await readFile(closeRouteUrl, 'utf8');
+  const atomic = await readFile(new URL('../supabase/migrations/20261105195000_atomic_work_order_close_timer_v2.sql', import.meta.url), 'utf8');
 
   assert.match(route, /requireAssignedMaintenanceExecution/);
   assert.match(route, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(route, /accessLevel !== 'ED'/);
-  assert.match(route, /rpc\('close_work_order_safely'/);
+  assert.match(route, /rpc\('close_work_order_with_timer_v2'/);
+  assert.match(atomic, /perform public\.close_work_order_safely\(p_work_order_id\)/);
   assert.doesNotMatch(route, /status:\s*['"]closed['"]/);
 });
 
