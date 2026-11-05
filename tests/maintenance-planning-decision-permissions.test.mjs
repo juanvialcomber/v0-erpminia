@@ -6,7 +6,7 @@ const route = await readFile(new URL('../app/api/maintenance/planning-decisions/
 
 test('planning decision reads expose write controls only to authorized OT creator cargos', () => {
   assert.match(route, /getMaintenanceWorkOrderCreationCapability\(context\)/);
-  assert.match(route, /canWrite: access\.canWrite && creationCapability\.canCreate/);
+  assert.match(route, /canWrite:\s*access\.canWrite && creationCapability\.canCreate/);
 });
 
 test('planning decision writes reject execution-only cargos before save or approve', () => {
