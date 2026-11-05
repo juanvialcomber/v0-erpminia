@@ -115,10 +115,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const normalizedHours = Number(actual_duration_hours);
     const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
+    // Actual work duration must come from the tracked timer or an explicit
+    // executor-provided duration. Calendar downtime can include legitimate
+    // pauses (overnight, waiting for parts, shift handoff) and must never
+    // inflate mechanic labor time.
     const effectiveHours = Math.max(
       Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
       Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-      downtime,
     );
     const closureData: Record<string, unknown> = { actual_duration_hours: effectiveHours, down_time_hours: downtime, updated_at: new Date().toISOString() };
     if (root_cause !== undefined) closureData.root_cause = root_cause;
