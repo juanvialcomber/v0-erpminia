@@ -298,3 +298,16 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel: L4 habilitado como control de proceso; evidencia E2 hasta observar reducción de backlog, tiempo de preparación, bloqueos o ciclo.
 - Métricas siguientes: tiempo Backlog→Preparado, porcentaje de OT preparadas sin bloqueo, cumplimiento de programación, tiempo Cierre→Aprobación, reincidencia 7/30d y costo final por activo.
 - Impacto económico: todavía no atribuido. El valor inmediato es control de proceso y reducción de reconstrucción manual; E3 requiere comparar outcomes antes/después.
+
+
+## 2026-11-05 — Activos fijos Laudus → Finanzas / Ficha 360
+
+- Problema previo: 661 registros de activos fijos Laudus existían como evidencia contable separada de la superficie operacional de Activos; revisar cobertura y pendientes requería reconstrucción manual entre fuentes.
+- Capacidad: Finanzas · Activos incorpora una vista read-only de Laudus con cobertura total, vinculados, conflictos, pendientes sin retiro informado y pendientes históricos, sin crear ni modificar Fichas 360 automáticamente.
+- Evidencia actual verificada: 661 registros fuente; 25 vinculados; 627 pendientes; 6 conflictos; 3 ignorados; 101 pendientes sin retiro informado; dentro de esos 101, 0 traen serie y 2 traen marca/modelo utilizable como pista de revisión.
+- Calidad de identidad: no se encontraron coincidencias exactas pendientes contra el maestro canónico por serie, nombre ni combinación marca+modelo. Por lo tanto, no existe base determinística para promover nuevos matches automáticamente.
+- Costo: la vista Laudus observada no expone costo de adquisición material utilizable en estos 661 registros; MOTIL no lo infiere ni lo mezcla con la economía canónica de Daniel.
+- Autoridad: Laudus permanece fuente observada y Daniel/equipo operacional conserva la decisión sobre identidad; los conflictos y nuevas Fichas 360 requieren revisión humana.
+- Nivel actual: L2 visibilidad operacional + L3 priorización de conciliación; evidencia E1 de cobertura. No se declara L4 hasta medir decisiones humanas sobre esta cola.
+- Valor demostrado: reduce fragmentación de evidencia y hace visible la brecha de identidad dentro del flujo financiero ya existente. No se atribuyen horas ahorradas ni ahorro CLP.
+- Siguiente medición: decisiones de conciliación por período, tiempo medio por revisión, tasa de resolución y porcentaje de pendientes que llegan a Ficha 360 con evidencia suficiente.
