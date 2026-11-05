@@ -12,6 +12,10 @@ const timerCouplingMigrationUrl = new URL(
   import.meta.url,
 );
 const timerRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/timer/route.ts', import.meta.url);
+const atomicStartMigrationUrl = new URL(
+  '../supabase/migrations/20261105181000_atomic_ot_start_with_timer.sql',
+  import.meta.url,
+);
 const workOrderRouteUrl = new URL('../app/api/maintenance/work-orders/[id]/route.ts', import.meta.url);
 
 test('database lifecycle guard requires canonical assignment for active and completed states', async () => {
@@ -29,7 +33,7 @@ test('work timer refuses play or resume without canonical assignee', async () =>
   assert.match(sql, /p_action in \('play', 'resume'\)[\s\S]*\('completed', 'closed', 'cancelled', 'canceled'\)/i);
 });
 
-test('timer mutation accepts module writers or the canonical assigned executor', async () => {
+test('timer mutation is restricted to the canonical assigned executor while readers retain GET access', async () => {
   const route = await readFile(timerRouteUrl, 'utf8');
 
   const postStart = route.indexOf('export async function POST');
@@ -37,9 +41,11 @@ test('timer mutation accepts module writers or the canonical assigned executor',
   const postSection = route.slice(postStart, getStart);
   const getSection = route.slice(getStart);
 
-  assert.match(postSection, /getModuleAccessLevel/);
   assert.match(postSection, /requireAssignedMaintenanceExecution/);
-  assert.match(postSection, /accessLevel !== 'ED' && !executionAccess\.ok/);
+  assert.match(postSection, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(postSection, /accessLevel !== 'ED'/);
+  assert.match(postSection, /getWorkOrderReleaseReadiness/);
+  assert.match(getSection, /getModuleAccessLevel/);
   assert.match(getSection, /requireAssignedMaintenanceExecution/);
 });
 
@@ -131,4 +137,17 @@ test('timer evidence is authoritative for actual OT duration when available', as
   assert.match(route, /total_timer_seconds/);
   assert.match(route, /totalTimerSeconds \/ 3600/);
   assert.match(route, /const effectiveHours = timerHours > 0/);
+});
+
+test('OT start is atomic with timer play at the database boundary', async () => {
+  const sql = await readFile(atomicStartMigrationUrl, 'utf8');
+  const route = await readFile(workOrderRouteUrl, 'utf8');
+
+  assert.match(sql, /if p_action = 'play'/);
+  assert.match(sql, /v_next_work_order_status := 'in_progress'/);
+  assert.match(sql, /set status = v_next_work_order_status/);
+  assert.match(sql, /timer_status = v_new_status/);
+  assert.match(sql, /start_date = case[\s\S]*p_action = 'play'[\s\S]*coalesce\(start_date, v_now\)/i);
+  assert.match(route, /canonical_start_endpoint/);
+  assert.match(route, /canonical_start_action: 'play'/);
 });
