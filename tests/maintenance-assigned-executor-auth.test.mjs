@@ -23,19 +23,25 @@ test('non-elevated maintenance users are restricted to their assigned person ide
   assert.match(access, /Sólo la persona asignada puede ejecutar esta orden de trabajo/);
 });
 
-test('assigned executor does not require general maintenance edit access to read or start own OT', () => {
+test('assigned executor does not require general maintenance edit access to read own OT or record execution evidence', () => {
   assert.match(workOrder, /getModuleAccessLevel/);
   assert.match(workOrder, /canExecuteAssigned/);
   assert.match(workOrder, /if \(!hasModuleWrite\)/);
-  assert.match(workOrder, /isStartOnly/);
   assert.match(workOrder, /isExecutionEvidenceOnly/);
+  assert.doesNotMatch(workOrder, /isStartOnly/);
   assert.match(workOrder, /root_cause/);
   assert.match(workOrder, /preventive_actions/);
   assert.match(workOrder, /actual_duration_hours/);
+  assert.match(workOrder, /canonical_start_action: 'play'/);
 });
 
-test('timer accepts module writers or assignee, but close is reserved to canonical assignee', () => {
-  assert.match(timer, /accessLevel !== 'ED' && !executionAccess\.ok/);
+test('timer mutations and close are reserved to the canonical assigned executor', () => {
+  const postStart = timer.indexOf('export async function POST');
+  const getStart = timer.indexOf('export async function GET');
+  const postSection = timer.slice(postStart, getStart);
+  assert.match(postSection, /requireAssignedMaintenanceExecution/);
+  assert.match(postSection, /if \(!executionAccess\.ok\) return executionAccess\.response/);
+  assert.doesNotMatch(postSection, /accessLevel !== 'ED'/);
   assert.match(close, /requireAssignedMaintenanceExecution/);
   assert.match(close, /if \(!executionAccess\.ok\) return executionAccess\.response/);
   assert.doesNotMatch(close, /accessLevel !== 'ED'/);
