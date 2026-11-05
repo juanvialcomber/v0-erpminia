@@ -6,6 +6,7 @@ const moduleAccess = readFileSync('lib/api/module-access.ts','utf8');
 const accessRoute = readFileSync('app/api/me/access/route.ts','utf8');
 const authHook = readFileSync('hooks/use-auth.ts','utf8');
 const compras = readFileSync('app/dashboard/compras/page.tsx','utf8');
+const proxy = readFileSync('proxy.ts','utf8');
 
 test('access kernel exposes canonical cargo identity with module grants',()=>{
   assert.match(moduleAccess,/cargoId: string \| null/);
@@ -26,4 +27,13 @@ test('Compras no longer claims Laudus is awaiting first access when status is un
   assert.match(compras,/Sincronización Laudus en curso/);
   assert.match(compras,/Verificando estado del conector Laudus/);
   assert.doesNotMatch(compras,/Esperando acceso y primera sincronización/);
+});
+
+
+test('finance manager cross-area API access follows canonical role_matrix',()=>{
+  assert.match(proxy,/financeManagerMatrixAllowed/);
+  assert.match(proxy,/path\.startsWith\('\/api\/maintenance\/'\)/);
+  assert.match(proxy,/path\.startsWith\('\/api\/bodega\/'\)/);
+  assert.match(proxy,/readOnly[\s\S]*access_level === 'ED' \|\| row\.access_level === 'LEC'/);
+  assert.match(proxy,/path === '\/api\/me'/);
 });
