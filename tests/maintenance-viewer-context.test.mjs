@@ -23,7 +23,7 @@ test('maintenance role routing stays explicit for every canonical maintenance ca
   assert.match(viewerMode, /jefe sostenibilidad/);
   assert.match(viewerMode, /return 'oversight'/);
   assert.match(viewerMode, /cargo\.startsWith\('mecánico'\)/);
-  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)/);
+  assert.match(viewerMode, /cargo\.startsWith\('jefe de taller mina'\)\) return 'planning'/);
   assert.match(viewerMode, /encargado de camionetas y camiones/);
   assert.match(viewerMode, /cargo === 'soldador'/);
 });
