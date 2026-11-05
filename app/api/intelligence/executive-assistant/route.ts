@@ -48,9 +48,14 @@ async function callN3RouterFallback(instructions: string, input: string) {
   const token = process.env.N3_MODEL_ROUTER_MOTIL_TOKEN?.trim();
   if (!url || !token) throw new Error('N3 Model Router fallback no está configurado');
 
+  const oidcToken = process.env.VERCEL_OIDC_TOKEN?.trim();
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-n3-service-token': token },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-n3-service-token': token,
+      ...(oidcToken ? { 'x-vercel-trusted-oidc-idp-token': oidcToken } : {}),
+    },
     body: JSON.stringify({
       task_class: 'motil-executive-assistant',
       capability: 'long-context',
