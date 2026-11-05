@@ -9,6 +9,7 @@ type MaintenanceWorkOrderRow = {
   id: string;
   asset_id: string | null;
   timer_status?: string | null;
+  total_timer_seconds?: number | string | null;
   actual_duration_hours?: number | string | null;
 };
 type CloseWorkOrderPayload = { actual_duration_hours?: number | string | null; root_cause?: string | null; preventive_actions?: string | null };
@@ -107,11 +108,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (woError || !typedWorkOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
     const normalizedHours = Number(actual_duration_hours);
-    const timerHours = Number(typedWorkOrder.actual_duration_hours || 0);
-    const effectiveHours = Math.max(
-      Number.isFinite(normalizedHours) && normalizedHours > 0 ? normalizedHours : 0,
-      Number.isFinite(timerHours) && timerHours > 0 ? timerHours : 0,
-    );
+    const totalTimerSeconds = Number(typedWorkOrder.total_timer_seconds || 0);
+    const timerHours = Number.isFinite(totalTimerSeconds) && totalTimerSeconds > 0
+      ? totalTimerSeconds / 3600
+      : 0;
+    const effectiveHours = timerHours > 0
+      ? timerHours
+      : Number.isFinite(normalizedHours) && normalizedHours > 0
+        ? normalizedHours
+        : Number(typedWorkOrder.actual_duration_hours || 0);
     const closureData: Record<string, unknown> = {
       actual_duration_hours: effectiveHours,
       updated_at: new Date().toISOString(),
