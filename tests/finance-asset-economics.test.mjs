@@ -451,3 +451,28 @@ test('single-source exact candidates preserve verified absence across internal a
   assert.match(stage,/purchase_cost_center_evidence/);
   assert.match(stage,/purchase_description_exact_plate/);
 });
+
+
+test('finance assets exposes Laudus fixed assets as read-only reconciliation evidence',()=>{
+  const api=fs.readFileSync('app/api/finance/laudus-fixed-assets-review/route.ts','utf8');
+  const panel=fs.readFileSync('components/finance/laudus-fixed-assets-review.tsx','utf8');
+  assert.match(api,/laudus_fixed_assets_service_v1/);
+  assert.match(api,/readOnly: true/);
+  assert.match(api,/physical_identifier/);
+  assert.match(api,/model_identifier/);
+  assert.match(api,/No se pudo cargar activos fijos observados en Laudus/);
+  assert.doesNotMatch(api,/\.insert\(/);
+  assert.doesNotMatch(api,/\.update\(/);
+  assert.match(panel,/Activos fijos observados/);
+  assert.match(panel,/Un registro Laudus no se transforma en Ficha 360 sin evidencia verificable/);
+  assert.match(panel,/Prioridad de conciliación/);
+  assert.match(page,/LaudusFixedAssetsReview/);
+});
+
+test('Laudus fixed asset review paginates source rows and keeps canonical lookups bounded',()=>{
+  const api=fs.readFileSync('app/api/finance/laudus-fixed-assets-review/route.ts','utf8');
+  assert.match(api,/PAGE_SIZE = 1000/);
+  assert.match(api,/MAX_ROWS = 5000/);
+  assert.match(api,/\.range\(from, from \+ PAGE_SIZE - 1\)/);
+  assert.match(api,/matchedIds\.slice\(index, index \+ 50\)/);
+});
