@@ -12,6 +12,7 @@ const fluidClosure = await readFile(new URL('../app/api/maintenance/work-orders/
 const plan = await readFile(new URL('../app/api/maintenance/work-orders/[id]/standard-plan/route.ts', import.meta.url), 'utf8');
 const waste = await readFile(new URL('../app/api/maintenance/work-orders/[id]/waste/route.ts', import.meta.url), 'utf8');
 const offline = await readFile(new URL('../app/api/maintenance/work-orders/[id]/offline-notes/route.ts', import.meta.url), 'utf8');
+const hse = await readFile(new URL('../app/api/maintenance/work-orders/[id]/hse/route.ts', import.meta.url), 'utf8');
 const execution = await readFile(new URL('../app/api/maintenance/work-orders/[id]/execution/route.ts', import.meta.url), 'utf8');
 const materials = await readFile(new URL('../app/api/maintenance/work-orders/[id]/materials/route.ts', import.meta.url), 'utf8');
 const issueMaterials = await readFile(new URL('../app/api/maintenance/work-orders/[id]/issue-materials/route.ts', import.meta.url), 'utf8');
@@ -71,4 +72,12 @@ test('material and parts surfaces hide mutations when permission is absent', () 
   assert.match(partsUi, /const canEdit = Boolean\(data\?\.canEdit\)/);
   assert.match(partsUi, /\{canEdit \? <section/);
   assert.match(partsUi, /pending > 0 && canEdit/);
+});
+
+
+test('OT HSE reporting preserves the safety authority boundary', () => {
+  assert.match(hse, /getModuleAccessLevel\(context\.userId, context\.role, MODULE_KEYS\.HSE_INCIDENTE\)/);
+  assert.match(hse, /!assigned\.ok && hseLevel !== 'ED'/);
+  assert.match(hse, /ejecutor asignado o un responsable HSE autorizado/);
+  assert.match(hse, /authority\.canReadAllWorkOrders/);
 });
