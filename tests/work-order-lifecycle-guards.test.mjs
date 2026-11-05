@@ -110,3 +110,25 @@ test('timer endpoint maps database concurrency races to a user-level conflict', 
   assert.match(route, /error\?\.code === '23505'/);
   assert.match(route, /otra OT con el cronómetro en ejecución/);
 });
+
+test('canonical close validates request and evidence stability before stopping the timer', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.match(route, /request\.json\(\)\.catch\(\(\) => null\)/);
+  assert.match(route, /fluidChangedAfterDeclaration/);
+  assert.match(route, /currentLinkedWasteCount/);
+  assert.match(route, /work_order_close_readiness_v2/);
+  assert.match(route, /La OT todavía tiene pasos pendientes antes del cierre/);
+  assert.ok(
+    route.indexOf("Solicitud de cierre inválida") < route.indexOf("p_action: 'terminate'"),
+    'request validation must happen before timer termination',
+  );
+});
+
+test('timer evidence is authoritative for actual OT duration when available', async () => {
+  const route = await readFile(closeRouteUrl, 'utf8');
+
+  assert.match(route, /total_timer_seconds/);
+  assert.match(route, /totalTimerSeconds \/ 3600/);
+  assert.match(route, /const effectiveHours = timerHours > 0/);
+});
