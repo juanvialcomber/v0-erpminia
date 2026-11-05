@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { ArrowRight, CircleDollarSign, Gauge, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
+import { LaudusFixedAssetsReview } from '@/components/finance/laudus-fixed-assets-review';
 
 type QueueRow = {
   assetId: string;
@@ -266,6 +267,8 @@ export default function FinanceAssetsPage(){
         </>
       )}
     </section>
+
+    <LaudusFixedAssetsReview />
 
     <section className="rounded-lg border px-4 py-3 text-xs leading-5 text-muted-foreground">
       <strong className="font-medium text-foreground">Regla actual:</strong> el valor asegurado se conserva en UF y no se compara todavía con valor libro. La cola de reemplazo se habilitará sólo cuando la depreciación de Daniel esté conciliada por activo.
