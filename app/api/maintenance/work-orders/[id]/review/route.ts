@@ -51,9 +51,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const context = await authorizeRead(request, id);
   if (!context.ok) return context.response;
 
-  const body = (await request.json().catch(() => null)) as { action?: 'approve' | 'reject'; note?: string | null; confirmMaterialsInstalled?: boolean } | null;
-  const action = body?.action === 'reject' ? 'reject' : 'approve';
-
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
     .select('id,status,work_order_number,closed_at,created_by')
@@ -85,30 +82,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .eq('organization_id', context.organizationId)
     .eq('work_order_id', id);
   if (installationsError) return NextResponse.json({ error: installationsError.message }, { status: 500 });
-
-  if (action === 'reject') {
-    const note = body?.note?.trim() || '';
-    if (note.length < 5) return NextResponse.json({ error: 'Indica qué debe corregir el mecánico antes de rechazar la OT.' }, { status: 400 });
-    const { data: reviewId, error: rejectionError } = await context.supabase.rpc('reject_work_order_supervisor_review_v1', {
-      p_organization_id: context.organizationId,
-      p_work_order_id: id,
-      p_reviewer_profile_id: context.userId,
-      p_decision_note: note,
-    });
-    if (rejectionError) {
-      const status = rejectionError.code === '22023' ? 400 : rejectionError.code === '55000' ? 409 : rejectionError.code === '42501' ? 403 : 500;
-      return NextResponse.json({ error: rejectionError.message }, { status });
-    }
-    const { data: rejectedReview, error: rejectedReadError } = await context.supabase
-      .from('work_order_supervisor_reviews')
-      .select('id,status,decision_note,reviewed_by_name,reviewed_at,rejection_count,last_rejected_at,last_rejected_by_name,last_rejection_note,resubmitted_at')
-      .eq('organization_id', context.organizationId)
-      .eq('work_order_id', id)
-      .eq('id', reviewId)
-      .single();
-    if (rejectedReadError) return NextResponse.json({ error: rejectedReadError.message }, { status: 500 });
-    return NextResponse.json({ review: rejectedReview, reopened: true });
-  }
 
   const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
     .from('work_order_events')
@@ -167,6 +140,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Ariel López o Mauricio Astudillo deben revisar y aprobar la OT.' }, { status: 403 });
   }
 
+  const body = (await request.json().catch(() => null)) as { action?: 'approve' | 'reject'; note?: string | null; confirmMaterialsInstalled?: boolean } | null;
+  const action = body?.action === 'reject' ? 'reject' : 'approve';
+
   const { data: workOrder, error: workOrderError } = await context.supabase
     .from('maintenance_work_orders')
     .select('id,status,work_order_number,canonical_asset_id,created_by,closed_at')
@@ -176,7 +152,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (workOrderError) return NextResponse.json({ error: workOrderError.message }, { status: 500 });
   if (!workOrder) return NextResponse.json({ error: 'No se encontró la orden de trabajo.' }, { status: 404 });
   if (String(workOrder.status || '') !== 'completed') {
-    return NextResponse.json({ error: 'La OT debe estar terminada antes de ser aprobada.' }, { status: 409 });
+    return NextResponse.json({ error: 'La OT debe estar terminada antes de ser revisada.' }, { status: 409 });
+  }
+
+  if (action === 'reject') {
+    const note = body?.note?.trim() || '';
+    if (note.length < 5) return NextResponse.json({ error: 'Indica qué debe corregir el mecánico antes de rechazar la OT.' }, { status: 400 });
+    const { data: reviewId, error: rejectionError } = await context.supabase.rpc('reject_work_order_supervisor_review_v1', {
+      p_organization_id: context.organizationId,
+      p_work_order_id: id,
+      p_reviewer_profile_id: context.userId,
+      p_decision_note: note,
+    });
+    if (rejectionError) {
+      const status = rejectionError.code === '22023' ? 400 : rejectionError.code === '55000' ? 409 : rejectionError.code === '42501' ? 403 : 500;
+      return NextResponse.json({ error: rejectionError.message }, { status });
+    }
+    const { data: rejectedReview, error: rejectedReadError } = await context.supabase
+      .from('work_order_supervisor_reviews')
+      .select('id,status,decision_note,reviewed_by_name,reviewed_at,rejection_count,last_rejected_at,last_rejected_by_name,last_rejection_note,resubmitted_at')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', id)
+      .eq('id', reviewId)
+      .single();
+    if (rejectedReadError) return NextResponse.json({ error: rejectedReadError.message }, { status: 500 });
+    return NextResponse.json({ review: rejectedReview, reopened: true });
   }
 
   const { data: fluidDeclaration, error: fluidDeclarationError } = await context.supabase
