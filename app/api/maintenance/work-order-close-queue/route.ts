@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { resolveWorkshopHeadScope, workshopHeadOrderFilter } from '@/lib/maintenance/workshop-site-scope';
+import { canBypassAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
 type CloseQueueRow = {
   organization_id: string;
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
       } else {
         allowedWorkOrderIds = [];
       }
-    } else if (accessLevel !== 'ED') {
+    } else if (!canBypassAssignedMaintenanceExecution(context, accessLevel)) {
       const { data: person, error: personError } = await context.supabase
         .from('people')
         .select('id')
@@ -212,7 +213,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       queue,
       summary,
-      canEdit: accessLevel === 'ED' || canEditAssigned,
+      canEdit: canBypassAssignedMaintenanceExecution(context, accessLevel) || canEditAssigned,
       source: 'work_order_close_readiness_v2',
       requestedWorkOrderId: requestedWorkOrderId || null,
       workshopSite: workshopScope.isWorkshopHead ? workshopScope.site : null,
