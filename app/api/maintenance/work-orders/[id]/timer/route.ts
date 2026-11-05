@@ -86,7 +86,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id: workOrderId } = await params;
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
   const assignedExecution = await requireAssignedMaintenanceExecution(context, workOrderId);
-  if (accessLevel === 'SR' && !assignedExecution.ok) return assignedExecution.response;
+  const canReadModule = accessLevel === 'ED' || accessLevel === 'LEC';
+  if (!canReadModule && !assignedExecution.ok) return assignedExecution.response;
 
   const { data: workOrder, error } = await context.supabase
     .from('maintenance_work_orders')
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const totalMinutes = Math.floor(totalSeconds / 60);
   return NextResponse.json({
     ok: true,
-    canEdit: Boolean(workOrder.created_by) && (accessLevel === 'ED' || assignedExecution.ok),
+    canEdit: Boolean(workOrder.created_by) && assignedExecution.ok,
     record_scope: workOrder.created_by ? 'operational' : 'historical',
     current: {
       timer_status: workOrder.timer_status || 'idle',
