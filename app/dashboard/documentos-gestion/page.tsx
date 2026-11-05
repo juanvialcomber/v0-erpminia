@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { AlertCircle, CheckCircle, Clock, FolderOpen, Plus, Search, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, FolderOpen, Plus, Search, UploadCloud, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -113,9 +113,14 @@ export default function DocumentosGestionPage() {
             Controla aprobaciones, vencimientos y categorías documentales.
           </p>
         </div>
-        <Button asChild className="gap-2">
-          <Link href="/dashboard/documentos-gestion/contratos"><Plus className="h-4 w-4" />Gestionar contratos</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/dashboard/documentos-gestion/ingesta"><UploadCloud className="h-4 w-4" />Ingesta documental</Link>
+          </Button>
+          <Button asChild className="gap-2">
+            <Link href="/dashboard/documentos-gestion/contratos"><Plus className="h-4 w-4" />Gestionar contratos</Link>
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-3">
