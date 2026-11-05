@@ -45,9 +45,30 @@ export async function GET(request: NextRequest) {
     if (status) positionsQuery = positionsQuery.eq('stock_status', status);
     if (query) positionsQuery = positionsQuery.or(`product_code.ilike.%${query}%,product_name.ilike.%${query}%`);
 
-    const [overviewResult, positionsResult, dieselPositionResult] = await Promise.all([
+    let missingOperationalQuery = context.supabase
+      .from('bodega_inventory_operational_service_v1')
+      .select('canonical_product_id,sku,description,unit_of_measure,operational_category,operational_quantity,legacy_motil_quantity,quantity_delta,reconciliation_state,operational_resolution,laudus_stock_date,laudus_synced_at,motil_updated_at')
+      .eq('organization_id', organizationId)
+      .eq('reconciliation_state', 'missing_in_motil')
+      .neq('operational_quantity', 0)
+      .order('operational_quantity', { ascending: true })
+      .limit(100);
+
+    if (query) {
+      missingOperationalQuery = missingOperationalQuery.or(
+        `sku.ilike.%${query}%,description.ilike.%${query}%,operational_category.ilike.%${query}%`,
+      );
+    }
+    if (status && status !== 'negative') {
+      missingOperationalQuery = missingOperationalQuery.limit(0);
+    } else if (status === 'negative') {
+      missingOperationalQuery = missingOperationalQuery.lt('operational_quantity', 0);
+    }
+
+    const [overviewResult, positionsResult, missingOperationalResult, dieselPositionResult] = await Promise.all([
       context.supabase.from('inventory_intelligence_overview_v1').select('*').eq('organization_id', organizationId).maybeSingle(),
       positionsQuery,
+      missingOperationalQuery,
       context.supabase
         .from('inventory_intelligence_position_v1')
         .select('stock_id,product_id,product_code,product_name,family,unit,quantity_available,quantity_reserved,unit_cost,stock_value,stock_status,last_counted_date,warehouse_code,validation_status')
@@ -57,10 +78,11 @@ export async function GET(request: NextRequest) {
         .limit(1),
     ]);
 
-    const initialError = overviewResult.error || positionsResult.error || dieselPositionResult.error;
+    const initialError = overviewResult.error || positionsResult.error || missingOperationalResult.error || dieselPositionResult.error;
     if (initialError) throw initialError;
 
     const rawPositions = positionsResult.data || [];
+    const rawMissingOperational = missingOperationalResult.data || [];
     const positionSkus = [...new Set(
       rawPositions
         .map((row: any) => String(row.product_code || '').trim().toUpperCase())
@@ -137,7 +159,7 @@ export async function GET(request: NextRequest) {
       if (row?.sku) operationalBySku.set(String(row.sku).toUpperCase(), row);
     }
 
-    const positions = rawPositions.map((row: any) => {
+    const canonicalPositions = rawPositions.map((row: any) => {
       const sku = String(row.product_code || '').trim().toUpperCase();
       const laudus = reconciliationBySku.get(sku) || null;
       const operational = operationalBySku.get(sku) || null;
@@ -162,6 +184,50 @@ export async function GET(request: NextRequest) {
         source_authority_state: authority?.authority_state || 'review_laudus_unavailable',
       };
     });
+
+    const canonicalSkus = new Set(
+      canonicalPositions.map((row: any) => String(row.product_code || '').trim().toUpperCase()).filter(Boolean),
+    );
+    const missingOperationalPositions = laudusIsPrimary
+      ? rawMissingOperational
+          .filter((row: any) => row?.canonical_product_id && row?.sku)
+          .filter((row: any) => !canonicalSkus.has(String(row.sku).trim().toUpperCase()))
+          .map((row: any) => {
+            const quantity = num(row.operational_quantity) ?? 0;
+            const sku = String(row.sku || '').trim();
+            return {
+              stock_id: `laudus:${row.canonical_product_id}`,
+              product_id: row.canonical_product_id,
+              product_code: sku,
+              product_name: String(row.description || sku),
+              family: row.operational_category || null,
+              unit: row.unit_of_measure || null,
+              quantity_available: quantity,
+              quantity_reserved: 0,
+              unit_cost: null,
+              stock_value: null,
+              stock_status: quantity < 0 ? 'negative' : quantity === 0 ? 'out_of_stock' : 'healthy',
+              last_counted_date: null,
+              warehouse_code: null,
+              validation_status: 'laudus_primary',
+              laudus_stock: quantity,
+              laudus_synced_at: row.laudus_synced_at ?? null,
+              laudus_source_date_to: row.laudus_stock_date ?? null,
+              laudus_quantity_delta: num(row.quantity_delta),
+              laudus_reconciliation_state: row.reconciliation_state ?? 'missing_in_motil',
+              laudus_stock_position_count: 0,
+              operational_resolution: row.operational_resolution ?? 'laudus_only_current',
+              operational_quantity: quantity,
+              legacy_motil_quantity: num(row.legacy_motil_quantity),
+              operational_stock_date: row.laudus_stock_date ?? null,
+              effective_quantity: quantity,
+              effective_source: 'laudus',
+              source_authority_state: authority?.authority_state || 'review_laudus_unavailable',
+            };
+          })
+      : [];
+
+    const positions = [...canonicalPositions, ...missingOperationalPositions].slice(0, 200);
 
     const currentDiesel = dieselPositionResult.data?.[0] || null;
     const dieselLaudus = normalizeReconciliation(dieselLaudusResult.data || null);
