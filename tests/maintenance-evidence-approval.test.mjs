@@ -15,10 +15,12 @@ test('completed OT shows a durable evidence list', () => {
   assert.doesNotMatch(component, /evidence_tag/);
 });
 
-test('approval is explicitly limited to Ariel in the application route', () => {
-  assert.match(reviewRoute, /Ariel López/);
-  assert.doesNotMatch(reviewRoute, /Mauricio Astudillo/);
-  assert.match(reviewRoute, /Ariel López debe revisar y aprobar la OT/);
+test('approval uses the canonical authorized-supervisor contract', async () => {
+  const reviewerAccess = await readFile(new URL('../lib/maintenance/work-order-review-access.ts', import.meta.url), 'utf8');
+  assert.match(reviewRoute, /isAuthorizedMaintenanceReviewerName/);
+  assert.match(reviewerAccess, /Ariel López/);
+  assert.match(reviewerAccess, /Mauricio Astudillo/);
+  assert.match(reviewRoute, /supervisor autorizado/);
   assert.match(reviewRoute, /approve_work_order_with_material_confirmation_v1/);
   assert.match(reviewRoute, /p_confirm_materials_installed/);
 });
