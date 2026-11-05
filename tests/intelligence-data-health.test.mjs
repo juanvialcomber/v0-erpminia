@@ -33,3 +33,13 @@ test('Data Health renders full runtime timestamps safely', async () => {
   assert.match(page, /\^\\d\{4\}-\\d\{2\}-\\d\{2\}T/);
   assert.match(page, /new Date\(metric\.value\)\.toLocaleString\('es-CL'\)/);
 });
+
+test('executive assistant degrades quota exhaustion as service unavailable', async () => {
+  const route = await readFile(new URL('../app/api/intelligence/executive-assistant/route.ts', import.meta.url), 'utf8');
+  const observability = await readFile(new URL('../lib/intelligence/core-error-observability.ts', import.meta.url), 'utf8');
+
+  assert.match(route, /quotaError/);
+  assert.match(route, /temporarily sin capacidad disponible|temporalmente sin capacidad disponible/);
+  assert.match(route, /configurationError \|\| quotaError \? 503 : 500/);
+  assert.match(observability, /return 'ai_quota_exhausted'/);
+});
