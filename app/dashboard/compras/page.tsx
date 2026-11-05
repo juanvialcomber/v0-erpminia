@@ -106,7 +106,7 @@ export default function ComprasPage() {
 
       <LaudusProcurementReadinessCard />
 
-      <LaudusProcurementReconciliationCard />
+      <LaudusProcurementReconciliationCard canEdit={data?.canEdit === true} />
 
       <LaudusSupplierResolutionQueueCard />
 
