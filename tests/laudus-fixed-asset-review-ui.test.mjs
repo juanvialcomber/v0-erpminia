@@ -59,3 +59,15 @@ test('fixed asset review records human decisions without canonical mutation', as
   assert.match(ui, /Diferir/);
   assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
 });
+
+
+test('fixed asset review UI mirrors server write permission before decision actions', async () => {
+  const route = await readFile(routePath, 'utf8');
+  const component = await readFile(componentPath, 'utf8');
+
+  assert.match(route, /canReview: access\.canWrite/);
+  assert.match(component, /canReview: boolean/);
+  assert.match(component, /!data\?\.canReview/);
+  assert.match(component, /tu acceso es de lectura y no permite registrar decisiones/);
+  assert.match(component, /disabled=\{saving \|\| !data\?\.canReview/);
+});
