@@ -7,12 +7,14 @@ export async function GET() {
   const url = process.env.N3_MODEL_ROUTER_URL?.trim();
   const token = process.env.N3_MODEL_ROUTER_MOTIL_TOKEN?.trim();
   const oidc = process.env.VERCEL_OIDC_TOKEN?.trim();
-  if (!url || !token || !oidc) {
+  const bypass = process.env.N3_MODEL_ROUTER_BYPASS_SECRET?.trim();
+  if (!url || !token || (!oidc && !bypass)) {
     return NextResponse.json({
       ok: false,
       routerUrl: Boolean(url),
       serviceToken: Boolean(token),
       oidcToken: Boolean(oidc),
+      bypassSecret: Boolean(bypass),
       error: 'PREVIEW_ROUTER_CONFIG_INCOMPLETE',
     }, { status: 503 });
   }
@@ -22,7 +24,8 @@ export async function GET() {
     headers: {
       'Content-Type': 'application/json',
       'x-n3-service-token': token,
-      'x-vercel-trusted-oidc-idp-token': oidc,
+      ...(oidc ? { 'x-vercel-trusted-oidc-idp-token': oidc } : {}),
+      ...(bypass ? { 'x-vercel-protection-bypass': bypass } : {}),
     },
     body: JSON.stringify({
       task_class: 'motil-executive-assistant',
