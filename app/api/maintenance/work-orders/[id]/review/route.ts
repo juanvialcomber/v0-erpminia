@@ -32,7 +32,8 @@ async function getReviewerPerson(context: Awaited<ReturnType<typeof getOrganizat
     .eq('employment_status', 'active')
     .maybeSingle();
   if (error || !data) return null;
-  return String(data.full_name || '') === 'Ariel López' ? data : null;
+  const authorizedReviewers = new Set(['Ariel López', 'Mauricio Astudillo']);
+  return authorizedReviewers.has(String(data.full_name || '')) ? data : null;
 }
 
 async function authorizeRead(request: NextRequest, workOrderId: string) {
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const reviewer = await getReviewerPerson(context);
   if (!reviewer) {
-    return NextResponse.json({ error: 'Ariel López debe revisar y aprobar la OT.' }, { status: 403 });
+    return NextResponse.json({ error: 'Ariel López o Mauricio Astudillo deben revisar y aprobar la OT.' }, { status: 403 });
   }
 
   const { data: workOrder, error: workOrderError } = await context.supabase
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (!legacyFluidDeclarationExemption && (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true)) {
     return NextResponse.json(
-      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
+      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de la aprobación de Ariel o Mauricio.' },
       { status: 409 },
     );
   }
