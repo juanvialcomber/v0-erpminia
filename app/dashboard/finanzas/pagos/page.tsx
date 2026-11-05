@@ -32,6 +32,8 @@ type Payable = { id:string; invoice_number:string; supplier_name:string; approve
 type Payment = { id:string; payable_id:string; amount:number; currency:string; payment_date:string; payment_reference?:string|null; notes?:string|null; reconciled_at?:string|null; reconciliation_reference?:string|null; reconciliation_notes?:string|null };
 type ObservedPayable = { purchase_invoice_external_id:string; doc_number?:string|null; supplier_name?:string|null; issued_date?:string|null; due_date?:string|null; total_amount:number; currency:string; paid_amount:number; outstanding_amount:number; payment_count:number; last_payment_at?:string|null; payment_status:string };
 type ObservedPayables = { source:string; readOnly:boolean; openItems:number; openAmountClp:number; partiallyPaidItems:number; unpaidItems:number; items:ObservedPayable[]; semantics:string };
+type PaymentReviewRow = { purchase_invoice_external_id:string; doc_number?:string|null; supplier_name?:string|null; total_amount:number; currency:string; paid_amount:number; excess_amount:number; payment_count:number; last_payment_at?:string|null; review_reason:'exact_double_total'|'additional_partial_excess' };
+type PaymentReview = { source:string; readOnly:boolean; itemCount:number; excessAmountClp:number; exactDoubleCount:number; exactDoubleAmountClp:number; additionalPartialCount:number; additionalPartialAmountClp:number; rows:PaymentReviewRow[]; semantics:string };
 type DialogMode = 'due' | 'pay' | 'reconcile' | null;
 
 export default function PayablesPage() {
@@ -53,6 +55,7 @@ export default function PayablesPage() {
   const payments: Payment[] = data?.payments || [];
   const canEdit = data?.canEdit === true;
   const observedPayables: ObservedPayables | null = data?.observedPayables || null;
+  const paymentReview: PaymentReview | null = data?.paymentReview || null;
 
   const outstandingByCurrency = useMemo(() => {
     const totals = new Map<string, number>();
@@ -194,6 +197,53 @@ export default function PayablesPage() {
             ))}
           </div>
           <p className="text-xs text-muted-foreground">No se puede registrar pago desde estas partidas hasta que la obligación sea promovida y aprobada en MOTIL.</p>
+        </CardContent>
+      </Card>
+    ) : null}
+
+    {paymentReview && paymentReview.itemCount > 0 ? (
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Requiere revisión</p>
+              <CardTitle className="mt-1">Aplicaciones de pago por revisar</CardTitle>
+              <CardDescription>{paymentReview.semantics}</CardDescription>
+            </div>
+            <Badge variant="outline">Laudus · sólo lectura</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Exceso aplicado</p>
+              <p className="mt-1 text-xl font-semibold">{money(paymentReview.excessAmountClp, 'CLP')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{number(paymentReview.itemCount)} facturas</p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Duplicado exacto</p>
+              <p className="mt-1 text-xl font-semibold">{number(paymentReview.exactDoubleCount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{money(paymentReview.exactDoubleAmountClp, 'CLP')}</p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Pago adicional parcial</p>
+              <p className="mt-1 text-xl font-semibold">{number(paymentReview.additionalPartialCount)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{money(paymentReview.additionalPartialAmountClp, 'CLP')}</p>
+            </div>
+          </div>
+          <div className="divide-y rounded-lg border">
+            {paymentReview.rows.slice(0, 12).map((row) => (
+              <div key={row.purchase_invoice_external_id} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{row.supplier_name || 'Proveedor por revisar'} · Factura {row.doc_number || 's/n'}</p>
+                  <p className="text-xs text-muted-foreground">{row.review_reason === 'exact_double_total' ? 'Pago total aplicado dos veces' : 'Pago adicional sobre factura'} · {number(row.payment_count)} aplicaciones</p>
+                </div>
+                <p className="text-xs text-muted-foreground sm:text-right">Factura {money(row.total_amount, row.currency || 'CLP')}</p>
+                <p className="text-sm font-semibold tabular-nums sm:text-right">Exceso {money(row.excess_amount, row.currency || 'CLP')}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Revisar comprobantes, anticipos y notas de crédito antes de cualquier ajuste. MOTIL no modifica estos pagos.</p>
         </CardContent>
       </Card>
     ) : null}
