@@ -6,7 +6,7 @@ import { ArrowRight, CircleAlert, Database, Link2, ScanSearch, type LucideIcon }
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
 
-type ReviewRow = {
+type SourceRow = {
   external_id: string;
   name: string | null;
   acquisition_date: string | null;
@@ -17,10 +17,13 @@ type ReviewRow = {
   supplier_name: string | null;
   invoice_number: string | null;
   location: string | null;
+};
+
+type ReviewRow = SourceRow & {
   reviewTier: { key: string; label: string; rank: number };
 };
 
-type MatchedRow = ReviewRow & {
+type MatchedRow = SourceRow & {
   canonical_asset_id: string;
   canonicalAsset: null | {
     id: string;
