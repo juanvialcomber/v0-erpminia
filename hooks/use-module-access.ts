@@ -7,6 +7,8 @@ export type AccessLevel = 'ED' | 'LEC' | 'SR';
 export interface ModuleAccessResponse {
   isAdmin: boolean;
   hasCargo: boolean;
+  cargoId: string | null;
+  cargoName: string | null;
   role: string | null;
   access: Record<string, AccessLevel>;
 }
@@ -15,7 +17,7 @@ const fetcher = async (url: string): Promise<ModuleAccessResponse> => {
   const res = await fetch(url, { credentials: 'include' });
   if (!res.ok) {
     // Unauthenticated or error: deny access. Never fail open.
-    return { isAdmin: false, hasCargo: false, role: null, access: {} };
+    return { isAdmin: false, hasCargo: false, cargoId: null, cargoName: null, role: null, access: {} };
   }
   return res.json();
 };
@@ -60,6 +62,8 @@ export function useModuleAccess() {
     hasCargo,
     enforced,
     role: data?.role ?? null,
+    cargoId: data?.cargoId ?? null,
+    cargoName: data?.cargoName ?? null,
     access,
     getLevel,
     canView,
