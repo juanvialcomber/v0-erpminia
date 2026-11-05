@@ -24,6 +24,10 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/integrations/greenapi/webhook',
   // Service-to-service route validates N3URALIA_TAX_GROUPS_TOKEN in the handler.
   '/api/integrations/n3uralia-tax/whatsapp-groups',
+  // Service-to-service accounting reply bridge validates GREENAPI_WEBHOOK_TOKEN in the handler.
+  '/api/integrations/n3uralia-tax/whatsapp-send',
+  // Preview-only smoke route; handler returns 404 outside preview and is removed before merge.
+  '/api/integrations/n3uralia-tax/send-smoke',
   // The cron handler validates CRON_SECRET before doing any work.
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
