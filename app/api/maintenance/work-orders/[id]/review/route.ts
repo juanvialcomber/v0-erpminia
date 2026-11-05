@@ -174,7 +174,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (!legacyFluidDeclarationExemption && (!fluidDeclaration || (fluidDeclaration.payload as any)?.declared_by_assigned_executor !== true)) {
     return NextResponse.json(
-      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de que Ariel apruebe la OT.' },
+      { error: 'El mecánico asignado debe completar la declaración de aceites/fluidos antes de la aprobación supervisora.' },
       { status: 409 },
     );
   }
