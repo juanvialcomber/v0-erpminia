@@ -13,12 +13,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    let assignedExecutor = false;
-    if (accessLevel !== 'ED') {
-      const executionAccess = await requireAssignedMaintenanceExecution(context, id);
-      assignedExecutor = executionAccess.ok;
-      if (accessLevel === 'SR' && !executionAccess.ok) return executionAccess.response;
-    }
+    const executionAccess = await requireAssignedMaintenanceExecution(context, id);
+    const assignedExecutor = executionAccess.ok;
+    if (accessLevel === 'SR' && !assignedExecutor) return executionAccess.response;
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
     if (scope === 'missing') return NextResponse.json({ error: 'No se encontró la orden de trabajo' }, { status: 404 });
 
@@ -30,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq('status', 'active')
       .maybeSingle();
     if (applicationError) throw applicationError;
-    const canEdit = scope === 'operational' && (accessLevel === 'ED' || assignedExecutor);
+    const canEdit = scope === 'operational' && assignedExecutor;
     if (!application?.plan_id) return NextResponse.json({ standardPlan: null, canEdit, record_scope: scope });
 
     const [{ data: plan, error: planError }, { data: steps, error: stepsError }, { data: materials, error: materialsError }, { data: execution, error: executionError }] = await Promise.all([
@@ -82,11 +79,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
 
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    if (accessLevel !== 'ED') {
-      const executionAccess = await requireAssignedMaintenanceExecution(context, id);
-      if (!executionAccess.ok) return executionAccess.response;
-    }
+    const executionAccess = await requireAssignedMaintenanceExecution(context, id);
+    if (!executionAccess.ok) return executionAccess.response;
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
