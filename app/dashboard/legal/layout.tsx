@@ -13,7 +13,7 @@ const primary = [
 ];
 const secondary = [
   { href: '/dashboard/legal/inbox', label: 'Pendientes' },
-  { href: '/dashboard/legal/laudus', label: 'Evidencia Laudus' },
+  { href: '/dashboard/legal/laudus', label: 'Evidencia financiera' },
   { href: '/dashboard/legal/control-contractual', label: 'Control contractual' },
   { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
   { href: '/dashboard/legal/documentos', label: 'Archivo Legal' },
