@@ -4,12 +4,13 @@
 
 Antes de concluir sobre un contrato, avance, pago, proveedor o excepción:
 
-1. Gmail de Elías Fernández y participantes del hilo.
-2. Adjuntos del hilo.
-3. Notas de reunión relacionadas.
-4. MOTIL contractual.
-5. Laudus / evidencia financiera.
-6. Resúmenes derivados.
+1. Evidencia canónica ya ingerida desde correos y adjuntos de Elías en MOTIL.
+2. Gmail de Elías Fernández y participantes del hilo para contexto y novedades posteriores.
+3. Adjuntos del hilo sólo si aún no fueron promovidos a evidencia canónica.
+4. Notas de reunión relacionadas.
+5. MOTIL contractual.
+6. Laudus / evidencia financiera.
+7. Resúmenes derivados.
 
 ## Qué extraer de correos y reuniones
 
@@ -52,3 +53,16 @@ Para preguntas "hoy", "esta semana", "último" o "qué falta":
 - leer primero la evidencia más reciente;
 - usar fechas absolutas en la salida cuando haya riesgo de confusión;
 - no reutilizar un estado histórico como si siguiera vigente.
+
+
+## Regla de reutilización canónica
+
+Si un archivo o adjunto ya fue ingerido desde Gmail y promovido como evidencia canónica en MOTIL:
+
+- reutilizar esa evidencia canónica;
+- no pedir al usuario volver a subir el archivo al chat;
+- no depender de que el attachment histórico del chat siga disponible;
+- conservar enlace al correo/adjunto original, hash, fecha y provenance cuando existan;
+- volver a Gmail sólo para comprobar si existe una versión posterior o un hilo que cambie el contexto.
+
+Pedir re-subida únicamente si el archivo requerido no existe ni en MOTIL canónico, ni en Gmail accesible, ni en otra fuente autorizada.
