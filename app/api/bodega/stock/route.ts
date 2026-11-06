@@ -60,7 +60,7 @@ type WarehouseStockItem = {
   reorder_level: number;
   reorder_quantity: number;
   unit_cost: number;
-  total_value: number;
+  total_value: number | null;
   valuation_trusted: boolean;
   valuation_state: 'trusted' | 'review';
   bin_location: string;
@@ -130,7 +130,7 @@ function referenceFor(code: string | null, benchmarks: Map<string, PriceBenchmar
   };
 }
 
-async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; valuation: { trusted: false; state: 'review'; reason: string }; pricingWarning?: string } | null> {
+async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number | null>; valuation: { trusted: false; state: 'review'; reason: string }; pricingWarning?: string } | null> {
   const pageSize = 1000;
   let start = 0;
   const rows: CanonicalInventoryRow[] = [];
@@ -169,7 +169,7 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     const unitCost = Number(row.unit_cost || 0);
     const operationalRow = operational.get(row.id);
     const totalValue = operationalRow
-      ? quantityOnHand * unitCost
+      ? null
       : Number(row.total_value ?? quantityOnHand * unitCost);
 
     return {
@@ -195,7 +195,7 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
   const summary = {
     total_items: items.length,
     total_quantity: items.reduce((sum, i) => sum + i.quantity_on_hand, 0),
-    total_value: items.reduce((sum, i) => sum + i.total_value, 0),
+    total_value: null,
     low_stock_count: items.filter((i) => i.is_low_stock).length,
     critical_count: items.filter((i) => i.is_critical).length,
     reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
