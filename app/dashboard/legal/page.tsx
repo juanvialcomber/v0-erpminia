@@ -24,7 +24,6 @@ export default function LegalPage() {
   const { data: coverage, error: coverageError } = useSWR<EeccCoverage>('/api/legal/eecc-coverage', fetcher, { revalidateOnFocus:false });
 
   const l1Queue = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l1');
-  const secondReview = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l2');
 
   return (
     <div className="space-y-5">
@@ -114,8 +113,8 @@ export default function LegalPage() {
         <div className="grid sm:grid-cols-4">
           <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Registrados</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.registered ?? '…'}</p></div>
           <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Con carpeta</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.with_folder ?? '…'}</p></div>
+          <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Sin carpeta</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.without_folder ?? '…'}</p></div>
           <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Primera revisión</p><p className="mt-1 text-xl font-semibold">{contractorError ? '—' : contractorData ? l1Queue.length : '…'}</p></div>
-          <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Segunda revisión</p><p className="mt-1 text-xl font-semibold">{contractorError ? '—' : contractorData ? secondReview.length : '…'}</p></div>
         </div>
       </section>
 
