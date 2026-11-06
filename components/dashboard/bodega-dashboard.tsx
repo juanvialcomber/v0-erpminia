@@ -36,14 +36,6 @@ function prettifyLabel(value: string) {
     .join(' ');
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
 export function BodegaDashboard() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
@@ -65,8 +57,6 @@ export function BodegaDashboard() {
   const lowStock = normalizedInventory.filter((item) =>
     isStockBelowMinimum(item.quantity, item.min_stock)
   );
-  const totalValue = normalizedInventory.reduce((sum, item) => sum + item.quantity * (item.unit_cost || 0), 0);
-
   // Use server-side category data for accuracy
   const familyCount = categories.length;
   const lowStockTotal = categories.reduce((sum, c) => sum + c.low_stock, 0);
@@ -146,11 +136,11 @@ export function BodegaDashboard() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Valor estimado</CardTitle>
+            <CardTitle className="text-base font-semibold">Valor del inventario</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-primary">{formatCurrency(totalValue)}</div>
-            <p className="mt-2 text-sm text-muted-foreground">Inventario valorizado</p>
+            <div className="text-3xl font-bold text-primary">En conciliación</div>
+            <p className="mt-2 text-sm text-muted-foreground">Los costos unitarios requieren revisión antes de publicar una valorización.</p>
           </CardContent>
         </Card>
       </div>
@@ -340,7 +330,7 @@ export function BodegaDashboard() {
                   <th className="p-3 text-right font-bold text-foreground">Stock</th>
                   <th className="p-3 text-right font-bold text-foreground">Min.</th>
                   <th className="p-3 text-right font-bold text-foreground">Costo</th>
-                  <th className="p-3 text-right font-bold text-foreground">Total</th>
+                  <th className="p-3 text-right font-bold text-foreground">Valor</th>
                 </tr>
               </thead>
               <tbody>
@@ -384,8 +374,8 @@ export function BodegaDashboard() {
                         <td className="p-3 text-right font-semibold text-muted-foreground">
                           {item.min_stock.toLocaleString()}
                         </td>
-                        <td className="p-3 text-right text-foreground">{formatCurrency(item.unit_cost || 0)}</td>
-                        <td className="p-3 text-right font-bold text-primary">{formatCurrency((item.quantity || 0) * (item.unit_cost || 0))}</td>
+                        <td className="p-3 text-right text-muted-foreground">En revisión</td>
+                        <td className="p-3 text-right font-medium text-muted-foreground">En conciliación</td>
                       </tr>
                     );
                   })
