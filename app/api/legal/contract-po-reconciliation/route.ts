@@ -77,13 +77,19 @@ export async function GET(request: NextRequest) {
       reason = 'El contrato fuente no existe en la tabla canónica de contratos.';
     } else if (!po) {
       status = 'not_found';
-      reason = 'La OC indicada en la planilla no existe todavía en el staging Laudus de MOTIL.';
-    } else if (supplier?.rut && po.supplier_tax_id && normalize(supplier.rut) !== normalize(po.supplier_tax_id)) {
+      reason = 'La OC indicada en la planilla no existe todavía en la fuente financiera de MOTIL.';
+    } else if (!supplier?.rut) {
+      status = 'pending';
+      reason = 'El contrato no tiene RUT de proveedor suficiente para verificar esta OC.';
+    } else if (!po.supplier_tax_id) {
+      status = 'pending';
+      reason = 'La OC existe, pero la fuente financiera no informa RUT de proveedor para verificarla.';
+    } else if (normalize(supplier.rut) !== normalize(po.supplier_tax_id)) {
       status = 'conflict';
       reason = 'La OC existe, pero el RUT del proveedor no coincide con el proveedor contractual.';
     } else {
       status = 'verified';
-      reason = 'OC Laudus encontrada en staging y RUT de proveedor compatible con el contrato.';
+      reason = 'OC encontrada en la fuente financiera y RUT de proveedor compatible con el contrato.';
     }
 
     return {
