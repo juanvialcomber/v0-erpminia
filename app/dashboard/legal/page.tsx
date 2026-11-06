@@ -16,7 +16,7 @@ const fetcher = async (url: string) => {
 type ContractorFolder = { id:string; empresa_nombre:string; status:string; carpeta_documentos?:Array<{file_name:string|null}> };
 type ContractorPayload = { carpetas?: ContractorFolder[] };
 type EeccCoverage = { summary:{registered:number;with_folder:number;without_folder:number} };
-type InboxPayload = { summary?:{total:number;overdue:number;due_next_7_days:number;waiting_signatures:number;evidence_pending:number}; warnings?:string[] };
+type InboxPayload = { summary?:{total:number;overdue:number;due_next_7_days:number;waiting_signatures:number;evidence_pending:number;ready_for_management:number}; warnings?:string[] };
 
 export default function LegalPage() {
   const { data: inboxData, error: inboxError, mutate: mutateInbox } = useSWR<InboxPayload>('/api/legal/inbox', fetcher, { revalidateOnFocus:false });
@@ -82,13 +82,12 @@ export default function LegalPage() {
           <p className="px-4 py-4 text-sm text-muted-foreground">Consolidando trabajo pendiente…</p>
         ) : (
           <>
-            <div className="grid sm:grid-cols-5">
+            <div className="grid sm:grid-cols-4">
               {[
                 ['Pendientes', inboxData.summary.total],
                 ['Vencidos', inboxData.summary.overdue],
                 ['Próx. 7 días', inboxData.summary.due_next_7_days],
-                ['Firmas', inboxData.summary.waiting_signatures],
-                ['Sin evidencia', inboxData.summary.evidence_pending],
+                ['Listos Gerencia', inboxData.summary.ready_for_management],
               ].map(([label, value], index) => (
                 <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
                   <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
