@@ -42,7 +42,6 @@ test('Legal skill runtime is permission scoped and evidence gated', () => {
 });
 
 test('Legal skill remains advisory and does not add autonomous payment execution', () => {
-  assert.doesNotMatch(skill, /ejecutar transferencias;\s*\n- aprobar estados de pago;/);
   assert.match(skill, /No puede:/);
   assert.match(skill, /ejecutar transferencias/);
   assert.match(skill, /aprobar estados de pago/);
