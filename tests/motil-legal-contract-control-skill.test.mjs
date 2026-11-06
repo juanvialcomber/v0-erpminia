@@ -15,9 +15,9 @@ const orchestrator = await readFile(new URL('../lib/motil-ai/skills/orchestrator
 test('MOTIL Legal contract control skill preserves financial truth boundaries', () => {
   assert.match(skill, /No convertir `facturado` en `pagado`/);
   assert.match(skill, /No convertir `% avance` en autorizacion de pago/);
-  assert.match(skill, /no ejecuta pagos/i);
+  assert.match(skill, /nunca ejecutar pagos|ejecutar transferencias/i);
   assert.match(dataModel, /laudus_purchase_invoice_payment_status_service_v1/);
-  assert.match(dataModel, /proveedor Laudus exacto + `doc_number` exacto/);
+  assert.match(dataModel, /proveedor Laudus exacto \+ `doc_number` exacto/);
   assert.match(workflow, /paid_with_retention/);
   assert.match(workflow, /Gerencia\/Finanzas conserva autoridad/);
 });
