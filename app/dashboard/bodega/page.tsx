@@ -55,7 +55,8 @@ export default function BodegaPage() {
   const sourceAuthority = error ? null : data?.sourceAuthority || null;
   const reconciliationSummary = error ? null : data?.reconciliationSummary || null;
   const operationalDifferenceSummary = error ? null : data?.operationalDifferenceSummary || null;
-  const valuationTrusted = Boolean(sourceAuthority?.laudusIsPrimary) && !diesel?.hasConflict;
+  const valuation = error ? null : data?.valuation || null;
+  const valuationTrusted = valuation?.trusted === true;
 
   const attention = [
     { label: 'Saldos negativos', value: overview.negative_stock_products, detail: 'Requieren conciliación antes de usar disponibilidad.', href: '/dashboard/bodega?status=negative', critical: true },
@@ -140,7 +141,7 @@ export default function BodegaPage() {
 
     {!negativeStockMode ? <section aria-label="Posición de inventario" className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
       <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><PackageCheck className="h-4 w-4"/>Productos disponibles</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : number(overview.products_with_stock)}</p></div>
-      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Boxes className="h-4 w-4"/>Valor del inventario</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : valuationTrusted ? money(overview.total_stock_value) : 'En conciliación'}</p>{!valuationTrusted && !isLoading ? <p className="mt-1 text-xs text-muted-foreground">Petróleo impide una valorización confiable hasta conciliar fuentes.</p> : null}</div>
+      <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Boxes className="h-4 w-4"/>Valor del inventario</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : valuationTrusted ? money(overview.total_stock_value) : 'En conciliación'}</p>{!valuationTrusted && !isLoading ? <p className="mt-1 text-xs text-muted-foreground">{valuation?.reason || 'Los costos requieren conciliación antes de publicar una valorización total.'}</p> : null}</div>
       <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="h-4 w-4"/>Conteos pendientes</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : number(overview.count_overdue_products)}</p></div>
     </section> : null}
 
