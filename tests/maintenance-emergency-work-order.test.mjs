@@ -49,8 +49,9 @@ test('OT inbox exposes emergency creation separately from planned OT creation', 
 
 test('execution home exposes OTe creation using the canonical viewer capability, even without assigned work', () => {
   assert.match(homeUi, /<MobileTerrainPanel canCreateEmergencyWorkOrder=\{viewer\?\.canCreateEmergencyWorkOrder === true\}/);
-  assert.match(terrainUi, /canCreateEmergencyWorkOrder = false/);
-  const creation = terrainUi.indexOf('{canCreateEmergencyWorkOrder ? (');
+  assert.match(terrainUi, /canCreateEmergencyWorkOrder === undefined \? '\/api\/maintenance\/viewer-context' : null/);
+  assert.match(terrainUi, /const emergencyCreationAllowed = canCreateEmergencyWorkOrder \?\? viewer\?\.canCreateEmergencyWorkOrder === true/);
+  const creation = terrainUi.indexOf('{emergencyCreationAllowed ? (');
   assert.ok(creation > 0);
   assert.ok(creation < terrainUi.indexOf('{isLoading ?'));
   assert.match(terrainUi.slice(creation, terrainUi.indexOf(') : null}', creation)), /create\?mode=emergency/);
