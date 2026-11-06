@@ -63,7 +63,7 @@ Mantener accesibles sin competir con el flujo principal:
 Incorporar progresivamente:
 
 - cálculo automático de estados de pago y fechas;
-- semáforo verde/amarillo/rojo por atraso;
+- semáforo de fechas: rojo = `Vencido`, amarillo = `Próximo` (0-7 días), verde = `En plazo` (>7 días); sin fecha = `Sin fecha`, nunca verde por defecto;
 - actualización desde foto, PDF, email, WhatsApp o planilla;
 - alerta de contratos atrasados a responsables;
 - proveedores cargando cumplimiento mensual por portal;
