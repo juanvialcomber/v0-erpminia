@@ -13,12 +13,12 @@ const CHUNK_SIZE = 250;
 
 export async function loadBodegaOperationalQuantities(
   supabase: SupabaseClientLike,
-  organizationId: string,
+  organizationId: string | null | undefined,
   canonicalProductIds: string[],
 ): Promise<Map<string, BodegaOperationalQuantity>> {
   const ids = [...new Set(canonicalProductIds.map((value) => String(value || '').trim()).filter(Boolean))];
   const result = new Map<string, BodegaOperationalQuantity>();
-  if (ids.length === 0) return result;
+  if (!organizationId || ids.length === 0) return result;
 
   for (let offset = 0; offset < ids.length; offset += CHUNK_SIZE) {
     const chunk = ids.slice(offset, offset + CHUNK_SIZE);
