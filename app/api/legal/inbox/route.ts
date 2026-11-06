@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
 
   const complianceItems = (complianceResult.data || [])
     .filter((row) => String(row.description || '').includes('[POLVORIN]'))
-    .map((row) => {
+    .flatMap((row) => {
       const alertDate = dateKey(row.next_date) || dateKey(row.due_date);
       const expiryDate = dateKey(row.due_date);
       const daysUntilAlert = daysFromToday(alertDate, today);
@@ -239,9 +239,9 @@ export async function GET(request: NextRequest) {
         daysUntilAlert <= 30 &&
         (daysUntilExpiry === null || daysUntilExpiry >= 0);
 
-      if (!shouldSurface) return null;
+      if (!shouldSurface) return [];
 
-      return {
+      return [{
         id: `compliance:${row.id}`,
         kind: 'legal_compliance',
         area: 'Legal',
@@ -262,9 +262,8 @@ export async function GET(request: NextRequest) {
         currency: null,
         source_href: '/dashboard/legal/permisos-licencias',
         updated_at: row.updated_at || row.created_at,
-      };
-    })
-    .filter(Boolean);
+      }];
+    });
 
   const royaltyItems = royaltyRows.map((row) => {
     const property = royaltyPropertiesById.get(row.mining_property_id);
