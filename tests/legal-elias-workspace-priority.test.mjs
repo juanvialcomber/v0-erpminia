@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const source=readFileSync('app/dashboard/legal/page.tsx','utf8');
-test('Legal home loads real first-review and second-signature queues',()=>{
+test('Legal home loads real supplier coverage and first-review queue',()=>{
  assert.match(source,/useSWR<ContractorPayload>\('\/api\/carpeta-arranque'/);
  assert.match(source,/status === 'en_revision_l1'/);
- assert.match(source,/status === 'en_revision_l2'/);
+ assert.match(source,/without_folder/);
  assert.match(source,/No se pudo actualizar la bandeja/);
 });
 test('daily work precedes support tools',()=>{
