@@ -6,6 +6,7 @@ import { resolveAuthContext } from '@/lib/api/auth-session';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { canonicalCategory } from '@/lib/bodega-normalization';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
+import { loadBodegaOperationalQuantities, resolvedOperationalQuantity } from '@/lib/bodega-operational-stock';
 
 type CanonicalInventoryRow = {
   id: string;
@@ -133,19 +134,27 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('[v0] canonical inventory error:', error);
     } else if (data && data.length > 0) {
-      const inventory = (data as CanonicalInventoryRow[]).map((item) => ({
+      const canonicalRows = data as CanonicalInventoryRow[];
+      const operational = await loadBodegaOperationalQuantities(supabase, orgId, canonicalRows.map((item) => item.id));
+      const inventory = canonicalRows.map((item) => {
+        const quantity = resolvedOperationalQuantity(item.quantity, operational.get(item.id));
+        return ({
         id: item.id,
         sku: String(item.sku || ''),
         name: String(item.name || item.sku || ''),
         category: String(item.category || 'Otros'),
-        quantity: toNumber(item.quantity),
-        quantity_available: toNumber(item.quantity),
+        quantity,
+        quantity_available: quantity,
         quantity_reserved: 0,
         min_stock: toNumber(item.min_stock),
         max_stock: toNumber(item.max_stock),
         unit_cost: toNumber(item.unit_cost),
         description: String(item.description || item.warehouse_code || ''),
-      }));
+        operational_resolution: operational.get(item.id)?.operational_resolution || null,
+        reconciliation_state: operational.get(item.id)?.reconciliation_state || null,
+        stock_source: operational.has(item.id) ? 'operational' : 'canonical',
+      });
+      });
 
       return NextResponse.json({
         inventory,
