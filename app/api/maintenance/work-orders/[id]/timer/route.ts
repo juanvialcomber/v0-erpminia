@@ -33,6 +33,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (action === 'pause' && !notes) {
     return NextResponse.json({ ok: false, error: 'Debes indicar por qué pausas la orden de trabajo.' }, { status: 400 });
   }
+  const supplyPause = action === 'pause' && Boolean(notes?.startsWith('Falta de repuesto o material'));
+  const supplyDetail = supplyPause ? String(notes || '').split('—').slice(1).join('—').trim() : '';
+  if (supplyPause && !supplyDetail) {
+    return NextResponse.json({ ok: false, error: 'Indica qué repuesto o material falta antes de pausar.' }, { status: 400 });
+  }
 
   if (action === 'play' || action === 'resume') {
     try {
@@ -60,6 +65,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   if (error) return timerErrorResponse(error);
+
+  if (supplyPause) {
+    const { data: existingRequirement, error: requirementError } = await context.supabase
+      .from('work_order_material_requirements')
+      .select('id')
+      .eq('organization_id', context.organizationId)
+      .eq('work_order_id', workOrderId)
+      .limit(1)
+      .maybeSingle();
+    if (requirementError) return NextResponse.json({ ok: false, error: requirementError.message }, { status: 500 });
+
+    if (!existingRequirement) {
+      const { error: eventError } = await context.supabase.from('work_order_events').insert({
+        organization_id: context.organizationId,
+        work_order_id: workOrderId,
+        event_type: 'supply_blocker_reported',
+        event_at: new Date().toISOString(),
+        actor_id: context.userId,
+        actor_name: context.userName || context.userEmail || null,
+        source_table: 'maintenance_work_orders',
+        source_record_id: workOrderId,
+        summary: 'Pausa por repuesto o material pendiente de formalizar',
+        payload: {
+          source: 'timer_pause',
+          detail: supplyDetail,
+          requires_supply_followup: true,
+          canonical_product_id: null,
+        },
+      });
+      if (eventError) return NextResponse.json({ ok: false, error: eventError.message }, { status: 500 });
+    }
+  }
+
   return NextResponse.json(data);
 }
 
