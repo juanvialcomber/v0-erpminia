@@ -29,6 +29,28 @@ export async function GET(request: NextRequest) {
       ? null
       : Number(row.execution_percentage);
     const paidPercentage = contractValue > 0 ? (paidAmount / contractValue) * 100 : null;
+    const pendingAmount = Math.max(contractValue - paidAmount, 0);
+    const today = new Date();
+    const endDate = row.end_date ? new Date(`${row.end_date}T12:00:00Z`) : null;
+    const daysUntilEnd = endDate && !Number.isNaN(endDate.getTime())
+      ? Math.ceil((endDate.getTime() - today.getTime()) / 86_400_000)
+      : null;
+    const billingState =
+      paidPercentage === null
+        ? 'unknown'
+        : paidPercentage >= 99.5
+          ? 'complete'
+          : paidPercentage > 0
+            ? 'partial'
+            : 'not_started';
+    const timelineState =
+      daysUntilEnd === null
+        ? 'unknown'
+        : daysUntilEnd < 0
+          ? 'overdue'
+          : daysUntilEnd <= 15
+            ? 'due_soon'
+            : 'on_track';
     const deltaPercentagePoints =
       paidPercentage !== null && executionPercentage !== null
         ? paidPercentage - executionPercentage
@@ -58,6 +80,10 @@ export async function GET(request: NextRequest) {
       currency: row.currency || 'CLP',
       paid_amount: paidAmount,
       paid_percentage: paidPercentage,
+      pending_amount: pendingAmount,
+      billing_state: billingState,
+      days_until_end: daysUntilEnd,
+      timeline_state: timelineState,
       execution_percentage: executionPercentage,
       delta_percentage_points: deltaPercentagePoints,
       review_due_date: row.review_due_date,
@@ -79,11 +105,16 @@ export async function GET(request: NextRequest) {
       payment_ahead_of_execution: items.filter((item) => (item.delta_percentage_points || 0) > 0).length,
       without_evidence: items.filter((item) => !item.has_evidence).length,
       with_attention: items.filter((item) => Boolean(item.attention_reason)).length,
+      billing_complete: items.filter((item) => item.billing_state === 'complete').length,
+      billing_partial: items.filter((item) => item.billing_state === 'partial').length,
+      due_within_15_days: items.filter((item) => item.timeline_state === 'due_soon').length,
+      overdue: items.filter((item) => item.timeline_state === 'overdue').length,
     },
     policy: {
       comparison: 'Pago % = monto pagado / valor contractual. La diferencia se muestra en puntos porcentuales frente al avance físico informado.',
       interpretation: 'Que el pago supere el avance no se declara incumplimiento automáticamente; se presenta como señal para revisión.',
       evidence: 'La ausencia de archivo contractual visible se muestra como falta de respaldo, no como inexistencia jurídica.',
+      traffic_light: 'Rojo = vencido o pago adelantado frente al avance físico; amarillo = vence en 15 días, falta avance físico o falta respaldo; verde sólo se usa cuando existe evidencia suficiente, nunca por ausencia de datos.',
     },
   });
 }
