@@ -1,98 +1,94 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireModuleAccess, MODULE_KEYS } from '@/lib/api/module-access';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
-type ReviewLevel = 'L1' | 'L2';
-type ReviewStatus = 'cumple' | 'no_cumple' | null;
 type ReviewRequestBody = {
+  documentId?: string;
   docId?: string;
-  level?: ReviewLevel | string;
-  status?: ReviewStatus;
+  action?: 'approve' | 'reject';
   observations?: string;
 };
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const auth = await resolveAuthContext(request);
-
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const access = await requireModuleAccess(request, MODULE_KEYS.LEGAL_MODULO, true);
+  if (!access.authorized) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible' }, { status: 403 });
   }
 
-  const { docId, level, status, observations } = (await request.json()) as ReviewRequestBody;
+  const body = (await request.json().catch(() => null)) as ReviewRequestBody | null;
+  const documentId = body?.documentId || body?.docId || '';
+  const action = body?.action;
+  const observations = String(body?.observations || '').trim();
 
-  if (!docId || !level || status === null || status === undefined) {
-    return NextResponse.json(
-      { error: 'docId, level, y status son requeridos' },
-      { status: 400 }
-    );
+  if (!/^[0-9a-f-]{36}$/i.test(documentId) || !action || !['approve', 'reject'].includes(action)) {
+    return NextResponse.json({ error: 'Documento o acción inválidos' }, { status: 400 });
   }
 
-  if (status === 'no_cumple' && !observations?.trim()) {
-    return NextResponse.json(
-      { error: 'Las observaciones son requeridas al rechazar' },
-      { status: 400 }
-    );
+  if (action === 'reject' && !observations) {
+    return NextResponse.json({ error: 'Debes ingresar una observación para rechazar' }, { status: 400 });
   }
 
-  const updateData: Record<string, string | null> = {
-    [`${level.toLowerCase()}_status`]: status,
-    [`${level.toLowerCase()}_observations`]: observations || null,
-    [`reviewed_by_${level.toLowerCase()}`]: auth.user.id,
-    [`reviewed_at_${level.toLowerCase()}`]: new Date().toISOString(),
-  };
+  const supabase = getSupabaseServerClient();
+  const { data: current, error: currentError } = await supabase
+    .from('module_documents')
+    .select('id,document_name,status')
+    .eq('id', documentId)
+    .eq('organization_id', access.organizationId)
+    .eq('module', 'legal')
+    .is('deleted_at', null)
+    .maybeSingle();
 
-  // If L1 approves, document moves to under_review; if L1 rejects, stays in draft
-  if (level === 'L1') {
-    updateData.status = status === 'cumple' ? 'under_review_l2' : 'under_review_l1';
+  if (currentError || !current) {
+    return NextResponse.json({ error: 'Documento no encontrado' }, { status: 404 });
   }
-  // If L2 approves, document is approved; if rejects, goes back to under_review_l1
-  if (level === 'L2') {
-    updateData.status = status === 'cumple' ? 'approved' : 'under_review_l1';
+
+  const normalizedCurrent = String(current.status || '').toLowerCase();
+  if (action === 'approve' && ['active', 'approved', 'aprobado'].includes(normalizedCurrent)) {
+    return NextResponse.json({ success: true, document: current, unchanged: true });
   }
+  if (action === 'reject' && ['rejected', 'rechazado'].includes(normalizedCurrent)) {
+    return NextResponse.json({ success: true, document: current, unchanged: true });
+  }
+
+  const now = new Date().toISOString();
+  const updateData =
+    action === 'approve'
+      ? {
+          status: 'active',
+          l1_status: 'approved',
+          l1_observations: observations || null,
+          reviewed_by_l1: access.user.id,
+          reviewed_at_l1: now,
+          updated_at: now,
+        }
+      : {
+          status: 'rejected',
+          l1_status: 'rejected',
+          l1_observations: observations,
+          reviewed_by_l1: access.user.id,
+          reviewed_at_l1: now,
+          updated_at: now,
+        };
 
   const { data, error } = await supabase
     .from('module_documents')
     .update(updateData)
-    .eq('id', docId)
+    .eq('id', documentId)
+    .eq('organization_id', access.organizationId)
     .eq('module', 'legal')
-    .select()
+    .select('id,document_name,status,l1_status,l1_observations,reviewed_at_l1')
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'No se pudo guardar la revisión' }, { status: 500 });
   }
 
-  // Send email notification about the review
-  try {
-    const emailRes = await fetch(
-      new URL('/api/legal/notifications/email', request.url),
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': request.headers.get('cookie') || '',
-        },
-        body: JSON.stringify({
-          docId,
-          documentTitle: data.document_name,
-          reviewLevel: level,
-          status,
-          observations,
-          recipientEmail: auth.user.email,
-        }),
-      }
-    );
-
-    if (!emailRes.ok) {
-      console.warn('[v0] Email notification failed:', await emailRes.text());
-    }
-  } catch (emailError) {
-    console.warn('[v0] Error sending email notification:', emailError);
-    // Don't fail the review if email fails
-  }
-
-  return NextResponse.json({ document: data }, { status: 200 });
+  return NextResponse.json({
+    success: true,
+    document: data,
+    decision: action,
+  });
 }
