@@ -40,6 +40,13 @@ function daysFromToday(value: string | null, today: string) {
   return Math.round((target - base) / 86_400_000);
 }
 
+function timingState(daysUntil: number | null) {
+  if (daysUntil === null) return 'no_due_date';
+  if (daysUntil < 0) return 'overdue';
+  if (daysUntil <= 7) return 'due_soon';
+  return 'on_track';
+}
+
 export async function GET(request: NextRequest) {
   const auth = await authorize(request);
   if (!auth.ok) return auth.response;
@@ -149,6 +156,7 @@ export async function GET(request: NextRequest) {
       due_date: dueDate,
       days_until: daysUntil,
       overdue: typeof daysUntil === 'number' && daysUntil < 0,
+      timing_state: timingState(daysUntil),
       status: row.status,
       priority: row.priority,
       owner: row.legal_owner || row.operational_owner,
@@ -219,6 +227,7 @@ export async function GET(request: NextRequest) {
       due_date: null,
       days_until: null,
       overdue: false,
+      timing_state: 'no_due_date',
       status: 'submitted',
       priority: row.evidence_document_id ? 'medium' : 'high',
       owner: contract?.responsible_person || contract?.responsible_area || null,
