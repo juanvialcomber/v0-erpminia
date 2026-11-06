@@ -137,7 +137,7 @@ export default function LegalPage() {
       </details>
 
       <StatePanel
-        tone="info"
+        tone="neutral"
         title="Regla de trabajo"
         description="MOTIL prioriza qué requiere atención y la siguiente acción. El detalle técnico y regulatorio queda disponible sólo cuando Elías lo necesita."
         className="min-h-0"
