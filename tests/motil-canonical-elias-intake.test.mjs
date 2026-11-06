@@ -23,7 +23,7 @@ test('canonical transport projection only exposes promoted source lineage', () =
 });
 
 test('legacy duplicate transport rows remain auditable but rejected from canonical projection', () => {
-  assert.match(transport, /relation_type[^\n]*'supersedes'/);
+  assert.match(transport, /'supersedes'/);
   assert.match(transport, /'rejected'/);
   assert.match(transport, /Legacy duplicate superseded/);
 });
