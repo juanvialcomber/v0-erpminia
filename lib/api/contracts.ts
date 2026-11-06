@@ -18,6 +18,7 @@ interface CreateContractInput {
   contractValue?: number;
   currency?: string;
   paidAmount?: number;
+  executionPercentage?: number;
   startDate?: string;
   endDate?: string;
   reviewDueDate?: string;
@@ -123,6 +124,7 @@ function mapContract(contract: any) {
     contract_value: contractValue,
     currency: contract.currency || 'CLP',
     paid_amount: paidAmount,
+    execution_percentage: contract.execution_percentage === null || contract.execution_percentage === undefined ? null : Number(contract.execution_percentage),
     pending_amount: Math.max(contractValue - paidAmount, 0),
     start_date: contract.start_date,
     end_date: contract.end_date,
@@ -189,6 +191,7 @@ export async function createContract(input: CreateContractInput) {
       contract_value: input.contractValue || 0,
       currency: input.currency || 'CLP',
       paid_amount: input.paidAmount || 0,
+      execution_percentage: input.executionPercentage ?? null,
       start_date: input.startDate || null,
       end_date: input.endDate || null,
       review_due_date: input.reviewDueDate || null,
