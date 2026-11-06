@@ -18,3 +18,11 @@ test('Elias inbox displays and uses the next action as CTA', () => {
   assert.match(page, /item\.next_action/);
   assert.doesNotMatch(page, />Abrir fuente </);
 });
+
+
+test('management-ready requires canonical approved payment state and completed signatures', () => {
+  assert.match(api, /String\(paymentStatus\)\.toLowerCase\(\) === 'approved'/);
+  assert.match(api, /signaturesDone >= signaturesRequired/);
+  assert.match(api, /!paymentRequest\.executed_at/);
+  assert.match(api, /Informar a Gerencia: pago listo/);
+});
