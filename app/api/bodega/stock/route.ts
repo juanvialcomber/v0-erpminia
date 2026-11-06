@@ -130,7 +130,7 @@ function referenceFor(code: string | null, benchmarks: Map<string, PriceBenchmar
   };
 }
 
-async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string } | null> {
+async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; valuation: { trusted: false; state: 'review'; reason: string }; pricingWarning?: string } | null> {
   const pageSize = 1000;
   let start = 0;
   const rows: CanonicalInventoryRow[] = [];
