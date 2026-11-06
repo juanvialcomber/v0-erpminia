@@ -61,6 +61,8 @@ type WarehouseStockItem = {
   reorder_quantity: number;
   unit_cost: number;
   total_value: number;
+  valuation_trusted: boolean;
+  valuation_state: 'trusted' | 'review';
   bin_location: string;
   is_low_stock: boolean;
   is_critical: boolean;
@@ -181,6 +183,8 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
       reorder_quantity: Number(row.max_stock || 0),
       unit_cost: unitCost,
       total_value: totalValue,
+      valuation_trusted: false,
+      valuation_state: 'review',
       bin_location: row.warehouse_code || 'N/A',
       is_low_stock: isStockBelowMinimum(quantityOnHand, reorderLevel),
       is_critical: isStockBelowMinimum(quantityOnHand, reorderLevel) && quantityOnHand <= 0,
@@ -197,7 +201,16 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
   };
 
-  return { items, summary, ...(pricingWarning ? { pricingWarning } : {}) };
+  return {
+    items,
+    summary,
+    valuation: {
+      trusted: false,
+      state: 'review',
+      reason: 'Los costos unitarios de Bodega siguen pendientes de conciliación completa; los valores monetarios son sólo referencia no publicable.',
+    },
+    ...(pricingWarning ? { pricingWarning } : {}),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -246,6 +259,8 @@ export async function GET(request: NextRequest) {
         reorder_quantity: reorderQuantity,
         unit_cost: unitCost,
         total_value: quantityOnHand * unitCost,
+        valuation_trusted: false,
+        valuation_state: 'review',
         bin_location: item.bin?.bin_location || item.bin_location || 'N/A',
         is_low_stock: isStockBelowMinimum(quantityOnHand, reorderLevel),
         is_critical: isStockBelowMinimum(quantityOnHand, reorderLevel) && quantityOnHand <= 0,
@@ -262,7 +277,17 @@ export async function GET(request: NextRequest) {
       reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
     };
 
-    return NextResponse.json({ items, summary, dataSource: 'warehouse', ...(pricingWarning ? { pricingWarning } : {}) });
+    return NextResponse.json({
+      items,
+      summary,
+      dataSource: 'warehouse',
+      valuation: {
+        trusted: false,
+        state: 'review',
+        reason: 'Los costos unitarios requieren conciliación antes de publicar valorizaciones operativas.',
+      },
+      ...(pricingWarning ? { pricingWarning } : {}),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo obtener el stock';
     return NextResponse.json({
