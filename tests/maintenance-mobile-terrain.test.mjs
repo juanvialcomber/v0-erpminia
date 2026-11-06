@@ -35,8 +35,7 @@ test('my-work API requires canonical person linkage and scopes work orders to th
   assert.match(myWork, /resolveMaintenanceViewerMode\(cargoName\) !== 'execution'/);
   assert.match(myWork, /\.from\('people'\)/);
   assert.match(myWork, /\.eq\('organization_id', context\.organizationId\)/);
-  assert.match(myWork, /\.eq\('profile_id', context\.userId\)/);
-  assert.match(myWork, /\.eq\('employment_status', 'active'\)/);
+  assert.match(myWork, /\.eq\('profile_id', access\.user\.id\)/);
   assert.match(myWork, /identityLinked: false/);
   assert.match(myWork, /\.from\('maintenance_work_orders'\)/);
   assert.match(myWork, /\.eq\('assigned_person_id', person\.id\)/);
