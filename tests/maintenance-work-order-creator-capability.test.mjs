@@ -14,8 +14,9 @@ test('OT creation is capability based instead of hard-coded to Ariel or Mauricio
   assert.match(access, /accessLevel === 'ED'/);
   assert.match(access, /jefe de planificación/);
   assert.match(access, /jefe de equipos móviles y estacionarios/);
-  assert.match(access, /jefe de taller mina/);
   assert.match(access, /jefe mina/);
+  const normalCreator = access.split('export function isEmergencyWorkOrderCreatorCargo')[0];
+  assert.doesNotMatch(normalCreator, /cargo\.startsWith\('jefe de taller mina '\)/);
   assert.doesNotMatch(route, /Solo Ariel López y Mauricio Astudillo/);
   assert.match(route, /getMaintenanceWorkOrderCreationCapability/);
 });
@@ -31,11 +32,14 @@ test('coarse maintenance role gate delegates POST work-order creation to canonic
   assert.match(org, /canonical work-order route by cargo/);
 });
 
-test('mine leads receive mant_operaciones edit capability', () => {
+test('workshop heads remain execution users and may only create self-assigned emergency OT', () => {
+  const emergencyCreator = access.split('export function isEmergencyWorkOrderCreatorCargo')[1];
+  assert.match(emergencyCreator, /cargo\.startsWith\('jefe de taller mina '\)/);
+  assert.match(access, /emergencySelfAssignOnly: canCreateEmergency && !canCreate/);
+  assert.match(route, /if \(isEmergencyWork && creationCapability\.emergencySelfAssignOnly\)/);
+  assert.match(route, /assignedPersonId = creationCapability\.personId/);
+
   for (const cargo of [
-    'jefe mina don jaime',
-    'jefe mina peumo',
-    'jefe mina san pedro',
     'jefe de taller mina don jaime',
     'jefe de taller mina peumo',
     'jefe de taller mina san pedro',
