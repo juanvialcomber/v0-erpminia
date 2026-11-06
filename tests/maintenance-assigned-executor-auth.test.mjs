@@ -18,9 +18,17 @@ test('assigned work-order execution bypass is narrow and excludes deletes', () =
 });
 
 test('non-elevated maintenance users are restricted to their assigned person identity', () => {
-  assert.match(access, /profile_id', context\.userId/);
+  assert.match(access, /profileIds = new Set<string>\(\[context\.userId\]\)/);
+  assert.match(access, /auth_profile_identity_links/);
+  assert.match(access, /context\.authUserId/);
   assert.match(access, /assigned_person_id !== person\.id/);
   assert.match(access, /Sólo la persona asignada puede ejecutar esta orden de trabajo/);
+});
+
+test('assigned executor identity bridge remains fail closed', () => {
+  assert.match(access, /employment_status', 'active'/);
+  assert.match(access, /uniquePeople\.size !== 1/);
+  assert.match(access, /más de una persona operativa activa/);
 });
 
 test('assigned executor does not require general maintenance edit access to read or start own OT', () => {
@@ -45,6 +53,6 @@ test('assigned executor capability is identity based, not hard-coded by cargo or
   const assignedIdentityHelper = access.split('export function canBypassAssignedMaintenanceExecution')[0];
   assert.doesNotMatch(assignedIdentityHelper, /Joaquín|Ariel|Jefe de Taller|tecnico/);
   assert.match(access, /context\.role !== 'tecnico'/);
-  assert.match(access, /profile_id', context\.userId/);
+  assert.match(access, /profile_id/);
   assert.match(access, /employment_status', 'active'/);
 });
