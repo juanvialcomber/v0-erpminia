@@ -6,17 +6,19 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const primary = [
-  { href: '/dashboard/legal', label: 'Inicio' },
-  { href: '/dashboard/legal/asistente', label: 'Asistente IA' },
-  { href: '/dashboard/legal/inbox', label: 'Pendientes' },
-  { href: '/dashboard/legal/contratistas-documentos', label: 'Contratistas · Documentos' },
-  { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
-  { href: '/dashboard/legal/documentos', label: 'Archivo Legal' },
+  { href: '/dashboard/legal', label: 'Hoy' },
+  { href: '/dashboard/legal/avances-pagos', label: 'Contratos y pagos' },
+  { href: '/dashboard/legal/contratistas-documentos', label: 'Proveedores' },
+  { href: '/dashboard/legal/asistente', label: 'Asistente' },
 ];
 const secondary = [
-  { href: '/dashboard/legal/casos', label: 'Casos' },
+  { href: '/dashboard/legal/inbox', label: 'Pendientes' },
+  { href: '/dashboard/legal/laudus', label: 'Evidencia Laudus' },
   { href: '/dashboard/legal/control-contractual', label: 'Control contractual' },
-  { href: '/dashboard/legal/avances-contractistas', label: 'Avances' },
+  { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
+  { href: '/dashboard/legal/documentos', label: 'Archivo Legal' },
+  { href: '/dashboard/legal/casos', label: 'Casos' },
+  { href: '/dashboard/legal/avances-contractistas', label: 'Avances históricos' },
   { href: '/dashboard/legal/sernageomin', label: 'Obligaciones' },
   { href: '/dashboard/legal/plazos-fatales', label: 'Plazos fatales' },
   { href: '/dashboard/legal/propiedad-minera', label: 'Propiedad minera' },
@@ -37,8 +39,8 @@ export default function LegalLayout({ children }: {children:ReactNode}) {
  return <div className="space-y-5">
   <div className="rounded-lg border border-border/70 bg-background p-2">
    <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
-     <Link href="/dashboard/legal" className="text-xs font-semibold uppercase tracking-[0.12em]">Legal / Espacio de trabajo</Link>
-     <span className="text-xs text-muted-foreground">Documentación · Contratos · Cumplimiento</span>
+     <Link href="/dashboard/legal" className="text-xs font-semibold uppercase tracking-[0.12em]">Legal / Elías</Link>
+     <span className="text-xs text-muted-foreground">Avances · Pagos · Proveedores · Evidencia</span>
    </div>
    <nav className="flex flex-wrap gap-1" aria-label="Navegación principal de Legal">
     {primary.map(link)}
