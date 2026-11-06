@@ -27,10 +27,11 @@ test('inventory API overlays canonical catalog with operational stock', () => {
 
 test('stock summary uses operational quantity and keeps monetary output explicitly untrusted', () => {
   assert.match(stockRoute, /resolvedOperationalQuantity\(row\.quantity, operational\.get\(row\.id\)\)/);
-  assert.match(stockRoute, /operationalRow\s*\? quantityOnHand \* unitCost/);
+  assert.match(stockRoute, /const totalValue = operationalRow\s*\? null/);
   assert.match(stockRoute, /dataSource: 'canonical\+operational'/);
   assert.match(stockRoute, /valuation_trusted: false/);
   assert.match(stockRoute, /valuation_state: 'review'/);
+  assert.match(stockRoute, /total_value: null/);
   assert.match(stockRoute, /Los costos unitarios de Bodega siguen pendientes de conciliación completa/);
   assert.doesNotMatch(stockRoute, /unitCost\s*=\s*Number\(operational/);
 });
