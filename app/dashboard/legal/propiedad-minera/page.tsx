@@ -4,136 +4,132 @@ import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
 
+type Royalty = {
+  id:string;
+  lot_ref:string|null;
+  event_date:string|null;
+  tonnes:number|null;
+  cu_grade_pct:number|null;
+  net_clp:number|null;
+  royalty_clp:number|null;
+  payment_status:string;
+  payment_note:string|null;
+  destination:string|null;
+};
+
 type PropertyItem = {
-  id: string;
-  contract_number: string | null;
-  title: string | null;
-  contract_type: string | null;
-  status: string | null;
-  contract_value: number | null;
-  currency: string | null;
-  paid_amount: number | null;
-  pending_amount: number;
-  execution_percentage: number | null;
-  responsible_area: string | null;
-  responsible_person: string | null;
-  end_date: string | null;
-  review_due_date: string | null;
-  contractor_name: string | null;
-  property_name: string | null;
-  project_name: string | null;
-  royalty_rate: number | null;
-  guarantee_amount: number | null;
-  compliance_status: string | null;
-  compliance_notes: string | null;
-  has_evidence: boolean;
+  id:string;
+  representative_name:string;
+  property_name:string;
+  patent_value_clp:number|null;
+  royalty_count:number;
+  royalty_total_clp:number;
+  tonnes_total:number;
+  paid_events:number;
+  pending_events:number;
+  latest_event_date:string|null;
+  royalties:Royalty[];
 };
 
-type Response = {
-  data: PropertyItem[];
-  summary: {
-    total: number;
-    with_property: number;
-    with_royalty: number;
-    review_due: number;
-    missing_evidence: number;
+type Payload = {
+  data:PropertyItem[];
+  summary:{
+    properties:number;
+    royalties:number;
+    royalty_total_clp:number;
+    tonnes_total:number;
+    paid_events:number;
+    pending_events:number;
+    latest_event_date:string|null;
   };
+  lineage:{note:string};
 };
 
-const fetcher = async (url: string) => {
-  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar propiedad minera');
+const fetcher=async(url:string):Promise<Payload>=>{
+  const response=await fetch(url,{credentials:'include',cache:'no-store'});
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok) throw new Error(payload?.error||'No se pudo cargar propiedad minera');
   return payload;
 };
 
-function money(value: number | null, currency: string | null) {
-  if (value === null || value === undefined) return null;
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: currency || 'CLP',
-    maximumFractionDigits: 0,
-  }).format(value);
+function clp(value:number|null|undefined){
+  if(value===null||value===undefined) return '—';
+  return new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(value);
 }
 
-export default function MiningPropertyPage() {
-  const { data, error, isLoading } = useSWR<Response>('/api/legal/mining-property', fetcher, {
-    revalidateOnFocus: false,
-  });
+function number(value:number|null|undefined,digits=1){
+  if(value===null||value===undefined) return '—';
+  return value.toLocaleString('es-CL',{maximumFractionDigits:digits});
+}
 
-  if (isLoading) {
-    return <StatePanel tone="loading" title="Cargando propiedad minera" description="Leyendo contratos y obligaciones asociadas." />;
-  }
+export default function MiningPropertyPage(){
+  const {data,error,isLoading}=useSWR<Payload>('/api/legal/mining-property',fetcher,{revalidateOnFocus:false});
 
-  if (error || !data) {
-    return <StatePanel tone="error" title="Propiedad minera no disponible" description="No se reemplazan datos faltantes por supuestos." />;
-  }
+  if(isLoading) return <StatePanel tone="loading" title="Cargando propiedad minera" description="Leyendo propiedades y regalías desde la fuente canónica."/>;
+  if(error||!data) return <StatePanel tone="error" title="Propiedad minera no disponible" description="No se reemplazan datos faltantes por supuestos."/>;
 
-  return (
-    <div className="space-y-5">
-      <header className="border-b border-border/70 pb-4">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Propiedad minera</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Propiedad minera</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Contratos, arriendos, regalías, revisiones y respaldo documental asociados a propiedad minera.
-        </p>
-      </header>
+  return <div className="space-y-5">
+    <header className="border-b border-border/70 pb-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Propiedad minera</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Propiedad minera</h1>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Propiedades, regalías, toneladas y estado de pago según la planilla canónica.</p>
+    </header>
 
-      <section className="grid overflow-hidden rounded-md border sm:grid-cols-5">
-        {[
-          ['Registros', data.summary.total],
-          ['Con propiedad', data.summary.with_property],
-          ['Con regalía', data.summary.with_royalty],
-          ['Con revisión', data.summary.review_due],
-          ['Sin evidencia', data.summary.missing_evidence],
-        ].map(([label, value], index) => (
-          <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
-            <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
-            <p className="mt-1 text-xl font-semibold">{value}</p>
+    <section className="grid overflow-hidden rounded-md border sm:grid-cols-6">
+      {[
+        ['Propiedades',data.summary.properties],
+        ['Regalías',data.summary.royalties],
+        ['Monto regalías',clp(data.summary.royalty_total_clp)],
+        ['Toneladas',number(data.summary.tonnes_total,1)],
+        ['Eventos pagados',data.summary.paid_events],
+        ['Pendientes',data.summary.pending_events],
+      ].map(([label,value],index)=><div key={String(label)} className={'px-4 py-3 '+(index?'border-t sm:border-l sm:border-t-0':'')}>
+        <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+        <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+      </div>)}
+    </section>
+
+    <section className="divide-y overflow-hidden rounded-md border">
+      {data.data.length?data.data.map((item)=><article key={item.id} className="p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{item.royalty_count} eventos</Badge>
+              {item.pending_events>0?<Badge variant="secondary">{item.pending_events} pendientes</Badge>:<Badge variant="outline">Sin pendientes reportados</Badge>}
+            </div>
+            <h2 className="mt-2 text-sm font-semibold">{item.property_name}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Representante: {item.representative_name}</p>
           </div>
-        ))}
-      </section>
+          <div className="shrink-0 text-xs text-muted-foreground md:text-right">
+            <p>Patente: {clp(item.patent_value_clp)}</p>
+            <p className="mt-1">{item.latest_event_date?'Último evento: '+item.latest_event_date:'Sin fecha de evento'}</p>
+          </div>
+        </div>
 
-      <section className="divide-y overflow-hidden rounded-md border">
-        {data.data.length ? data.data.map((item) => (
-          <article key={item.id} className="p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{item.contract_type || 'Contrato'}</Badge>
-                  <Badge variant="outline">{item.status || 'Sin estado'}</Badge>
-                  {item.royalty_rate && item.royalty_rate > 0 ? (
-                    <Badge variant="secondary">Regalía {item.royalty_rate}%</Badge>
-                  ) : null}
-                  {!item.has_evidence ? <Badge variant="destructive">Sin respaldo</Badge> : null}
-                </div>
-                <h2 className="mt-2 text-sm font-semibold">{item.property_name || item.title || item.contract_number || 'Propiedad sin nombre'}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {[item.contractor_name, item.project_name, item.responsible_area].filter(Boolean).join(' · ') || 'Sin contexto adicional registrado'}
-                </p>
-                {item.compliance_notes ? <p className="mt-2 text-sm">{item.compliance_notes}</p> : null}
-              </div>
+        <div className="mt-3 grid gap-2 border-t pt-3 text-xs text-muted-foreground md:grid-cols-4">
+          <p><span className="font-medium text-foreground">Regalías</span><br/>{clp(item.royalty_total_clp)}</p>
+          <p><span className="font-medium text-foreground">Toneladas</span><br/>{number(item.tonnes_total,1)} t</p>
+          <p><span className="font-medium text-foreground">Pagadas</span><br/>{item.paid_events}</p>
+          <p><span className="font-medium text-foreground">Pendientes</span><br/>{item.pending_events}</p>
+        </div>
 
-              <div className="shrink-0 text-xs text-muted-foreground md:text-right">
-                <p>{item.review_due_date ? `Revisión: ${item.review_due_date}` : 'Sin fecha de revisión'}</p>
-                <p className="mt-1">{item.end_date ? `Término: ${item.end_date}` : 'Sin fecha de término'}</p>
-                <p className="mt-1">{item.responsible_person || 'Responsable no asignado'}</p>
-              </div>
-            </div>
+        {item.royalties.length?<details className="mt-3 rounded-md border bg-muted/10">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium">Ver últimos eventos</summary>
+          <div className="divide-y border-t">
+            {item.royalties.map((row)=><div key={row.id} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[100px_1fr_110px_120px]">
+              <span className="text-muted-foreground">{row.event_date||'Sin fecha'}</span>
+              <span>{row.lot_ref||row.destination||'Sin referencia'}</span>
+              <span className="text-right">{row.tonnes===null?'—':number(row.tonnes,1)+' t'}</span>
+              <span className="text-right font-medium">{clp(row.royalty_clp)}</span>
+            </div>)}
+          </div>
+        </details>:null}
+      </article>):<p className="p-4 text-sm text-muted-foreground">No hay propiedades mineras promovidas desde la fuente canónica.</p>}
+    </section>
 
-            <div className="mt-3 grid gap-2 border-t pt-3 text-xs text-muted-foreground md:grid-cols-4">
-              <p><span className="font-medium text-foreground">Valor</span><br />{money(item.contract_value, item.currency) || 'Sin monto'}</p>
-              <p><span className="font-medium text-foreground">Pagado</span><br />{money(item.paid_amount, item.currency) || 'Sin pago registrado'}</p>
-              <p><span className="font-medium text-foreground">Pendiente</span><br />{money(item.pending_amount, item.currency) || 'Sin monto pendiente'}</p>
-              <p><span className="font-medium text-foreground">Avance</span><br />{item.execution_percentage !== null ? `${item.execution_percentage}%` : 'Sin avance registrado'}</p>
-            </div>
-          </article>
-        )) : (
-          <p className="p-4 text-sm text-muted-foreground">
-            No hay contratos con propiedad minera o regalías registrados en la fuente canónica.
-          </p>
-        )}
-      </section>
-    </div>
-  );
+    <section className="rounded-md border bg-muted/20 p-4">
+      <p className="text-sm font-semibold">Fuente</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{data.lineage.note}</p>
+    </section>
+  </div>;
 }
