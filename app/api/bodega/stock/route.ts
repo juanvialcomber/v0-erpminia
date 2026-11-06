@@ -258,7 +258,7 @@ export async function GET(request: NextRequest) {
         reorder_level: reorderLevel,
         reorder_quantity: reorderQuantity,
         unit_cost: unitCost,
-        total_value: quantityOnHand * unitCost,
+        total_value: null,
         valuation_trusted: false,
         valuation_state: 'review',
         bin_location: item.bin?.bin_location || item.bin_location || 'N/A',
@@ -271,7 +271,7 @@ export async function GET(request: NextRequest) {
     const summary = {
       total_items: items.length,
       total_quantity: items.reduce((sum, i) => sum + i.quantity_on_hand, 0),
-      total_value: items.reduce((sum, i) => sum + i.total_value, 0),
+      total_value: null,
       low_stock_count: items.filter((i) => i.is_low_stock).length,
       critical_count: items.filter((i) => i.is_critical).length,
       reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
