@@ -12,11 +12,15 @@ test('bodega operational quantity resolver reads the Laudus-resolved service by 
   assert.match(helper, /canonical_product_id/);
   assert.match(helper, /operational_quantity/);
   assert.match(helper, /resolvedOperationalQuantity/);
+  assert.match(helper, /const CHUNK_SIZE = 250/);
+  assert.match(helper, /for \(let offset = 0; offset < ids\.length; offset \+= CHUNK_SIZE\)/);
+  assert.match(helper, /\.in\('canonical_product_id', chunk\)/);
 });
 
 test('inventory API overlays canonical catalog with operational stock', () => {
   assert.match(inventoryRoute, /loadBodegaOperationalQuantities/);
   assert.match(inventoryRoute, /resolvedOperationalQuantity/);
+  assert.match(inventoryRoute, /const validPageSize = Math\.min\(Math\.max\(pageSize, 10\), 500\)/);
   assert.match(inventoryRoute, /stockAuthority: 'bodega_inventory_operational_service_v1'/);
   assert.match(inventoryRoute, /stock_source: operational\.has\(item\.id\) \? 'operational' : 'canonical'/);
 });
