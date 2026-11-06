@@ -88,6 +88,11 @@ export function WorkOrderTimer({ workOrderId, onActionComplete }: WorkOrderTimer
         setMessage(payload?.error || 'No se pudo actualizar el temporizador.');
         return;
       }
+      const expectedStatus = action === 'pause' ? 'paused' : action === 'terminate' ? 'idle' : 'running';
+      if (payload?.timer_status !== expectedStatus) {
+        setMessage('El servidor no confirmó el estado del cronómetro. Actualiza la OT antes de continuar.');
+        return;
+      }
       setTimerStatus(payload.timer_status);
       setTotalSeconds(Number(payload.total_seconds ?? Number(payload.total_minutes || 0) * 60));
       setStartTime(payload.timer_start_time ? new Date(payload.timer_start_time) : null);
