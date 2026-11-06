@@ -58,3 +58,11 @@ test('Legal skill reads fresh Elias email, attachments and meeting evidence befo
   assert.match(sourceIntake, /no marcar como pagado/);
   assert.match(sourceIntake, /evidencia más reciente/);
 });
+
+
+test('Legal skill reuses canonical Gmail-ingested evidence before asking for reupload', () => {
+  assert.match(sourceIntake, /evidencia canónica ya ingerida desde correos y adjuntos/i);
+  assert.match(sourceIntake, /no pedir al usuario volver a subir el archivo al chat/i);
+  assert.match(sourceIntake, /volver a Gmail sólo para comprobar si existe una versión posterior/i);
+  assert.match(sourceIntake, /Pedir re-subida únicamente si el archivo requerido no existe/i);
+});
