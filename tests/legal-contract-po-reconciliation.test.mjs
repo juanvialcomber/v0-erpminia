@@ -55,6 +55,8 @@ test('Laudus staging order number normalization is idempotent and integration-on
   assert.match(normalizeMigration, /update integration\.laudus_purchase_orders/);
   assert.match(normalizeMigration, /set order_number = external_id/);
   assert.match(normalizeMigration, /where order_number is null/);
+  assert.match(normalizeMigration, /create trigger normalize_laudus_purchase_order_number/);
+  assert.match(normalizeMigration, /before insert or update of external_id, order_number/);
   assert.doesNotMatch(normalizeMigration, /canonical\./);
   assert.doesNotMatch(normalizeMigration, /public\.contracts/);
 });
