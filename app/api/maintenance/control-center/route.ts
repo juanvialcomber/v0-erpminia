@@ -34,6 +34,7 @@ const autopilotPreparation = (action: ActionItem): AutopilotPreparation => {
     plan_step: { risk: 'medium', preparedAction: 'Abrir el siguiente paso pendiente del plan estándar', authority: 'Ejecutor autorizado registra la ejecución real' },
     ready_to_close: { risk: 'high', preparedAction: 'Abrir la OT con controles de cierre satisfechos', authority: 'Responsable autorizado revisa y ejecuta el cierre' },
     closure_evidence: { risk: 'medium', preparedAction: 'Abrir la evidencia faltante para cierre auditado', authority: 'Responsable completa o valida la evidencia requerida' },
+    supply_followup: { risk: 'medium', preparedAction: 'Abrir la OT y formalizar el repuesto o material reportado', authority: 'Bodega, Compras o responsable identifica producto y cantidad antes de crear requerimiento' },
     reliability: { risk: 'medium', preparedAction: 'Abrir la recurrencia validada para revisión', authority: 'Supervisor o confiabilidad decide la acción posterior' },
   };
   const prepared = byKind[action.kind] || { risk: 'medium' as const, preparedAction: 'Abrir el contexto operacional asociado', authority: 'Una persona autorizada toma la decisión' };
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
       context.supabase.from('work_order_close_readiness_v2').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('preventive_maintenance_hour_status_v1').select('*').eq('organization_id', context.organizationId),
       context.supabase.from('maintenance_reliability_by_asset_v1').select('canonical_asset_id,asset_code,asset_name,audited_closures,recurring_cause_count,max_same_cause_occurrences,has_recurring_root_cause').eq('organization_id', context.organizationId),
-      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id,assigned_to_name,scheduled_date,status,created_at').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
+      context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,assigned_person_id,assigned_to_name,scheduled_date,status,timer_status,created_at').eq('organization_id', context.organizationId).not('created_by', 'is', null).neq('status', 'completed'),
       context.supabase.from('drilling_maintenance_review_queue_v1').select('review_id,canonical_asset_id,asset_code,asset_name,operation_date,review_reason,equipment_status_raw,machine_observations,review_status,linked_work_order_id,has_linked_work_order').eq('organization_id', context.organizationId).eq('review_status', 'pending').eq('has_linked_work_order', false).order('operation_date', { ascending: true }).limit(50),
       context.supabase.from('maintenance_work_orders').select('id,work_order_number,title,canonical_asset_id,completion_date,assigned_to_name').eq('organization_id', context.organizationId).not('created_by', 'is', null).eq('status', 'completed').order('completion_date', { ascending: false, nullsFirst: false }).limit(100),
       context.supabase.from('work_order_supervisor_reviews').select('work_order_id,status,reviewed_at,reviewed_by_name').eq('organization_id', context.organizationId),
@@ -120,6 +121,31 @@ export async function GET(request: NextRequest) {
     const completedOrderRows = completedOrdersResult.data || [];
     const approvedWorkOrderIds = new Set((supervisorReviewsResult.data || []).filter((row:any) => String(row.status || '').toLowerCase() === 'approved').map((row:any) => String(row.work_order_id)));
     const pendingApprovalRows = completedOrderRows.filter((row:any) => !approvedWorkOrderIds.has(String(row.id)));
+    const activeOrderIds = operationalOrderRows.map((row:any) => String(row.id));
+    const supplyEventResult = activeOrderIds.length > 0
+      ? await context.supabase.from('work_order_events')
+          .select('work_order_id,event_at,summary,payload')
+          .eq('organization_id', context.organizationId)
+          .eq('event_type', 'supply_blocker_reported')
+          .in('work_order_id', activeOrderIds.slice(0, 250))
+          .order('event_at', { ascending: false })
+      : { data: [], error: null };
+    if (supplyEventResult.error) throw supplyEventResult.error;
+
+    const materialRequirementResult = activeOrderIds.length > 0
+      ? await context.supabase.from('work_order_material_requirements')
+          .select('work_order_id')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', activeOrderIds.slice(0, 250))
+      : { data: [], error: null };
+    if (materialRequirementResult.error) throw materialRequirementResult.error;
+
+    const ordersWithMaterialRequirement = new Set((materialRequirementResult.data || []).map((row:any) => String(row.work_order_id)));
+    const latestSupplyEventByOrder = new Map<string, any>();
+    for (const event of supplyEventResult.data || []) {
+      const id = String(event.work_order_id);
+      if (!latestSupplyEventByOrder.has(id)) latestSupplyEventByOrder.set(id, event);
+    }
     const recentChanges: Array<{ kind: string; title: string; detail: string; href: string; occurredAt: string }> = [];
     const changedSince = `${yesterday}T00:00:00`;
 
@@ -209,6 +235,24 @@ export async function GET(request: NextRequest) {
     };
 
     const actions: ActionItem[] = [];
+
+    for (const row of operationalOrderRows) {
+      const id = String(row.id);
+      const event:any = latestSupplyEventByOrder.get(id);
+      if (!event || ordersWithMaterialRequirement.has(id) || String(row.status || '') !== 'in_progress' || String(row.timer_status || '') !== 'paused') continue;
+      const detail = String(event.payload?.detail || event.summary || 'Repuesto o material por identificar');
+      actions.push({
+        id: `supply-followup:${id}`,
+        kind: 'supply_followup',
+        priority: 25,
+        title: `Formalizar repuesto/material faltante · ${row.work_order_number || 'OT'}`,
+        description: `${row.title || 'Orden de trabajo'}${row.assigned_to_name ? ` · ${row.assigned_to_name}` : ''}`,
+        evidence: detail,
+        href: `/dashboard/mantenimiento/ordenes-trabajo/${encodeURIComponent(id)}`,
+        assetHref: assetHref(row.canonical_asset_id),
+        waitingSince: event.event_at || null,
+      });
+    }
 
     for (const row of meterReviewResult.data || []) {
       const reason = row.reason === 'meter_decrease' ? 'horómetro disminuyó'
@@ -377,6 +421,7 @@ export async function GET(request: NextRequest) {
         pendingPlanSteps: closeRows.reduce((sum:number,row:any) => sum + Number(row.standard_plan_steps_pending || 0), 0),
         readyToClose: closeRows.filter((row:any) => row.ready_to_close).length,
         pendingApprovals: pendingApprovalRows.length,
+        pendingSupplyFollowups: actions.filter((row) => row.kind === 'supply_followup').length,
         recurringReliabilityAssets: reliabilityRows.filter((row:any) => row.has_recurring_root_cause).length,
         totalActions: actions.length,
       },
@@ -399,7 +444,7 @@ export async function GET(request: NextRequest) {
         recentChanges: 'Qué cambió desde ayer usa sólo timestamps explícitos de OT creadas/terminadas, aprobaciones, señales operacionales y revisiones de horómetro. No infiere cuándo comenzó un bloqueo.',
         serviceAge: 'La antigüedad se muestra sólo cuando la acción tiene un timestamp verificable. No se inventa un SLA para estados sin inicio registrado.',
       },
-      sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue'],
+      sources: ['work_order_close_readiness_v2','preventive_maintenance_hour_status_v1','maintenance_reliability_by_asset_v1','maintenance_work_orders','work_order_events','work_order_material_requirements','drilling_maintenance_review_queue_v1','work_order_supervisor_reviews','maintenance_meter_review_queue'],
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'No se pudo cargar el centro de mantenimiento' }, { status: 500 });
