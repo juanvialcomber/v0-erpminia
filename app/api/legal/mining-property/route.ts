@@ -13,33 +13,70 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No tienes acceso al módulo Legal' }, { status: 403 });
   }
 
-  const { data, error } = await context.supabase
-    .from('contracts')
-    .select('id,contract_number,title,contract_type,status,contract_value,currency,paid_amount,execution_percentage,responsible_area,responsible_person,end_date,review_due_date,contractor_name,property_name,project_name,royalty_rate,guarantee_amount,compliance_status,compliance_notes,file_url,updated_at')
-    .eq('organization_id', context.organizationId)
-    .or('property_name.not.is.null,royalty_rate.gt.0')
-    .order('review_due_date', { ascending: true, nullsFirst: false })
-    .order('end_date', { ascending: true, nullsFirst: false })
-    .limit(500);
+  const [propertiesResult, royaltiesResult] = await Promise.all([
+    context.supabase
+      .from('mining_properties')
+      .select('id,representative_name,property_name,patent_value_clp,source_file,source_sheet,source_row,updated_at')
+      .eq('organization_id', context.organizationId)
+      .order('property_name', { ascending: true }),
+    context.supabase
+      .from('mining_property_royalties')
+      .select('id,mining_property_id,lot_ref,event_date,tonnes,cu_grade_pct,net_clp,royalty_clp,payment_status,payment_note,destination,notes,source_file,source_sheet,source_row,created_at')
+      .eq('organization_id', context.organizationId)
+      .order('event_date', { ascending: false, nullsFirst: false }),
+  ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (propertiesResult.error) return NextResponse.json({ error: propertiesResult.error.message }, { status: 500 });
+  if (royaltiesResult.error) return NextResponse.json({ error: royaltiesResult.error.message }, { status: 500 });
 
-  const rows = data || [];
-  const items = rows.map((row) => ({
-    ...row,
-    has_evidence: Boolean(row.file_url),
-    pending_amount: Math.max(Number(row.contract_value || 0) - Number(row.paid_amount || 0), 0),
-  }));
+  const royalties = royaltiesResult.data || [];
+  const royaltiesByProperty = new Map<string, typeof royalties>();
+  for (const row of royalties) {
+    const current = royaltiesByProperty.get(row.mining_property_id) || [];
+    current.push(row);
+    royaltiesByProperty.set(row.mining_property_id, current);
+  }
+
+  const properties = (propertiesResult.data || []).map((property) => {
+    const propertyRoyalties = royaltiesByProperty.get(property.id) || [];
+    const royaltyTotal = propertyRoyalties.reduce((sum, row) => sum + Number(row.royalty_clp || 0), 0);
+    const tonnesTotal = propertyRoyalties.reduce((sum, row) => sum + Number(row.tonnes || 0), 0);
+    const paid = propertyRoyalties.filter((row) => String(row.payment_status || '').toLowerCase() === 'paid').length;
+    const pending = propertyRoyalties.length - paid;
+    const latest = propertyRoyalties.find((row) => row.event_date)?.event_date || null;
+
+    return {
+      ...property,
+      royalty_count: propertyRoyalties.length,
+      royalty_total_clp: royaltyTotal,
+      tonnes_total: tonnesTotal,
+      paid_events: paid,
+      pending_events: pending,
+      latest_event_date: latest,
+      royalties: propertyRoyalties.slice(0, 12),
+    };
+  });
+
+  const totalRoyalty = royalties.reduce((sum, row) => sum + Number(row.royalty_clp || 0), 0);
+  const totalTonnes = royalties.reduce((sum, row) => sum + Number(row.tonnes || 0), 0);
+  const paidEvents = royalties.filter((row) => String(row.payment_status || '').toLowerCase() === 'paid').length;
 
   return NextResponse.json({
-    data: items,
-    accessLevel: access,
+    data: properties,
     summary: {
-      total: items.length,
-      with_property: items.filter((item) => Boolean(item.property_name)).length,
-      with_royalty: items.filter((item) => Number(item.royalty_rate || 0) > 0).length,
-      review_due: items.filter((item) => Boolean(item.review_due_date)).length,
-      missing_evidence: items.filter((item) => !item.has_evidence).length,
+      properties: properties.length,
+      royalties: royalties.length,
+      royalty_total_clp: totalRoyalty,
+      tonnes_total: totalTonnes,
+      paid_events: paidEvents,
+      pending_events: royalties.length - paidEvents,
+      latest_event_date: royalties.find((row) => row.event_date)?.event_date || null,
     },
+    lineage: {
+      property_table: 'mining_properties',
+      royalty_table: 'mining_property_royalties',
+      note: 'Datos promovidos desde Control Arriendo de propiedades (1).xlsx. Los estados de pago se muestran tal como vienen de la fuente; no se infieren pagos faltantes.',
+    },
+    accessLevel: access,
   });
 }

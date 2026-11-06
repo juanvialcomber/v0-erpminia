@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   const organizationId = auth.context.organizationId;
   const today = todayKey();
 
-  const [casesResult, payablesResult, paymentRequestsResult, progressResult] = await Promise.all([
+  const [casesResult, payablesResult, paymentRequestsResult, progressResult, complianceResult, royaltiesResult] = await Promise.all([
     auth.context.supabase
       .from('legal_cases')
       .select('id,title,reason,priority,operational_owner,legal_owner,due_at,status,evidence_status,source_module,source_href,updated_at,created_at')
@@ -76,6 +76,22 @@ export async function GET(request: NextRequest) {
       .eq('status', 'submitted')
       .order('submitted_at', { ascending: true })
       .limit(500),
+    auth.context.supabase
+      .from('compliance_events')
+      .select('id,event_type,title,description,due_date,next_date,status,location,priority,updated_at,created_at')
+      .eq('org_id', organizationId)
+      .eq('event_type', 'legal')
+      .eq('status', 'pending')
+      .order('next_date', { ascending: true, nullsFirst: false })
+      .order('due_date', { ascending: true })
+      .limit(200),
+    auth.context.supabase
+      .from('mining_property_royalties')
+      .select('id,mining_property_id,lot_ref,event_date,royalty_clp,payment_status,payment_note,destination,created_at')
+      .eq('organization_id', organizationId)
+      .in('payment_status', ['unpaid', 'partial', 'unknown'])
+      .order('event_date', { ascending: false, nullsFirst: false })
+      .limit(200),
   ]);
 
   const warnings: string[] = [];
@@ -85,14 +101,18 @@ export async function GET(request: NextRequest) {
   if (progressResult.error && progressResult.error.code !== '42P01') {
     warnings.push('No se pudieron cargar los avances contractuales pendientes.');
   }
+  if (complianceResult.error) warnings.push('No se pudieron cargar los vencimientos legales.');
+  if (royaltiesResult.error) warnings.push('No se pudieron cargar las regalías con estado pendiente o incierto.');
 
   const payableRows = payablesResult.data || [];
   const invoiceIds = payableRows.map((row) => row.invoice_id).filter(Boolean);
   const supplierIds = payableRows.map((row) => row.supplier_id).filter(Boolean);
   const progressRows = progressResult.error ? [] : progressResult.data || [];
   const progressContractIds = Array.from(new Set(progressRows.map((row) => row.contract_id).filter(Boolean)));
+  const royaltyRows = royaltiesResult.error ? [] : royaltiesResult.data || [];
+  const royaltyPropertyIds = Array.from(new Set(royaltyRows.map((row) => row.mining_property_id).filter(Boolean)));
 
-  const [invoicesResult, suppliersResult, signaturesResult, progressContractsResult] = await Promise.all([
+  const [invoicesResult, suppliersResult, signaturesResult, progressContractsResult, royaltyPropertiesResult] = await Promise.all([
     invoiceIds.length
       ? auth.context.supabase
           .from('procurement_supplier_invoices')
@@ -119,16 +139,25 @@ export async function GET(request: NextRequest) {
           .eq('organization_id', organizationId)
           .in('id', progressContractIds)
       : Promise.resolve({ data: [], error: null }),
+    royaltyPropertyIds.length
+      ? auth.context.supabase
+          .from('mining_properties')
+          .select('id,property_name,representative_name')
+          .eq('organization_id', organizationId)
+          .in('id', royaltyPropertyIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (invoicesResult.error) warnings.push('No se pudieron resolver las facturas.');
   if (suppliersResult.error) warnings.push('No se pudieron resolver los proveedores.');
   if (signaturesResult.error) warnings.push('No se pudieron resolver las firmas de pago.');
   if (progressContractsResult.error) warnings.push('No se pudieron resolver los contratos de los avances.');
+  if (royaltyPropertiesResult.error) warnings.push('No se pudieron resolver las propiedades de las regalías.');
 
   const invoicesById = new Map((invoicesResult.data || []).map((row) => [row.id, row]));
   const suppliersById = new Map((suppliersResult.data || []).map((row) => [row.id, row]));
   const progressContractsById = new Map((progressContractsResult.data || []).map((row) => [row.id, row]));
+  const royaltyPropertiesById = new Map((royaltyPropertiesResult.data || []).map((row) => [row.id, row]));
   const paymentRequestByPayable = new Map((paymentRequestsResult.data || []).map((row) => [row.payable_id, row]));
   const signaturesByRequest = new Map<string, number>();
 
@@ -198,6 +227,73 @@ export async function GET(request: NextRequest) {
       };
     });
 
+  const complianceItems = (complianceResult.data || [])
+    .filter((row) => String(row.description || '').includes('[POLVORIN]'))
+    .flatMap((row) => {
+      const alertDate = dateKey(row.next_date) || dateKey(row.due_date);
+      const expiryDate = dateKey(row.due_date);
+      const daysUntilAlert = daysFromToday(alertDate, today);
+      const daysUntilExpiry = daysFromToday(expiryDate, today);
+      const shouldSurface =
+        typeof daysUntilAlert === 'number' &&
+        daysUntilAlert <= 30 &&
+        (daysUntilExpiry === null || daysUntilExpiry >= 0);
+
+      if (!shouldSurface) return [];
+
+      return [{
+        id: `compliance:${row.id}`,
+        kind: 'legal_compliance',
+        area: 'Legal',
+        title: row.title,
+        detail: expiryDate
+          ? `Renovación requerida antes del ${expiryDate}. Aviso preventivo 15 días antes.`
+          : row.description,
+        due_date: alertDate,
+        days_until: daysUntilAlert,
+        overdue: typeof daysUntilAlert === 'number' && daysUntilAlert < 0,
+        status: row.status,
+        priority: row.priority || 'medium',
+        owner: null,
+        evidence_status: 'pending',
+        signatures_required: null,
+        signatures_done: null,
+        amount: null,
+        currency: null,
+        source_href: '/dashboard/legal/permisos-licencias',
+        updated_at: row.updated_at || row.created_at,
+      }];
+    });
+
+  const royaltyItems = royaltyRows.map((row) => {
+    const property = royaltyPropertiesById.get(row.mining_property_id);
+    const status = String(row.payment_status || 'unknown').toLowerCase();
+    const amount = Number(row.royalty_clp || 0);
+    return {
+      id: 'royalty:' + row.id,
+      kind: 'mining_royalty',
+      area: 'Propiedad minera',
+      title: property?.property_name || 'Regalía de propiedad minera',
+      detail: [
+        status === 'partial' ? 'Pago parcial informado por fuente' : status === 'unpaid' ? 'No pagada según fuente' : 'Estado de pago no determinado',
+        row.lot_ref || row.destination || null,
+        row.payment_note || null,
+      ].filter(Boolean).join(' · '),
+      due_date: null,
+      days_until: null,
+      overdue: false,
+      status,
+      priority: status === 'partial' ? 'high' : 'medium',
+      owner: property?.representative_name || null,
+      evidence_status: 'pending',
+      signatures_required: null,
+      signatures_done: null,
+      amount: amount > 0 ? amount : null,
+      currency: amount > 0 ? 'CLP' : null,
+      source_href: '/dashboard/legal/propiedad-minera',
+      updated_at: row.event_date || row.created_at,
+    };
+  });
   const progressItems = progressRows.map((row) => {
     const contract = progressContractsById.get(row.contract_id);
     return {
@@ -224,7 +320,7 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const data = [...legalItems, ...financeItems, ...progressItems].sort((a, b) => {
+  const data = [...legalItems, ...financeItems, ...progressItems, ...complianceItems, ...royaltyItems].sort((a, b) => {
     if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
     if (a.due_date) return -1;
