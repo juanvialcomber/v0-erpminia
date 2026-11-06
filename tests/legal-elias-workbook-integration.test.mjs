@@ -21,6 +21,7 @@ test('contracts bridge to canonical suppliers without requiring the legacy contr
   assert.match(supplierMigration, /contracts_party_present_check/);
   assert.match(contracts, /\.from\('suppliers'\)/);
   assert.match(contracts, /supplier_id: supplierId/);
+  assert.match(contracts, /suppliers\?\.length === 1 \? suppliers\[0\]\.id : null/);
 });
 
 test('missing source dates remain missing rather than fabricated', () => {
