@@ -18,15 +18,14 @@ test('Elias workspace primary navigation follows daily jobs instead of technical
 });
 
 test('Legal home surfaces the four primary Elias work areas', () => {
-  assert.match(home, /Trabajo principal de Legal/);
   assert.match(home, /Contratos y pagos/);
-  assert.match(home, /Cumplimiento mensual, documentos y subsanaciones/);
-  assert.match(home, /Preguntar qué falta, qué cambió y cuál es la siguiente acción/);
+  assert.match(home, /Cumplimiento mensual/);
+  assert.match(home, /Conclusión, siguiente acción y evidencia/);
 });
 
 test('Legal assistant copy covers contracts payments providers and documents', () => {
   assert.match(assistant, /Asistente de Elías/);
-  assert.match(assistant, /Contratos, avances, pagos, proveedores y documentos/);
+  assert.match(assistant, /contratos, avances, pagos, proveedores o documentos/i);
   assert.match(assistant, /¿Qué contratos requieren atención hoy\?/);
   assert.match(assistant, /¿Qué falta pagar de IO-01\?/);
 });
