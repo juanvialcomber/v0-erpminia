@@ -16,6 +16,7 @@ type InboxItem = {
   due_date: string | null;
   days_until: number | null;
   overdue: boolean;
+  timing_state: 'overdue' | 'due_soon' | 'on_track' | 'no_due_date';
   status: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
   owner: string | null;
@@ -122,7 +123,10 @@ export default function LegalInboxPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{item.area}</Badge>
-                    {item.overdue ? <Badge variant="destructive">Vencido</Badge> : null}
+                    {item.timing_state === 'overdue' ? <Badge variant="destructive">Vencido</Badge> : null}
+                    {item.timing_state === 'due_soon' ? <Badge variant="secondary">Próximo</Badge> : null}
+                    {item.timing_state === 'on_track' ? <Badge variant="outline">En plazo</Badge> : null}
+                    {item.timing_state === 'no_due_date' ? <Badge variant="outline">Sin fecha</Badge> : null}
                     {waitingSignatures ? <Badge variant="secondary">{item.signatures_done}/{item.signatures_required} firmas</Badge> : null}
                     <Badge variant="outline">Evidencia: {item.evidence_status === 'complete' ? 'completa' : 'pendiente'}</Badge>
                   </div>
