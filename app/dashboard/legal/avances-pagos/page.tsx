@@ -1,0 +1,79 @@
+'use client';
+
+import Link from 'next/link';
+import useSWR from 'swr';
+import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, ShieldCheck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { StatePanel } from '@/components/ui/state-panel';
+
+type Invoice = { doc_number:string; source_net_amount:number; source_retention_amount:number; payment_state:string; laudus:{outstanding_amount:number}|null };
+type Milestone = { contract_number:string; contractor_name:string|null; sequence:number; title:string; purchase_order_number:string; currency:string; total_amount:number; progress_ratio:number; executed_amount:number; invoiced_amount:number; pending_to_invoice:number; payment_state:string; invoices:Invoice[]; provenance:{source_sheet:string;source_row:number} };
+type ContractSummary = { contract_number:string; title:string|null; contractor_name:string|null; contract_value:number; contract_paid_amount:number; milestones:number; milestones_started:number; milestones_paid:number; milestones_retained:number; invoice_matches:number; invoice_expected:number };
+type Payload = { data:Milestone[]; contracts:ContractSummary[]; summary:{contracts:number;milestones:number;invoices_expected:number;invoices_matched:number;retained_milestones:number}; policy:{retention:string;no_inference:string} };
+
+const fetcher = async (url:string) => {
+  const response = await fetch(url,{credentials:'include',cache:'no-store'});
+  const payload = await response.json().catch(()=>null);
+  if(!response.ok) throw new Error(payload?.error || 'No se pudo cargar avances y pagos');
+  return payload as Payload;
+};
+
+function money(value:number,currency='CLP'){ return new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(value||0); }
+function percent(value:number){ return new Intl.NumberFormat('es-CL',{style:'percent',maximumFractionDigits:1}).format(value||0); }
+function label(state:string){
+  if(state==='paid') return 'Pagado';
+  if(state==='paid_with_retention') return 'Pagado · retención pendiente';
+  if(state==='partial') return 'Pago parcial';
+  if(state==='unpaid') return 'Factura pendiente';
+  if(state==='not_invoiced') return 'Sin facturar';
+  return 'Revisar conciliación';
+}
+function variant(state:string):'default'|'secondary'|'destructive'|'outline'{
+  if(state==='paid') return 'secondary';
+  if(state==='unpaid'||state==='partial') return 'destructive';
+  return 'outline';
+}
+
+export default function ContractPaymentsPage(){
+  const {data,error,isLoading}=useSWR<Payload>('/api/legal/contract-payment-control',fetcher,{revalidateOnFocus:false});
+  if(isLoading) return <StatePanel tone="loading" title="Conciliando avances y pagos" description="Leyendo avance contractual y evidencia financiera Laudus."/>;
+  if(error||!data) return <StatePanel tone="error" title="Avances no disponibles" description="MOTIL no muestra estados de pago si no puede verificar la evidencia."/>;
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <Button asChild size="sm" variant="ghost"><Link href="/dashboard/legal"><ArrowLeft className="mr-2 h-4 w-4"/>Legal</Link></Button>
+      <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/laudus">Legal ↔ Laudus <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+    </div>
+    <header className="border-b border-border/70 pb-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Avances y pagos</h1>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Avance físico desde la planilla contractual y estado financiero confirmado con Laudus. Facturado no se trata como pagado.</p>
+    </header>
+    <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
+      <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos piloto</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Hitos</p><p className="mt-1 text-xl font-semibold">{data.summary.milestones}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Facturas conciliadas</p><p className="mt-1 text-xl font-semibold">{data.summary.invoices_matched}/{data.summary.invoices_expected}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Con retención</p><p className="mt-1 text-xl font-semibold">{data.summary.retained_milestones}</p></div>
+    </section>
+    <section className="grid gap-3 lg:grid-cols-2">
+      {data.contracts.map((contract)=><article key={contract.contract_number} className="rounded-md border p-4">
+        <div className="flex items-start justify-between gap-3"><div><Badge variant="outline">{contract.contract_number}</Badge><h2 className="mt-2 text-sm font-semibold">{contract.title || contract.contractor_name}</h2></div><div className="text-right text-xs text-muted-foreground"><p>{money(contract.contract_value)}</p><p className="mt-1">Pagado resumen: {money(contract.contract_paid_amount)}</p></div></div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-xs"><div><span className="text-muted-foreground">Iniciados</span><p className="mt-1 font-semibold">{contract.milestones_started}/{contract.milestones}</p></div><div><span className="text-muted-foreground">Pagados</span><p className="mt-1 font-semibold">{contract.milestones_paid}</p></div><div><span className="text-muted-foreground">Retención</span><p className="mt-1 font-semibold">{contract.milestones_retained}</p></div></div>
+      </article>)}
+    </section>
+    <section className="space-y-3">
+      {data.contracts.map((contract)=><article key={'detail-'+contract.contract_number} className="overflow-hidden rounded-md border">
+        <div className="border-b bg-muted/20 px-4 py-3"><p className="text-sm font-semibold">{contract.contract_number} · {contract.contractor_name}</p><p className="mt-1 text-xs text-muted-foreground">{contract.invoice_matches}/{contract.invoice_expected} facturas encontradas en Laudus</p></div>
+        <div className="divide-y">
+          {data.data.filter((item)=>item.contract_number===contract.contract_number).map((item)=><div key={item.contract_number+'-'+item.sequence} className="p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">Hito {item.sequence}</Badge><Badge variant="outline">OC {item.purchase_order_number}</Badge><Badge variant={variant(item.payment_state)}>{label(item.payment_state)}</Badge></div><h3 className="mt-2 text-sm font-semibold">{item.title}</h3><p className="mt-1 text-xs text-muted-foreground">Avance {percent(item.progress_ratio)} · Ejecutado {money(item.executed_amount,item.currency)} · Facturado {money(item.invoiced_amount,item.currency)}</p></div><div className="text-xs lg:text-right"><p className="font-medium">{money(item.total_amount,item.currency)}</p><p className="mt-1 text-muted-foreground">Pendiente de facturar {money(item.pending_to_invoice,item.currency)}</p></div></div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground" style={{width:String(Math.max(0,Math.min(100,item.progress_ratio*100)))+'%'}}/></div>
+            {item.invoices.length ? <div className="mt-3 grid gap-2">{item.invoices.map((invoice)=><div key={invoice.doc_number} className="grid gap-2 rounded-md border px-3 py-2 text-xs md:grid-cols-[90px_1fr_1fr_1fr]"><div className="font-medium">F-{invoice.doc_number}</div><div><span className="text-muted-foreground">Neto planilla</span><p>{money(invoice.source_net_amount,item.currency)}</p></div><div><span className="text-muted-foreground">Retención</span><p>{money(invoice.source_retention_amount,item.currency)}</p></div><div><span className="text-muted-foreground">Laudus</span><p className="flex items-center gap-1.5">{invoice.payment_state==='paid'?<CheckCircle2 className="h-3.5 w-3.5"/>:<Clock3 className="h-3.5 w-3.5"/>}{label(invoice.payment_state)}</p>{invoice.laudus?<p className="mt-1 text-muted-foreground">Saldo {money(invoice.laudus.outstanding_amount)}</p>:null}</div></div>)}</div> : <p className="mt-3 rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Todavía no hay factura informada para este hito.</p>}
+            <p className="mt-3 text-[11px] text-muted-foreground">Fuente: {item.provenance.source_sheet} · fila {item.provenance.source_row}</p>
+          </div>)}
+        </div>
+      </article>)}
+    </section>
+    <section className="rounded-md border p-4"><ShieldCheck className="h-4 w-4 text-muted-foreground"/><h2 className="mt-3 text-sm font-semibold">Regla de verdad</h2><p className="mt-2 text-xs text-muted-foreground">{data.policy.no_inference}</p><p className="mt-2 text-xs text-muted-foreground">{data.policy.retention}</p></section>
+  </div>;
+}
