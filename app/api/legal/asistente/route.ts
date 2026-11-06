@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireModuleAccess, MODULE_KEYS } from '@/lib/api/module-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { LEGAL_PROGRESS_MILESTONES, LEGAL_PROGRESS_SOURCE_FILE } from '@/lib/legal/contract-progress-source';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,6 +23,7 @@ const SKILLS = [
   'DS 76 y Ley 16.744: identificar puntos de revisión para coordinación de empresas contratistas.',
   'Redacción de observaciones y solicitud de subsanaciones, para validación y envío manual por Legal.',
   'Separación de responsabilidades: Legal L1, firma L2 opcional, HSE y habilitación operacional son decisiones distintas.',
+  'Control contractual y pagos: distinguir avance físico, facturado, retención y pago verificado; nunca convertir facturado en pagado.',
 ];
 
 export async function GET(request: NextRequest) {
@@ -74,6 +76,66 @@ export async function POST(request: NextRequest) {
       l1: d.l1_status || 'sin_revisar', l2: d.l2_status || 'sin_revisar',
     })),
   }));
+
+  const legalContractNumbers = [...new Set(LEGAL_PROGRESS_MILESTONES.map((item) => item.contractNumber))];
+  const { data: legalContracts } = await db
+    .from('contracts')
+    .select('id,contract_number,title,contractor_name,contract_value,paid_amount,supplier_id,status')
+    .eq('organization_id', access.organizationId)
+    .in('contract_number', legalContractNumbers);
+
+  const supplierIds = [...new Set((legalContracts || []).map((item) => item.supplier_id).filter(Boolean))];
+  const { data: legalSuppliers } = supplierIds.length
+    ? await db.from('suppliers').select('id,name,rut').eq('organization_id', access.organizationId).in('id', supplierIds)
+    : { data: [] };
+  const supplierById = new Map((legalSuppliers || []).map((item) => [item.id, item]));
+  const ruts = [...new Set((legalSuppliers || []).map((item) => item.rut).filter(Boolean))];
+  const { data: laudusSuppliers } = ruts.length
+    ? await db.from('laudus_suppliers_service_v1').select('external_id,tax_id,name,legal_name').eq('organization_id', access.organizationId).in('tax_id', ruts)
+    : { data: [] };
+  const normalizeTaxId = (value: unknown) => String(value || '').replace(/[^0-9kK]/g, '').toUpperCase();
+  const laudusByRut = new Map((laudusSuppliers || []).map((item) => [normalizeTaxId(item.tax_id), item]));
+  const docNumbers = [...new Set(LEGAL_PROGRESS_MILESTONES.flatMap((item) => item.invoices.filter((invoice) => invoice.sourceAmount > 0).map((invoice) => invoice.docNumber)))];
+  const supplierExternalIds = [...new Set((laudusSuppliers || []).map((item) => item.external_id).filter(Boolean))];
+  const { data: paymentRows } = supplierExternalIds.length && docNumbers.length
+    ? await db.from('laudus_purchase_invoice_payment_status_service_v1')
+        .select('doc_number,supplier_external_id,total_amount,paid_amount,outstanding_amount,last_payment_at,payment_status')
+        .eq('organization_id', access.organizationId)
+        .in('supplier_external_id', supplierExternalIds)
+        .in('doc_number', docNumbers)
+        .limit(500)
+    : { data: [] };
+  const paymentByKey = new Map((paymentRows || []).map((item) => [String(item.supplier_external_id) + ':' + String(item.doc_number), item]));
+  const contractByNumber = new Map((legalContracts || []).map((item) => [item.contract_number, item]));
+  const contractPaymentEvidence = LEGAL_PROGRESS_MILESTONES.map((item) => {
+    const contract = contractByNumber.get(item.contractNumber);
+    const supplier = contract?.supplier_id ? supplierById.get(contract.supplier_id) : null;
+    const laudusSupplier = supplier?.rut ? laudusByRut.get(normalizeTaxId(supplier.rut)) : null;
+    return {
+      contract_number: item.contractNumber,
+      contract_title: contract?.title || null,
+      milestone: item.sequence,
+      title: item.title,
+      purchase_order: item.purchaseOrderNumber,
+      progress_ratio: item.progressRatio,
+      executed_amount: item.executedAmount,
+      invoiced_amount: item.invoicedAmount,
+      pending_to_invoice: item.pendingToInvoice,
+      invoices: item.invoices.filter((invoice) => invoice.sourceAmount > 0).map((invoice) => {
+        const payment = paymentByKey.get(String(laudusSupplier?.external_id || '') + ':' + invoice.docNumber);
+        return {
+          doc_number: invoice.docNumber,
+          source_net_amount: invoice.sourceAmount,
+          source_retention_amount: invoice.retentionAmount,
+          laudus_payment_status: payment?.payment_status || 'not_found',
+          laudus_paid_amount: Number(payment?.paid_amount || 0),
+          laudus_outstanding_amount: Number(payment?.outstanding_amount || 0),
+          laudus_last_payment_at: payment?.last_payment_at || null,
+        };
+      }),
+      source: LEGAL_PROGRESS_SOURCE_FILE,
+    };
+  });
   const system = [
     'Eres copiloto técnico-jurídico de Legal de MOTIL para Elías Fernández, no un aprobador autónomo.',
     'Responde en español claro, concreto y breve. Distingue HECHO del sistema, NORMA referencial y PENDIENTE DE VALIDAR.',
@@ -81,7 +143,9 @@ export async function POST(request: NextRequest) {
     'Los archivos cargados NO están verificados por ti: recibes metadatos, nunca contenido documental. No afirmes haber leído un PDF.',
     'Elías puede revisar L1 por documento; la carpeta solo se cierra después del envío, aplicabilidad y controles correspondientes.',
     'La firma L2 puede ser opcional pero HSE y autorización operacional nunca se sustituyen por aprobación Legal.',
-    'No apruebes, rechaces, envíes notificaciones, ni afirmes que realizaste acciones: tus propuestas requieren confirmación humana.',
+    'No apruebes, rechaces, envíes notificaciones, ejecutes pagos ni afirmes que realizaste acciones: tus propuestas requieren confirmación humana.',
+    'Para contratos: separa SIEMPRE avance físico, facturado, retención y pago Laudus. Facturado nunca significa pagado.',
+    'Si payment_status es partially_paid y el saldo coincide con la retención contractual informada, descríbelo como pago con retención pendiente; si no coincide, requiere revisión.',
     'No trates una lista base de 19 documentos como 19 obligaciones universales.',
     'Para normativa enlaza solo las fuentes suministradas; son enlaces de consulta, no textos consolidados verificados en tiempo real.',
     'Cuando cites una norma, da URL y advierte verificar vigencia y aplicabilidad para la faena.',
@@ -90,6 +154,7 @@ export async function POST(request: NextRequest) {
     'Habilidades:\n' + SKILLS.join('\n'),
     'Fuentes oficiales de consulta:\n' + SOURCES.map(x => x.title + ': ' + x.url).join('\n'),
     'Datos estructurados del sistema para esta organización (no contienen documentos originales):\n' + JSON.stringify(evidence),
+    'Evidencia contractual y financiera para consultas de avances/pagos (fuente contractual + Laudus; no autoriza pagos):\n' + JSON.stringify(contractPaymentEvidence),
   ].join('\n\n');
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
