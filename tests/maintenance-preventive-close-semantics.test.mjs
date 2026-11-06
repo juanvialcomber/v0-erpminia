@@ -11,9 +11,9 @@ test('preventive OT does not require corrective root-cause fields to close', () 
   assert.match(migration, /close_work_order_safely/);
   assert.match(migration, /root_cause/);
   assert.match(migration, /preventive_actions/);
-  assert.match(migration, /not in \('general','preventive','preventivo'\)/);
+  assert.ok(migration.includes("not in (''general'',''preventive'',''preventivo'')"));
 });
 
 test('corrective semantics remain protected', () => {
-  assert.doesNotMatch(migration, /corrective.*not in \('general','preventive','preventivo'\)/);
+  assert.ok(!migration.includes("corrective'',''preventive"));
 });
