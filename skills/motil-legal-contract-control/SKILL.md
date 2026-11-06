@@ -49,6 +49,7 @@ Priorizar siempre evidencia reciente y fechada sobre recuerdos narrativos previo
 Leer `references/data-model.md` para fuentes canonicas y precedencia.
 Leer `references/workflow.md` para estados, excepciones y respuesta esperada.
 Leer `references/source-intake.md` antes de tareas que dependan de correos, adjuntos o reuniones.
+Leer `references/workspace.md` al diseñar o revisar la experiencia de Elías.
 
 Prioridad por defecto:
 
