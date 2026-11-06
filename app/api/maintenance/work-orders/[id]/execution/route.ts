@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getMaintenanceWorkOrderScope, requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 
@@ -24,17 +24,15 @@ type ExecutionPayload = {
 };
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
 
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
-    const canReadModule = context.role !== 'tecnico' && (accessLevel === 'ED' || accessLevel === 'LEC');
-    if (!canReadModule && !assignedExecution.ok) return assignedExecution.response;
-
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, id);
+    const assignedExecution = context.role === 'tecnico' ? await requireAssignedMaintenanceExecution(context, id) : null;
     if (scope === 'missing') return NextResponse.json({ error: 'La orden no existe' }, { status: 404 });
 
     const [orderResult, partsResult, laborResult, servicesResult, eventsResult, costsResult, snapshotResult, materialsResult, approvalResult] = await Promise.all([
@@ -98,7 +96,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       externalServices: servicesResult.data || [],
       events: eventsResult.data || [],
       costs,
-      canEdit: scope === 'operational' && (assignedExecution.ok || (accessLevel === 'ED' && context.role !== 'tecnico')),
+      canEdit: access.canWrite && scope === 'operational' && (context.role !== 'tecnico' || assignedExecution?.ok === true),
       record_scope: scope,
     });
   } catch (error) {
@@ -108,17 +106,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
+  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
   const { id } = await params;
 
   try {
-    const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
-    const canWriteModule = accessLevel === 'ED' && context.role !== 'tecnico';
-    if (!canWriteModule && !assignedExecution.ok) return assignedExecution.response;
-
     const guard = await requireOperationalMaintenanceWorkOrder(context.supabase, context.organizationId, id);
+    if (context.role === 'tecnico') {
+      const assignedExecution = await requireAssignedMaintenanceExecution(context, id);
+      if (!assignedExecution.ok) return assignedExecution.response;
+    }
     if (!guard.ok) return NextResponse.json({ error: guard.error, record_scope: guard.scope }, { status: guard.status });
 
     const body = (await request.json()) as ExecutionPayload;
