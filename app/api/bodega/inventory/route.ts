@@ -158,6 +158,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         inventory,
+        stockAuthority: 'bodega_inventory_operational_service_v1',
         pagination: {
           page: validPage,
           pageSize: validPageSize,
