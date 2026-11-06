@@ -155,7 +155,7 @@ export default function LegalAssistantPage(){
     {historyTarget?<div className="space-y-2">
       <p className="text-sm font-semibold">Historial documental</p>
       {historyError?<p className="text-sm text-destructive">{historyError}</p>:history.map(entry=><div key={entry.id} className="rounded-md border p-3 text-sm">
-       <p className="font-medium">{entry.file_name}</p><p className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleString('es-CL')} · SHA {entry.file_sha256.slice(0,12)}…</p>
+       <p className="font-medium">{entry.file_name}</p><p className="text-xs text-muted-foreground">{new Date(entry.created_at).toLocaleString('es-CL')} · Versión registrada</p>
        <p className="mt-2 whitespace-pre-wrap">{entry.analysis}</p>
        {entry.suggestion_status==='proposed'?<div className="mt-3 space-y-2"><Textarea placeholder="Observación para revisión humana" value={observation[entry.id]||''} onChange={e=>setObservation(cur=>({...cur,[entry.id]:e.target.value}))}/><div className="flex gap-2"><Button size="sm" disabled={savingReview!==''||!(observation[entry.id]||'').trim()} onClick={()=>void decide(entry.id,'accepted')}>Guardar observación</Button><Button size="sm" variant="outline" disabled={savingReview!==''} onClick={()=>void decide(entry.id,'dismissed')}>Descartar</Button></div></div>:null}
       </div>)}
