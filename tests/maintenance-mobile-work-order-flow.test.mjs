@@ -26,7 +26,9 @@ test('the terrain flow preserves the start pause resume and evidence-gated close
   assert.match(flow, /Iniciar trabajo/);
   assert.match(flow, /Pausar trabajo/);
   assert.match(flow, /Reanudar trabajo/);
-  assert.match(flow, /Terminar y registrar evidencia/);
+  assert.match(flow, /Terminar y cerrar OT/);
+  assert.match(flow, /Continuar al cierre/);
+  assert.match(flow, /Tiempo detenido/);
   assert.match(flow, /Fotos de la OT/);
   assert.match(flow, /Agregar fotos/);
   assert.match(flow, /multiple/);
