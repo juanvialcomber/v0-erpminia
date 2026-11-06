@@ -159,6 +159,7 @@ export async function GET(request: NextRequest) {
       currency: null,
       source_href: row.source_href || '/dashboard/legal/casos',
       updated_at: row.updated_at || row.created_at,
+      next_action: row.evidence_status === 'pending' ? 'Completar evidencia del caso' : 'Revisar y resolver caso',
     };
   });
 
@@ -195,6 +196,13 @@ export async function GET(request: NextRequest) {
         currency: paymentRequest?.currency ?? row.currency ?? null,
         source_href: '/dashboard/finanzas/pagos',
         updated_at: paymentRequest?.updated_at || paymentRequest?.created_at || null,
+        next_action: !paymentRequest
+          ? 'Preparar solicitud de pago'
+          : signaturesDone < signaturesRequired
+            ? 'Completar firmas requeridas'
+            : paymentRequest.executed_at && !(paymentRequest.evidence_document_id || paymentRequest.evidence_url)
+              ? 'Adjuntar evidencia de transferencia'
+              : 'Revisar estado de pago',
       };
     });
 
@@ -221,6 +229,7 @@ export async function GET(request: NextRequest) {
       currency: null,
       source_href: '/dashboard/legal/avances-contractistas',
       updated_at: row.updated_at || row.submitted_at,
+      next_action: row.evidence_document_id ? 'Revisar avance contractual' : 'Adjuntar evidencia de avance',
     };
   });
 
