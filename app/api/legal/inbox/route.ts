@@ -184,9 +184,9 @@ export async function GET(request: NextRequest) {
       const paymentStatus = paymentRequest?.status || 'payment_not_requested';
       const managementReady = Boolean(
         paymentRequest &&
+        String(paymentStatus).toLowerCase() === 'approved' &&
         signaturesDone >= signaturesRequired &&
-        !paymentRequest.executed_at &&
-        !['paid', 'executed', 'cancelled', 'canceled', 'rejected'].includes(String(paymentStatus).toLowerCase()),
+        !paymentRequest.executed_at,
       );
 
       return {
