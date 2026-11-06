@@ -37,6 +37,39 @@ type ContractBridgeItem = {
   };
 };
 
+type ReconciliationItem = {
+  contract_number: string;
+  contract_title: string | null;
+  contractor_name: string | null;
+  purchase_order_number: string;
+  status: 'pending' | 'verified' | 'conflict' | 'not_found';
+  reason: string;
+  provenance: {
+    source_file: string;
+    source_file_sha256: string;
+    source_sheet: string;
+    source_cell: string;
+    source_text: string;
+  };
+};
+
+type ReconciliationPayload = {
+  data: ReconciliationItem[];
+  summary: {
+    total: number;
+    verified: number;
+    pending: number;
+    conflicts: number;
+    not_found: number;
+    contracts_covered: number;
+  };
+  policy: {
+    promotion: string;
+    no_inference: string;
+    payment_link: string;
+  };
+};
+
 type Payload = {
   data: ContractBridgeItem[];
   summary: {
@@ -85,6 +118,11 @@ export default function LegalLaudusPage() {
   const { data, error, isLoading } = useSWR<Payload>('/api/legal/laudus-bridge', fetcher, {
     revalidateOnFocus: false,
   });
+  const { data: reconciliation, error: reconciliationError } = useSWR<ReconciliationPayload>(
+    '/api/legal/contract-po-reconciliation',
+    fetcher,
+    { revalidateOnFocus: false },
+  );
 
   if (isLoading) {
     return <StatePanel tone="loading" title="Revisando interacción con Laudus" description="Conciliando contratos, proveedores, facturas, pagos y liquidaciones." />;
@@ -145,6 +183,59 @@ export default function LegalLaudusPage() {
             {data.migration.stays_laudus_canonical.map((item) => <p key={item}>• {item}</p>)}
           </div>
         </article>
+      </section>
+
+      <section className="overflow-hidden rounded-md border">
+        <div className="border-b bg-muted/20 px-4 py-3">
+          <h2 className="text-sm font-semibold">Conciliación Contrato ↔ OC</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Candidatos extraídos de la planilla de Legal. Una OC sólo queda verificada cuando existe en la fuente canónica y el proveedor es compatible.
+          </p>
+        </div>
+        {reconciliationError ? (
+          <p className="p-4 text-sm text-destructive">No se pudo actualizar la conciliación de órdenes de compra.</p>
+        ) : !reconciliation ? (
+          <p className="p-4 text-sm text-muted-foreground">Revisando órdenes de compra…</p>
+        ) : (
+          <>
+            <div className="grid border-b sm:grid-cols-5">
+              {[
+                ['Candidatas', reconciliation.summary.total],
+                ['Verificadas', reconciliation.summary.verified],
+                ['Pendientes', reconciliation.summary.pending],
+                ['Conflictos', reconciliation.summary.conflicts],
+                ['No encontradas', reconciliation.summary.not_found],
+              ].map(([label, value], index) => (
+                <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="divide-y">
+              {reconciliation.data.map((item) => (
+                <div key={`${item.contract_number}-${item.purchase_order_number}`} className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{item.contract_number}</Badge>
+                      <span className="text-sm font-medium">OC {item.purchase_order_number}</span>
+                      <Badge variant={item.status === 'verified' ? 'secondary' : item.status === 'conflict' ? 'destructive' : 'outline'}>
+                        {item.status === 'verified' ? 'Verificada' : item.status === 'conflict' ? 'Conflicto' : item.status === 'not_found' ? 'No encontrada' : 'Pendiente'}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.contract_title || item.contractor_name || 'Contrato'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.reason}</p>
+                  </div>
+                  <div className="shrink-0 text-xs text-muted-foreground md:text-right">
+                    <p>{item.provenance.source_sheet} · {item.provenance.source_cell}</p>
+                    <p className="mt-1">Fuente: {item.provenance.source_file}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="border-t px-4 py-3 text-xs text-muted-foreground">{reconciliation.policy.payment_link}</p>
+          </>
+        )}
       </section>
 
       <section className="overflow-hidden rounded-md border">
