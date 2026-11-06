@@ -118,6 +118,29 @@ export default function LegalPage() {
         </p>
       </header>
 
+      <section className="grid gap-3 md:grid-cols-4" aria-label="Trabajo principal de Legal">
+        <Link href="/dashboard/legal/inbox" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <Clock3 className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Hoy</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Lo que requiere acción, venció o necesita respuesta.</p>
+        </Link>
+        <Link href="/dashboard/legal/avances-pagos" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Contratos y pagos</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Avance, OC, factura, retención y estado de pago.</p>
+        </Link>
+        <Link href="/dashboard/legal/contratistas-documentos" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <FolderCheck className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Proveedores</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Cumplimiento mensual, documentos y subsanaciones.</p>
+        </Link>
+        <Link href="/dashboard/legal/asistente" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <Scale className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Asistente</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Preguntar qué falta, qué cambió y cuál es la siguiente acción.</p>
+        </Link>
+      </section>
+
       <section aria-labelledby="legal-inbox-title" className="overflow-hidden rounded-md border">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
           <div>
