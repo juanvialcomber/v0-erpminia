@@ -183,16 +183,15 @@ export async function createContract(input: CreateContractInput) {
   let supplierId = input.supplierId || null;
 
   if (!supplierId && input.contractorName) {
-    const { data: supplier, error: supplierError } = await supabase
+    const { data: suppliers, error: supplierError } = await supabase
       .from('suppliers')
       .select('id')
       .eq('organization_id', input.organizationId)
       .ilike('name', input.contractorName)
-      .limit(1)
-      .maybeSingle();
+      .limit(2);
 
     if (supplierError) throw supplierError;
-    supplierId = supplier?.id || null;
+    supplierId = suppliers?.length === 1 ? suppliers[0].id : null;
   }
 
   const { data, error } = await supabase
