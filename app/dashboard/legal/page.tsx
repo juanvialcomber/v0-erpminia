@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, FileText, Scale, ShieldCheck, FolderCheck, Clock3 } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, FileText, Scale, ShieldCheck, FolderCheck, Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -267,6 +267,11 @@ export default function LegalPage() {
           <FileText className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Documentos</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Expedientes, versiones y evidencia.</p>
+        </Link>
+        <Link href="/dashboard/legal/laudus" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Laudus</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Facturas, pagos y trabajo financiero que Legal puede dejar de revisar fuera de MOTIL.</p>
         </Link>
       </section>
 
