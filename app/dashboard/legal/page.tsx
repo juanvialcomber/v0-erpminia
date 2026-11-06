@@ -40,6 +40,17 @@ type RegulatoryPayload = {
   };
 };
 
+type InboxPayload = {
+  summary?: {
+    total: number;
+    overdue: number;
+    due_next_7_days: number;
+    waiting_signatures: number;
+    evidence_pending: number;
+  };
+  warnings?: string[];
+};
+
 export default function LegalPage() {
   const { data: complianceData, error: complianceError, mutate: mutateCompliance } = useSWR<CompliancePayload>(
     '/api/legal/compliance',
@@ -53,6 +64,11 @@ export default function LegalPage() {
   );
   const { data: regulatoryData, error: regulatoryError, mutate: mutateRegulatory } = useSWR<RegulatoryPayload>(
     '/api/legal/sernageomin',
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const { data: inboxData, error: inboxError, mutate: mutateInbox } = useSWR<InboxPayload>(
+    '/api/legal/inbox',
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -90,7 +106,10 @@ export default function LegalPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end"><Link href="/dashboard/legal/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Calendario del área →</Link></div>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Link href="/dashboard/legal/inbox" className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Ver pendientes →</Link>
+        <Link href="/dashboard/legal/calendario" className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Calendario del área →</Link>
+      </div>
       <header className="border-b border-border/70 pb-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Legal</h1>
@@ -98,6 +117,45 @@ export default function LegalPage() {
           Casos, vencimientos y evidencia que requieren seguimiento legal.
         </p>
       </header>
+
+      <section aria-labelledby="legal-inbox-title" className="overflow-hidden rounded-md border">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Prioridad operacional</p>
+            <h2 id="legal-inbox-title" className="mt-1 text-base font-semibold">Pendientes Legal</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Casos, pagos, firmas, avances contractuales y evidencia que requieren seguimiento.</p>
+          </div>
+          <Button asChild size="sm"><Link href="/dashboard/legal/inbox">Abrir pendientes <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+        </div>
+        {inboxError ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+            <span className="text-destructive">No se pudo actualizar la bandeja unificada.</span>
+            <button className="font-medium underline" onClick={() => void mutateInbox()}>Reintentar</button>
+          </div>
+        ) : !inboxData?.summary ? (
+          <p className="px-4 py-4 text-sm text-muted-foreground">Consolidando pendientes del área…</p>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-5">
+              {[
+                ['Pendientes', inboxData.summary.total],
+                ['Vencidos', inboxData.summary.overdue],
+                ['Próx. 7 días', inboxData.summary.due_next_7_days],
+                ['Esperando firmas', inboxData.summary.waiting_signatures],
+                ['Evidencia pendiente', inboxData.summary.evidence_pending],
+              ].map(([label, value], index) => (
+                <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
+                  <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-semibold tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+            {inboxData.warnings?.length ? (
+              <p className="border-t px-4 py-2 text-xs text-muted-foreground">Bandeja parcial: {inboxData.warnings.join(' ')}</p>
+            ) : null}
+          </>
+        )}
+      </section>
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4" aria-label="Compliance 360">
         <div><h2 className="font-semibold">Compliance 360 · SERNAGEOMIN</h2><p className="mt-1 text-sm text-muted-foreground">Obligaciones, evidencias candidatas y acciones que requieren validación de Legal.</p></div>
