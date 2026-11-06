@@ -114,8 +114,8 @@ export function WorkOrderTimer({ workOrderId, onActionComplete }: WorkOrderTimer
       setMessage('Selecciona el motivo de la pausa.');
       return;
     }
-    if (pauseReason === 'Otro' && !pauseDetail.trim()) {
-      setMessage('Describe el motivo de la pausa.');
+    if ((pauseReason === 'Otro' || pauseReason === 'Falta de repuesto o material') && !pauseDetail.trim()) {
+      setMessage(pauseReason === 'Falta de repuesto o material' ? 'Indica qué repuesto o material falta.' : 'Describe el motivo de la pausa.');
       return;
     }
     const notes = pauseDetail.trim() ? `${pauseReason} — ${pauseDetail.trim()}` : pauseReason;
@@ -161,12 +161,12 @@ export function WorkOrderTimer({ workOrderId, onActionComplete }: WorkOrderTimer
             onChange={(event) => setPauseDetail(event.target.value)}
             rows={2}
             maxLength={500}
-            placeholder="Detalle adicional"
+            placeholder={pauseReason === 'Falta de repuesto o material' ? 'Indica qué repuesto o material falta' : 'Detalle adicional'}
             className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
           <div className="grid grid-cols-2 gap-2">
             <Button variant="ghost" size="sm" disabled={loading} onClick={() => { setPauseOpen(false); setMessage(null); }}>Cancelar</Button>
-            <Button size="sm" disabled={loading || !pauseReason} onClick={() => void pauseWork()}>
+            <Button size="sm" disabled={loading || !pauseReason || ((pauseReason === 'Otro' || pauseReason === 'Falta de repuesto o material') && !pauseDetail.trim())} onClick={() => void pauseWork()}>
               <Pause className="mr-2 h-4 w-4" />
               Confirmar pausa
             </Button>
