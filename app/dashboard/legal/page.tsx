@@ -273,6 +273,11 @@ export default function LegalPage() {
           <p className="mt-3 text-sm font-semibold">Laudus</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Facturas, pagos y trabajo financiero que Legal puede dejar de revisar fuera de MOTIL.</p>
         </Link>
+        <Link href="/dashboard/legal/avances-pagos" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <Clock3 className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Avances y pagos</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Avance contractual, hitos, facturas, retenciones y pago confirmado en Laudus.</p>
+        </Link>
       </section>
 
       <section className="rounded-md border bg-muted/20 p-4">
