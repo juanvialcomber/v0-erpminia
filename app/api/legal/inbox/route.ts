@@ -182,6 +182,12 @@ export async function GET(request: NextRequest) {
       const signaturesRequired = paymentRequest?.required_signatures ?? 2;
       const signaturesDone = paymentRequest ? signaturesByRequest.get(paymentRequest.id) || 0 : 0;
       const paymentStatus = paymentRequest?.status || 'payment_not_requested';
+      const managementReady = Boolean(
+        paymentRequest &&
+        signaturesDone >= signaturesRequired &&
+        !paymentRequest.executed_at &&
+        !['paid', 'executed', 'cancelled', 'canceled', 'rejected'].includes(String(paymentStatus).toLowerCase()),
+      );
 
       return {
         id: `payable:${row.id}`,
@@ -198,6 +204,7 @@ export async function GET(request: NextRequest) {
         evidence_status: paymentRequest?.executed_at
           ? (paymentRequest.evidence_document_id || paymentRequest.evidence_url ? 'complete' : 'pending')
           : 'pending',
+        management_ready: managementReady,
         signatures_required: signaturesRequired,
         signatures_done: signaturesDone,
         amount: paymentRequest?.amount ?? row.approved_amount ?? null,
@@ -208,9 +215,11 @@ export async function GET(request: NextRequest) {
           ? 'Preparar solicitud de pago'
           : signaturesDone < signaturesRequired
             ? 'Completar firmas requeridas'
-            : paymentRequest.executed_at && !(paymentRequest.evidence_document_id || paymentRequest.evidence_url)
-              ? 'Adjuntar evidencia de transferencia'
-              : 'Revisar estado de pago',
+            : managementReady
+              ? 'Informar a Gerencia: pago listo'
+              : paymentRequest.executed_at && !(paymentRequest.evidence_document_id || paymentRequest.evidence_url)
+                ? 'Adjuntar evidencia de transferencia'
+                : 'Revisar estado de pago',
       };
     });
 
@@ -260,6 +269,7 @@ export async function GET(request: NextRequest) {
       due_next_7_days: data.filter((item) => typeof item.days_until === 'number' && item.days_until >= 0 && item.days_until <= 7).length,
       waiting_signatures: data.filter((item) => item.kind === 'payable' && (item.signatures_done || 0) < (item.signatures_required || 0)).length,
       evidence_pending: data.filter((item) => item.evidence_status === 'pending').length,
+      ready_for_management: data.filter((item) => item.kind === 'payable' && item.management_ready === true).length,
     },
   });
 }
