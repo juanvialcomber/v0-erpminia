@@ -33,7 +33,9 @@ test('Legal assistant copy covers contracts payments providers and documents', (
 test('Legal skill documents the workspace operating model from the Nov 6 requirements', () => {
   assert.match(skill, /references\/workspace\.md/);
   assert.match(workspace, /cálculo automático de estados de pago y fechas/);
-  assert.match(workspace, /semáforo verde\/amarillo\/rojo/);
+  assert.match(workspace, /rojo = `Vencido`/);
+  assert.match(workspace, /amarillo = `Próximo`/);
+  assert.match(workspace, /verde = `En plazo`/);
   assert.match(workspace, /foto, PDF, email, WhatsApp o planilla/);
   assert.match(workspace, /aviso a Gerencia cuando una transferencia\/pago esté listo/);
   assert.match(workspace, /No exponer "Laudus", "staging", "sync", "RLS", "canonical"/);
