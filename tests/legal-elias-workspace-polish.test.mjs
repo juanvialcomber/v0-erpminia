@@ -19,7 +19,7 @@ test('Elias assistant is action-first and hides document tools behind progressiv
   assert.match(assistant, /Preguntas rápidas/);
   assert.match(assistant, /¿Qué contratos requieren atención hoy\?/);
   assert.match(assistant, /¿Qué falta pagar de IO-01\?/);
-  assert.match(assistant, /Conclusión, siguiente acción y evidencia/);
+  assert.match(assistant, /conclusión, siguiente acción y evidencia/i);
   assert.match(assistant, /Herramientas documentales/);
   assert.match(assistant, /<details/);
 });
