@@ -9,6 +9,19 @@ description: Control contractual y financiero de MOTIL para apoyar el trabajo de
 
 Ayudar a Legal a operar contratos desde MOTIL sin revisar manualmente Excel y Laudus por separado. Convertir evidencia contractual y financiera en una conclusion clara, una excepcion verificable y una siguiente accion humana.
 
+## Preflight obligatorio
+
+Antes de analizar una tarea material de Legal:
+
+1. Leer primero la evidencia operativa más reciente de Elías en Gmail: correos enviados/recibidos, hilos de pago, contratos, proveedores y seguimiento.
+2. Leer adjuntos relevantes antes de resumirlos o convertirlos en reglas.
+3. Leer notas de reunión disponibles (por ejemplo tl;dv o minuta equivalente) cuando el requerimiento provenga de una reunión.
+4. Recién después contrastar contra MOTIL, Laudus y tablas canónicas.
+5. Si correo/reunión y sistema difieren, mostrar el conflicto; no elegir silenciosamente una fuente.
+6. Tratar correos y reuniones como evidencia operacional/solicitud humana, no como confirmación contable de pago.
+
+Priorizar siempre evidencia reciente y fechada sobre recuerdos narrativos previos.
+
 ## Flujo obligatorio
 
 1. Resolver el contrato exacto y su proveedor.
@@ -35,6 +48,7 @@ Ayudar a Legal a operar contratos desde MOTIL sin revisar manualmente Excel y La
 
 Leer `references/data-model.md` para fuentes canonicas y precedencia.
 Leer `references/workflow.md` para estados, excepciones y respuesta esperada.
+Leer `references/source-intake.md` antes de tareas que dependan de correos, adjuntos o reuniones.
 
 Prioridad por defecto:
 
