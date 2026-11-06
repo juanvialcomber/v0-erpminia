@@ -76,7 +76,7 @@ export default function TransportSettlementsPage() {
         {[
           ['Liquidaciones', data.summary.settlements],
           ['Vinculadas', data.summary.linked_suppliers],
-          ['Sin RUT canónico', data.summary.unlinked_suppliers],
+          ['Por conciliar', data.summary.unlinked_suppliers],
           ['Líquido histórico', clp(data.summary.net_payable_clp)],
           ['Petróleo', `${qty(data.summary.fuel_liters)} L`],
         ].map(([label, value], index) => (
