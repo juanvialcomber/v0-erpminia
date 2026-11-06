@@ -11,7 +11,8 @@ test('inventory overview is corrected with operational Laudus quantities without
   assert.match(route, /operational_resolution.*legacy_motil_stale/);
   assert.match(route, /operational_resolution.*laudus_only_current/);
   assert.match(route, /overview: adjustedOverview/);
-  assert.match(route, /overview\.total_stock_value \+= \(after - before\) \* row\.unit_cost/);
+  assert.doesNotMatch(route, /overview\.total_stock_value \+=/);
+  assert.match(route, /overview\.total_stock_value = null/);
   assert.match(route, /if \(quantity < 0\) return 'negative'/);
   assert.match(route, /if \(before > 0 && after <= 0\) overview\.products_with_stock -= 1/);
   assert.match(route, /if \(before <= 0 && after > 0\) overview\.products_with_stock \+= 1/);
