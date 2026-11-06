@@ -24,11 +24,14 @@ test('bodega makes conflicting diesel evidence explicit and blocks false certain
   assert.match(page, /No usar una cifra única para compra, consumo ni valorización hasta conciliar la diferencia/);
 });
 
-test('conflicted diesel cannot contaminate trusted inventory valuation in the UI', async () => {
+test('inventory valuation requires an explicit trusted valuation contract, not diesel alone', async () => {
+  const route = await readFile(routePath, 'utf8');
   const page = await readFile(pagePath, 'utf8');
-  assert.match(page, /const valuationTrusted = Boolean\(sourceAuthority\?\.laudusIsPrimary\) && !diesel\?\.hasConflict/);
+  assert.match(route, /valuation:\s*\{/);
+  assert.match(route, /trusted: false/);
+  assert.match(page, /const valuationTrusted = valuation\?\.trusted === true/);
   assert.match(page, /valuationTrusted \? money\(overview\.total_stock_value\) : 'En conciliación'/);
-  assert.match(page, /Petróleo impide una valorización confiable hasta conciliar fuentes/);
+  assert.match(page, /Los costos requieren conciliación antes de publicar una valorización total/);
   assert.match(page, /conflictedDiesel \? 'En conciliación'/);
   assert.match(page, /Difiere Laudus/);
   assert.match(page, /Laudus primario/);
