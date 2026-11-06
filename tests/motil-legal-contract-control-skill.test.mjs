@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const skill = await readFile(new URL('../skills/motil-legal-contract-control/SKILL.md', import.meta.url), 'utf8');
 const dataModel = await readFile(new URL('../skills/motil-legal-contract-control/references/data-model.md', import.meta.url), 'utf8');
 const workflow = await readFile(new URL('../skills/motil-legal-contract-control/references/workflow.md', import.meta.url), 'utf8');
+const sourceIntake = await readFile(new URL('../skills/motil-legal-contract-control/references/source-intake.md', import.meta.url), 'utf8');
 const catalog = await readFile(new URL('../lib/motil-ai/skills/catalog.ts', import.meta.url), 'utf8');
 const router = await readFile(new URL('../lib/motil-ai/skills/router.ts', import.meta.url), 'utf8');
 const prompts = await readFile(new URL('../lib/motil-ai/skills/prompt-suggestions.ts', import.meta.url), 'utf8');
@@ -45,4 +46,15 @@ test('Legal skill remains advisory and does not add autonomous payment execution
   assert.match(skill, /No puede:/);
   assert.match(skill, /ejecutar transferencias/);
   assert.match(skill, /aprobar estados de pago/);
+});
+
+
+test('Legal skill reads fresh Elias email, attachments and meeting evidence before analysis', () => {
+  assert.match(skill, /Preflight obligatorio/);
+  assert.match(skill, /Gmail de Elías|Gmail: correos enviados\/recibidos/i);
+  assert.match(skill, /adjuntos relevantes/i);
+  assert.match(skill, /notas de reunión/i);
+  assert.match(sourceIntake, /pago está programado para esta semana/);
+  assert.match(sourceIntake, /no marcar como pagado/);
+  assert.match(sourceIntake, /evidencia más reciente/);
 });
