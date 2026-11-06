@@ -56,10 +56,13 @@ export async function getWorkOrderReleaseReadiness(
 
   const typedOrder = order as OrderRow;
   const typedReadiness = (readiness || {}) as ReadinessRow;
-  const emergencyBypass = String(typedOrder.work_type || '').toLowerCase() === 'emergency';
+  const workType = String(typedOrder.work_type || '').toLowerCase();
+  const emergencyBypass = workType === 'emergency';
+  const isGeneralWork = workType === 'general';
 
   const checks = {
-    asset: Boolean(typedOrder.canonical_asset_id),
+    // General workshop work is intentionally not tied to a canonical asset.
+    asset: isGeneralWork || Boolean(typedOrder.canonical_asset_id),
     assignee: Boolean(typedOrder.assigned_person_id),
     schedule: Boolean(typedOrder.scheduled_date),
     procurement: Number(typedReadiness.open_procurement_orders || 0) === 0,
