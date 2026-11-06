@@ -94,12 +94,15 @@ type Payload = {
   };
 };
 
-const fetcher = async (url: string) => {
+const fetchJson = async <T,>(url: string): Promise<T> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la interacción con Laudus');
-  return payload as Payload;
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar la evidencia financiera');
+  return payload as T;
 };
+
+const fetchBridge = (url: string) => fetchJson<Payload>(url);
+const fetchReconciliation = (url: string) => fetchJson<ReconciliationPayload>(url);
 
 function money(value: number, currency = 'CLP') {
   return new Intl.NumberFormat('es-CL', {
@@ -115,12 +118,12 @@ function date(value: string | null) {
 }
 
 export default function LegalLaudusPage() {
-  const { data, error, isLoading } = useSWR<Payload>('/api/legal/laudus-bridge', fetcher, {
+  const { data, error, isLoading } = useSWR<Payload>('/api/legal/laudus-bridge', fetchBridge, {
     revalidateOnFocus: false,
   });
   const { data: reconciliation, error: reconciliationError } = useSWR<ReconciliationPayload>(
     '/api/legal/contract-po-reconciliation',
-    fetcher,
+    fetchReconciliation,
     { revalidateOnFocus: false },
   );
 
