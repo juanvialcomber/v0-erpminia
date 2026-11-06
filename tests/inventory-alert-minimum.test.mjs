@@ -25,7 +25,8 @@ test('canonical organizations share one paginated stock-alert source', async () 
 
   assert.match(source, /orgHasCanonicalData\(input\.organizationId\)/);
   assert.match(source, /from\('canonical_inventory_current'\)/);
-  assert.match(source, /isStockBelowMinimum\(row\.quantity, row\.min_stock\)/);
+  assert.match(source, /resolvedOperationalQuantity\(row\.quantity, operational\.get\(row\.id\)\)/);
+  assert.match(source, /isStockBelowMinimum\(quantity, row\.min_stock\)/);
   assert.match(source, /dataSource: 'canonical'/);
   assert.match(source, /dataSource: 'warehouse'/);
   assert.match(source, /\.range\(start, start \+ PAGE_SIZE - 1\)/);
