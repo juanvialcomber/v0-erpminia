@@ -2,11 +2,15 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
 import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 import { buildAssignedWorkActions } from '@/lib/maintenance/my-work-priority.mjs';
 
 export async function GET(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (!access.authorized) return access.response;
+
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
@@ -14,7 +18,7 @@ export async function GET(request: NextRequest) {
     const { data: profile, error: profileError } = await context.supabase
       .from('profiles')
       .select('cargo_id')
-      .eq('id', context.userId)
+      .eq('id', access.user.id)
       .eq('organization_id', context.organizationId)
       .maybeSingle();
     if (profileError) throw profileError;
@@ -38,8 +42,7 @@ export async function GET(request: NextRequest) {
       .from('people')
       .select('id')
       .eq('organization_id', context.organizationId)
-      .eq('profile_id', context.userId)
-      .eq('employment_status', 'active')
+      .eq('profile_id', access.user.id)
       .maybeSingle();
     if (personError) throw personError;
 
@@ -47,7 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         identityLinked: false,
         actions: [],
-        canEdit: false,
+        canEdit: access.canWrite,
         sources: ['profiles', 'cargos', 'people'],
       });
     }
@@ -68,7 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       identityLinked: true,
       actions,
-      canEdit: true,
+      canEdit: access.canWrite,
       generatedAt: new Date().toISOString(),
       sources: ['profiles', 'cargos', 'people', 'maintenance_work_orders'],
     });
