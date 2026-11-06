@@ -4,10 +4,13 @@ import { readFile } from 'node:fs/promises';
 
 const mobile = await readFile(new URL('../components/maintenance/mobile-work-order-flow.tsx', import.meta.url), 'utf8');
 
-test('in-progress idle OT restarts timer with play instead of invalid resume', () => {
+test('in-progress idle OT distinguishes resumed work from pending closure', () => {
   assert.match(mobile, /timerAction\(action: 'play' \| 'pause' \| 'resume'/);
   assert.match(mobile, /timerStatus === 'idle'/);
   assert.match(mobile, /timerAction\('play'\)/);
+  assert.match(mobile, /Tiempo detenido/);
+  assert.match(mobile, /Continuar al cierre/);
+  assert.match(mobile, /baseSeconds > 0/);
 });
 
 test('running OT exposes pause flow and paused OT resumes', () => {
