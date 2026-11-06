@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   const organizationId = auth.context.organizationId;
   const today = todayKey();
 
-  const [casesResult, payablesResult, paymentRequestsResult, progressResult] = await Promise.all([
+  const [casesResult, payablesResult, paymentRequestsResult, progressResult, complianceResult] = await Promise.all([
     auth.context.supabase
       .from('legal_cases')
       .select('id,title,reason,priority,operational_owner,legal_owner,due_at,status,evidence_status,source_module,source_href,updated_at,created_at')
@@ -76,6 +76,15 @@ export async function GET(request: NextRequest) {
       .eq('status', 'submitted')
       .order('submitted_at', { ascending: true })
       .limit(500),
+    auth.context.supabase
+      .from('compliance_events')
+      .select('id,event_type,title,description,due_date,next_date,status,location,priority,updated_at,created_at')
+      .eq('org_id', organizationId)
+      .eq('event_type', 'legal')
+      .eq('status', 'pending')
+      .order('next_date', { ascending: true, nullsFirst: false })
+      .order('due_date', { ascending: true })
+      .limit(200),
   ]);
 
   const warnings: string[] = [];
@@ -85,6 +94,7 @@ export async function GET(request: NextRequest) {
   if (progressResult.error && progressResult.error.code !== '42P01') {
     warnings.push('No se pudieron cargar los avances contractuales pendientes.');
   }
+  if (complianceResult.error) warnings.push('No se pudieron cargar los vencimientos legales.');
 
   const payableRows = payablesResult.data || [];
   const invoiceIds = payableRows.map((row) => row.invoice_id).filter(Boolean);
@@ -198,6 +208,45 @@ export async function GET(request: NextRequest) {
       };
     });
 
+  const complianceItems = (complianceResult.data || [])
+    .filter((row) => String(row.description || '').includes('[POLVORIN]'))
+    .map((row) => {
+      const alertDate = dateKey(row.next_date) || dateKey(row.due_date);
+      const expiryDate = dateKey(row.due_date);
+      const daysUntilAlert = daysFromToday(alertDate, today);
+      const daysUntilExpiry = daysFromToday(expiryDate, today);
+      const shouldSurface =
+        typeof daysUntilAlert === 'number' &&
+        daysUntilAlert <= 30 &&
+        (daysUntilExpiry === null || daysUntilExpiry >= 0);
+
+      if (!shouldSurface) return null;
+
+      return {
+        id: `compliance:${row.id}`,
+        kind: 'legal_compliance',
+        area: 'Legal',
+        title: row.title,
+        detail: expiryDate
+          ? `Renovación requerida antes del ${expiryDate}. Aviso preventivo 15 días antes.`
+          : row.description,
+        due_date: alertDate,
+        days_until: daysUntilAlert,
+        overdue: typeof daysUntilAlert === 'number' && daysUntilAlert < 0,
+        status: row.status,
+        priority: row.priority || 'medium',
+        owner: null,
+        evidence_status: 'pending',
+        signatures_required: null,
+        signatures_done: null,
+        amount: null,
+        currency: null,
+        source_href: '/dashboard/legal/permisos-licencias',
+        updated_at: row.updated_at || row.created_at,
+      };
+    })
+    .filter(Boolean);
+
   const progressItems = progressRows.map((row) => {
     const contract = progressContractsById.get(row.contract_id);
     return {
@@ -224,7 +273,7 @@ export async function GET(request: NextRequest) {
     };
   });
 
-  const data = [...legalItems, ...financeItems, ...progressItems].sort((a, b) => {
+  const data = [...legalItems, ...financeItems, ...progressItems, ...complianceItems].sort((a, b) => {
     if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
     if (a.due_date) return -1;
