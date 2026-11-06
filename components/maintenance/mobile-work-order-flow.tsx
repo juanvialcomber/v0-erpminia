@@ -493,10 +493,15 @@ export function MobileWorkOrderFlow({
               {busy ? 'Iniciando...' : 'Iniciar trabajo'}
             </Button>
           ) : timerStatus === 'idle' ? (
-            <Button size="lg" className="h-14 w-full text-base" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('play')}>
-              <CirclePlay className="mr-2 h-5 w-5" />
-              {busy ? 'Iniciando...' : 'Reanudar trabajo'}
-            </Button>
+            <div className="space-y-2">
+              {baseSeconds > 0 ? (
+                <StatePanel tone="neutral" title="Tiempo detenido" description="El cronómetro ya fue finalizado. Continúa al cierre si el trabajo terminó, o reanúdalo si todavía falta trabajo en terreno." />
+              ) : null}
+              <Button size="lg" variant="outline" className="h-12 w-full" disabled={busy || !assignedWork || Boolean(assignedWorkError) || Boolean(runningElsewhere)} onClick={() => void timerAction('play')}>
+                <CirclePlay className="mr-2 h-5 w-5" />
+                {busy ? 'Iniciando...' : 'Reanudar trabajo'}
+              </Button>
+            </div>
           ) : timerStatus === 'running' && !showPauseForm ? (
             <Button size="lg" className="h-14 w-full text-base" disabled={busy} onClick={() => { setMessage(null); setShowPauseForm(true); }}>
               <CirclePause className="mr-2 h-5 w-5" />
@@ -550,9 +555,9 @@ export function MobileWorkOrderFlow({
           )}
 
           {status === 'in_progress' ? (
-            <Button size="lg" variant="outline" className="h-14 w-full text-base" disabled={busy} onClick={() => void finishWork()}>
+            <Button size="lg" variant={timerStatus === 'idle' && baseSeconds > 0 ? 'default' : 'outline'} className="h-14 w-full text-base" disabled={busy} onClick={() => void finishWork()}>
               <SquareStop className="mr-2 h-5 w-5" />
-              Terminar y registrar evidencia
+              {timerStatus === 'idle' && baseSeconds > 0 ? 'Continuar al cierre' : 'Terminar y cerrar OT'}
             </Button>
           ) : null}
         </CardContent>

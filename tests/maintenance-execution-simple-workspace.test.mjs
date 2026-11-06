@@ -19,7 +19,8 @@ test('execution workspace exposes only job context, timer and controlled finish 
   assert.match(flow, /Iniciar trabajo/);
   assert.match(flow, /Pausar trabajo/);
   assert.match(flow, /Reanudar trabajo/);
-  assert.match(flow, /Terminar y registrar evidencia/);
+  assert.match(flow, /Terminar y cerrar OT/);
+  assert.match(flow, /Continuar al cierre/);
   assert.match(flow, /causa, acción preventiva, horas reales y evidencia de horómetro/);
 });
 

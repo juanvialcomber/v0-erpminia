@@ -31,7 +31,7 @@ test('coarse maintenance role gate delegates POST work-order creation to canonic
   assert.match(org, /canonical work-order route by cargo/);
 });
 
-test('mine leads receive mant_operaciones edit capability', () => {
+test('mine leads and workshop heads receive mant_operaciones edit capability', () => {
   for (const cargo of [
     'jefe mina don jaime',
     'jefe mina peumo',

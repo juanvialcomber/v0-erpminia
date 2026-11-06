@@ -25,6 +25,7 @@ type TerrainAction = {
   isPaused: boolean;
 };
 type TerrainResponse = { actions?: TerrainAction[]; identityLinked?: boolean; generatedAt?: string };
+type ViewerContext = { canCreateEmergencyWorkOrder?: boolean };
 
 async function fetcher(url: string): Promise<TerrainResponse> {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
@@ -41,7 +42,18 @@ function dateContext(action: TerrainAction) {
   return 'En ' + action.daysUntil + ' días';
 }
 
-export function MobileTerrainPanel({ canCreateEmergencyWorkOrder = false }: { canCreateEmergencyWorkOrder?: boolean }) {
+export function MobileTerrainPanel({ canCreateEmergencyWorkOrder }: { canCreateEmergencyWorkOrder?: boolean }) {
+  const { data: viewer } = useSWR<ViewerContext>(
+    canCreateEmergencyWorkOrder === undefined ? '/api/maintenance/viewer-context' : null,
+    async (url: string) => {
+      const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar tu contexto.');
+      return payload as ViewerContext;
+    },
+    { revalidateOnFocus: false },
+  );
+  const emergencyCreationAllowed = canCreateEmergencyWorkOrder ?? viewer?.canCreateEmergencyWorkOrder === true;
   const { data, error, isLoading, mutate, isValidating } = useSWR<TerrainResponse>(
     '/api/maintenance/my-work',
     fetcher,
@@ -85,7 +97,7 @@ export function MobileTerrainPanel({ canCreateEmergencyWorkOrder = false }: { ca
         </Button>
       </header>
 
-      {canCreateEmergencyWorkOrder ? (
+      {emergencyCreationAllowed ? (
         <Button asChild className="min-h-10 w-full">
           <Link href="/dashboard/mantenimiento/ordenes-trabajo/create?mode=emergency"><Siren className="mr-2 h-4 w-4" />Crear OTe de emergencia</Link>
         </Button>
