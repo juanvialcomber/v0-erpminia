@@ -13,7 +13,7 @@ test('assistant is advisory and sources are traceable',()=>{
  assert.match(api,/No apruebes, rechaces/);
  assert.match(api,/SERNAGEOMIN/);
  assert.match(api,/www\.bcn\.cl/);
- assert.match(page,/Asistente IA de Legal/);
+ assert.match(page,/Asistente de Elías/);
  assert.match(nav,/\/dashboard\/legal\/asistente/);
 });
 
