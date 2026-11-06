@@ -1,138 +1,115 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireModuleAccess, MODULE_KEYS } from '@/lib/api/module-access';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-
-  const auth = await resolveAuthContext(request);
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const access = await requireModuleAccess(request, MODULE_KEYS.LEGAL_MODULO);
+  if (!access.authorized) return access.response;
+  if (!access.organizationId) {
+    return NextResponse.json({ error: 'Organización no disponible' }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
-  const search = searchParams.get('search') || '';
-  const category = searchParams.get('category') || '';
+  const search = (searchParams.get('search') || '').trim();
+  const status = (searchParams.get('status') || '').trim();
 
+  const supabase = getSupabaseServerClient();
   let query = supabase
     .from('module_documents')
-    .select('id, document_name, document_type, description, status, file_path, file_url, uploaded_at, uploaded_by')
+    .select([
+      'id',
+      'document_name',
+      'document_type',
+      'document_type_category',
+      'document_code',
+      'description',
+      'status',
+      'file_path',
+      'file_url',
+      'file_size_bytes',
+      'uploaded_at',
+      'uploaded_by',
+      'valid_from',
+      'valid_until',
+      'version',
+      'l1_status',
+      'l1_observations',
+      'l2_status',
+      'l2_observations',
+      'canonical_section',
+      'provenance_status',
+      'canonical_role',
+      'extracted_data',
+    ].join(','))
+    .eq('organization_id', access.organizationId)
     .eq('module', 'legal')
     .is('deleted_at', null)
     .order('uploaded_at', { ascending: false });
 
-  if (search) {
-    query = query.ilike('document_name', `%${search}%`);
-  }
-  if (category) {
-    query = query.eq('document_type', category);
-  }
+  if (search) query = query.ilike('document_name', `%${search}%`);
+  if (status) query = query.eq('status', status);
 
   const { data, error } = await query;
-
   if (error) {
     console.error('[legal/documentos GET]', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const documents = await Promise.all(
-    (data || []).map(async (doc) => {
-      let fileUrl: string | null = doc.file_url ?? null;
+  const uploaderIds = Array.from(new Set((data || []).map((doc) => doc.uploaded_by).filter(Boolean)));
+  const { data: uploaders } = uploaderIds.length
+    ? await supabase.from('profiles').select('id,full_name,email').in('id', uploaderIds)
+    : { data: [] as Array<{ id:string; full_name:string|null; email:string|null }> };
 
-      if (!fileUrl && doc.file_path) {
-        const { data: signedData } = await supabase.storage
-          .from('module-documents')
-          .createSignedUrl(doc.file_path, 3600);
-        fileUrl = signedData?.signedUrl ?? null;
-      }
+  const uploaderById = new Map((uploaders || []).map((row) => [row.id, row]));
 
-      return {
-        id: doc.id,
-        title: doc.document_name,
-        description: doc.description || '',
-        category: doc.document_type || 'legal',
-        documentType: doc.document_type || 'legal',
-        status: doc.status || 'active',
-        fileUrl,
-        filePath: doc.file_path,
-        uploadedAt: doc.uploaded_at,
-        uploadedBy: doc.uploaded_by,
-      };
-    })
-  );
+  const documents = (data || []).map((doc) => {
+    const uploader = uploaderById.get(doc.uploaded_by);
+    const normalizedStatus =
+      ['active', 'approved', 'aprobado'].includes(String(doc.status || '').toLowerCase())
+        ? 'approved'
+        : ['rejected', 'rechazado'].includes(String(doc.status || '').toLowerCase())
+          ? 'rejected'
+          : 'pending';
 
-  return NextResponse.json({ documents, total: documents.length });
-}
+    return {
+      id: doc.id,
+      document_name: doc.document_name,
+      document_type: doc.document_type || 'document',
+      document_type_category: doc.document_type_category || 'Legal',
+      document_code: doc.document_code || '',
+      description: doc.description || '',
+      status: doc.status || 'draft',
+      review_state: normalizedStatus,
+      file_url: doc.file_url || null,
+      file_size_bytes: Number(doc.file_size_bytes || 0),
+      uploaded_at: doc.uploaded_at,
+      uploaded_by: uploader?.full_name || uploader?.email || 'Usuario MOTIL',
+      uploaded_by_email: uploader?.email || null,
+      valid_from: doc.valid_from,
+      valid_until: doc.valid_until,
+      version: Number(doc.version || 1),
+      l1_status: doc.l1_status,
+      l1_observations: doc.l1_observations,
+      l2_status: doc.l2_status,
+      l2_observations: doc.l2_observations,
+      canonical_section: doc.canonical_section,
+      provenance_status: doc.provenance_status,
+      canonical_role: doc.canonical_role,
+      extracted_data: doc.extracted_data || {},
+      preview_url: `/api/legal/documentos/${doc.id}/preview`,
+    };
+  });
 
-export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const auth = await resolveAuthContext(request);
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
-
-  const contentType = request.headers.get('content-type') || '';
-
-  // If it's FormData with a file, delegate to the standard upload endpoint
-  if (contentType.includes('multipart/form-data')) {
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    
-    if (file) {
-      // Forward to the documents/upload endpoint with module='legal'
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
-      uploadFormData.append('module', 'legal');
-      uploadFormData.append('category', formData.get('category') || 'legal');
-      uploadFormData.append('documentType', formData.get('documentType') || 'legal');
-      uploadFormData.append('description', formData.get('description') || '');
-      
-      const uploadRes = await fetch(
-        new URL('/api/documents/upload', request.url),
-        {
-          method: 'POST',
-          headers: {
-            'Cookie': request.headers.get('cookie') || '',
-          },
-          body: uploadFormData,
-        }
-      );
-      
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) {
-        return NextResponse.json(uploadData, { status: uploadRes.status });
-      }
-      
-      return NextResponse.json({ document: uploadData }, { status: 201 });
-    }
-  }
-
-  // Otherwise, handle as JSON metadata-only request
-  const body = await request.json();
-  const { title, category, documentType, description } = body;
-
-  if (!title) {
-    return NextResponse.json({ error: 'El título es requerido' }, { status: 400 });
-  }
-
-  const { data, error } = await supabase
-    .from('module_documents')
-    .insert({
-      document_name: title,
-      document_type: documentType || category || 'legal',
-      description: description || null,
-      module: 'legal',
-      status: 'draft',
-      uploaded_by: auth.user.id,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ document: data }, { status: 201 });
+  return NextResponse.json({
+    documents,
+    total: documents.length,
+    summary: {
+      pending: documents.filter((doc) => doc.review_state === 'pending').length,
+      approved: documents.filter((doc) => doc.review_state === 'approved').length,
+      rejected: documents.filter((doc) => doc.review_state === 'rejected').length,
+    },
+    accessLevel: access.accessLevel,
+  });
 }
