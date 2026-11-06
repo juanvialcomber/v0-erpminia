@@ -9,7 +9,6 @@ const primary = [
   { href: '/dashboard/legal', label: 'Hoy' },
   { href: '/dashboard/legal/avances-pagos', label: 'Contratos y pagos' },
   { href: '/dashboard/legal/contratistas-documentos', label: 'Proveedores' },
-  { href: '/dashboard/legal/asistente', label: 'Asistente' },
 ];
 const secondary = [
   { href: '/dashboard/legal/inbox', label: 'Pendientes' },
