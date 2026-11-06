@@ -12,6 +12,8 @@ export type SkillEvidenceFacts = {
   maintenance: boolean;
   assets: boolean;
   procurementRequests: boolean;
+  legalContracts: boolean;
+  legalInvoiceEvidence: boolean;
   laudus: 'pending' | 'syncing' | 'updated' | 'review' | 'offline';
   laudusFixedAssets: boolean;
 };
@@ -121,6 +123,14 @@ export function buildEvidenceState(facts: SkillEvidenceFacts): EvidenceState {
       'spare_part_lifecycle_relations',
       'equipment_technical_bom_lines',
     ]);
+  }
+
+  if (facts.legalContracts) {
+    availableSources.add('contracts');
+  }
+
+  if (facts.legalInvoiceEvidence) {
+    availableSources.add('laudus_purchase_invoice_payment_status_service_v1');
   }
 
   if (facts.procurementRequests) {
