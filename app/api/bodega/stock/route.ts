@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
+import { loadBodegaOperationalQuantities, resolvedOperationalQuantity } from '@/lib/bodega-operational-stock';
 
 type CanonicalInventoryRow = {
   id: string;
@@ -59,7 +60,9 @@ type WarehouseStockItem = {
   reorder_level: number;
   reorder_quantity: number;
   unit_cost: number;
-  total_value: number;
+  total_value: number | null;
+  valuation_trusted: boolean;
+  valuation_state: 'trusted' | 'review';
   bin_location: string;
   is_low_stock: boolean;
   is_critical: boolean;
@@ -127,7 +130,7 @@ function referenceFor(code: string | null, benchmarks: Map<string, PriceBenchmar
   };
 }
 
-async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number>; pricingWarning?: string } | null> {
+async function buildCanonicalStock(context: OrgContext): Promise<{ items: WarehouseStockItem[]; summary: Record<string, number | null>; valuation: { trusted: false; state: 'review'; reason: string }; pricingWarning?: string } | null> {
   const pageSize = 1000;
   let start = 0;
   const rows: CanonicalInventoryRow[] = [];
@@ -158,11 +161,16 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     console.error('[bodega/stock:pricing]', error);
   }
 
+  const operational = await loadBodegaOperationalQuantities(context.supabase, context.organizationId, rows.map((row) => row.id));
+
   const items: WarehouseStockItem[] = rows.map((row) => {
-    const quantityOnHand = Number(row.quantity || 0);
+    const quantityOnHand = resolvedOperationalQuantity(row.quantity, operational.get(row.id));
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
-    const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
+    const operationalRow = operational.get(row.id);
+    const totalValue = operationalRow
+      ? null
+      : Number(row.total_value ?? quantityOnHand * unitCost);
 
     return {
       id: row.id,
@@ -175,6 +183,8 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
       reorder_quantity: Number(row.max_stock || 0),
       unit_cost: unitCost,
       total_value: totalValue,
+      valuation_trusted: false,
+      valuation_state: 'review',
       bin_location: row.warehouse_code || 'N/A',
       is_low_stock: isStockBelowMinimum(quantityOnHand, reorderLevel),
       is_critical: isStockBelowMinimum(quantityOnHand, reorderLevel) && quantityOnHand <= 0,
@@ -185,13 +195,22 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
   const summary = {
     total_items: items.length,
     total_quantity: items.reduce((sum, i) => sum + i.quantity_on_hand, 0),
-    total_value: items.reduce((sum, i) => sum + i.total_value, 0),
+    total_value: null,
     low_stock_count: items.filter((i) => i.is_low_stock).length,
     critical_count: items.filter((i) => i.is_critical).length,
     reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
   };
 
-  return { items, summary, ...(pricingWarning ? { pricingWarning } : {}) };
+  return {
+    items,
+    summary,
+    valuation: {
+      trusted: false,
+      state: 'review',
+      reason: 'Los costos unitarios de Bodega siguen pendientes de conciliación completa; los valores monetarios son sólo referencia no publicable.',
+    },
+    ...(pricingWarning ? { pricingWarning } : {}),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -201,7 +220,7 @@ export async function GET(request: NextRequest) {
   try {
     if (orgHasCanonicalData(context.organizationId)) {
       const canonical = await buildCanonicalStock(context);
-      if (canonical) return NextResponse.json({ ...canonical, dataSource: 'canonical' });
+      if (canonical) return NextResponse.json({ ...canonical, dataSource: 'canonical+operational', stockAuthority: 'bodega_inventory_operational_service_v1' });
     }
 
     const { data: stock, error } = await context.supabase
@@ -239,7 +258,9 @@ export async function GET(request: NextRequest) {
         reorder_level: reorderLevel,
         reorder_quantity: reorderQuantity,
         unit_cost: unitCost,
-        total_value: quantityOnHand * unitCost,
+        total_value: null,
+        valuation_trusted: false,
+        valuation_state: 'review',
         bin_location: item.bin?.bin_location || item.bin_location || 'N/A',
         is_low_stock: isStockBelowMinimum(quantityOnHand, reorderLevel),
         is_critical: isStockBelowMinimum(quantityOnHand, reorderLevel) && quantityOnHand <= 0,
@@ -250,13 +271,23 @@ export async function GET(request: NextRequest) {
     const summary = {
       total_items: items.length,
       total_quantity: items.reduce((sum, i) => sum + i.quantity_on_hand, 0),
-      total_value: items.reduce((sum, i) => sum + i.total_value, 0),
+      total_value: null,
       low_stock_count: items.filter((i) => i.is_low_stock).length,
       critical_count: items.filter((i) => i.is_critical).length,
       reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
     };
 
-    return NextResponse.json({ items, summary, dataSource: 'warehouse', ...(pricingWarning ? { pricingWarning } : {}) });
+    return NextResponse.json({
+      items,
+      summary,
+      dataSource: 'warehouse',
+      valuation: {
+        trusted: false,
+        state: 'review',
+        reason: 'Los costos unitarios requieren conciliación antes de publicar valorizaciones operativas.',
+      },
+      ...(pricingWarning ? { pricingWarning } : {}),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo obtener el stock';
     return NextResponse.json({

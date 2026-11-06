@@ -1,5 +1,6 @@
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
+import { loadBodegaOperationalQuantities, resolvedOperationalQuantity } from '@/lib/bodega-operational-stock';
 
 type SupabaseClientLike = any;
 
@@ -72,14 +73,17 @@ async function readCanonicalAlerts(
     if (batch.length < PAGE_SIZE) break;
   }
 
+  const operational = await loadBodegaOperationalQuantities(supabase, organizationId, rows.map((row) => row.id));
+
   const items = rows
-    .filter((row) => isStockBelowMinimum(row.quantity, row.min_stock))
-    .map((row) => ({
+    .map((row) => ({ row, quantity: resolvedOperationalQuantity(row.quantity, operational.get(row.id)) }))
+    .filter(({ row, quantity }) => isStockBelowMinimum(quantity, row.min_stock))
+    .map(({ row, quantity }) => ({
       id: row.id,
       part_code: row.sku,
       part_name: row.name || row.description || row.sku,
       category: row.category,
-      quantity_on_hand: Number(row.quantity || 0),
+      quantity_on_hand: quantity,
       reorder_level: Number(row.min_stock || 0),
       location_label: row.warehouse_code || 'bodega',
     }));
