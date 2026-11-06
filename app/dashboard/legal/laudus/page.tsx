@@ -136,7 +136,10 @@ export default function LegalLaudusPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <Button asChild size="sm" variant="ghost"><Link href="/dashboard/legal"><ArrowLeft className="mr-2 h-4 w-4" />Legal</Link></Button>
-        <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/control-contractual">Control contractual <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/avances-pagos">Avances y pagos <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+          <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/control-contractual">Control contractual <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+        </div>
       </div>
 
       <header className="border-b border-border/70 pb-4">
