@@ -23,6 +23,60 @@ function normalizeReconciliation(row: any) {
   };
 }
 
+
+function stockState(quantity: number, minimum: number) {
+  if (quantity < 0) return 'negative';
+  if (quantity <= 0) return 'out_of_stock';
+  if (minimum > 0 && quantity <= minimum) return 'reorder';
+  return 'healthy';
+}
+
+function adjustedOverview(
+  base: any,
+  rows: Array<{ canonical_quantity: number; operational_quantity: number; min_stock: number; unit_cost: number }>,
+) {
+  const overview = { ...(base || {}) };
+  const numericKeys = [
+    'products_with_stock',
+    'units_on_hand',
+    'units_reserved',
+    'units_available',
+    'total_stock_value',
+    'out_of_stock_products',
+    'reorder_products',
+    'negative_stock_products',
+    'expired_products',
+    'expiring_products',
+    'count_overdue_products',
+  ];
+  for (const key of numericKeys) overview[key] = Number(overview[key] || 0);
+
+  for (const row of rows) {
+    const before = row.canonical_quantity;
+    const after = row.operational_quantity;
+    const beforeState = stockState(before, row.min_stock);
+    const afterState = stockState(after, row.min_stock);
+
+    if (before > 0 && after <= 0) overview.products_with_stock -= 1;
+    if (before <= 0 && after > 0) overview.products_with_stock += 1;
+
+    overview.units_on_hand += after - before;
+    overview.units_available += after - before;
+    overview.total_stock_value += (after - before) * row.unit_cost;
+
+    for (const [state, key] of [
+      ['out_of_stock', 'out_of_stock_products'],
+      ['reorder', 'reorder_products'],
+      ['negative', 'negative_stock_products'],
+    ] as const) {
+      if (beforeState === state && afterState !== state) overview[key] -= 1;
+      if (beforeState !== state && afterState === state) overview[key] += 1;
+    }
+  }
+
+  return overview;
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
   if (!access.authorized) return access.response;
@@ -83,6 +137,42 @@ export async function GET(request: NextRequest) {
 
     const rawPositions = positionsResult.data || [];
     const rawMissingOperational = missingOperationalResult.data || [];
+
+    const { data: operationalDeltaRows, error: operationalDeltaError } = await context.supabase
+      .from('bodega_inventory_operational_service_v1')
+      .select('canonical_product_id,operational_quantity,operational_resolution')
+      .eq('organization_id', organizationId)
+      .in('operational_resolution', ['legacy_motil_stale', 'laudus_only_current']);
+
+    if (operationalDeltaError) throw operationalDeltaError;
+
+    const operationalDeltaIds = [...new Set((operationalDeltaRows || [])
+      .map((row: any) => String(row.canonical_product_id || '').trim())
+      .filter(Boolean))];
+
+    const canonicalDeltaRows:any[] = [];
+    for (let index = 0; index < operationalDeltaIds.length; index += 250) {
+      const ids = operationalDeltaIds.slice(index, index + 250);
+      const { data: rows, error } = await context.supabase
+        .from('canonical_inventory_current')
+        .select('id,quantity,min_stock,unit_cost')
+        .eq('organization_id', organizationId)
+        .in('id', ids);
+      if (error) throw error;
+      canonicalDeltaRows.push(...(rows || []));
+    }
+
+    const operationalDeltaById = new Map(
+      (operationalDeltaRows || []).map((row:any) => [String(row.canonical_product_id), num(row.operational_quantity)]),
+    );
+    const overviewAdjustments = canonicalDeltaRows
+      .map((row:any) => ({
+        canonical_quantity: num(row.quantity) ?? 0,
+        operational_quantity: operationalDeltaById.get(String(row.id)) ?? num(row.quantity) ?? 0,
+        min_stock: num(row.min_stock) ?? 0,
+        unit_cost: num(row.unit_cost) ?? 0,
+      }))
+      .filter((row:any) => Math.abs(row.operational_quantity - row.canonical_quantity) > 0.000001);
     const positionSkus = [...new Set(
       rawPositions
         .map((row: any) => String(row.product_code || '').trim().toUpperCase())
@@ -253,7 +343,7 @@ export async function GET(request: NextRequest) {
       : null;
 
     return NextResponse.json({
-      overview: overviewResult.data || null,
+      overview: adjustedOverview(overviewResult.data || null, overviewAdjustments),
       positions,
       diesel: currentDiesel || dieselLaudus ? {
         current: currentDiesel,
@@ -283,6 +373,11 @@ export async function GET(request: NextRequest) {
         latestWhatsappStockEvidence: authority.latest_whatsapp_stock_evidence,
         whatsappStockEvidenceSinceLaudus: Number(authority.whatsapp_stock_evidence_since_laudus || 0),
       } : null,
+      valuation: {
+        trusted: false,
+        state: 'review',
+        reason: 'Las cantidades operativas usan Laudus primario, pero los costos de Bodega siguen pendientes de conciliación completa.',
+      },
       source: 'public.inventory_intelligence_position_v1 + public.laudus_inventory_reconciliation_service_v1 + public.bodega_inventory_operational_service_v1 + public.bodega_stock_source_authority_service_v1',
       canonical: true,
     });
