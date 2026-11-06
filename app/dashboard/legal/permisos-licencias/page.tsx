@@ -16,6 +16,17 @@ const fetcher = async (url: string) => {
   return Array.isArray(payload) ? payload : payload.documents || payload.data || [];
 };
 
+type ComplianceEventItem = {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  due_date?: string | null;
+  next_date?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  location?: string | null;
+};
+
 type LegalDocumentItem = {
   id: string | number;
   title?: string | null;
@@ -44,6 +55,7 @@ function matchesPermitLicense(document: LegalDocumentItem) {
 export default function PermisosLicenciasPage() {
   const [query, setQuery] = useState('');
   const { data } = useSWR('/api/legal/documentos', fetcher);
+  const { data: complianceEvents } = useSWR('/api/sostenibilidad/compliance-events?limit=100', fetcher);
   const handleUploadSuccess = () => {
     window.location.reload();
   };
@@ -52,6 +64,13 @@ export default function PermisosLicenciasPage() {
     const source = Array.isArray(data) ? data : [];
     return source.filter((doc): doc is LegalDocumentItem => matchesPermitLicense(doc as LegalDocumentItem));
   }, [data]);
+
+  const polvorines = useMemo(() => {
+    const source = Array.isArray(complianceEvents) ? complianceEvents as ComplianceEventItem[] : [];
+    return source
+      .filter((event) => String(event.description || '').includes('[POLVORIN]'))
+      .sort((a, b) => String(a.due_date || '').localeCompare(String(b.due_date || '')));
+  }, [complianceEvents]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -158,6 +177,34 @@ export default function PermisosLicenciasPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Polvorines y consumidores habituales</CardTitle>
+          <CardDescription>Vencimientos cargados desde la planilla de Elías. El aviso operativo comienza 15 días antes del vencimiento.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {polvorines.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay vencimientos de polvorines verificados en la fuente canónica.</p>
+          ) : (
+            <div className="divide-y rounded-md border">
+              {polvorines.map((event) => (
+                <div key={event.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{event.title || event.location || 'Registro de polvorín'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Vence {event.due_date || 'sin fecha'} · Aviso desde {event.next_date || 'sin fecha'}
+                    </p>
+                  </div>
+                  <Badge variant={event.priority === 'alta' ? 'destructive' : 'outline'}>
+                    {event.priority === 'alta' ? 'Prioridad alta' : 'Seguimiento'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

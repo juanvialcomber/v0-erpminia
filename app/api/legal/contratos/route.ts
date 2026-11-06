@@ -53,6 +53,18 @@ export async function POST(request: NextRequest) {
       return fallback;
     };
 
+    const optionalNumber = (keys: string[]) => {
+      for (const key of keys) {
+        const value = payload instanceof FormData ? payload.get(key) : (payload as Record<string, unknown>)[key];
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim()) {
+          const parsed = Number(value);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+      }
+      return undefined;
+    };
+
     const contract = await createContract({
       organizationId: auth.organizationId,
       createdBy: auth.user.id,
@@ -66,6 +78,7 @@ export async function POST(request: NextRequest) {
       contractValue: parseNumber(['contractValue', 'contract_value', 'monto_total']),
       currency: readField(['currency'], 'CLP'),
       paidAmount: parseNumber(['paidAmount', 'paid_amount']),
+      executionPercentage: optionalNumber(['executionPercentage', 'execution_percentage']),
       startDate: readField(['startDate', 'start_date', 'fecha_inicio']) || undefined,
       endDate: readField(['endDate', 'end_date', 'fecha_fin']) || undefined,
       reviewDueDate: readField(['reviewDueDate', 'review_due_date']) || undefined,

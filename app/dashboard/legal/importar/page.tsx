@@ -39,10 +39,16 @@ type ContractRow = {
   contractType: string;
   status: string;
   contractValue: number;
+  paidAmount: number;
+  executionPercentage?: number;
   currency: string;
   complianceStatus: string;
+  complianceNotes: string;
+  responsibleArea: string;
+  projectName: string;
   startDate: string;
   endDate: string;
+  sourceLabel?: string;
 };
 
 function normalizeText(value: unknown) {
@@ -64,6 +70,67 @@ function parseNumber(value: unknown) {
 
 function pickIndex(headers: string[], variants: string[]) {
   return headers.findIndex((header) => variants.some((variant) => header.includes(variant)));
+}
+
+function inferLaPataguaContractor(title: string) {
+  const normalized = normalizeHeader(title);
+  const rules: Array<[RegExp, string]> = [
+    [/rpr/, 'RPR INGENIERÍA EN MANTENIMIENTO SPA'],
+    [/sl ingenieria/, 'SL INGENIERÍA SpA'],
+    [/petra/, 'INGENIERÍA Y CONSTRUCCIÓN PETRA SPA'],
+    [/serv.*mineria.*energia/, 'SERVICIOS DE MINERÍA Y ENERGÍAS RENOVABLES SPA'],
+    [/geophysical/, 'INGENIERIA Y PROYECTOS GEOPHYSICAL STUDIES CHILE SPA'],
+    [/constructora 3d/, 'CONSTRUCTORA 3D SPA'],
+    [/spin technologies/, 'SPIN TECHNOLOGIES SERVICIOS DE INGENIERIA LIMITADA'],
+    [/global fire/, 'GLOBAL FIRE CHILE SPA'],
+    [/sustentable/, 'SUSTENTABLE S.A'],
+    [/pma/, 'PMA SPA'],
+    [/ga consultores/, 'GA Consultores'],
+    [/cedrem/, 'Cedrem'],
+  ];
+  return rules.find(([pattern]) => pattern.test(normalized))?.[1] || 'Proveedor por conciliar';
+}
+
+function parseLaPataguaContractSummary(rows: unknown[][], fileName: string): ContractRow[] {
+  const headerRow = rows.findIndex((row) => normalizeHeader(row?.[0]) === 'ncl proy');
+  if (headerRow < 0) return [];
+
+  const parsed: ContractRow[] = [];
+  for (let index = headerRow + 1; index < rows.length; index += 1) {
+    const row = rows[index] || [];
+    const code = normalizeText(row[0]);
+    if (!/^(IO|EP)-\d+$/i.test(code)) continue;
+
+    const title = normalizeText(row[2]);
+    const contractValue = typeof row[4] === 'number' ? row[4] : parseNumber(row[4]);
+    const paidAmount = typeof row[5] === 'number' ? row[5] : parseNumber(row[5]);
+    const observation = normalizeText(row[7]);
+    if (!title || !(contractValue > 0)) continue;
+
+    parsed.push({
+      title,
+      contractorName: inferLaPataguaContractor(title),
+      contractNumber: code,
+      description: observation,
+      contractType: normalizeText(row[1]) || 'Principal',
+      status: 'En Revisión',
+      contractValue,
+      paidAmount,
+      currency: normalizeText(row[3]) || 'CLP',
+      complianceStatus: 'Pendiente',
+      complianceNotes: [
+        observation ? `Estado fuente: ${observation}` : '',
+        `Fuente operativa: ${fileName} · hoja Resumen · fila ${index + 1}`,
+        'Importación desde planilla de seguimiento. Requiere validación humana antes de tratarla como estado jurídico o contractual definitivo.',
+      ].filter(Boolean).join(' · '),
+      responsibleArea: normalizeText(row[1]),
+      projectName: title,
+      startDate: '',
+      endDate: '',
+      sourceLabel: `${fileName} · Resumen · fila ${index + 1}`,
+    });
+  }
+  return parsed;
 }
 
 function parseCsvRows(text: string, mode: ImportMode) {
@@ -126,8 +193,12 @@ function parseCsvRows(text: string, mode: ImportMode) {
         contractType: values[columns.contractType] || 'Principal',
         status: values[columns.status] || 'En Revisión',
         contractValue: parseNumber(values[columns.contractValue]),
+        paidAmount: 0,
         currency: values[columns.currency] || 'CLP',
         complianceStatus: values[columns.complianceStatus] || 'Pendiente',
+        complianceNotes: '',
+        responsibleArea: '',
+        projectName: '',
         startDate: values[columns.startDate] || '',
         endDate: values[columns.endDate] || '',
       } satisfies ContractRow,
@@ -139,6 +210,15 @@ async function parseWorkbook(file: File, mode: ImportMode) {
   const xlsx = await loadXlsxModule();
   const buffer = await file.arrayBuffer();
   const workbook = xlsx.read(buffer, { type: 'array', cellDates: true });
+  if (mode === 'contracts' && workbook.SheetNames.includes('Resumen')) {
+    const summarySheet = workbook.Sheets.Resumen;
+    if (summarySheet) {
+      const summaryRows = sheetToMatrix(xlsx, summarySheet, true);
+      const laPataguaRows = parseLaPataguaContractSummary(summaryRows, file.name);
+      if (laPataguaRows.length) return laPataguaRows;
+    }
+  }
+
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) return [];
 
@@ -284,10 +364,16 @@ export default function LegalImportPage() {
           contractType: row.contractType,
           status: row.status,
           contractValue: row.contractValue,
+          paidAmount: row.paidAmount,
+          executionPercentage: row.executionPercentage,
           currency: row.currency,
           complianceStatus: row.complianceStatus,
+          complianceNotes: row.complianceNotes,
+          responsibleArea: row.responsibleArea || undefined,
+          projectName: row.projectName || undefined,
           startDate: row.startDate || undefined,
           endDate: row.endDate || undefined,
+          fileName: row.sourceLabel ? row.sourceLabel.split(' · ')[0] : undefined,
         }),
       });
 
@@ -526,7 +612,8 @@ function ImportPanel({
             <>
               <p>Campos obligatorios: `TITLE` y `CONTRACTOR_NAME`.</p>
               <p>Campos recomendados: `CONTRACT_NUMBER`, `START_DATE`, `END_DATE`, `STATUS`, `CONTRACT_VALUE`, `CURRENCY`, `COMPLIANCE_STATUS`.</p>
-              <p>Los contratos se crean con el mismo esquema de datos del módulo legal.</p>
+              <p>También reconoce la planilla La Patagua con hoja <strong>Resumen</strong> y códigos <code>IO-*</code> / <code>EP-*</code>.</p>
+              <p>Los registros importados desde esa planilla entran <strong>En Revisión</strong>; la planilla es evidencia operativa y no reemplaza la validación contractual.</p>
             </>
           )}
         </CardContent>

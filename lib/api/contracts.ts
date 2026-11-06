@@ -18,6 +18,7 @@ interface CreateContractInput {
   contractValue?: number;
   currency?: string;
   paidAmount?: number;
+  executionPercentage?: number;
   startDate?: string;
   endDate?: string;
   reviewDueDate?: string;
@@ -25,6 +26,7 @@ interface CreateContractInput {
   responsibleArea?: string;
   eeccId?: string;
   contractorName?: string;
+  supplierId?: string;
   propertyName?: string;
   projectName?: string;
   royaltyRate?: number;
@@ -123,6 +125,7 @@ function mapContract(contract: any) {
     contract_value: contractValue,
     currency: contract.currency || 'CLP',
     paid_amount: paidAmount,
+    execution_percentage: contract.execution_percentage === null || contract.execution_percentage === undefined ? null : Number(contract.execution_percentage),
     pending_amount: Math.max(contractValue - paidAmount, 0),
     start_date: contract.start_date,
     end_date: contract.end_date,
@@ -130,6 +133,7 @@ function mapContract(contract: any) {
     responsible_person: contract.responsible_person || '',
     responsible_area: contract.responsible_area || '',
     contractor_name: contract.contractor_name || '',
+    supplier_id: contract.supplier_id || null,
     property_name: contract.property_name || '',
     project_name: contract.project_name || '',
     royalty_rate: royaltyRate,
@@ -176,6 +180,20 @@ export async function listContractsForOrganization(
 
 export async function createContract(input: CreateContractInput) {
   const supabase = getSupabaseServerClient();
+  let supplierId = input.supplierId || null;
+
+  if (!supplierId && input.contractorName) {
+    const { data: suppliers, error: supplierError } = await supabase
+      .from('suppliers')
+      .select('id')
+      .eq('organization_id', input.organizationId)
+      .ilike('name', input.contractorName)
+      .limit(2);
+
+    if (supplierError) throw supplierError;
+    supplierId = suppliers?.length === 1 ? suppliers[0].id : null;
+  }
+
   const { data, error } = await supabase
     .from('contracts')
     .insert({
@@ -189,6 +207,7 @@ export async function createContract(input: CreateContractInput) {
       contract_value: input.contractValue || 0,
       currency: input.currency || 'CLP',
       paid_amount: input.paidAmount || 0,
+      execution_percentage: input.executionPercentage ?? null,
       start_date: input.startDate || null,
       end_date: input.endDate || null,
       review_due_date: input.reviewDueDate || null,
@@ -196,6 +215,7 @@ export async function createContract(input: CreateContractInput) {
       responsible_area: input.responsibleArea || null,
       eecc_id: input.eeccId || null,
       contractor_name: input.contractorName || null,
+      supplier_id: supplierId,
       property_name: input.propertyName || null,
       project_name: input.projectName || null,
       royalty_rate: input.royaltyRate || 0,
