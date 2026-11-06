@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -54,13 +55,14 @@ function qty(value: number | null | undefined) {
 }
 
 export default function TransportSettlementsPage() {
+  const [selectedPeriod, setSelectedPeriod] = useState('');
   const { data, error, isLoading } = useSWR<Response>('/api/finance/transport-settlements', fetcher, { revalidateOnFocus: false });
 
   if (isLoading) return <StatePanel tone="loading" title="Cargando transportistas" description="Reconstruyendo liquidaciones desde evidencia histórica." />;
   if (error || !data) return <StatePanel tone="error" title="Liquidaciones no disponibles" description="La fuente histórica no se reemplaza por valores inferidos." />;
 
-  const latestPeriod = data.periods[0] || null;
-  const latestRows = latestPeriod ? data.items.filter((item) => item.period_start.startsWith(latestPeriod)) : data.items.slice(0, 20);
+  const activePeriod = selectedPeriod || data.periods[0] || '';
+  const activeRows = activePeriod ? data.items.filter((item) => item.period_start.startsWith(activePeriod)) : data.items.slice(0, 20);
 
   return (
     <div className="space-y-5">
@@ -93,16 +95,26 @@ export default function TransportSettlementsPage() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold">Último período</h2>
-            <p className="text-sm text-muted-foreground">{latestPeriod || 'Sin período disponible'}</p>
+            <h2 className="text-base font-semibold">Período</h2>
+            <p className="text-sm text-muted-foreground">{data.periods.length} períodos mensuales disponibles</p>
           </div>
-          <p className="text-xs text-muted-foreground">{data.periods.length} períodos mensuales disponibles</p>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Mes
+            <select
+              value={activePeriod}
+              onChange={(event) => setSelectedPeriod(event.target.value)}
+              className="h-9 rounded-md border bg-background px-3 text-sm text-foreground"
+              aria-label="Seleccionar período de liquidaciones"
+            >
+              {data.periods.map((period) => <option key={period} value={period}>{period}</option>)}
+            </select>
+          </label>
         </div>
 
         <div className="divide-y overflow-hidden rounded-md border">
-          {latestRows.length ? latestRows.map((item) => (
+          {activeRows.length ? activeRows.map((item) => (
             <article key={item.id} className="grid gap-3 p-3 md:grid-cols-[1.5fr_120px_120px_120px_110px] md:items-center">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
