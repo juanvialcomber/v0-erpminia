@@ -32,6 +32,7 @@ test('stock summary uses operational quantity and keeps monetary output explicit
   assert.match(stockRoute, /valuation_trusted: false/);
   assert.match(stockRoute, /valuation_state: 'review'/);
   assert.match(stockRoute, /total_value: null/);
+  assert.ok((stockRoute.match(/total_value: null/g) || []).length >= 2, 'canonical and warehouse fallback totals must both remain suppressed');
   assert.match(stockRoute, /Los costos unitarios de Bodega siguen pendientes de conciliación completa/);
   assert.doesNotMatch(stockRoute, /unitCost\s*=\s*Number\(operational/);
 });
