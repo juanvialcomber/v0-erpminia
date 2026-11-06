@@ -21,6 +21,7 @@ type InboxItem = {
   priority: 'critical' | 'high' | 'medium' | 'low';
   owner: string | null;
   evidence_status: string;
+  management_ready?: boolean;
   signatures_required: number | null;
   signatures_done: number | null;
   amount: number | null;
@@ -38,6 +39,7 @@ type InboxResponse = {
     due_next_7_days: number;
     waiting_signatures: number;
     evidence_pending: number;
+    ready_for_management: number;
   };
 };
 
@@ -95,12 +97,13 @@ export default function LegalInboxPage() {
         <StatePanel tone="warning" title="Inbox parcial" description={data.warnings.join(' ')} className="min-h-0" />
       ) : null}
 
-      <section className="grid overflow-hidden rounded-md border sm:grid-cols-5">
+      <section className="grid overflow-hidden rounded-md border sm:grid-cols-3 lg:grid-cols-6">
         {[
           ['Pendientes', data.summary.total],
           ['Vencidos', data.summary.overdue],
           ['Próx. 7 días', data.summary.due_next_7_days],
           ['Esperando firmas', data.summary.waiting_signatures],
+          ['Listos Gerencia', data.summary.ready_for_management],
           ['Evidencia pendiente', data.summary.evidence_pending],
         ].map(([label, value], index) => (
           <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
@@ -128,6 +131,7 @@ export default function LegalInboxPage() {
                     {item.timing_state === 'on_track' ? <Badge variant="outline">En plazo</Badge> : null}
                     {item.timing_state === 'no_due_date' ? <Badge variant="outline">Sin fecha</Badge> : null}
                     {waitingSignatures ? <Badge variant="secondary">{item.signatures_done}/{item.signatures_required} firmas</Badge> : null}
+                    {item.management_ready ? <Badge variant="secondary">Listo para Gerencia</Badge> : null}
                     <Badge variant="outline">Evidencia: {item.evidence_status === 'complete' ? 'completa' : 'pendiente'}</Badge>
                   </div>
                   <h2 className="mt-2 text-sm font-semibold">{item.title}</h2>
