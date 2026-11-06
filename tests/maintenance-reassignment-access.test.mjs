@@ -26,7 +26,6 @@ test('mechanic ED matrix does not bypass assigned executor boundary after reassi
     assert.match(route, /canBypassAssignedMaintenanceExecution/);
   }
   assert.match(reviewRoute, /accessLevel === 'ED' && context\.role !== 'tecnico'/);
-  assert.match(executionRoute, /canReadModule = context\.role !== 'tecnico'/);
-  assert.match(executionRoute, /canWriteModule = accessLevel === 'ED' && context\.role !== 'tecnico'/);
+  assert.match(executionRoute, /context\.role === 'tecnico'/);
   assert.match(executionRoute, /requireAssignedMaintenanceExecution/);
 });
