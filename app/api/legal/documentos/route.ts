@@ -4,6 +4,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireModuleAccess, MODULE_KEYS } from '@/lib/api/module-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
+type LegalDocumentRow = {
+  id:string;
+  document_name:string;
+  document_type:string|null;
+  document_type_category:string|null;
+  document_code:string|null;
+  description:string|null;
+  status:string|null;
+  file_path:string;
+  file_url:string|null;
+  file_size_bytes:number|null;
+  uploaded_at:string|null;
+  uploaded_by:string;
+  valid_from:string|null;
+  valid_until:string|null;
+  version:number|null;
+  l1_status:string|null;
+  l1_observations:string|null;
+  l2_status:string|null;
+  l2_observations:string|null;
+  canonical_section:string|null;
+  provenance_status:string|null;
+  canonical_role:string|null;
+  extracted_data:unknown;
+};
+
 export async function GET(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.LEGAL_MODULO);
   if (!access.authorized) return access.response;
@@ -57,14 +83,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const uploaderIds = Array.from(new Set((data || []).map((doc) => doc.uploaded_by).filter(Boolean)));
+  const rows = (data || []) as unknown as LegalDocumentRow[];
+  const uploaderIds = Array.from(new Set(rows.map((doc) => doc.uploaded_by).filter(Boolean)));
   const { data: uploaders } = uploaderIds.length
     ? await supabase.from('profiles').select('id,full_name,email').in('id', uploaderIds)
     : { data: [] as Array<{ id:string; full_name:string|null; email:string|null }> };
 
   const uploaderById = new Map((uploaders || []).map((row) => [row.id, row]));
 
-  const documents = (data || []).map((doc) => {
+  const documents = rows.map((doc) => {
     const uploader = uploaderById.get(doc.uploaded_by);
     const normalizedStatus =
       ['active', 'approved', 'aprobado'].includes(String(doc.status || '').toLowerCase())
