@@ -10,7 +10,7 @@ test('EECC coverage requires Legal access and tenant-scoped registration',()=>{
 });
 test('EECC coverage keeps unstarted folders apart from Legal approvals',()=>{
  assert.match(api,/without_folder:entries\.filter/);
- assert.match(home,/contratistas registradas/);
- assert.match(home,/aún sin carpeta/);
+ assert.match(home,/Registrados/);
+ assert.match(home,/Sin carpeta/);
  assert.match(home,/c\.status === 'en_revision_l1'/);
 });
