@@ -136,9 +136,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: closeError.message || 'No se pudo cerrar la orden de trabajo' }, { status });
     }
 
+    const reviewNow = new Date().toISOString();
+    const { error: createReviewError } = await context.supabase
+      .from('work_order_supervisor_reviews')
+      .upsert(
+        {
+          organization_id: context.organizationId,
+          work_order_id: id,
+          status: 'pending',
+          updated_at: reviewNow,
+        },
+        {
+          onConflict: 'organization_id,work_order_id',
+          ignoreDuplicates: true,
+        },
+      );
+    if (createReviewError) throw createReviewError;
+
     const { error: resubmitReviewError } = await context.supabase
       .from('work_order_supervisor_reviews')
-      .update({ status: 'pending', resubmitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ status: 'pending', resubmitted_at: reviewNow, updated_at: reviewNow })
       .eq('organization_id', context.organizationId)
       .eq('work_order_id', id)
       .eq('status', 'rejected');

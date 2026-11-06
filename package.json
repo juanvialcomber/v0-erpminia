@@ -17,7 +17,8 @@
     "ci": "pnpm build",
     "canonical:products": "node scripts/import-canonical-products.mjs",
     "canonical:drilling": "node scripts/import-canonical-drilling.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "qa:maintenance-canary": "node --test tests/maintenance-assigned-executor-auth.test.mjs tests/maintenance-work-readiness.test.mjs tests/maintenance-timer-contract.test.mjs tests/maintenance-pause-reason.test.mjs tests/maintenance-work-order-idempotency.test.mjs tests/maintenance-evidence-approval.test.mjs tests/maintenance-supervisor-rejection-cycle.test.mjs tests/maintenance-supervisor-review-on-close.test.mjs tests/maintenance-close-assigned-executor.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
