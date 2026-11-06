@@ -50,7 +50,7 @@ export default function ContractPaymentsPage(){
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Avance físico desde la evidencia contractual y estado financiero verificado. Facturado no se trata como pagado.</p>
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
-      <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos piloto</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
+      <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
       <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Hitos</p><p className="mt-1 text-xl font-semibold">{data.summary.milestones}</p></div>
       <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Facturas conciliadas</p><p className="mt-1 text-xl font-semibold">{data.summary.invoices_matched}/{data.summary.invoices_expected}</p></div>
       <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Con retención</p><p className="mt-1 text-xl font-semibold">{data.summary.retained_milestones}</p></div>
@@ -63,7 +63,7 @@ export default function ContractPaymentsPage(){
     </section>
     <section className="space-y-3">
       {data.contracts.map((contract)=><article key={'detail-'+contract.contract_number} className="overflow-hidden rounded-md border">
-        <div className="border-b bg-muted/20 px-4 py-3"><p className="text-sm font-semibold">{contract.contract_number} · {contract.contractor_name}</p><p className="mt-1 text-xs text-muted-foreground">{contract.invoice_matches}/{contract.invoice_expected} facturas encontradas en Laudus</p></div>
+        <div className="border-b bg-muted/20 px-4 py-3"><p className="text-sm font-semibold">{contract.contract_number} · {contract.contractor_name}</p><p className="mt-1 text-xs text-muted-foreground">{contract.invoice_matches}/{contract.invoice_expected} facturas verificadas</p></div>
         <div className="divide-y">
           {data.data.filter((item)=>item.contract_number===contract.contract_number).map((item)=><div key={item.contract_number+'-'+item.sequence} className="p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">Hito {item.sequence}</Badge><Badge variant="outline">OC {item.purchase_order_number}</Badge><Badge variant={variant(item.payment_state)}>{label(item.payment_state)}</Badge></div><h3 className="mt-2 text-sm font-semibold">{item.title}</h3><p className="mt-1 text-xs text-muted-foreground">Avance {percent(item.progress_ratio)} · Ejecutado {money(item.executed_amount,item.currency)} · Facturado {money(item.invoiced_amount,item.currency)}</p></div><div className="text-xs lg:text-right"><p className="font-medium">{money(item.total_amount,item.currency)}</p><p className="mt-1 text-muted-foreground">Pendiente de facturar {money(item.pending_to_invoice,item.currency)}</p></div></div>
