@@ -12,7 +12,6 @@ export function isMaintenanceWorkOrderCreatorCargo(cargoName?: string | null) {
     cargo === 'jefe departamento de mantenimiento' ||
     cargo === 'jefe de planificación' ||
     cargo === 'jefe de equipos móviles y estacionarios' ||
-    cargo.startsWith('jefe de taller mina ') ||
     cargo.startsWith('jefe mina ') ||
     cargo.startsWith('jefe de mina ')
   );
@@ -23,6 +22,7 @@ export function isEmergencyWorkOrderCreatorCargo(cargoName?: string | null) {
 
   return (
     isMaintenanceWorkOrderCreatorCargo(cargoName) ||
+    cargo.startsWith('jefe de taller mina ') ||
     cargo.startsWith('mecánico') ||
     cargo === 'soldador' ||
     cargo === 'encargado de camionetas y camiones'
