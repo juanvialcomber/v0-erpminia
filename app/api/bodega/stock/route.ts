@@ -165,7 +165,10 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     const quantityOnHand = resolvedOperationalQuantity(row.quantity, operational.get(row.id));
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
-    const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
+    const operationalRow = operational.get(row.id);
+    const totalValue = operationalRow
+      ? quantityOnHand * unitCost
+      : Number(row.total_value ?? quantityOnHand * unitCost);
 
     return {
       id: row.id,
@@ -204,7 +207,7 @@ export async function GET(request: NextRequest) {
   try {
     if (orgHasCanonicalData(context.organizationId)) {
       const canonical = await buildCanonicalStock(context);
-      if (canonical) return NextResponse.json({ ...canonical, dataSource: 'canonical' });
+      if (canonical) return NextResponse.json({ ...canonical, dataSource: 'canonical+operational', stockAuthority: 'bodega_inventory_operational_service_v1' });
     }
 
     const { data: stock, error } = await context.supabase
