@@ -25,6 +25,7 @@ type InboxItem = {
   amount: number | null;
   currency: string | null;
   source_href: string;
+  next_action: string;
 };
 
 type InboxResponse = {
@@ -128,6 +129,7 @@ export default function LegalInboxPage() {
                   <h2 className="mt-2 text-sm font-semibold">{item.title}</h2>
                   {item.detail ? <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p> : null}
                   {amount ? <p className="mt-2 text-sm font-medium">{amount}</p> : null}
+                  <p className="mt-2 text-sm"><span className="font-medium">Siguiente acción:</span> {item.next_action}</p>
                 </div>
                 <div className="shrink-0 text-xs text-muted-foreground md:text-right">
                   <p className={item.overdue ? 'font-medium text-destructive' : ''}>{dueLabel(item)}</p>
@@ -139,7 +141,7 @@ export default function LegalInboxPage() {
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
                 <Button asChild variant="ghost" size="sm">
                   <Link href={item.source_href}>
-                    Abrir fuente <ArrowRight className="ml-1 h-4 w-4" />
+                    {item.next_action} <ArrowRight className="ml-1 h-4 w-4" />
                   </Link>
                 </Button>
                 {item.evidence_status === 'complete' ? (
