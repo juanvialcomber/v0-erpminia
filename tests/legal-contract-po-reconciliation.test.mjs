@@ -6,6 +6,7 @@ const catalog = await readFile(new URL('../lib/legal/contract-purchase-order-can
 const api = await readFile(new URL('../app/api/legal/contract-po-reconciliation/route.ts', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/dashboard/legal/laudus/page.tsx', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/20261106183000_legal_contract_purchase_order_links.sql', import.meta.url), 'utf8');
+const normalizeMigration = await readFile(new URL('../supabase/migrations/20261106190000_normalize_laudus_purchase_order_number.sql', import.meta.url), 'utf8');
 
 test('contract OC candidates preserve workbook provenance', () => {
   assert.match(catalog, /Planilla Avance Contratos - Con resumen\.xlsx/);
@@ -19,12 +20,14 @@ test('contract OC candidates preserve workbook provenance', () => {
 });
 
 test('contract OC reconciliation fails closed when canonical OC is absent or supplier conflicts', () => {
-  assert.match(api, /canonical_purchase_orders_v1/);
+  assert.match(api, /schema\('integration'\)/);
+  assert.match(api, /laudus_purchase_orders/);
+  assert.match(api, /external_id/);
   assert.match(api, /status = 'not_found'/);
   assert.match(api, /status = 'conflict'/);
   assert.match(api, /normalize\(supplier\.rut\) !== normalize\(po\.supplier_tax_id\)/);
   assert.match(api, /status = 'verified'/);
-  assert.match(api, /OC canónica encontrada y proveedor compatible/);
+  assert.match(api, /OC Laudus encontrada en staging y RUT de proveedor compatible/);
 });
 
 test('Legal OC reconciliation UI exposes verification states and provenance', () => {
@@ -45,4 +48,13 @@ test('ledger schema is human-reviewed and does not seed guessed links', () => {
   assert.match(migration, /verified_at/);
   assert.doesNotMatch(migration, /insert into public\.legal_contract_purchase_order_links/i);
   assert.match(migration, /service_role/);
+});
+
+
+test('Laudus staging order number normalization is idempotent and integration-only', () => {
+  assert.match(normalizeMigration, /update integration\.laudus_purchase_orders/);
+  assert.match(normalizeMigration, /set order_number = external_id/);
+  assert.match(normalizeMigration, /where order_number is null/);
+  assert.doesNotMatch(normalizeMigration, /canonical\./);
+  assert.doesNotMatch(normalizeMigration, /public\.contracts/);
 });
