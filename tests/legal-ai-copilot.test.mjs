@@ -16,3 +16,13 @@ test('assistant is advisory and sources are traceable',()=>{
  assert.match(page,/Asistente IA de Legal/);
  assert.match(nav,/\/dashboard\/legal\/asistente/);
 });
+
+
+test('legal assistant receives contract progress and Laudus payment evidence without payment authority',()=>{
+ assert.match(api,/LEGAL_PROGRESS_MILESTONES/);
+ assert.match(api,/laudus_purchase_invoice_payment_status_service_v1/);
+ assert.match(api,/contractPaymentEvidence/);
+ assert.match(api,/Facturado nunca significa pagado/);
+ assert.match(api,/ejecutes pagos/);
+ assert.match(api,/retención contractual/);
+});
