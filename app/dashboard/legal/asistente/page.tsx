@@ -73,10 +73,10 @@ export default function LegalAssistantPage() {
   finally{setBusy(false);}
  };
  return <main className="mx-auto max-w-3xl space-y-5">
-  <header><h1 className="text-2xl font-semibold">Asistente IA de Legal</h1><p className="text-sm text-muted-foreground">Copiloto de Elías para documentos EECC y contexto SERNAGEOMIN. Las decisiones son humanas.</p></header>
+  <header><h1 className="text-2xl font-semibold">Asistente de Elías</h1><p className="text-sm text-muted-foreground">Contratos, avances, pagos, proveedores y documentos. MOTIL separa hechos, conciliación y decisiones humanas.</p></header>
   <div className="rounded-lg border p-4 space-y-3">
-   <label htmlFor="legal-question" className="text-sm font-medium">Consulta jurídica y documental</label>
-   <Textarea id="legal-question" rows={4} maxLength={1800} value={question} onChange={e=>setQuestion(e.target.value)} placeholder="¿Qué documentos de contratistas están pendientes de revisar?"/>
+   <label htmlFor="legal-question" className="text-sm font-medium">¿Qué necesitas revisar?</label>
+   <Textarea id="legal-question" rows={4} maxLength={1800} value={question} onChange={e=>setQuestion(e.target.value)} placeholder="Ej.: ¿Qué contratos requieren atención hoy? ¿Qué falta pagar de IO-01? ¿Qué proveedores tienen documentos pendientes?"/>
    <Button disabled={busy||!question.trim()} onClick={ask}>{busy?'Consultando...':'Consultar IA'}</Button>
    {error?<p role="alert" className="text-sm text-destructive">{error}</p>:null}
    {answer?<div aria-live="polite" className="rounded-md bg-muted p-4 text-sm whitespace-pre-wrap">{answer}</div>:null}
