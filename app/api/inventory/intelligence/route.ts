@@ -62,7 +62,6 @@ function adjustedOverview(
 
     overview.units_on_hand += after - before;
     overview.units_available += after - before;
-    overview.total_stock_value += (after - before) * row.unit_cost;
 
     for (const [state, key] of [
       ['out_of_stock', 'out_of_stock_products'],
@@ -74,6 +73,7 @@ function adjustedOverview(
     }
   }
 
+  overview.total_stock_value = null;
   return overview;
 }
 
