@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
+import { loadBodegaOperationalQuantities, resolvedOperationalQuantity } from '@/lib/bodega-operational-stock';
 
 type CanonicalInventoryRow = {
   id: string;
@@ -158,8 +159,10 @@ async function buildCanonicalStock(context: OrgContext): Promise<{ items: Wareho
     console.error('[bodega/stock:pricing]', error);
   }
 
+  const operational = await loadBodegaOperationalQuantities(context.supabase, context.organizationId, rows.map((row) => row.id));
+
   const items: WarehouseStockItem[] = rows.map((row) => {
-    const quantityOnHand = Number(row.quantity || 0);
+    const quantityOnHand = resolvedOperationalQuantity(row.quantity, operational.get(row.id));
     const reorderLevel = Number(row.min_stock || 0);
     const unitCost = Number(row.unit_cost || 0);
     const totalValue = Number(row.total_value ?? quantityOnHand * unitCost);
