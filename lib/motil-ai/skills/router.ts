@@ -1,6 +1,7 @@
 import { MOTIL_CONTEXTUAL_SKILLS, type MotilSkill } from './catalog';
 
 const INTENT_TERMS: Record<string, string[]> = {
+  'legal-contract-payment-control': ['avance contrato', 'avance contractual', 'estado de pago', 'retencion', 'retención', 'que falta pagar', 'qué falta pagar', 'contrato pago', 'hito contrato', 'factura contrato', 'pago contrato', 'legal contrato', 'elias', 'elías'],
   'laudus-source-reconciliation': ['laudus', 'sincronizacion', 'sincronización', 'conciliar fuente', 'dato externo'],
   'inventory-stock-risk': ['stock', 'bodega', 'sin stock', 'faltante', 'reponer', 'repuesto'],
   'procurement-three-way-match': ['three way', '3 way', 'factura', 'recepcion', 'recepción', 'orden de compra', 'oc'],
