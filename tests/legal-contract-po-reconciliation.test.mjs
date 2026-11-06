@@ -24,10 +24,13 @@ test('contract OC reconciliation fails closed when canonical OC is absent or sup
   assert.match(api, /laudus_purchase_orders/);
   assert.match(api, /external_id/);
   assert.match(api, /status = 'not_found'/);
+  assert.match(api, /status = 'pending'/);
+  assert.match(api, /!supplier\?\.rut/);
+  assert.match(api, /!po\.supplier_tax_id/);
   assert.match(api, /status = 'conflict'/);
   assert.match(api, /normalize\(supplier\.rut\) !== normalize\(po\.supplier_tax_id\)/);
   assert.match(api, /status = 'verified'/);
-  assert.match(api, /OC Laudus encontrada en staging y RUT de proveedor compatible/);
+  assert.match(api, /OC encontrada en la fuente financiera y RUT de proveedor compatible/);
 });
 
 test('Legal OC reconciliation UI exposes verification states and provenance', () => {
