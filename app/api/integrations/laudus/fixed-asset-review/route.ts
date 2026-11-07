@@ -264,6 +264,36 @@ export async function POST(request: NextRequest) {
 
     if (decisionError) throw decisionError;
 
+    const reconciliationStatus =
+      decision === 'confirm_candidate'
+        ? 'accepted'
+        : decision === 'reject_candidate'
+          ? 'ignored'
+          : 'resolved';
+    const resolutionNote = [
+      `decision=${decision}`,
+      `candidate_asset_id=${currentCandidateId || 'none'}`,
+      `reviewer=${context.userName || context.userEmail || context.userId}`,
+      `rationale=${rationale || 'sin observación'}`,
+      'canonical_mutation=false',
+      'laudus_mutation=false',
+    ].join(' | ');
+
+    const { error: reconciliationError } = await context.supabase
+      .from('data_reconciliation_reviews')
+      .update({
+        status: reconciliationStatus,
+        resolution_note: resolutionNote,
+        reviewed_by: context.userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('organization_id', context.organizationId)
+      .eq('issue_key', `laudus:fixed_asset_identity:${externalId}`)
+      .eq('status', 'open');
+
+    if (reconciliationError) throw reconciliationError;
+
     return NextResponse.json({
       ok: true,
       decision,
