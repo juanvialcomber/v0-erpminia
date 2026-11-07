@@ -211,7 +211,8 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
         latestLimit: 200,
         rowsRead: listed.rows.length,
         uniqueEntries: uniqueRows.length,
-        duplicatesRemoved: Math.max(listed.rows.length - uniqueRows.length, 0),
+        flattenedLineRowsGrouped: Math.max(listed.rows.length - uniqueRows.length, 0),
+        duplicatesRemoved: 0,
         canonicalMutated: false,
       },
     });
