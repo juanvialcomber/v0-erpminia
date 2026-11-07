@@ -30,7 +30,7 @@ test('contract payment UI exposes evidence without creating another workspace', 
 
 
 test('Legal evidence queue reads the canonical WhatsApp group display_name field',()=>{
-  assert.match(route,/select\('id,display_name,chat_id'\)/);
-  assert.match(route,/group\?\.display_name \|\| group\?\.chat_id/);
-  assert.doesNotMatch(route,/select\('id,name,chat_id'\)/);
+  assert.match(api,/select\('id,display_name,chat_id'\)/);
+  assert.match(api,/group\?\.display_name \|\| group\?\.chat_id/);
+  assert.doesNotMatch(api,/select\('id,name,chat_id'\)/);
 });
