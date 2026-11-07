@@ -20,11 +20,12 @@ test('Compras exposes Laudus invoice evidence through a bounded read-only route'
   assert.doesNotMatch(route, /\.delete\(/);
 });
 
-test('Facturas keeps Laudus source evidence separate from the MOTIL operational workflow', () => {
+test('Facturas keeps external financial evidence secondary to the MOTIL decision workflow', () => {
   assert.match(ui, /\/api\/procurement\/laudus-invoices/);
-  assert.match(ui, /Facturas Laudus/);
   assert.match(ui, /Facturas MOTIL/);
-  assert.match(ui, /no se convierte automáticamente en factura operacional MOTIL/);
-  assert.match(ui, /three-way match ni aprobación de pago/);
-  assert.match(ui, /El universo fuente permanece en Laudus y no se duplica en MOTIL/);
+  assert.match(ui, /Respaldo financiero/);
+  assert.match(ui, /Evidencia externa de sólo lectura para contrastar decisiones MOTIL/);
+  assert.match(ui, /MOTIL usa sólo la evidencia necesaria para decidir/);
+  assert.doesNotMatch(ui, /<CardTitle>Facturas Laudus<\/CardTitle>/);
+  assert.doesNotMatch(ui, />Fuente Laudus</);
 });
