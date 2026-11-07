@@ -463,8 +463,8 @@ test('finance assets exposes Laudus fixed assets as read-only reconciliation evi
   assert.match(api,/No se pudo cargar activos fijos observados en Laudus/);
   assert.doesNotMatch(api,/\.insert\(/);
   assert.doesNotMatch(api,/\.update\(/);
-  assert.match(panel,/Activos fijos observados/);
-  assert.match(panel,/Un registro Laudus no se transforma en Ficha 360 sin evidencia verificable/);
+  assert.match(panel,/Respaldo financiero · sólo lectura/);
+  assert.match(panel,/MOTIL prioriza identidad operacional y propone qué revisar/);
   assert.match(panel,/Prioridad de conciliación/);
   assert.match(page,/LaudusFixedAssetsReview/);
 });

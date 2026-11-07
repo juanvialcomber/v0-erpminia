@@ -23,8 +23,8 @@ test('Bodega explains that mixed units are never aggregated and offers bounded K
   const card = await readFile(cardPath, 'utf8');
 
   assert.match(card, /Las cantidades no se suman entre unidades/);
-  assert.match(card, /Laudus: \{count\(row\.laudusStock\)\} \{row\.unit\}/);
+  assert.match(card, /ERP: \{count\(row\.laudusStock\)\} \{row\.unit\}/);
   assert.match(card, /MOTIL: \{count\(row\.motilStock\)\} \{row\.unit\}/);
-  assert.match(card, /% vs Laudus/);
+  assert.match(card, /% vs ERP/);
   assert.match(card, /loadKardex\(row\.productId, row\.sku\)/);
 });

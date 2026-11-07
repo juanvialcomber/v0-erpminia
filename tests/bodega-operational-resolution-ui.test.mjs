@@ -25,15 +25,15 @@ test('Bodega UI explains reconciled stock states in operational language', async
   const page = await readFile(pagePath, 'utf8');
 
   assert.match(page, /MOTIL histórico/);
-  assert.match(page, /Solo Laudus/);
-  assert.match(page, /Laudus · saldo 0/);
+  assert.match(page, /Solo ERP/);
+  assert.match(page, /ERP · saldo 0/);
   assert.match(page, /Alineado/);
   assert.match(page, /Revisar evidencia/);
-  assert.doesNotMatch(page, /operational_resolution === 'legacy_motil_stale'.*Difiere Laudus/);
+  assert.doesNotMatch(page, /operational_resolution === 'legacy_motil_stale'.*Difiere ERP/);
   assert.match(page, /bloqueantes/);
-  assert.match(page, /contrastes históricos MOTIL/);
+  assert.match(page, /contrastes históricos/);
   assert.match(page, /Sin diferencias operacionales bloqueantes/);
-  assert.match(page, /no bloquean disponibilidad cuando Laudus es la fuente primaria/);
+  assert.match(page, /no bloquean la decisión operativa cuando el respaldo ERP vigente pasa el gate de autoridad/);
 });
 
 

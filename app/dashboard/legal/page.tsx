@@ -141,7 +141,7 @@ export default function LegalPage() {
         </summary>
         <div className="grid gap-2 border-t p-3 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ['/dashboard/legal/laudus','Evidencia financiera'],
+            ['/dashboard/legal/pagos-facturas','Respaldo financiero'],
             ['/dashboard/legal/control-contractual','Control contractual'],
             ['/dashboard/legal/documentos','Archivo Legal'],
             ['/dashboard/legal/casos','Casos'],

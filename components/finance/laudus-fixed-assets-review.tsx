@@ -56,7 +56,7 @@ type Response = {
 const fetcher=async(url:string):Promise<Response>=>{
   const response=await fetch(url,{credentials:'include',cache:'no-store'});
   const payload=await response.json().catch(()=>null);
-  if(!response.ok) throw new Error(payload?.error||'No se pudo cargar activos fijos Laudus');
+  if(!response.ok) throw new Error(payload?.error||'No se pudo cargar la conciliación financiera de activos');
   return payload;
 };
 
@@ -71,17 +71,17 @@ function detail(row: ReviewRow) {
 export function LaudusFixedAssetsReview(){
   const {data,error,isLoading}=useSWR<Response>('/api/finance/laudus-fixed-assets-review',fetcher,{revalidateOnFocus:false});
 
-  if(isLoading) return <StatePanel tone="loading" title="Preparando activos fijos Laudus" description="Conciliando identidad sin modificar la fuente." />;
-  if(error) return <StatePanel tone="error" title="No se pudo cargar activos fijos Laudus" description={error.message} />;
+  if(isLoading) return <StatePanel tone="loading" title="Preparando conciliación de activos" description="Conciliando identidad sin modificar la fuente." />;
+  if(error) return <StatePanel tone="error" title="No se pudo cargar la conciliación financiera de activos" description={error.message} />;
   if(!data) return null;
 
   return <section className="overflow-hidden rounded-lg border bg-card">
     <div className="flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Laudus · sólo lectura</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Respaldo financiero · sólo lectura</p>
         <h2 className="mt-1 font-semibold">Activos fijos observados</h2>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Prioriza identidad operacional. Un registro Laudus no se transforma en Ficha 360 sin evidencia verificable.
+          MOTIL prioriza identidad operacional y propone qué revisar. Un registro financiero no se transforma en Ficha 360 sin evidencia verificable.
         </p>
       </div>
       <Badge variant="outline">{number(data.summary.totalRows)} registros fuente</Badge>
@@ -127,12 +127,12 @@ export function LaudusFixedAssetsReview(){
 
     {data.matchedRows.length ? (
       <details className="border-t">
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">Ver activos Laudus ya vinculados</summary>
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">Ver respaldo financiero ya vinculado</summary>
         <div className="divide-y border-t">
           {data.matchedRows.slice(0,12).map((row)=>(
             <div key={row.external_id} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{row.name||'Activo Laudus'}</p>
+                <p className="truncate text-sm font-medium">{row.name||'Activo financiero'}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{row.canonicalAsset?.asset_code||'Sin código'} · {row.canonicalAsset?.name||'Ficha 360 vinculada'}</p>
               </div>
               <Link href={'/dashboard/mantenimiento/equipos/'+encodeURIComponent(row.canonical_asset_id)+'/ficha'} className="inline-flex items-center gap-2 text-xs font-medium hover:text-primary">

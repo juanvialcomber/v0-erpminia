@@ -105,7 +105,7 @@ const dateTime = (value: string | null) => value
   : 'Sin sincronización';
 
 const reconciliationLabel: Record<Payload['reconciliation']['state'], string> = {
-  waiting_laudus: 'Esperando stock Laudus',
+  waiting_laudus: 'Esperando respaldo ERP',
   ready_to_compare: 'Conectado · conciliado',
   review: 'Conectado · requiere conciliación',
 };
@@ -159,7 +159,7 @@ export function LaudusInventoryReadinessCard() {
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div>
-            <p className="text-sm font-medium">Laudus · inventario no disponible</p>
+            <p className="text-sm font-medium">Respaldo ERP no disponible</p>
             <p className="mt-1 text-xs text-muted-foreground">MOTIL no pudo verificar la evidencia ERP. No se oculta el error ni se asume que el stock está sincronizado.</p>
           </div>
         </div>
@@ -181,12 +181,12 @@ export function LaudusInventoryReadinessCard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Boxes className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Laudus · inventario ERP</h2>
+            <h2 className="text-sm font-semibold">Control de stock MOTIL</h2>
           </div>
-          <LaudusSourceMark state={sourceState} />
+          <LaudusSourceMark state={sourceState} compact />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus es la fuente primaria de stock cuando está fresco y no existe evidencia oficial contradictoria. Correo y WhatsApp actúan como contraste y abren conciliación antes de aceptar una cifra como vigente.
+          MOTIL decide disponibilidad usando la mejor evidencia vigente. El ERP aporta el saldo base cuando está fresco. Correo y WhatsApp actúan como contraste y abren conciliación ante diferencias.
         </p>
       </div>
 
@@ -196,8 +196,8 @@ export function LaudusInventoryReadinessCard() {
             {isLoading || !data
               ? 'Verificando autoridad de stock.'
               : data.authority.laudusIsPrimary
-                ? 'Fuente primaria: Laudus'
-                : 'Fuente en revisión · Laudus no se usa como verdad única'}
+                ? 'Base vigente: respaldo ERP'
+                : 'Fuente en revisión · MOTIL bloquea una cifra única hasta conciliar'}
           </p>
           {!isLoading && data?.authority.latestEmailStockCutoff ? (
             <p className="text-muted-foreground">
@@ -206,7 +206,7 @@ export function LaudusInventoryReadinessCard() {
           ) : null}
         </div>
         <p className="mt-1 text-muted-foreground">
-          {isLoading || !data ? 'Comparando Laudus con correo y WhatsApp.' : data.authority.reason}
+          {isLoading || !data ? 'Comparando respaldo ERP con correo y WhatsApp.' : data.authority.reason}
         </p>
       </div>
 
@@ -214,7 +214,7 @@ export function LaudusInventoryReadinessCard() {
         <div className="bg-card p-4">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : pct(data.laudus.canonicalProductCoverage)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Productos Laudus elegibles enlazados al catálogo</p>
+          <p className="mt-1 text-xs text-muted-foreground">Productos financieros enlazados al catálogo MOTIL</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             {isLoading || !data ? '—' : `${count(data.laudus.eligibleProducts)} elegibles · ${count(data.laudus.excludedProducts)} fuera de alcance`}
           </p>
@@ -222,9 +222,9 @@ export function LaudusInventoryReadinessCard() {
         <div className="bg-card p-4">
           <GitCompareArrows className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
+          <p className="mt-1 text-xs text-muted-foreground">Saldos que requieren conciliación</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua · ${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL`}
+            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua · ${count(data.laudus.missingInMotilNonzero)} SKU con saldo ERP sin existencia MOTIL`}
           </p>
         </div>
         <div className="bg-card p-4">
@@ -232,13 +232,13 @@ export function LaudusInventoryReadinessCard() {
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : `${data.laudus.mappedPhysicalWarehouses}/${data.laudus.physicalWarehouses}`}</p>
           <p className="mt-1 text-xs text-muted-foreground">Bodegas físicas conciliadas con MOTIL</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.negativeProducts)} SKU Laudus con saldo negativo`}
+            {isLoading || !data ? '—' : `${count(data.laudus.negativeProducts)} SKU ERP con saldo negativo`}
           </p>
         </div>
         <div className="bg-card p-4">
           <History className="h-4 w-4 text-muted-foreground" />
           <p className="mt-2 text-sm font-semibold">{isLoading || !data ? '—' : dateTime(data.laudus.latestStockSync)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Última evidencia de stock Laudus</p>
+          <p className="mt-1 text-xs text-muted-foreground">Último respaldo ERP de stock</p>
           <p className={`mt-1 text-[11px] ${data?.laudus.stockIsStale ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}`}>
             {isLoading || !data ? '—' : data.laudus.stockIsStale ? 'Evidencia con más de 8 horas: refresco requerido.' : 'Evidencia dentro de la ventana de frescura.'}
           </p>
@@ -251,10 +251,10 @@ export function LaudusInventoryReadinessCard() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <div>
               <p className="text-sm font-medium">
-                {count(data.laudus.negativeProducts)} SKU Laudus con saldo negativo en {count(data.laudus.negativeWarehouses)} bodega{data.laudus.negativeWarehouses === 1 ? '' : 's'}
+                {count(data.laudus.negativeProducts)} SKU ERP con saldo negativo en {count(data.laudus.negativeWarehouses)} bodega{data.laudus.negativeWarehouses === 1 ? '' : 's'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                La excepción se localiza por bodega. MOTIL no corrige el saldo: primero se revisan movimientos, recepciones, consumos o conteos en Laudus.
+                La excepción se localiza por bodega. MOTIL no corrige el saldo automáticamente: primero se revisan movimientos, recepciones, consumos o conteos en la fuente ERP.
               </p>
             </div>
           </div>
@@ -294,7 +294,7 @@ export function LaudusInventoryReadinessCard() {
             <div>
               <p className="text-sm font-medium">Conciliación prioritaria · consumibles</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Combustibles y explosivos primero; luego fortificación y reactivos. Las cantidades no se suman entre unidades: cada diferencia se evalúa por SKU contra Laudus.
+                Combustibles y explosivos primero; luego fortificación y reactivos. Las cantidades no se suman entre unidades: cada diferencia se evalúa por SKU contra el respaldo ERP.
               </p>
             </div>
           </div>
@@ -308,13 +308,13 @@ export function LaudusInventoryReadinessCard() {
                 </div>
                 <span className="text-muted-foreground">{row.domain}</span>
                 <div className="tabular-nums">
-                  <span className="block">Laudus: {count(row.laudusStock)} {row.unit}</span>
+                  <span className="block">ERP: {count(row.laudusStock)} {row.unit}</span>
                   <span className="block text-muted-foreground">MOTIL: {count(row.motilStock)} {row.unit}</span>
                 </div>
                 <div className="tabular-nums">
                   <span className="block font-semibold">{row.delta > 0 ? '+' : ''}{count(row.delta)} {row.unit}</span>
                   <span className="block text-muted-foreground">
-                    {row.relativeDeltaPct == null ? 'Sin base relativa' : `${row.relativeDeltaPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% vs Laudus`}
+                    {row.relativeDeltaPct == null ? 'Sin base relativa' : `${row.relativeDeltaPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% vs ERP`}
                   </span>
                 </div>
                 <Button
@@ -348,7 +348,7 @@ export function LaudusInventoryReadinessCard() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {data?.authority.laudusIsPrimary ? 'Laudus primario · validación cruzada activa' : 'Conciliación activa · sin overwrite automático'}
+          {data?.authority.laudusIsPrimary ? 'MOTIL operativo · respaldo ERP vigente' : 'Conciliación activa · sin overwrite automático'}
         </p>
       </div>
     </section>

@@ -53,7 +53,7 @@ export function LaudusFinanceStatusStrip({ compact = false }: { compact?: boolea
     <section className={compact ? 'rounded-lg border bg-card px-4 py-3' : 'rounded-lg border bg-card px-4 py-4'} aria-label="Estado de la fuente financiera">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <LaudusSourceMark state={state} />
+          <LaudusSourceMark state={state} compact />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold">Fuente financiera</p>

@@ -30,14 +30,14 @@ test('credit notes and reconciliation gaps keep conservative semantics', () => {
 test('Daniel finance workspace surfaces the Laudus control block', () => {
   assert.match(page, /LaudusFinanceControlCard/);
   assert.match(page, /<LaudusFinanceControlCard \/>/);
-  assert.match(card, /Laudus · fuente financiera/);
+  assert.match(card, /Respaldo financiero · sólo lectura/);
   assert.match(card, /Pagos por verificar/);
 });
 
 
 test('pending Laudus payments are shown as source-state cases, not inferred debt', () => {
   assert.match(loader, /pendingItems/);
-  assert.match(card, /estado “no depositado” en Laudus/);
+  assert.match(card, /estado “no depositado” en la fuente financiera/);
   assert.match(card, /MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente/);
   assert.match(card, /Monto no informado/);
 });
@@ -78,7 +78,7 @@ test('decision-first finance visuals expose observable change, risk and source f
   assert.match(card, /Exposición abierta/);
   assert.match(card, /Riesgo/);
   assert.match(card, /Explicación/);
-  assert.match(card, /Laudus ·/);
+  assert.match(card, /Fuente financiera ·/);
   assert.match(card, /Concentración no implica causalidad/);
   assert.match(card, /Aún no existe una serie diaria histórica comparable de saldo/);
 });
@@ -168,7 +168,7 @@ test('Daniel sees stale Laudus evidence before acting on financial priorities', 
   assert.match(loader, /operationalSyncAgeDays/);
   assert.match(loader, /expectedCadence: 'daily'/);
   assert.match(card, /Dato atrasado/);
-  assert.match(card, /Revisar actualización de Laudus/);
+  assert.match(card, /Revisar actualización financiera/);
   assert.match(card, /Última sincronización operativa/);
   assert.match(card, /href: '\/dashboard\/finanzas\/fuentes'/);
 });

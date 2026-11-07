@@ -25,8 +25,8 @@ test('finance readiness API is scoped to finance permissions', () => {
   assert.doesNotMatch(helper, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
 
-test('finance readiness UI explains Laudus as financial evidence without payment authority', () => {
-  assert.match(card, /Preparación financiera para Laudus/);
-  assert.match(card, /no puede aprobar, crear ni conciliar pagos automáticamente/);
+test('finance readiness UI keeps MOTIL decisions primary and ERP as evidence', () => {
+  assert.match(card, /Preparación financiera MOTIL/);
+  assert.match(card, /MOTIL no aprueba, crea ni concilia pagos automáticamente sin autoridad humana/);
   assert.match(card, /Aprobación humana obligatoria/);
 });
