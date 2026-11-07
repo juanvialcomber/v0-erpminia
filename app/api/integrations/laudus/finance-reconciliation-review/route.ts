@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       .select('id,issue_key,entity_type,entity_id,issue_type,evidence_reference,created_at,updated_at')
       .eq('organization_id', context.organizationId)
       .eq('status', 'open')
-      .or('issue_key.like.laudus:cxp_inconsistente:%,issue_key.like.laudus:open_invoice_trace_once:%')
+      .or('issue_key.like.laudus:cxp_inconsistente:%,issue_key.like.laudus:open_invoice_trace_once:%,issue_key.like.laudus:purchase_order_unresolved:%')
       .order('updated_at', { ascending: false })
       .limit(100);
 
@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
         updatedAt: row.updated_at,
         kind: String(row.issue_key).startsWith('laudus:cxp_inconsistente:')
           ? 'accounts_payable_inconsistency'
-          : 'invoice_trace',
+          : String(row.issue_key).startsWith('laudus:purchase_order_unresolved:')
+            ? 'purchase_order_reconciliation'
+            : 'invoice_trace',
       })),
       canDecide,
       owner: {
@@ -63,6 +65,7 @@ export async function GET(request: NextRequest) {
       summary: {
         pending: (rows || []).length,
         accountsPayable: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:cxp_inconsistente:')).length,
+        purchaseOrders: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:purchase_order_unresolved:')).length,
         trace: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:open_invoice_trace_once:')).length,
       },
       policy: {
@@ -117,7 +120,8 @@ export async function POST(request: NextRequest) {
 
     const valid =
       String(review.issue_key).startsWith('laudus:cxp_inconsistente:') ||
-      String(review.issue_key).startsWith('laudus:open_invoice_trace_once:');
+      String(review.issue_key).startsWith('laudus:open_invoice_trace_once:') ||
+      String(review.issue_key).startsWith('laudus:purchase_order_unresolved:');
 
     if (!valid) return NextResponse.json({ error: 'La conciliación no pertenece a Administración y Finanzas.' }, { status: 400 });
 
