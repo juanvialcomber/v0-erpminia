@@ -311,3 +311,17 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L2 visibilidad operacional + L3 priorización de conciliación; evidencia E1 de cobertura. No se declara L4 hasta medir decisiones humanas sobre esta cola.
 - Valor demostrado: reduce fragmentación de evidencia y hace visible la brecha de identidad dentro del flujo financiero ya existente. No se atribuyen horas ahorradas ni ahorro CLP.
 - Siguiente medición: decisiones de conciliación por período, tiempo medio por revisión, tasa de resolución y porcentaje de pendientes que llegan a Ficha 360 con evidencia suficiente.
+
+
+## 2026-11-06 — Legal: MOTIL reemplaza consulta diaria a Laudus
+
+- Problema previo: Elías debía combinar planillas, correo y consulta financiera en Laudus para entender contratos, facturas, pagos, proveedores, transportistas, permisos y vencimientos.
+- Capacidad: el workspace Legal concentra contratos/pagos, cumplimiento mensual de proveedores, Proveedor 360, liquidaciones de transportistas, propiedad minera, polvorines, evidencia entrante y notificaciones de pago.
+- Cambio de experiencia: la superficie visible `Legal ↔ Laudus` se retira; la navegación pasa a `Pagos y facturas`. Laudus queda como fuente ERP trazable en segundo plano.
+- Evidencia de cobertura actual: 604/605 nombres de proveedor verificados; 11.237 órdenes verificadas; 12.426 facturas con estado financiero disponible, de las cuales 10.977 figuran pagadas, 740 parcialmente pagadas y 507 impagas en la fuente observada.
+- Salud de fuente: procurement, productos, stock, proveedores, bancos y contabilidad reportan sync read-only saludable en la medición del 6 de noviembre de 2026.
+- Autoridad: MOTIL no ejecuta pagos ni contabilidad y no transforma facturación en pago. Laudus conserva autoridad contable/tributaria mientras MOTIL absorbe la experiencia operacional.
+- Nivel actual: L2 visibilidad operacional + L3 inteligencia de excepciones. El workspace habilita L4 en conciliación/decisión cuando exista revisión humana registrada.
+- Evidencia actual: E1 fuerte de cobertura. No existe todavía evidencia suficiente para declarar horas ahorradas o ROI.
+- Métrica siguiente: porcentaje de consultas financieras de Legal resueltas íntegramente en MOTIL, tiempo medio de resolución y cantidad de aperturas manuales de Laudus evitadas/observadas.
+- Hipótesis de valor: reducir búsqueda y doble navegación entre Excel/Gmail/Laudus. Debe medirse antes de monetizarse.
