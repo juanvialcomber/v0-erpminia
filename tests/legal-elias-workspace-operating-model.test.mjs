@@ -21,9 +21,11 @@ test('Elias workspace primary navigation follows requested daily jobs', () => {
 });
 
 test('Legal home surfaces Elias operational work instead of a standalone assistant', () => {
-  assert.match(home, /Contratos y pagos/);
-  assert.match(home, /Cumplimiento mensual/);
-  assert.match(home, /Transportistas/);
+  assert.match(home, /Prioridad/);
+  assert.match(home, /Máximo tres asuntos/);
+  assert.match(home, /Excepciones operativas/);
+  assert.match(home, /Proveedores/);
+  assert.match(home, /Pagos/);
   assert.doesNotMatch(home, /Preguntar al asistente/);
   assert.doesNotMatch(home, /href="\/dashboard\/legal\/asistente"/);
 });
