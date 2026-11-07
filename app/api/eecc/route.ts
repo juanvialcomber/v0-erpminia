@@ -25,10 +25,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const manager = await requireEeccProfileManager(request);
-  if (!manager.authorized || !manager.auth.organizationId || !manager.auth.user) {
-    return manager.response;
-  }
+  if (!manager.authorized) return manager.response;
   const auth = manager.auth;
+  if (!auth.organizationId || !auth.user) {
+    return NextResponse.json({ error: 'Contexto de organización no disponible' }, { status: 403 });
+  }
 
   try {
     const body = await request.json();
