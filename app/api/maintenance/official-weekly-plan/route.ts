@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   const [sourcesResult, itemsResult, officialMasterResult] = await Promise.all([
     context.supabase.from('planning_weekly_work_sources')
-      .select('id,mine,source_file,source_sha256,source_sheet,week_start,week_end,reported_at,is_current,source_url')
+      .select('id,mine,source_file,source_sha256,source_sheet,week_start,week_end,reported_at,status,is_current,source_url')
       .eq('organization_id',context.organizationId).eq('is_current',true)
       .order('mine',{ascending:true}).limit(20),
     context.supabase.from('planning_weekly_work_items')
