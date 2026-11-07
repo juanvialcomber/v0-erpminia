@@ -6,11 +6,11 @@ export type LegalProgressInvoiceSource = {
 };
 
 export type LegalProgressMilestoneSource = {
-  contractNumber: 'IO-01' | 'IO-02' | 'IO-03' | 'IO-04' | 'IO-05' | 'IO-06' | 'IO-07' | 'IO-08' | 'IO-09';
+  contractNumber: 'IO-01' | 'IO-02' | 'IO-03' | 'IO-04' | 'IO-05' | 'IO-06' | 'IO-07' | 'IO-08' | 'IO-09' | 'EP-02' | 'EP-03';
   sequence: number;
   title: string;
   purchaseOrderNumber: string;
-  currency: 'CLP' | 'USD';
+  currency: 'CLP' | 'USD' | 'UF';
   totalAmount: number;
   progressRatio: number;
   executedAmount: number;
@@ -237,5 +237,25 @@ export const LEGAL_PROGRESS_MILESTONES: LegalProgressMilestoneSource[] = [
     currency: 'USD', totalAmount: 1588826, progressRatio: 0.4, executedAmount: 635530.4,
     invoicedAmount: 0, pendingToInvoice: 953295.6, invoices: [],
     sourceSheet: 'SPIN TECHNOLOGIES Leasing', sourceRow: 20,
+  },
+  {
+    contractNumber: 'EP-02', sequence: 1, title: 'Proyecto de peralte de tranque de relaves', purchaseOrderNumber: '28341',
+    currency: 'UF', totalAmount: 953.59, progressRatio: 0.5, executedAmount: 476.795,
+    invoicedAmount: 476.8, pendingToInvoice: 476.795,
+    invoices: [
+      { docNumber: '572', sourceAmount: 238.4, retentionAmount: 0, sourceText: 'F-572 · monto fuente en UF; retención informada en CLP no se mezcla' },
+      { docNumber: '608', sourceAmount: 238.4, retentionAmount: 0, sourceText: 'F-608 · monto fuente en UF; retención informada en CLP no se mezcla' },
+    ],
+    sourceSheet: 'Global Fire', sourceRow: 18,
+  },
+  {
+    contractNumber: 'EP-03', sequence: 1, title: 'DIA Proyecto Regularización Planta de Procesamiento La Patagua', purchaseOrderNumber: '28399 / 28488 / 28489 / 28490',
+    currency: 'UF', totalAmount: 3296, progressRatio: 0.25, executedAmount: 824,
+    invoicedAmount: 829.6, pendingToInvoice: 2472,
+    invoices: [
+      { docNumber: '2220', sourceAmount: 329.6, retentionAmount: 0, sourceText: 'F-2220 10% · monto fuente en UF; retención informada en CLP no se mezcla' },
+      { docNumber: '2330', sourceAmount: 500, retentionAmount: 0, sourceText: 'F-2330 15% · monto fuente en UF; retención informada en CLP no se mezcla' },
+    ],
+    sourceSheet: 'Sustentable', sourceRow: 67,
   }
 ];
