@@ -57,7 +57,7 @@ test('fixed asset review records human decisions without canonical mutation', as
   assert.match(ui, /Confirmar candidato/);
   assert.match(ui, /Rechazar/);
   assert.match(ui, /Diferir/);
-  assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
+  assert.match(ui, /Confirmar registra la decisión de conciliación/);
 });
 
 
