@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No tienes acceso al módulo Legal' }, { status: 403 });
   }
 
-  const detailContractNumbers = [...new Set(LEGAL_PROGRESS_MILESTONES.map((item) => item.contractNumber))];
+  const detailContractNumbers = new Set<string>(LEGAL_PROGRESS_MILESTONES.map((item) => item.contractNumber));
   const contractNumbers = [
     'IO-01','IO-02','IO-03','IO-04','IO-05','IO-06','IO-07','IO-08','IO-09',
     'EP-01','EP-02','EP-03','EP-04','EP-05','EP-06',
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
       milestones_not_invoiced: rows.filter((item) => item.payment_state === 'not_invoiced').length,
       invoice_matches: rows.reduce((sum, item) => sum + item.matched_invoice_count, 0),
       invoice_expected: rows.reduce((sum, item) => sum + item.invoice_count, 0),
-      detail_available: detailContractNumbers.includes(contractNumber),
+      detail_available: detailContractNumbers.has(contractNumber),
     };
   });
 
