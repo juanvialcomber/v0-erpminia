@@ -97,7 +97,8 @@ function date(value: string | null) {
   }).format(parsed);
 }
 
-export function LaudusFixedAssetReview() {
+export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' | 'maintenance' }) {
+  const isMaintenance = area === 'maintenance';
   const { data, error, isLoading, mutate } = useSWR<Payload>(
     '/api/integrations/laudus/fixed-asset-review',
     fetcher,
@@ -170,15 +171,17 @@ export function LaudusFixedAssetReview() {
     <div className="space-y-6">
       <section className="border-b border-border/70 pb-5">
         <Button asChild variant="ghost" size="sm" className="-ml-3 mb-2">
-          <Link href="/dashboard/finanzas">
+          <Link href={isMaintenance ? '/dashboard/mantenimiento' : '/dashboard/finanzas'}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Finanzas
+            {isMaintenance ? 'Mantenimiento' : 'Finanzas'}
           </Link>
         </Button>
         <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : 'connected'} className="mb-2" />
         <h1 className="text-2xl font-semibold tracking-tight">Revisión de activos Laudus</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Prioriza candidatos por evidencia de identidad. Esta vista no enlaza activos automáticamente ni modifica Laudus o el maestro MOTIL.
+          {isMaintenance
+            ? 'Confirma identidad operacional entre activos Laudus y el maestro MOTIL. La decisión queda trazable y no modifica automáticamente ninguno de los dos sistemas.'
+            : 'Prioriza candidatos por evidencia de identidad. Esta vista no enlaza activos automáticamente ni modifica Laudus o el maestro MOTIL.'}
         </p>
       </section>
 
@@ -317,7 +320,7 @@ export function LaudusFixedAssetReview() {
               value={rationale}
               onChange={(event) => setRationale(event.target.value)}
               className="mt-3"
-              placeholder="Observación opcional para Finanzas"
+              placeholder={isMaintenance ? 'Motivo de la decisión operacional' : 'Observación opcional para Finanzas'}
               disabled={saving}
             />
             <div className="mt-3 flex flex-wrap gap-2">
