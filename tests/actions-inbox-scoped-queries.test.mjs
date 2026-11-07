@@ -35,3 +35,9 @@ test('timeout fallback remains fail-safe and explicit', () => {
 test('successful scoped response identifies its source contract', () => {
   assert.match(source, /source: 'scoped_role_task_queries_v1'/);
 });
+
+
+test('missing coverage never suppresses actionable role tasks', () => {
+  assert.match(source, /Always query actionable tasks so newly-routed work cannot disappear until coverage refreshes/);
+  assert.doesNotMatch(source, /const actionableLookup = coverageMissing\s*\? Promise\.resolve\(\{ data: \[\], error: null \}\)/);
+});
