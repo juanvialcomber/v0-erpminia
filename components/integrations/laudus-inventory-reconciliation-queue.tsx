@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type ReviewRow = {
   id: string;
@@ -108,7 +109,7 @@ export function LaudusInventoryReconciliationQueue() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Revisión Jefe de Bodega</p>
-            <h2 className="mt-1 text-lg font-semibold">Conciliar evidencia Laudus</h2>
+            <div className="mt-1 flex items-center gap-2"><h2 className="text-lg font-semibold">Conciliar evidencia Laudus</h2><LaudusSourceMark state="review" /></div>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
               MOTIL no pudo resolver este caso de forma determinística. La decisión humana queda registrada y no cambia stock automáticamente.
             </p>
