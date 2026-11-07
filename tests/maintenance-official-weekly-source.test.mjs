@@ -31,6 +31,8 @@ test('official program is in Ariel current planning surface',()=>{
  assert.match(screen,/OT generadas/);
  assert.match(screen,/Excepciones/);
  assert.match(screen,/source\.status==='review_required'/);
+ assert.match(screen,/coverageStart/);
+ assert.match(screen,/Cobertura/);
 });
 test('urgencias oficiales preservan filas P1/P2 aunque falte vinculación de equipo',()=>{
  assert.match(route,/officialMaster/);
