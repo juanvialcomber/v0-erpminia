@@ -235,7 +235,8 @@ export async function runLaudusAccountingBackfill(
 
       const pageRows = rowsFrom(payload);
       const uniqueRows = normalizeAndDedupe(pageRows);
-      const pageDuplicates = Math.max(pageRows.length - uniqueRows.length, 0);
+      const groupedLineRows = Math.max(pageRows.length - uniqueRows.length, 0);
+      const pageDuplicates = 0;
 
       if (uniqueRows.length > 0) {
         const { error: ingestError } = await db.rpc('motil_ingest_laudus_extended_finance', {
@@ -277,7 +278,7 @@ export async function runLaudusAccountingBackfill(
       });
 
       if (status === 'completed') {
-        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, nextDateFrom };
+        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, groupedLineRows, nextDateFrom };
       }
 
       if (pageComplete) {
