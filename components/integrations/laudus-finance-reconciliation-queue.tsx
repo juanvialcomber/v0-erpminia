@@ -9,7 +9,7 @@ import { LaudusSourceMark } from '@/components/integrations/laudus-source-mark';
 
 type Row = {
   id: string;
-  kind: 'accounts_payable_inconsistency' | 'invoice_trace' | 'purchase_order_reconciliation';
+  kind: 'accounts_payable_inconsistency' | 'invoice_trace' | 'purchase_order_reconciliation' | 'cost_center_reconciliation';
   issueType: string;
   evidenceReference: string | null;
 };
@@ -18,7 +18,7 @@ type Payload = {
   rows: Row[];
   canDecide: boolean;
   owner: { cargo: string; area: string };
-  summary: { pending: number; accountsPayable: number; purchaseOrders: number; trace: number };
+  summary: { pending: number; accountsPayable: number; purchaseOrders: number; costCenters: number; trace: number };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -31,6 +31,7 @@ const fetcher = async (url: string): Promise<Payload> => {
 function label(row: Row) {
   if (row.kind === 'accounts_payable_inconsistency') return 'CxP inconsistente';
   if (row.kind === 'purchase_order_reconciliation') return 'OC pendiente de conciliación';
+  if (row.kind === 'cost_center_reconciliation') return 'Centro de costo pendiente';
   return 'Trazabilidad de factura';
 }
 
@@ -110,7 +111,7 @@ export function LaudusFinanceReconciliationQueue() {
           </div>
           <div className="text-right text-xs text-muted-foreground">
             <p>Responsable: {data?.owner?.cargo || 'Gerente de Finanzas'}</p>
-            <p>{data?.summary.pending ?? 0} pendientes · {data?.summary.accountsPayable ?? 0} CxP · {data?.summary.purchaseOrders ?? 0} OC · {data?.summary.trace ?? 0} trazabilidad</p>
+            <p>{data?.summary.pending ?? 0} pendientes · {data?.summary.accountsPayable ?? 0} CxP · {data?.summary.purchaseOrders ?? 0} OC · {data?.summary.costCenters ?? 0} centros · {data?.summary.trace ?? 0} trazabilidad</p>
           </div>
         </div>
       </div>
