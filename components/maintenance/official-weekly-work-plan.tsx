@@ -28,15 +28,15 @@ export function OfficialWeeklyWorkPlan(){
    if(!response.ok)throw new Error(payload?.error||'No se pudo incorporar el programa semanal');
    const mismatch=payload?.summary?.mismatch===true;
    setUploadMessage(mismatch
-    ? `Programa incorporado con revisión pendiente: el resumen declara ${payload.summary.declared} actividades y el detalle contiene ${payload.summary.parsed}.`
-    : `Programa incorporado: ${payload?.summary?.parsed||0} actividades · ${payload?.summary?.matched||0} equipos vinculados.`);
+    ? `Programa incorporado: ${payload?.automation?.created||0} OT creadas. El resumen declara ${payload.summary.declared} actividades y el detalle contiene ${payload.summary.parsed}; esa diferencia queda para revisión.`
+    : `Programa incorporado: ${payload?.automation?.created||0} OT creadas · ${payload?.summary?.matched||0} equipos vinculados · ${payload?.automation?.skippedIdentity||0} filas pendientes por identidad.`);
    await mutate();
   }catch(cause){setUploadMessage(cause instanceof Error?cause.message:'No se pudo incorporar el programa semanal');}
   finally{setUploading(false);}
  };
  return <section className="space-y-4" aria-label="Programas oficiales">
   <div className="flex items-center justify-between gap-3">
-   <div><h2 className="text-lg font-semibold">Trabajos por faena</h2><p className="text-sm text-muted-foreground">Fuente oficial de Ariel. No crea ni cierra órdenes automáticamente.</p></div>
+   <div><h2 className="text-lg font-semibold">Trabajos por faena</h2><p className="text-sm text-muted-foreground">Fuente oficial de Ariel. Desde hoy, cada fila vigente y correctamente identificada genera su OT automáticamente; el cierre y la aprobación siguen siendo humanos.</p></div>
    <div className="flex flex-wrap gap-2">
     <label className="inline-flex h-9 cursor-pointer items-center justify-center rounded-md border bg-background px-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground">
      <FileUp className="mr-2 h-4 w-4"/>{uploading?'Procesando…':'Cargar programa'}
