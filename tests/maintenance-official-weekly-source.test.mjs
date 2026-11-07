@@ -97,3 +97,14 @@ test('weekly import refuses multiple recognized program sheets instead of silent
  assert.match(importer,/más de una hoja de programa semanal/);
  assert.match(importer,/sheets:parsed\.map\(program=>program\.sheetName\)/);
 });
+
+
+test('cross-user retry checks organization-wide creation keys before creating another OT',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/existingByRequest/);
+ assert.match(importer,/\.eq\('organization_id',context\.organizationId\)\.in\('creation_request_id',ids\)/);
+ assert.match(importer,/offset\+=50/);
+ assert.match(importer,/existingOrders\.length>1/);
+ assert.match(importer,/OT existente encontrada pero no se pudo reparar el vínculo/);
+ assert.match(importer,/repaired_link:true/);
+});
