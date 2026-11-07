@@ -87,7 +87,7 @@ export async function syncLegalContractInvoiceTraces(organizationId: string, db:
 
   const { data: observed, error: observedError } = await db
     .from('laudus_purchase_invoice_payment_status_service_v1')
-    .select('purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_external_id,supplier_name')
+    .select('purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_external_id,supplier_name,total_amount')
     .eq('organization_id', organizationId).in('doc_number', docNumbers).limit(2000);
   if (observedError) throw new Error('No se pudieron resolver facturas observadas');
 
@@ -110,6 +110,7 @@ export async function syncLegalContractInvoiceTraces(organizationId: string, db:
     const matches = (observed || []).filter((row) =>
       String(row.doc_number || '').trim() === ref.docNumber &&
       supplierTaxByExternalId.get(String(row.purchase_invoice_external_id)) === expectedRut &&
+      Number(row.total_amount || 0) > 0 &&
       Number.isFinite(Number(row.laudus_purchase_invoice_id)),
     );
     if (matches.length === 1) {
