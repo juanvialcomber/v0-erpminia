@@ -114,9 +114,9 @@ export async function loadPersonalMaintenanceTasks(
   const workshop = await resolveWorkshopHeadScope(context);
   const canFollowup = accessLevel === 'ED' && isMaintenanceWorkOrderCreatorCargo(cargoName);
   // Production review endpoint allows precisely these active reviewers, not all technicians with ED.
-  const canApprove = accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(
-    String((person as Person | null)?.full_name || ''),
-  );
+  const personName = String((person as Person | null)?.full_name || '');
+  const isAriel = personName === 'Ariel López';
+  const canApprove = accessLevel === 'ED' && ['Ariel López', 'Mauricio Astudillo'].includes(personName);
 
   if (!person?.id && !canFollowup && !canApprove) return [];
   const emptyResult: { data: Order[]; error: null } = { data: [], error: null };
@@ -149,9 +149,43 @@ export async function loadPersonalMaintenanceTasks(
     throw assignedResult.error || createdResult.error || completedResult.error;
   }
 
+  let officialSupervision: Order[] = [];
+  if (canFollowup && isAriel) {
+    const { data: officialSources, error: sourceError } = await context.supabase
+      .from('planning_weekly_work_sources')
+      .select('id')
+      .eq('organization_id', context.organizationId)
+      .eq('source_owner', personName)
+      .eq('is_current', true);
+    if (sourceError) throw sourceError;
+    const sourceIds = (officialSources || []).map((source) => source.id);
+    if (sourceIds.length) {
+      const { data: links, error: linkError } = await context.supabase
+        .from('planning_weekly_work_items')
+        .select('linked_work_order_id')
+        .eq('organization_id', context.organizationId)
+        .in('source_id', sourceIds)
+        .not('linked_work_order_id', 'is', null);
+      if (linkError) throw linkError;
+      const workOrderIds = [...new Set((links || []).map((row) => row.linked_work_order_id).filter(Boolean))] as string[];
+      if (workOrderIds.length) {
+        const { data: officialOrders, error: officialError } = await context.supabase
+          .from('maintenance_work_orders')
+          .select(ORDER_COLUMNS)
+          .eq('organization_id', context.organizationId)
+          .in('id', workOrderIds)
+          .in('status', ACTIVE)
+          .order('scheduled_date', { ascending: true, nullsFirst: false });
+        if (officialError) throw officialError;
+        officialSupervision = (officialOrders || []) as Order[];
+      }
+    }
+  }
+
   const visible = (order: Order) => workshopHeadCanAccessOrder(workshop, order);
   const assigned = ((assignedResult.data || []) as Order[]).filter(visible);
   const created = ((createdResult.data || []) as Order[]).filter(visible);
+  const supervised = officialSupervision.filter(visible);
   const closed = ((completedResult.data || []) as Order[]).filter(visible);
   const reviewed = new Set<string>();
   if (closed.length) {
@@ -167,6 +201,11 @@ export async function loadPersonalMaintenanceTasks(
   const now = chileTodayDateKey();
   const tasks = new Map<string, PersonalMaintenanceTask>();
   for (const order of created) {
+    tasks.set(order.id, toInboxTask(context, cargoId, cargoName, order, 'followup', now));
+  }
+  // Ariel supervises active OTs generated from his current official weekly programs,
+  // even when automation created the OT on his behalf.
+  for (const order of supervised) {
     tasks.set(order.id, toInboxTask(context, cargoId, cargoName, order, 'followup', now));
   }
   // A person's own assignment takes precedence over merely having created the OT.

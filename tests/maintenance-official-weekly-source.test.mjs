@@ -19,13 +19,20 @@ test('official weekly program stays source evidence while import auto-creates el
  assert.match(route,/requireModuleAccess\(request, MODULE_KEYS.MANT_OPERACIONES\)/);
  assert.match(route,/\.eq\('organization_id',context.organizationId\)/);
  assert.match(route,/\.eq\('is_current',true\)/);
- assert.match(screen,/genera su OT automáticamente/i);
+ assert.match(screen,/OT generadas/i);
  assert.match(screen,/cierre y la aprobación siguen siendo humanos/i);
 });
 test('official program is in Ariel current planning surface',()=>{
  assert.match(planning,/OfficialWeeklyWorkPlan/);
- assert.match(screen,/Trabajos por faena/);
+ assert.match(screen,/Programa oficial/);
  assert.match(screen,/Ver fuente/);
+ assert.match(screen,/Fuente/);
+ assert.match(screen,/Actividades/);
+ assert.match(screen,/OT generadas/);
+ assert.match(screen,/Excepciones/);
+ assert.match(screen,/source\.status==='review_required'/);
+ assert.match(screen,/coverageStart/);
+ assert.match(screen,/Cobertura/);
 });
 test('urgencias oficiales preservan filas P1/P2 aunque falte vinculación de equipo',()=>{
  assert.match(route,/officialMaster/);

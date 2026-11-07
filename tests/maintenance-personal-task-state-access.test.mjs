@@ -25,3 +25,15 @@ test('reject arbitrary task keys and do not convert personal preference into wor
  assert.match(route,/\.from\('user_action_states'\)\.upsert/);
  assert.doesNotMatch(route,/\.from\('maintenance_work_orders'\)\.update/);
 });
+
+
+test('Ariel sees active OTs from his current official weekly programs as supervision tasks',()=>{
+ assert.match(source,/const isAriel = personName === 'Ariel López'/);
+ assert.match(source,/from\('planning_weekly_work_sources'\)/);
+ assert.match(source,/\.eq\('source_owner', personName\)/);
+ assert.match(source,/\.eq\('is_current', true\)/);
+ assert.match(source,/from\('planning_weekly_work_items'\)/);
+ assert.match(source,/linked_work_order_id/);
+ assert.match(source,/for \(const order of supervised\)/);
+ assert.match(source,/toInboxTask\(context, cargoId, cargoName, order, 'followup', now\)/);
+});
