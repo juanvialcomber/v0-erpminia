@@ -83,3 +83,12 @@ test('Maintenance owns operational identity review without financial write acces
   assert.match(inbox, /kind === 'laudus-fixed-asset'/);
   assert.match(inbox, /\/dashboard\/mantenimiento\/activos-laudus/);
 });
+
+
+test('Planning project lead receives support visibility for open asset identity reviews', async () => {
+  const sql = await readFile(new URL('../supabase/migrations/20261107194100_surface_laudus_asset_support_to_planning.sql', import.meta.url), 'utf8');
+  assert.match(sql, /JEFE DE PLANIFICACIÓN/);
+  assert.match(sql, /support_laudus_fixed_asset_identity/);
+  assert.match(sql, /'support'::text as responsibility/);
+  assert.match(sql, /laudus:fixed_asset_identity:%/);
+});
