@@ -68,10 +68,18 @@ test('wallboard remains operationally read-only while allowing presentation cont
   assert.doesNotMatch(page, /<form/);
 });
 
-test('wallboard preserves missing KPI truth instead of inventing availability', () => {
-  assert.match(api, /availabilityPct: null/);
-  assert.match(api, /Sin base canónica de disponibilidad diaria/);
+test('wallboard publishes availability only from the reported snapshot denominator', () => {
+  assert.match(api, /maintenance_reported_availability_daily_v1/);
+  assert.match(api, /reportedAvailabilityClassified/);
+  assert.match(api, /reportedAvailabilityExpectedKeys/);
+  assert.match(api, /reportedAvailabilityExpected/);
+  assert.match(api, /availabilityMethod: reportedAvailabilityPct == null \? null : 'reported_snapshot_v1'/);
+  assert.match(api, /observaciones esperadas clasificadas/);
+  assert.match(api, /no equivale a disponibilidad horaria/);
+  assert.match(page, /Don Jaime · disponibilidad reportada/);
+  assert.match(page, /Sin % derivado de este snapshot/);
   assert.doesNotMatch(page, /Disponibilidad operacional/);
+  assert.doesNotMatch(page, /site\.operational \/ classified \* 100/);
   assert.match(page, /Sólo cifras calculadas desde órdenes registradas/);
 });
 
@@ -192,11 +200,13 @@ test('preventive slide separates hour and kilometer bases and reports active sch
   assert.match(page, /Plan preventivo vigente/);
 });
 
-test('fleet slide separates known equipment states and unknown status by mine', () => {
-  assert.match(page, /Disponibilidad de equipos por mina/);
-  assert.match(page, /site\.operational \+ site\.stopped/);
+test('fleet slide separates current state from reported availability by mine', () => {
+  assert.match(page, /Control general de flota/);
+  assert.match(page, /Estado actual por mina \+ disponibilidad reportada sólo donde existe denominador trazable/);
   assert.match(page, /site\.unknown/);
-  assert.match(page, /Sobre \{classified\} con estado conocido/);
+  assert.match(page, /Sin % derivado de este snapshot/);
+  assert.doesNotMatch(page, /site\.operational \+ site\.stopped/);
+  assert.doesNotMatch(page, /Sobre \{classified\} con estado conocido/);
 });
 
 

@@ -44,7 +44,9 @@ type AssetByZone = {
     operational: number;
     maintenance: number;
     critical: number;
-    availabilityPercentage: number;
+    availabilityPercentage: number | null;
+    operationalSharePercentage: number | null;
+    evidenceStatus: string;
   };
 };
 
@@ -153,7 +155,7 @@ export async function GET(request: NextRequest) {
         );
 
         const total = zoneAssets.length;
-        const availability = total > 0 ? Math.round((statusCounts.operational / total) * 100) : 0;
+        const operationalShare = total > 0 ? Math.round((statusCounts.operational / total) * 100) : null;
 
         // Convert asset rows to proper format
         const formattedAssets = (zoneAssets as any[]).map((asset) => {
@@ -183,11 +185,13 @@ export async function GET(request: NextRequest) {
             operational: statusCounts.operational,
             maintenance: statusCounts.maintenance,
             critical: statusCounts.critical,
-            availabilityPercentage: availability,
+            availabilityPercentage: null,
+            operationalSharePercentage: operationalShare,
+            evidenceStatus: 'status_snapshot_not_availability',
           },
         };
       })
-      .sort((a, b) => b.summary.availabilityPercentage - a.summary.availabilityPercentage);
+      .sort((a, b) => (b.summary.operationalSharePercentage ?? -1) - (a.summary.operationalSharePercentage ?? -1));
 
     return NextResponse.json(
       {
