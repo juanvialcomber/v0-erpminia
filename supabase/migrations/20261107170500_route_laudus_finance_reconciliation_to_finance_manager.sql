@@ -128,16 +128,19 @@ select
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 'warning'::text
     when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'warning'::text
+    when d.issue_key like 'laudus:cost_center_pending:%' then 'warning'::text
     else 'observation'::text
   end as severity,
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 75
     when d.issue_key like 'laudus:purchase_order_unresolved:%' then 70
+    when d.issue_key like 'laudus:cost_center_pending:%' then 72
     else 55
   end as priority_score,
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 'Conciliar CxP Laudus'
     when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'Conciliar OC Laudus'
+    when d.issue_key like 'laudus:cost_center_pending:%' then 'Conciliar centro de costo Laudus'
     else 'Revisar trazabilidad de factura Laudus'
   end as title,
   concat_ws(
@@ -145,6 +148,7 @@ select
     case
       when d.issue_key like 'laudus:cxp_inconsistente:%' then 'La fuente financiera presenta una inconsistencia que requiere decisión humana'
       when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'La OC no tiene centro de costo resoluble y requiere decisión administrativa'
+      when d.issue_key like 'laudus:cost_center_pending:%' then 'El centro de costo Laudus no tiene identidad operacional confirmada y requiere decisión administrativa con evidencia operacional'
       else 'La trazabilidad de factura requiere revisión humana'
     end,
     nullif(d.evidence_reference, '')
@@ -163,4 +167,5 @@ where d.status = 'open'
     d.issue_key like 'laudus:cxp_inconsistente:%'
     or d.issue_key like 'laudus:open_invoice_trace_once:%'
     or d.issue_key like 'laudus:purchase_order_unresolved:%'
+    or d.issue_key like 'laudus:cost_center_pending:%'
   );
