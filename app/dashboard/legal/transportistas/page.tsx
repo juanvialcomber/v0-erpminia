@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import useSWR from 'swr';
-import { ArrowLeft, Fuel, ReceiptText, Truck } from 'lucide-react';
+import { ArrowLeft, FileUp, ReceiptText, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -15,8 +16,39 @@ const fetcher=async(url:string)=>{const r=await fetch(url,{credentials:'include'
 const money=(v:number|null|undefined)=>new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(v||0));
 const number=(v:number|null|undefined)=>new Intl.NumberFormat('es-CL',{maximumFractionDigits:2}).format(Number(v||0));
 
+type ImportState={intakeId:string;summary:{parsed:number;new_candidates:number;duplicates:number;unmatched_suppliers:number};next_action:string}|null;
+
 export default function TransportSettlementsPage(){
- const {data,error,isLoading}=useSWR<Payload>('/api/legal/transport-settlements',fetcher,{revalidateOnFocus:false});
+ const {data,error,isLoading,mutate}=useSWR<Payload>('/api/legal/transport-settlements',fetcher,{revalidateOnFocus:false});
+ const [importing,setImporting]=useState(false);
+ const [promoting,setPromoting]=useState(false);
+ const [importState,setImportState]=useState<ImportState>(null);
+ const [importMessage,setImportMessage]=useState<string|null>(null);
+
+ const uploadWorkbook=async(file:File)=>{
+  setImporting(true);setImportMessage(null);setImportState(null);
+  try{
+   const form=new FormData(); form.append('file',file);
+   const response=await fetch('/api/legal/transport-settlements/import',{method:'POST',credentials:'include',body:form});
+   const payload=await response.json().catch(()=>null);
+   if(!response.ok)throw new Error(payload?.error||'No se pudo preparar la carga');
+   setImportState(payload); setImportMessage(payload.next_action||'Carga preparada para revisión.');
+  }catch(error){setImportMessage(error instanceof Error?error.message:'No se pudo preparar la carga');}
+  finally{setImporting(false);}
+ };
+
+ const promoteWorkbook=async()=>{
+  if(!importState?.intakeId)return;
+  setPromoting(true);setImportMessage(null);
+  try{
+   const response=await fetch('/api/legal/transport-settlements/import',{method:'PATCH',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({intakeId:importState.intakeId})});
+   const payload=await response.json().catch(()=>null);
+   if(!response.ok)throw new Error(payload?.error||'No se pudo promover la carga');
+   setImportMessage(`${payload.promoted} liquidaciones incorporadas a la vista canónica. No se ejecutaron pagos.`);
+   setImportState(null); await mutate();
+  }catch(error){setImportMessage(error instanceof Error?error.message:'No se pudo promover la carga');}
+  finally{setPromoting(false);}
+ };
  if(isLoading)return <StatePanel tone="loading" title="Cargando liquidaciones" description="Leyendo la capa canónica deduplicada de transportistas."/>;
  if(error||!data)return <StatePanel tone="error" title="Liquidaciones no disponibles" description="MOTIL no calcula pagos si no puede verificar la fuente."/>;
  return <div className="space-y-5">
@@ -26,6 +58,28 @@ export default function TransportSettlementsPage(){
    <h1 className="mt-1 text-2xl font-semibold">Liquidaciones</h1>
    <p className="mt-1 text-sm text-muted-foreground">Tonelaje, descuentos, anticipos y líquido a pago desde la planilla canónica de Elías. Liquidación no equivale a transferencia ejecutada.</p>
   </header>
+
+  <section className="rounded-md border">
+   <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+    <div>
+     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Carga directa</p>
+     <p className="mt-1 text-sm font-semibold">Libro mensual de transportistas</p>
+     <p className="mt-1 max-w-2xl text-xs text-muted-foreground">Acepta el Excel histórico real de Elías. MOTIL reconoce períodos, transportistas, préstamos, anticipos, petróleo y líquido a pago. La carga queda candidata hasta revisión humana.</p>
+    </div>
+    <label className="inline-flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted/40">
+     <FileUp className="mr-2 h-4 w-4"/>{importing?'Procesando…':'Cargar Excel'}
+     <input type="file" accept=".xls,.xlsx" className="hidden" disabled={importing||promoting} onChange={(event)=>{const file=event.target.files?.[0];if(file)void uploadWorkbook(file);event.currentTarget.value='';}}/>
+    </label>
+   </div>
+   {importMessage?<div className="border-t px-4 py-3 text-sm">{importMessage}</div>:null}
+   {importState?<div className="grid gap-3 border-t p-4 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] md:items-end">
+    <div><p className="text-[11px] uppercase text-muted-foreground">Leídas</p><p className="mt-1 text-lg font-semibold">{importState.summary.parsed}</p></div>
+    <div><p className="text-[11px] uppercase text-muted-foreground">Nuevas</p><p className="mt-1 text-lg font-semibold">{importState.summary.new_candidates}</p></div>
+    <div><p className="text-[11px] uppercase text-muted-foreground">Duplicadas</p><p className="mt-1 text-lg font-semibold">{importState.summary.duplicates}</p></div>
+    <div><p className="text-[11px] uppercase text-muted-foreground">Proveedor/RUT pendiente</p><p className="mt-1 text-lg font-semibold">{importState.summary.unmatched_suppliers}</p></div>
+    <Button size="sm" disabled={promoting||importState.summary.new_candidates===0||importState.summary.unmatched_suppliers>0} onClick={()=>void promoteWorkbook()}>{promoting?'Incorporando…':'Incorporar'}</Button>
+   </div>:null}
+  </section>
   {data.period&&data.summary?<>
    <section className="rounded-md border p-4">
     <p className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Período</p>
