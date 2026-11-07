@@ -106,6 +106,8 @@ select
       then 'proveedor_invalido_en_origen'
     when supplier_resolution_status<>'already_linked'
       then 'proveedor_no_resuelto'
+    when cost_center_resolution_status='line_distribution'
+      then 'distribucion_multi_centro_valida'
     else 'centro_costo_no_resuelto'
   end,
   case when supplier_resolution_status<>'already_linked' then 'proveedor' else 'centro_costo' end,
@@ -219,5 +221,45 @@ where i.id is null
 on conflict (organization_id,issue_key) do update
 set issue_type=excluded.issue_type,
     evidence_reference=excluded.evidence_reference,
+    updated_at=now(),
+    status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
+
+
+-- Caso excepcional: OC con proveedor resuelto pero sin centro de costo en OC, lineas ni solicitud de compra.
+-- Se conserva como revision humana; no inferir centro por proveedor, monto o fecha.
+insert into public.data_reconciliation_reviews
+  (organization_id, issue_key, entity_type, entity_id, issue_type, field_name, status, evidence_reference, updated_at)
+select
+  po.organization_id,
+  'motil:oc_sin_centro_costo:' || po.id::text,
+  'purchase_order',
+  po.id,
+  'centro_costo_ausente_cadena_compra',
+  'centro_costo',
+  'open',
+  concat('canonical.purchase_orders:',po.order_number,
+         ' | solicitud=',coalesce(pr.request_number,'sin_dato'),
+         ' | cotizacion=',coalesce(sq.quotation_number,'sin_dato'),
+         ' | centro_oc=',coalesce(po.cost_center_code,'sin_dato'),
+         ' | centro_solicitud=',coalesce(pr.cost_center_code,'sin_dato'),
+         ' | ot=',coalesce(pr.work_order_id::text,'sin_dato'),
+         ' | activo=',coalesce(pr.canonical_asset_id::text,'sin_dato')),
+  now()
+from canonical.purchase_orders po
+left join canonical.procurement_requests pr on pr.id=po.procurement_request_id
+left join canonical.supplier_quotations sq on sq.id=po.awarded_quotation_id
+where po.canonical_supplier_id is not null
+  and nullif(btrim(po.cost_center_code),'') is null
+  and nullif(btrim(pr.cost_center_code),'') is null
+  and pr.work_order_id is null
+  and pr.canonical_asset_id is null
+  and not exists (
+    select 1
+    from canonical.purchase_order_lines pol
+    where pol.purchase_order_id=po.id
+      and nullif(btrim(pol.cost_center_code),'') is not null
+  )
+on conflict (organization_id,issue_key) do update
+set evidence_reference=excluded.evidence_reference,
     updated_at=now(),
     status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
