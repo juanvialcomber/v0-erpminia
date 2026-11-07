@@ -56,7 +56,7 @@ test('weekly import creates only current/future, matched and assigned OTs with s
  assert.match(importer,/linked_work_order_id/);
  assert.match(importer,/official_weekly_program_imported/);
  assert.match(importer,/source_sha256:sha256/);
- assert.match(importer,/status\.includes\('terminado'\)/);
+ assert.match(importer,/\['terminado','completado','cerrado','finalizado','ejecutado'\]/);
 });
 
 
