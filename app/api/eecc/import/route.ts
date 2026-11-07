@@ -17,10 +17,11 @@ type XlsxModule = {
 export async function POST(request: NextRequest) {
   try {
     const manager = await requireEeccProfileManager(request);
-    if (!manager.authorized || !manager.auth.user || !manager.auth.organizationId) {
-      return manager.response;
-    }
+    if (!manager.authorized) return manager.response;
     const auth = manager.auth;
+    if (!auth.user || !auth.organizationId) {
+      return NextResponse.json({ error: 'Contexto de organización no disponible' }, { status: 403 });
+    }
 
     // Get form data with file
     const formData = await request.formData();
