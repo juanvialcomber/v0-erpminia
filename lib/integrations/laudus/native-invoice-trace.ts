@@ -210,7 +210,6 @@ export async function recoverOpenInvoiceTraces(
       if (traces.length > 0) withTrace += 1;
       else withoutTrace += 1;
     } catch {
-      apiCalls += 1;
       errors += 1;
     }
   }
