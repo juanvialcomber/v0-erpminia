@@ -35,11 +35,12 @@ test('supplier finance aggregates separately by currency', () => {
   assert.match(page,/moneyFor\(summary\.currency/);
 });
 
-test('supplier 360 distinguishes operational invoices from Laudus accounting evidence', () => {
+test('supplier 360 distinguishes operational invoices from accounting evidence without exposing ERP branding', () => {
   assert.match(page,/Facturas operacionales/);
-  assert.match(page,/Finanzas · Laudus/);
-  assert.match(page,/Laudus conserva la autoridad contable/);
+  assert.match(page,/Finanzas/);
+  assert.match(page,/La fuente financiera conserva la autoridad contable/);
   assert.match(page,/Sin vínculo financiero confirmado/);
+  assert.doesNotMatch(page,/Finanzas · Laudus|Laudus conserva la autoridad contable/);
 });
 
 test('supplier 360 exposes source freshness and health without infrastructure details', () => {
