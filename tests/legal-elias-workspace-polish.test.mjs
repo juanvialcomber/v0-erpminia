@@ -8,10 +8,10 @@ const widget = await readFile(new URL('../components/intelligence/senior-assista
 const api = await readFile(new URL('../app/api/legal/asistente/route.ts', import.meta.url), 'utf8');
 
 test('Elias home keeps only daily work as the primary surface', () => {
-  assert.match(home, /Qué necesita atención/);
-  assert.match(home, /Contratos y pagos/);
-  assert.match(home, /Cumplimiento mensual/);
-  assert.match(home, /Transportistas/);
+  assert.match(home, /Prioridad/);
+  assert.match(home, /Máximo tres asuntos/);
+  assert.match(home, /Siguiente acción:/);
+  assert.match(home, /Excepciones operativas/);
   assert.match(home, /Herramientas y áreas de soporte/);
 });
 
