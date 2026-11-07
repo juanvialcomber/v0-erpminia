@@ -42,11 +42,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const manager = await requireEeccProfileManager(request);
-  if (!manager.authorized || !manager.auth.organizationId) return manager.response;
+  if (!manager.authorized) return manager.response;
+  const auth = manager.auth;
+  if (!auth.organizationId) {
+    return NextResponse.json({ error: 'Contexto de organización no disponible' }, { status: 403 });
+  }
   if (!manager.canDelete) {
     return NextResponse.json({ error: 'Eliminar perfiles requiere permiso contractual de edición' }, { status: 403 });
   }
-  const auth = manager.auth;
 
   try {
     const { id } = await params;
