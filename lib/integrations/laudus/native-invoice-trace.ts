@@ -167,7 +167,7 @@ export async function recoverOpenInvoiceTraces(
   );
 
   const pending = openRows
-    .filter((row) => !complete.has(String(row.purchase_invoice_external_id)))
+    .filter((row) => row.total_amount == null || !complete.has(String(row.purchase_invoice_external_id)))
     .sort((a, b) => {
       const aMissingTotal = a.total_amount == null ? 1 : 0;
       const bMissingTotal = b.total_amount == null ? 1 : 0;
