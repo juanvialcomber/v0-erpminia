@@ -184,7 +184,7 @@ export async function POST(request:NextRequest){
   if(promoteError)throw promoteError;
 
   const today=chileTodayDateKey();
-  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,errors:[] as string[]};
+  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,skippedClassification:0,errors:[] as string[]};
   for(const item of insertedItems){
    const status=normalize(item.source_status);
    if(status.includes('terminado')||status.includes('completado')||status.includes('cerrado')){automation.skippedCompleted+=1;continue;}
@@ -192,8 +192,11 @@ export async function POST(request:NextRequest){
    const assignees=peopleByName.get(normalize(item.assigned_name))||[];
    const assignee=assignees.length===1?assignees[0]:null;
    if(!item.canonical_asset_id||item.reconciliation_status!=='matched'||!assignee){automation.skippedIdentity+=1;continue;}
-   const priority=normalize(item.priority_raw).includes('alta')?'high':normalize(item.priority_raw).includes('crit')?'critical':'medium';
-   const workType=normalize(item.work_type_raw).includes('correct')?'corrective':normalize(item.work_type_raw).includes('prevent')?'preventive':'corrective';
+   const priorityRaw=normalize(item.priority_raw);
+   const priority=priorityRaw.includes('crit')?'critical':priorityRaw.includes('alta')?'high':priorityRaw.includes('baja')?'low':'medium';
+   const workTypeRaw=normalize(item.work_type_raw);
+   const workType=workTypeRaw.includes('correct')?'corrective':workTypeRaw.includes('prevent')?'preventive':workTypeRaw.includes('predict')?'predictive':null;
+   if(!workType){automation.skippedClassification+=1;automation.errors.push(`Fila ${item.source_row}: clasificación de trabajo no reconocida`);continue;}
    const headers=new Headers(request.headers);headers.set('content-type','application/json');headers.set('idempotency-key',item.id);
    const internalRequest=new NextRequest(new URL('/api/maintenance/work-orders',request.url),{method:'POST',headers,body:JSON.stringify({
     canonicalAssetId:item.canonical_asset_id,assignedPersonId:assignee.id,title:item.title,
