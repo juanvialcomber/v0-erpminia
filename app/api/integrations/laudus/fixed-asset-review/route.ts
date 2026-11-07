@@ -41,8 +41,11 @@ function n(value: unknown) {
 async function canDecideOperationalIdentity(userId: string, role: string | null) {
   if (isAdminRole(role)) return true;
   const access = await getUserModuleAccess(userId);
-  return access.cargoName?.trim().toUpperCase() === 'JEFE DEPARTAMENTO DE MANTENIMIENTO'
-    && access.access[MODULE_KEYS.MANT_OPERACIONES] === 'ED';
+  const cargo = access.cargoName?.trim().toUpperCase();
+  const authorizedCargo =
+    cargo === 'JEFE DEPARTAMENTO DE MANTENIMIENTO'
+    || cargo === 'JEFE DE PLANIFICACIÓN';
+  return authorizedCargo && access.access[MODULE_KEYS.MANT_OPERACIONES] === 'ED';
 }
 
 async function requireReviewReadAccess(request: NextRequest) {
@@ -191,7 +194,7 @@ export async function POST(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
   if (!(await canDecideOperationalIdentity(access.user.id, access.role))) {
-    return NextResponse.json({ error: 'La identidad operacional la resuelve el Jefe Departamento de Mantenimiento.' }, { status: 403 });
+    return NextResponse.json({ error: 'La identidad operacional la resuelve Mantenimiento o el Jefe de Planificación como líder del proyecto.' }, { status: 403 });
   }
 
   const context = await getOrganizationContext(request);
