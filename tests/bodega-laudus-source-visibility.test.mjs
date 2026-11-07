@@ -9,7 +9,7 @@ test('Bodega presents Laudus as live ERP evidence, not a pending integration', (
 
   assert.doesNotMatch(page, /pendiente de habilitación comercial de API/i);
   assert.doesNotMatch(page, /Esperando acceso y primera sincronización/i);
-  assert.match(card, /Laudus es la fuente primaria de stock cuando está fresco/);
+  assert.match(card, /MOTIL decide disponibilidad usando la mejor evidencia vigente/);
   assert.match(card, /Correo y WhatsApp actúan como contraste/);
   assert.match(card, /mappedPhysicalWarehouses/);
   assert.match(card, /latestStockSync/);
@@ -44,9 +44,9 @@ test('Bodega displays Laudus stock and quantity deltas per visible SKU', () => {
   assert.match(route, /laudus_inventory_reconciliation_summary_service_v1/);
   assert.match(route, /laudus_quantity_delta/);
   assert.match(route, /reconciliation_state/);
-  assert.match(page, /Laudus ERP/);
-  assert.match(page, /Difiere Laudus/);
-  assert.match(page, /Δ MOTIL − Laudus/);
+  assert.match(page, /Respaldo ERP/);
+  assert.match(page, /Difiere ERP/);
+  assert.match(page, /Δ MOTIL − ERP/);
   assert.doesNotMatch(page, /Referencia canónica más reciente/);
 });
 
@@ -59,6 +59,6 @@ test('Laudus becomes the effective displayed quantity only when the authority ga
   assert.match(route, /effective_quantity/);
   assert.match(route, /effective_source/);
   assert.match(route, /laudusIsPrimary/);
-  assert.match(page, /Fuente: Laudus/);
-  assert.match(page, /Laudus primario/);
+  assert.match(page, /Fuente: ERP/);
+  assert.match(page, /ERP vigente/);
 });
