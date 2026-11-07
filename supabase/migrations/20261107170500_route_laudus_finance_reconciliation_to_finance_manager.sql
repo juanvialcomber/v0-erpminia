@@ -127,20 +127,24 @@ select
   'finance'::text as domain,
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 'warning'::text
+    when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'warning'::text
     else 'observation'::text
   end as severity,
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 75
+    when d.issue_key like 'laudus:purchase_order_unresolved:%' then 70
     else 55
   end as priority_score,
   case
     when d.issue_key like 'laudus:cxp_inconsistente:%' then 'Conciliar CxP Laudus'
+    when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'Conciliar OC Laudus'
     else 'Revisar trazabilidad de factura Laudus'
   end as title,
   concat_ws(
     ' · ',
     case
       when d.issue_key like 'laudus:cxp_inconsistente:%' then 'La fuente financiera presenta una inconsistencia que requiere decisión humana'
+      when d.issue_key like 'laudus:purchase_order_unresolved:%' then 'La OC no tiene centro de costo resoluble y requiere decisión administrativa'
       else 'La trazabilidad de factura requiere revisión humana'
     end,
     nullif(d.evidence_reference, '')
@@ -158,4 +162,5 @@ where d.status = 'open'
   and (
     d.issue_key like 'laudus:cxp_inconsistente:%'
     or d.issue_key like 'laudus:open_invoice_trace_once:%'
+    or d.issue_key like 'laudus:purchase_order_unresolved:%'
   );
