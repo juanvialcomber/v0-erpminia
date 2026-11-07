@@ -136,6 +136,17 @@ export async function POST(request:NextRequest){
  const program=parsed[0];
  const today=chileTodayDateKey();
 
+ // Source freshness is a calendar decision in Chile. A delayed resend must
+ // never displace a newer active plan or reopen work from a past week.
+ const {data:currentOfficial,error:currentError}=await context.supabase
+  .from('planning_weekly_work_sources').select('id,week_start')
+  .eq('organization_id',context.organizationId).eq('mine',program.mine)
+  .eq('is_current',true).maybeSingle();
+ if(currentError)return NextResponse.json({error:'No se pudo comprobar vigencia del programa previo'},{status:503});
+ const historical=program.weekEnd<today;
+ const superseded=Boolean(currentOfficial&&program.weekStart<currentOfficial.week_start);
+ const canPromote=!historical&&!superseded;
+
  const {data:existing}=await context.supabase.from('planning_weekly_work_sources')
   .select('id,mine,week_start,week_end,is_current').eq('organization_id',context.organizationId)
   .eq('source_sha256',sha256).eq('source_sheet',program.sheetName).maybeSingle();
@@ -151,7 +162,7 @@ export async function POST(request:NextRequest){
   const {data:source,error:sourceError}=await context.supabase.from('planning_weekly_work_sources').insert({
    organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:program.sheetName,
    source_url:`storage:${BUCKET}/${storagePath}`,mine:program.mine,week_start:program.weekStart,week_end:program.weekEnd,
-   reported_at:new Date().toISOString(),source_owner:'Ariel López',status:mismatch?'review_required':'official_source',is_current:false,
+   reported_at:new Date().toISOString(),source_owner:'Ariel López',status:historical?'archived':(superseded||mismatch)?'review_required':'official_source',is_current:false,
   }).select('id,mine,week_start,week_end,status').single();
   if(sourceError)throw sourceError;
   persistedSourceId=source.id;
@@ -181,9 +192,11 @@ export async function POST(request:NextRequest){
    const exact=candidateIds.length===1?assets?.find(asset=>asset.id===candidateIds[0])||null:null;
    const assignees=peopleByName.get(normalize(item.assigned_name))||[];
    const status=normalize(item.source_status);
-   const completed=['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag));
-   const ready=Boolean(exact)&&!ambiguous&&assignees.length===1&&Boolean(item.planned_date)&&item.planned_date>=today&&!completed;
+   const completed=['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag))||(item.source_progress!=null&&item.source_progress>=1);
+   const ready=canPromote&&Boolean(exact)&&!ambiguous&&assignees.length===1&&Boolean(item.planned_date)&&item.planned_date>=today&&!completed;
    const reviewReason=ready?(directIds.length===0?'Vínculo reutilizado desde programas semanales oficiales previamente conciliados':null)
+    :historical?'Programa histórico: no se generan nuevas OT'
+    :superseded?'Programa anterior al oficial vigente; requiere revisión sin nuevas OT'
     :ambiguous?'Más de un equipo canónico coincide con la etiqueta fuente o su historial'
     :!exact?'Equipo fuente no coincide con un activo canónico vigente'
     :assignees.length!==1?(assignees.length>1?'Responsable ambiguo entre personas activas':'Responsable sin coincidencia única y activa')
@@ -193,16 +206,20 @@ export async function POST(request:NextRequest){
     reconciliation_status:ready?'matched':ambiguous?'ambiguous':'review_required',review_reason:reviewReason};
   });
   let insertedItems:any[]=[];
-  if(rows.length){const {data,error:itemError}=await context.supabase.from('planning_weekly_work_items').insert(rows).select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,materials,reconciliation_status');if(itemError)throw itemError;insertedItems=data||[];}
-  const {error:retireError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:false}).eq('organization_id',context.organizationId).eq('mine',program.mine).eq('is_current',true).neq('id',source.id);
-  if(retireError)throw retireError;
-  const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
-  if(promoteError)throw promoteError;
+  if(rows.length){const {data,error:itemError}=await context.supabase.from('planning_weekly_work_items').insert(rows).select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,source_progress,materials,reconciliation_status');if(itemError)throw itemError;insertedItems=data||[];}
+  if(canPromote){
+   const {error:retireError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:false}).eq('organization_id',context.organizationId).eq('mine',program.mine).eq('is_current',true).neq('id',source.id);
+   if(retireError)throw retireError;
+   const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
+   if(promoteError)throw promoteError;
+  }
 
-  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,errors:[] as string[]};
+  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedSuperseded:0,skippedIdentity:0,errors:[] as string[]};
   for(const item of insertedItems){
+   if(historical){automation.skippedPast+=1;continue;}
+   if(superseded){automation.skippedSuperseded+=1;continue;}
    const status=normalize(item.source_status);
-   if(['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag))){automation.skippedCompleted+=1;continue;}
+   if(['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag))||(item.source_progress!=null&&item.source_progress>=1)){automation.skippedCompleted+=1;continue;}
    if(!item.planned_date||item.planned_date<today){automation.skippedPast+=1;continue;}
    const assignees=peopleByName.get(normalize(item.assigned_name))||[];
    const assignee=assignees.length===1?assignees[0]:null;
