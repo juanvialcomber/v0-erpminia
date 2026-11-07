@@ -302,10 +302,6 @@ export async function GET(request: NextRequest) {
   }
   const hasPrivateFinanceInbox = cargoName?.toUpperCase() === 'JEFE ADM.';
 
-  if (!coverageError && !coverage && !hasPrivateFinanceInbox && personalWorkOrderTasks.length === 0) {
-    return emptyRoleInbox(profile.full_name || null, profile.cargo_id, cargoName);
-  }
-
   if (coverageError) {
     console.warn('[role-task-inbox] coverage lookup failed; continuing with scoped task queries', coverageError);
   }
@@ -319,13 +315,13 @@ export async function GET(request: NextRequest) {
         .select(TASK_COLUMNS)
         .eq('organization_id', context.organizationId)
         .eq('cargo_id', profile.cargo_id);
-  const actionableLookup = coverageMissing
-    ? Promise.resolve({ data: [], error: null })
-    : context.supabase
-        .from('role_tasks_actionable_v1')
-        .select(TASK_COLUMNS)
-        .eq('organization_id', context.organizationId)
-        .eq('cargo_id', profile.cargo_id);
+  // Coverage is an optimization/summary source, never authority for task visibility.
+  // Always query actionable tasks so newly-routed work cannot disappear until coverage refreshes.
+  const actionableLookup = context.supabase
+    .from('role_tasks_actionable_v1')
+    .select(TASK_COLUMNS)
+    .eq('organization_id', context.organizationId)
+    .eq('cargo_id', profile.cargo_id);
   const [actionableResult, escalationResult] = await Promise.all([actionableLookup, escalationLookup]);
 
   const taskError = actionableResult.error || escalationResult.error;
