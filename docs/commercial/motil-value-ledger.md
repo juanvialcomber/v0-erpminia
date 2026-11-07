@@ -349,3 +349,16 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L4 de preparación/decisión asistida. No es L5.
 - Métrica siguiente: porcentaje de facturas contractuales que alcanzan readiness, motivo de bloqueo, tiempo desde factura observada a CxP aprobada y tiempo desde CxP a transferencia confirmada.
 - Impacto económico: no medido todavía; la hipótesis es reducir búsqueda manual y ciclos de coordinación, pendiente de baseline.
+
+
+## 2026-11-06 — Solicitud de pago y doble firma dentro de MOTIL
+
+- Problema previo: incluso con evidencia contractual y CxP preparada, el handoff a pago quedaba fuera del flujo Legal visible.
+- Capacidad: Legal puede crear una solicitud de pago sólo desde una CxP MOTIL exacta, con saldo y vencimiento; la solicitud nace `pending_signatures` con mínimo 2 firmas.
+- Separación de funciones: el creador no puede firmar; cada firmante decide una sola vez; rechazo requiere observación.
+- Gate de aprobación: dos aprobaciones distintas cambian la solicitud a `approved`.
+- Autoridad: ningún endpoint de este bloque ejecuta transferencia ni llama a `record_supplier_payment_v2`. Ejecución y conciliación siguen en Tesorería.
+- Evidencia actual de roles: Daniel Villarroel tiene edición Finanzas; Gerencia/Admin provee separación adicional de aprobación. Elías prepara desde Legal sólo cuando el payable exacto está listo.
+- Nivel actual: L4 decisión/preparación asistida. No es L5 porque no existe ejecución autónoma.
+- Métrica siguiente: tiempo desde readiness a solicitud, tiempo a 2 firmas, tasa de rechazo, motivos de rechazo y tiempo a transferencia real.
+- Impacto económico: hipótesis de menor coordinación manual; aún no medido.
