@@ -7,7 +7,7 @@ import { requireAdmin } from '@/lib/api/guard';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 import { recoverOpenInvoiceTraces } from '@/lib/integrations/laudus/native-invoice-trace';
 
-const RUN_KEY='laudus:open_invoice_trace_once:20261107_a';
+const RUN_KEY='laudus:open_invoice_trace_once:20261107_b';
 
 function authorized(request: NextRequest) {
   const expected=process.env.CRON_SECRET || '';
