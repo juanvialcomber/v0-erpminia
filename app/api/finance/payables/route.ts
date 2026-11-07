@@ -171,7 +171,58 @@ export async function POST(request: NextRequest) {
         p_notes: body.notes ?? null,
       });
       if (error) throw error;
-      return NextResponse.json({ paymentId: data });
+
+      let legalNotificationCreated = false;
+      try {
+        const [{ data: payable }, { data: elias }] = await Promise.all([
+          context.supabase
+            .from('procurement_accounts_payable_v1')
+            .select('id,invoice_number,supplier_name,currency')
+            .eq('organization_id', context.organizationId)
+            .eq('id', body.payableId)
+            .maybeSingle(),
+          context.supabase
+            .from('profiles')
+            .select('id,email')
+            .ilike('email', 'eliasfernandez@lapatagua.cl')
+            .maybeSingle(),
+        ]);
+
+        if (elias?.id) {
+          const amount = Number(body.amount || 0);
+          const currency = String(payable?.currency || 'CLP');
+          const formattedAmount = currency === 'CLP'
+            ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount)
+            : `${currency} ${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(amount)}`;
+          const supplier = payable?.supplier_name || 'Proveedor';
+          const invoice = payable?.invoice_number || 's/n';
+          const { error: notificationError } = await context.supabase.from('legal_notifications').insert({
+            organization_id: context.organizationId,
+            user_id: elias.id,
+            type: 'supplier_payment_recorded',
+            title: 'Pago a proveedor confirmado',
+            message: `${supplier} · Factura ${invoice} · ${formattedAmount} · ${body.paymentDate}`,
+            entity_type: 'procurement_payable',
+            entity_id: String(body.payableId),
+            metadata: {
+              payment_id: data,
+              payable_id: body.payableId,
+              supplier_name: supplier,
+              invoice_number: invoice,
+              amount,
+              currency,
+              payment_date: body.paymentDate,
+              reference: body.reference ?? null,
+            },
+          });
+          if (!notificationError) legalNotificationCreated = true;
+          else console.error('[finance/payables:legal-notification]', notificationError);
+        }
+      } catch (notificationError) {
+        console.error('[finance/payables:legal-notification]', notificationError);
+      }
+
+      return NextResponse.json({ paymentId: data, legalNotificationCreated });
     }
     if (action === 'reconcile_payment') {
       const { error } = await context.supabase.rpc('reconcile_supplier_payment_v2', {
