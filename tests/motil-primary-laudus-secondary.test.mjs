@@ -8,6 +8,8 @@ const assets = fs.readFileSync('components/integrations/laudus-fixed-asset-revie
 const finance = fs.readFileSync('components/integrations/laudus-finance-control-card.tsx','utf8');
 const bodega = fs.readFileSync('app/dashboard/bodega/page.tsx','utf8');
 const bodegaSource = fs.readFileSync('components/integrations/laudus-inventory-readiness-card.tsx','utf8');
+const financeReadiness = fs.readFileSync('components/integrations/laudus-finance-readiness-card.tsx','utf8');
+const embeddedAssets = fs.readFileSync('components/finance/laudus-fixed-assets-review.tsx','utf8');
 
 test('MOTIL decision surfaces demote ERP branding to provenance', () => {
   assert.match(legal, /Respaldo financiero/);
@@ -31,6 +33,11 @@ test('MOTIL decision surfaces demote ERP branding to provenance', () => {
   assert.doesNotMatch(bodega, /Laudus es la fuente primaria de stock/);
   assert.match(bodegaSource, /Control de stock MOTIL/);
   assert.match(bodegaSource, /MOTIL decide disponibilidad usando la mejor evidencia vigente/);
+
+  assert.match(financeReadiness, /Preparación financiera MOTIL/);
+  assert.doesNotMatch(financeReadiness, /Preparación financiera para Laudus/);
+  assert.match(embeddedAssets, /MOTIL prioriza identidad operacional y propone qué revisar/);
+  assert.doesNotMatch(embeddedAssets, /Laudus · sólo lectura/);
 });
 
 test('technical Laudus integration contracts remain intact behind the UI', () => {
