@@ -9,7 +9,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 
 type Invoice = { doc_number:string; source_net_amount:number; source_retention_amount:number; payment_state:string; laudus:{outstanding_amount:number}|null };
 type Milestone = { contract_number:string; contractor_name:string|null; sequence:number; title:string; purchase_order_number:string; currency:string; total_amount:number; progress_ratio:number; executed_amount:number; invoiced_amount:number; pending_to_invoice:number; payment_state:string; invoices:Invoice[]; provenance:{source_sheet:string;source_row:number} };
-type ContractSummary = { contract_number:string; title:string|null; contractor_name:string|null; contract_value:number; contract_paid_amount:number; milestones:number; milestones_started:number; milestones_paid:number; milestones_retained:number; invoice_matches:number; invoice_expected:number };
+type ContractSummary = { contract_number:string; title:string|null; contractor_name:string|null; contract_value:number; contract_paid_amount:number; milestones:number; milestones_started:number; milestones_paid:number; milestones_retained:number; invoice_matches:number; invoice_expected:number; detail_available:boolean };
 type Payload = { data:Milestone[]; contracts:ContractSummary[]; summary:{contracts:number;milestones:number;invoices_expected:number;invoices_matched:number;retained_milestones:number}; policy:{retention:string;no_inference:string} };
 
 const fetcher = async (url:string) => {
@@ -90,7 +90,7 @@ export default function ContractPaymentsPage(){
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Avances y pagos</h1>
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Primero muestra qué significa cada estado y qué debe hacer Legal. Avance físico, facturación, retención y pago se mantienen separados.</p>
-      <p className="mt-2 text-xs text-muted-foreground">Cobertura detallada actual: IO-01 e IO-02. El resto de IO/EP se incorporará desde la misma planilla fuente sin inventar detalle.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Cobertura contractual: IO-01…IO-09 y EP-01…EP-06. Detalle de hitos/facturas conciliadas disponible por ahora en IO-01 e IO-02.</p>
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
       <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
@@ -101,11 +101,11 @@ export default function ContractPaymentsPage(){
     <section className="grid gap-3 lg:grid-cols-2">
       {data.contracts.map((contract)=><article key={contract.contract_number} className="rounded-md border p-4">
         <div className="flex items-start justify-between gap-3"><div><Badge variant="outline">{contract.contract_number}</Badge><h2 className="mt-2 text-sm font-semibold">{contract.title || contract.contractor_name}</h2></div><div className="text-right text-xs text-muted-foreground"><p>{money(contract.contract_value)}</p><p className="mt-1">Pagado resumen: {money(contract.contract_paid_amount)}</p></div></div>
-        <div className="mt-4 grid grid-cols-3 gap-2 text-xs"><div><span className="text-muted-foreground">Iniciados</span><p className="mt-1 font-semibold">{contract.milestones_started}/{contract.milestones}</p></div><div><span className="text-muted-foreground">Pagados</span><p className="mt-1 font-semibold">{contract.milestones_paid}</p></div><div><span className="text-muted-foreground">Retención</span><p className="mt-1 font-semibold">{contract.milestones_retained}</p></div></div>
+        {contract.detail_available ? <div className="mt-4 grid grid-cols-3 gap-2 text-xs"><div><span className="text-muted-foreground">Iniciados</span><p className="mt-1 font-semibold">{contract.milestones_started}/{contract.milestones}</p></div><div><span className="text-muted-foreground">Pagados</span><p className="mt-1 font-semibold">{contract.milestones_paid}</p></div><div><span className="text-muted-foreground">Retención</span><p className="mt-1 font-semibold">{contract.milestones_retained}</p></div></div> : <p className="mt-4 text-xs text-muted-foreground">Resumen contractual cargado. Detalle de hitos/facturas aún no estructurado.</p>}
       </article>)}
     </section>
     <section className="space-y-3">
-      {data.contracts.map((contract)=><article key={'detail-'+contract.contract_number} className="overflow-hidden rounded-md border">
+      {data.contracts.filter((contract)=>contract.detail_available).map((contract)=><article key={'detail-'+contract.contract_number} className="overflow-hidden rounded-md border">
         <div className="border-b bg-muted/20 px-4 py-3"><p className="text-sm font-semibold">{contract.contract_number} · {contract.contractor_name}</p><p className="mt-1 text-xs text-muted-foreground">{contract.invoice_matches}/{contract.invoice_expected} facturas verificadas</p></div>
         <div className="divide-y">
           {data.data.filter((item)=>item.contract_number===contract.contract_number).map((item)=>{
