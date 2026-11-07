@@ -18,3 +18,14 @@ test('EECC coverage is explicitly scoped to the current compliance month',()=>{
  assert.match(api,/in_review:/);
  assert.match(home,/coverage\?\.summary\.in_review/);
 });
+
+
+const supplierPage=readFileSync('app/dashboard/legal/contratistas-documentos/page.tsx','utf8');
+
+test('Elias supplier workspace leads with current-month coverage',()=>{
+ assert.match(supplierPage,/Cumplimiento mensual/);
+ assert.match(supplierPage,/mes en curso/);
+ assert.match(supplierPage,/\/api\/legal\/eecc-coverage/);
+ assert.match(supplierPage,/Falta carpeta del mes/);
+ assert.match(supplierPage,/Ver carpetas y documentos/);
+});
