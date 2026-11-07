@@ -3,6 +3,8 @@ import MaintenanceControlTowerPage from '@/components/maintenance/control-tower-
 
 export const metadata: Metadata = {
   title: 'Torre de Control Mantenimiento',
+  manifest: '/motil-torre.webmanifest',
+  themeColor: '#0a0a0a',
   robots: { index: false, follow: false },
 };
 
