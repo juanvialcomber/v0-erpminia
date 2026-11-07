@@ -37,18 +37,76 @@ function normalizeNumberish(value: unknown) {
 
 function normalizeAndDedupe(rows: JsonRow[]) {
   const byId = new Map<string, JsonRow>();
+
   for (const row of rows) {
     const id = String(row.journalEntryId ?? row.id ?? '').trim();
     if (!id) continue;
-    const lines = Array.isArray(row.lines)
-      ? row.lines.map((line: JsonRow) => ({
+
+    const current = byId.get(id) || { ...row, lines: [] };
+    const existingLines = Array.isArray(current.lines) ? current.lines as JsonRow[] : [];
+    const lineMap = new Map<string, JsonRow>();
+
+    const lineKey = (line: JsonRow) => String(line?.lineId ?? [
+      line?.account?.accountNumber ?? line?.accountNumber ?? '',
+      line?.description ?? '',
+      line?.debit ?? '',
+      line?.credit ?? '',
+      line?.document ?? '',
+    ].join('|'));
+
+    for (const line of existingLines) lineMap.set(lineKey(line), line);
+
+    if (Array.isArray(row.lines)) {
+      for (const line of row.lines as JsonRow[]) {
+        const normalizedLine = {
           ...line,
           debit: normalizeNumberish(line?.debit),
           credit: normalizeNumberish(line?.credit),
-        }))
-      : [];
-    byId.set(id, { ...row, lines });
+        };
+        lineMap.set(lineKey(normalizedLine), normalizedLine);
+      }
+    }
+
+    const flatLineId = row.lines_lineId ?? row['lines.lineId'];
+    const flatAccountNumber = row.lines_account_accountNumber ?? row['lines.account.accountNumber'];
+    const flatAccountName = row.lines_account_name ?? row['lines.account.name'];
+    const flatDescription = row.lines_description ?? row['lines.description'];
+    const flatDebit = row.lines_debit ?? row['lines.debit'];
+    const flatCredit = row.lines_credit ?? row['lines.credit'];
+    const flatCurrency = row.lines_currencyCode ?? row['lines.currencyCode'];
+    const flatCostCenter = row.lines_costCenter_costCenterId ?? row['lines.costCenter.costCenterId'];
+    const flatDocument = row.lines_document ?? row['lines.document'];
+
+    if (
+      flatLineId != null
+      || flatAccountNumber != null
+      || flatDescription != null
+      || flatDebit != null
+      || flatCredit != null
+    ) {
+      const normalizedFlatLine: JsonRow = {
+        lineId: flatLineId ?? null,
+        account: {
+          accountNumber: flatAccountNumber ?? null,
+          name: flatAccountName ?? null,
+        },
+        description: flatDescription ?? null,
+        debit: normalizeNumberish(flatDebit),
+        credit: normalizeNumberish(flatCredit),
+        currencyCode: flatCurrency ?? null,
+        costCenter: flatCostCenter != null ? { costCenterId: flatCostCenter } : null,
+        document: flatDocument ?? null,
+      };
+      lineMap.set(lineKey(normalizedFlatLine), normalizedFlatLine);
+    }
+
+    byId.set(id, {
+      ...current,
+      ...row,
+      lines: [...lineMap.values()],
+    });
   }
+
   return [...byId.values()];
 }
 
@@ -158,6 +216,7 @@ export async function runLaudusAccountingBackfill(
   let rowsRead = 0;
   let rowsStaged = 0;
   let duplicatesRemoved = 0;
+  let lineRowsGrouped = 0;
 
   while (apiCalls < boundedMaxCalls) {
     try {
@@ -177,7 +236,9 @@ export async function runLaudusAccountingBackfill(
 
       const pageRows = rowsFrom(payload);
       const uniqueRows = normalizeAndDedupe(pageRows);
-      const pageDuplicates = Math.max(pageRows.length - uniqueRows.length, 0);
+      const groupedLineRows = Math.max(pageRows.length - uniqueRows.length, 0);
+      lineRowsGrouped += groupedLineRows;
+      const pageDuplicates = 0;
 
       if (uniqueRows.length > 0) {
         const { error: ingestError } = await db.rpc('motil_ingest_laudus_extended_finance', {
@@ -219,7 +280,7 @@ export async function runLaudusAccountingBackfill(
       });
 
       if (status === 'completed') {
-        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, nextDateFrom };
+        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, lineRowsGrouped, nextDateFrom };
       }
 
       if (pageComplete) {
@@ -252,6 +313,7 @@ export async function runLaudusAccountingBackfill(
       rowsRead,
       rowsStaged,
       duplicatesRemoved,
+      lineRowsGrouped,
       nextDateFrom: windowFrom,
       nextOffset: offset,
       targetDate,
