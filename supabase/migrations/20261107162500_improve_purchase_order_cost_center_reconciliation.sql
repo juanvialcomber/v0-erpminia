@@ -1,6 +1,8 @@
 -- Mejora la conciliacion de centros de costo de OC usando MOTIL como capa operacional canonica.
--- Conserva los codigos hoja de Laudus como evidencia, pero permite heredar al padre activo de MOTIL
--- cuando el centro hoja esta explicitamente ignorado y todas las lineas convergen al mismo centro operacional.
+-- Conserva los codigos hoja de Laudus como evidencia y permite heredar al padre activo de MOTIL
+-- cuando el centro hoja esta explicitamente ignorado.
+-- Si una OC distribuye lineas entre varios centros validos de MOTIL, se considera distribucion valida
+-- a nivel de linea y no se fuerza un unico centro en la cabecera.
 
 create or replace view integration.purchase_order_reconciliation_preview_v1 as
 with supplier_name_map as (
@@ -99,7 +101,10 @@ select
   end as supplier_resolution_status,
   plc.consensus_raw as raw_line_cost_center,
   plc.parsed_code as parsed_line_cost_center_code,
-  plc.consensus_operational_code as proposed_cost_center_code,
+  case
+    when plc.distinct_operational_centers=1 then plc.consensus_operational_code
+    else null
+  end as proposed_cost_center_code,
   coalesce(plc.distinct_cost_centers,0::bigint) as distinct_line_cost_centers,
   case
     when nullif(btrim(po.cost_center_code),'') is not null then 'already_linked'
@@ -107,7 +112,7 @@ select
      and plc.distinct_operational_centers=1
      and plc.consensus_operational_code is not null then 'line_consensus'
     when plc.unresolved_line_count=0
-     and coalesce(plc.distinct_operational_centers,0)>1 then 'conflict'
+     and coalesce(plc.distinct_operational_centers,0)>1 then 'line_distribution'
     when coalesce(plc.distinct_cost_centers,0)>0 then 'unresolved'
     else 'unresolved'
   end as cost_center_resolution_status,
@@ -118,8 +123,7 @@ select
       nullif(btrim(po.cost_center_code),'') is not null
       or (
         plc.unresolved_line_count=0
-        and plc.distinct_operational_centers=1
-        and plc.consensus_operational_code is not null
+        and coalesce(plc.distinct_operational_centers,0)>=1
       )
     )
   ) as fully_resolvable,
