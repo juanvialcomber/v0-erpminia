@@ -125,7 +125,7 @@ type FinanceControl = {
 const fetcher = async (url: string): Promise<FinanceControl> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Laudus.');
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo actualizar el respaldo financiero.');
   return payload as FinanceControl;
 };
 
@@ -178,7 +178,7 @@ function freshnessText(value?: string | null) {
   if (!value) return 'Sin sincronización';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return 'Fecha por revisar';
-  return `Laudus · actualizado ${new Intl.DateTimeFormat('es-CL', {
+  return `Fuente financiera · actualizada ${new Intl.DateTimeFormat('es-CL', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
@@ -225,7 +225,7 @@ export function LaudusFinanceControlCard() {
       <Card className="shadow-none">
         <CardContent className="p-5">
           <LaudusSourceMark state="offline" className="mb-3" />
-          <p className="text-sm font-medium">Control Laudus no disponible</p>
+          <p className="text-sm font-medium">Respaldo financiero no disponible</p>
           <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
         </CardContent>
       </Card>
@@ -301,7 +301,7 @@ export function LaudusFinanceControlCard() {
       if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
       setDecisionByPriority((current) => ({ ...current, [priorityKey]: decision }));
       await decisionEvidence.mutate();
-      setDecisionNotice('Decisión registrada. No se modificó Laudus ni el dato canónico.');
+      setDecisionNotice('Decisión registrada. No se modificó la fuente financiera ni el dato operacional.');
     } catch (decisionError) {
       setDecisionNotice(decisionError instanceof Error ? decisionError.message : 'No fue posible registrar la decisión.');
     }
@@ -337,7 +337,7 @@ export function LaudusFinanceControlCard() {
       ? {
           key: 'freshness',
           rank: 130,
-          title: 'Revisar actualización de Laudus',
+          title: 'Revisar actualización financiera',
           evidence: `Última sincronización operativa: ${shortDate(data?.freshness?.latestOperationalSync)} · ${number(operationalSyncAgeDays)} día(s) de antigüedad`,
           action: 'Revisar fuente',
           href: '/dashboard/finanzas/fuentes',
@@ -378,7 +378,7 @@ export function LaudusFinanceControlCard() {
           key: 'deposit',
           rank: 70,
           title: 'Validar pagos no depositados',
-          evidence: `${number(pendingDeposit)} registros Laudus requieren verificación antes de cerrar conciliación`,
+          evidence: `${number(pendingDeposit)} registros financieros requieren verificación antes de cerrar conciliación`,
           action: 'Validar pagos',
           href: '/dashboard/finanzas/pagos',
         }
@@ -414,7 +414,7 @@ export function LaudusFinanceControlCard() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex flex-wrap items-center gap-2">
             <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} />
-            <p className="text-xs font-medium text-muted-foreground">Laudus · fuente financiera</p>
+            <p className="text-xs font-medium text-muted-foreground">Respaldo financiero · sólo lectura</p>
           </div>
           <div className="flex items-center gap-2">
             {!isLoading && freshnessIsStale ? <Badge variant="destructive">Dato atrasado</Badge> : null}
