@@ -81,10 +81,10 @@ export default function LegalInboxPage() {
     <div className="space-y-5">
       <header className="flex flex-col gap-3 border-b border-border/70 pb-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Bandeja operacional</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inbox</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Elías</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Pendientes</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Todo lo que requiere atención, firma, evidencia o cierre en un solo lugar.
+            Trabajo ordenado por urgencia, evidencia y siguiente acción.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void mutate()}>
@@ -97,14 +97,12 @@ export default function LegalInboxPage() {
         <StatePanel tone="warning" title="Inbox parcial" description={data.warnings.join(' ')} className="min-h-0" />
       ) : null}
 
-      <section className="grid overflow-hidden rounded-md border sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
         {[
-          ['Pendientes', data.summary.total],
           ['Vencidos', data.summary.overdue],
-          ['Próx. 7 días', data.summary.due_next_7_days],
-          ['Esperando firmas', data.summary.waiting_signatures],
-          ['Listos Gerencia', data.summary.ready_for_management],
-          ['Evidencia pendiente', data.summary.evidence_pending],
+          ['Esta semana', data.summary.due_next_7_days],
+          ['Esperando firma', data.summary.waiting_signatures],
+          ['Falta evidencia', data.summary.evidence_pending],
         ].map(([label, value], index) => (
           <div key={String(label)} className={`px-4 py-3 ${index ? 'border-t sm:border-l sm:border-t-0' : ''}`}>
             <p className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
@@ -114,7 +112,7 @@ export default function LegalInboxPage() {
       </section>
 
       <section className="divide-y overflow-hidden rounded-md border">
-        {data.data.length ? data.data.map((item) => {
+        {data.data.length ? data.data.map((item, index) => {
           const amount = moneyLabel(item);
           const waitingSignatures = item.signatures_required !== null
             && item.signatures_done !== null
@@ -124,15 +122,14 @@ export default function LegalInboxPage() {
             <article key={item.id} className="p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{item.area}</Badge>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-muted-foreground">#{index + 1}</span>
+                    <span className="font-medium text-muted-foreground">{item.area}</span>
                     {item.timing_state === 'overdue' ? <Badge variant="destructive">Vencido</Badge> : null}
-                    {item.timing_state === 'due_soon' ? <Badge variant="secondary">Próximo</Badge> : null}
-                    {item.timing_state === 'on_track' ? <Badge variant="outline">En plazo</Badge> : null}
-                    {item.timing_state === 'no_due_date' ? <Badge variant="outline">Sin fecha</Badge> : null}
-                    {waitingSignatures ? <Badge variant="secondary">{item.signatures_done}/{item.signatures_required} firmas</Badge> : null}
+                    {item.timing_state === 'due_soon' ? <Badge variant="secondary">Esta semana</Badge> : null}
+                    {waitingSignatures ? <Badge variant="secondary">Faltan firmas</Badge> : null}
                     {item.management_ready ? <Badge variant="secondary">Listo para Gerencia</Badge> : null}
-                    <Badge variant="outline">Evidencia: {item.evidence_status === 'complete' ? 'completa' : 'pendiente'}</Badge>
+                    {item.evidence_status !== 'complete' ? <Badge variant="outline">Falta evidencia</Badge> : null}
                   </div>
                   <h2 className="mt-2 text-sm font-semibold">{item.title}</h2>
                   {item.detail ? <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p> : null}
@@ -155,7 +152,7 @@ export default function LegalInboxPage() {
                 {item.evidence_status === 'complete' ? (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <FileCheck2 className="h-3.5 w-3.5" />
-                    Evidencia registrada
+                    Respaldo disponible
                   </span>
                 ) : null}
               </div>
