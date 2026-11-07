@@ -12,9 +12,11 @@ test('Elias workspace primary navigation follows requested daily jobs', () => {
   assert.match(layout, /label: 'Hoy'/);
   assert.match(layout, /label: 'Contratos y pagos'/);
   assert.match(layout, /label: 'Proveedores'/);
+  assert.match(layout, /label: 'Pagos y facturas'/);
   assert.match(layout, /label: 'Transportistas'/);
   assert.doesNotMatch(layout, /label: 'Asistente'/);
-  assert.match(layout, /label: 'Evidencia financiera'/);
+  assert.doesNotMatch(layout, /Evidencia financiera/);
+  assert.doesNotMatch(layout, /label: 'Laudus'/);
   assert.match(layout, /Legal \/ Elías/);
 });
 
