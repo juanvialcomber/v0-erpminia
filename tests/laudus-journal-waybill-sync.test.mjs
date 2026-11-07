@@ -55,3 +55,9 @@ test('journal staging groups repeated journalEntryId values without dropping dis
   assert.match(sync,/lines: \[\.\.\.lineMap\.values\(\)\]/);
   assert.match(sync,/duplicatesRemoved/);
 });
+
+
+test('journal sync observability separates grouped line rows from real duplicates',()=>{
+  assert.match(sync,/flattenedLineRowsGrouped/);
+  assert.match(sync,/duplicatesRemoved: 0/);
+});
