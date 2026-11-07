@@ -38,15 +38,16 @@ function n(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
-async function requireReviewAccess(request: NextRequest, requireWrite = false) {
-  const maintenance = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, requireWrite);
-  if (maintenance.authorized) return maintenance;
-  const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, requireWrite);
-  return finance;
+async function requireReviewReadAccess(request: NextRequest) {
+  const maintenance = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (maintenance.authorized) return { access: maintenance, canDecide: maintenance.canWrite };
+  const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  return { access: finance, canDecide: false };
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireReviewAccess(request);
+  const resolved = await requireReviewReadAccess(request);
+  const access = resolved.access;
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -154,6 +155,7 @@ export async function GET(request: NextRequest) {
         rejectedTotal,
       },
       rows: actionable,
+      canDecide: resolved.canDecide,
       policy: {
         noAutomaticLink: true,
         noCanonicalMutation: true,
@@ -174,7 +176,7 @@ export async function GET(request: NextRequest) {
 type ReviewDecision = 'confirm_candidate' | 'reject_candidate' | 'defer';
 
 export async function POST(request: NextRequest) {
-  const access = await requireReviewAccess(request, true);
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
