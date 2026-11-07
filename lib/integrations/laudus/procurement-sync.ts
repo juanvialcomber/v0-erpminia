@@ -2,7 +2,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getLaudusReadOnly, listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import { syncLegalContractInvoiceTraces } from '@/lib/legal/contract-invoice-trace-sync';
-import { recoverOpenInvoiceTraces } from '@/lib/integrations/laudus/native-invoice-trace';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -362,8 +361,14 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
     const missingInvoiceRecovery = await recoverMissingPurchaseInvoices(organizationId, db);
     apiCalls += Number(missingInvoiceRecovery.apiCalls || 0);
 
-    const openInvoiceTraceRecovery = await recoverOpenInvoiceTraces(db, organizationId);
-    apiCalls += Number(openInvoiceTraceRecovery.apiCalls || 0);
+    const openInvoiceTraceRecovery = {
+      estado: 'desactivado_bajo_rendimiento',
+      motivo: 'Ensayo controlado 2026-11-07: 1 traza nativa en 12 facturas y 0 OC resueltas.',
+      apiCalls: 0,
+      canonicalMutationExecuted: false,
+      laudusMutationExecuted: false,
+      stagingOnly: true,
+    };
 
     const refresh = await db.rpc('motil_refresh_laudus_financial_staging', {
       p_organization_id: organizationId,
