@@ -184,7 +184,7 @@ select
   a.organization_id,
   'laudus:asignacion_pago_factura_no_resuelta:' ||
     a.payment_external_id || ':' || coalesce(a.payment_item_id,'sin_item') || ':' || a.purchase_invoice_external_id,
-  'payment',
+  'invoice',
   null,
   case
     when a.purchase_invoice_external_id ~ '^[0-9]+$'

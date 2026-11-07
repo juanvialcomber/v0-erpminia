@@ -7,6 +7,7 @@ const policy = fs.readFileSync('lib/integrations/laudus/sync-policy.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_procurement_sync_domains.sql','utf8');
 const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
 const missingRecoveryMigration = fs.readFileSync('supabase/migrations/20261107170000_laudus_missing_invoice_recovery_candidates.sql','utf8');
+const evidenceMigration = fs.readFileSync('supabase/migrations/20261107152500_persist_laudus_90d_inconsistency_evidence.sql','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
@@ -96,4 +97,11 @@ test('cola de recuperacion prioriza huecos del rango cargado sin excluir histori
   assert.match(missingRecoveryMigration,/historia_anterior_backfill/);
   assert.match(missingRecoveryMigration,/recovery_priority/);
   assert.match(missingRecoveryMigration,/left join integration\.laudus_purchase_invoices/);
+});
+
+
+test('evidencia de asignaciones de pago usa un entity_type permitido por la bandeja',()=>{
+  assert.match(evidenceMigration,/laudus:asignacion_pago_factura_no_resuelta:/);
+  assert.match(evidenceMigration,/\n\s*'invoice',\n\s*null,\n\s*case/);
+  assert.doesNotMatch(evidenceMigration,/\n\s*'payment',\n\s*null,\n\s*case/);
 });
