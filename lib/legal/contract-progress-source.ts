@@ -134,7 +134,7 @@ export const LEGAL_PROGRESS_MILESTONES: LegalProgressMilestoneSource[] = [
     contractNumber: 'IO-02', sequence: 8, title: 'Montaje de chancador terciario mecánico estructural', purchaseOrderNumber: '29513',
     currency: 'CLP', totalAmount: 55775000, progressRatio: 0, executedAmount: 0, invoicedAmount: 0,
     pendingToInvoice: 55775000, invoices: [], sourceSheet: 'Control Contrato RPR Fase 1 Mon', sourceRow: 153,
-  },,
+  },
   {
     contractNumber: 'IO-03', sequence: 1, title: 'Suministro equipos Molino 9 x 12 N° 1 y 2', purchaseOrderNumber: '27602',
     currency: 'CLP', totalAmount: 149500000, progressRatio: 0.2, executedAmount: 29900000,
