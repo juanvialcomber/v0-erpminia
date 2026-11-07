@@ -14,7 +14,7 @@ type Item={
  laudus:{invoice_count:number;invoiced_amount:number;paid_amount:number;outstanding_amount:number;last_payment_at:string|null;payment_statuses:string[]}|null;
  attribution:{level:'supplier'|'unresolved';exact_contract_payment:boolean;reason:string};
 };
-type Recon={contract_number:string;purchase_order_number:string;status:'pending'|'verified'|'conflict'|'not_found';reason:string};
+type Recon={contract_number:string;purchase_order_number:string;status:'pending'|'verified'|'conflict'|'not_found';reason:string;provenance:{source_file:string;source_sheet:string;source_cell:string;source_text:string}};
 type Payload={
  data:Item[];
  summary:{
@@ -101,7 +101,23 @@ export default function LegalPaymentsInvoicesPage(){
    </div>
   </section>
 
-  {recon?<section className="rounded-md border p-4"><CircleDollarSign className="h-4 w-4 text-muted-foreground"/><h2 className="mt-3 text-sm font-semibold">Conciliación contrato ↔ OC</h2><p className="mt-2 text-xs text-muted-foreground">{recon.summary.verified} verificadas · {recon.summary.pending} pendientes · {recon.summary.conflicts} conflictos · {recon.summary.not_found} no encontradas.</p></section>:null}
+  {recon?<details className="rounded-md border">
+    <summary className="cursor-pointer list-none p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div><CircleDollarSign className="h-4 w-4 text-muted-foreground"/><h2 className="mt-3 text-sm font-semibold">Conciliación contrato ↔ OC</h2><p className="mt-2 text-xs text-muted-foreground">{recon.summary.verified} verificadas · {recon.summary.pending} pendientes · {recon.summary.conflicts} conflictos · {recon.summary.not_found} no encontradas.</p></div>
+        <span className="text-xs text-muted-foreground">Ver detalle</span>
+      </div>
+    </summary>
+    <div className="divide-y border-t">
+      {recon.data.slice(0,20).map((item)=><div key={item.contract_number+'-'+item.purchase_order_number} className="grid gap-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]">
+        <div>
+          <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{item.contract_number}</Badge><span className="text-sm font-medium">OC {item.purchase_order_number}</span><Badge variant={item.status==='verified'?'secondary':item.status==='conflict'?'destructive':'outline'}>{item.status==='verified'?'Verificada':item.status==='conflict'?'Conflicto':item.status==='not_found'?'No encontrada':'Pendiente'}</Badge></div>
+          <p className="mt-1 text-xs text-muted-foreground">{item.reason}</p>
+        </div>
+        <div className="text-xs text-muted-foreground md:text-right"><p>{item.provenance.source_sheet} · {item.provenance.source_cell}</p><p className="mt-1">{item.provenance.source_file}</p></div>
+      </div>)}
+    </div>
+  </details>:null}
 
   <p className="text-xs text-muted-foreground">{data.policy.source}</p>
  </div>;
