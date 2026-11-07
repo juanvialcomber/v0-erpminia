@@ -52,3 +52,24 @@ test('finance traceability presents native Laudus evidence without overclaiming 
   assert.match(page,/no se interpreta automáticamente como orden de compra ni como aprobación de pago/);
   assert.doesNotMatch(page,/OC confirmada/);
 });
+
+
+test('open trace recovery is bounded, budget-aware and staging-only',()=>{
+  assert.match(lib,/MAX_OPEN_TRACE_RECOVERY_PER_RUN = 12/);
+  assert.match(lib,/MIN_LAUDUS_API_BUDGET_RESERVE = 200/);
+  assert.match(lib,/laudus_api_budget_service_v1/);
+  assert.match(lib,/motil_get_laudus_invoice_trace_status_v1/);
+  assert.match(lib,/motil_ingest_laudus_invoice_rows/);
+  assert.match(lib,/motil_ingest_laudus_invoice_traces/);
+  assert.match(lib,/evidencePolicy: 'solo_traceFrom'/);
+  assert.match(lib,/canonicalMutationExecuted: false/);
+  assert.match(lib,/laudusMutationExecuted: false/);
+});
+
+test('open trace recovery does not persist traceTo as purchase-order evidence',()=>{
+  const start=lib.indexOf('export async function recoverOpenInvoiceTraces');
+  const end=lib.indexOf('export async function loadLaudusNativeInvoiceTrace');
+  const recovery=lib.slice(start,end);
+  assert.match(recovery,/traceFrom/);
+  assert.doesNotMatch(recovery,/traceTo/);
+});

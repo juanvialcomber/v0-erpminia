@@ -134,3 +134,23 @@ test('recuperacion server-to-server usa token sensible y falla cerrado por organ
   assert.match(missingRecoveryRoute,/organizationFromRequest:\s*false/);
   assert.doesNotMatch(missingRecoveryRoute,/body\.organizationId|organization_id\s*:\s*body/);
 });
+
+
+test('recuperacion puntual de factura preserva el monto total fuente',()=>{
+  assert.match(sync,/totals_total: detail\.totals\?\.total \?\? detail\.totals_total \?\? detail\.totalAmount \?\? null/);
+});
+
+test('trazabilidad de facturas abiertas prioriza montos realmente desconocidos',()=>{
+  const traceLib=fs.readFileSync('lib/integrations/laudus/native-invoice-trace.ts','utf8');
+  assert.match(traceLib,/aUnknownUnpaid = a\.total_amount == null && num\(a\.paid_amount\) <= 0 \? 1 : 0/);
+  assert.match(traceLib,/bUnknownUnpaid = b\.total_amount == null && num\(b\.paid_amount\) <= 0 \? 1 : 0/);
+  assert.match(traceLib,/totals_total: detail\.totals\?\.total \?\? detail\.totalAmount \?\? null/);
+});
+
+
+test('monto desconocido sin pagos se repara aunque la traza figure completa',()=>{
+  const traceLib=fs.readFileSync('lib/integrations/laudus/native-invoice-trace.ts','utf8');
+  assert.match(traceLib,/missingTotal \|\| !complete\.has/);
+  assert.match(traceLib,/missingTotal && hasPayments\) return false/);
+  assert.match(traceLib,/aUnknownUnpaid/);
+});
