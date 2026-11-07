@@ -129,6 +129,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({error:'No se pudo crear la solicitud de pago'},{status:503});
   }
 
+  const { error: auditError } = await auth.context.supabase.from('audit_log').insert({
+    organization_id:auth.context.organizationId,
+    user_id:auth.context.userId,
+    action:'legal.payment_request.created',
+    resource_type:'finance_payment_request',
+    resource_id:created.id,
+    resource_identifier:String(payable.invoice_number||payableId),
+    new_values:{
+      payable_id:payableId,
+      amount:outstanding,
+      currency:payable.currency,
+      required_signatures:2,
+      requested_payment_date:requestedPaymentDate,
+    },
+    status:'completed',
+  });
+  if(auditError)console.error('[legal/payment-requests:audit]',auditError);
+
   return NextResponse.json({
     request:created,
     payable:{
