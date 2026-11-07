@@ -128,6 +128,18 @@ async function createEligibleOrders({
 }){
  const today=chileTodayDateKey();
  const automation={created:0,replayed:0,skippedLinked:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,skippedClassification:0,errors:[] as string[]};
+ const unlinkedIds=items.filter(item=>!item.linked_work_order_id).map(item=>String(item.id)).filter(Boolean);
+ const existingByRequest=new Map<string,Array<{id:string;creation_request_id:string|null}>>();
+ for(let offset=0;offset<unlinkedIds.length;offset+=50){
+  const ids=unlinkedIds.slice(offset,offset+50);
+  const {data:existingOrders,error:existingError}=await context.supabase.from('maintenance_work_orders')
+   .select('id,creation_request_id').eq('organization_id',context.organizationId).in('creation_request_id',ids);
+  if(existingError)throw existingError;
+  for(const order of existingOrders||[]){
+   const key=String(order.creation_request_id||'');if(!key)continue;
+   const list=existingByRequest.get(key)||[];list.push(order as {id:string;creation_request_id:string|null});existingByRequest.set(key,list);
+  }
+ }
  for(const item of items){
   if(item.linked_work_order_id){automation.skippedLinked+=1;continue;}
   const status=normalize(item.source_status);
@@ -136,6 +148,16 @@ async function createEligibleOrders({
   const assignees=peopleByName.get(normalize(item.assigned_name))||[];
   const assignee=assignees.length===1?assignees[0]:null;
   if(!item.canonical_asset_id||item.reconciliation_status!=='matched'||!assignee){automation.skippedIdentity+=1;continue;}
+  const existingOrders=existingByRequest.get(String(item.id))||[];
+  if(existingOrders.length>1){automation.errors.push(`Fila ${item.source_row}: más de una OT existente comparte la clave de creación; requiere revisión`);continue;}
+  if(existingOrders.length===1){
+   const existingOrderId=existingOrders[0].id;
+   const {error:linkError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:existingOrderId,updated_at:new Date().toISOString()}).eq('organization_id',context.organizationId).eq('id',item.id);
+   if(linkError){automation.errors.push(`Fila ${item.source_row}: OT existente encontrada pero no se pudo reparar el vínculo`);continue;}
+   const {data:event}=await context.supabase.from('work_order_events').select('id').eq('organization_id',context.organizationId).eq('work_order_id',existingOrderId).eq('event_type','official_weekly_program_imported').eq('source_record_id',item.id).limit(1).maybeSingle();
+   if(!event)await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:existingOrderId,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'Vínculo de OT reparado desde programa semanal oficial de Ariel',payload:{source_id:sourceId,source_row:item.source_row,source_file:sourceFile,source_sha256:sha256,planned_date:item.planned_date,repaired_link:true}});
+   automation.replayed+=1;continue;
+  }
   const priorityRaw=normalize(item.priority_raw);
   const priority=priorityRaw.includes('crit')?'critical':priorityRaw.includes('alta')?'high':priorityRaw.includes('baja')?'low':'medium';
   const workTypeRaw=normalize(item.work_type_raw);
