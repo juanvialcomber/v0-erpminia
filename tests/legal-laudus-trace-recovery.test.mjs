@@ -11,6 +11,7 @@ test('Legal invoice trace recovery is bounded and exact',()=>{
  assert.match(lib,/supplierTaxByExternalId/);
  assert.match(lib,/expectedRut/);
  assert.match(lib,/String\(row\.doc_number \|\| ''\)\.trim\(\) === ref\.docNumber/);
+ assert.match(lib,/Number\(row\.total_amount \|\| 0\) > 0/);
  assert.match(lib,/matches\.length === 1/);
  assert.match(lib,/matches\.length > 1/);
 });
