@@ -23,5 +23,10 @@ set
   issue_type='centro_costo_ausente_cadena_compra',
   field_name='centro_costo',
   updated_at=now()
-where r.issue_key='motil:oc_sin_centro_costo:d57e56f5-4669-4910-b7d6-028c9b21908d'
+from canonical.purchase_orders po
+where r.organization_id=po.organization_id
+  and r.entity_type='purchase_order'
+  and r.entity_id=po.id
+  and po.order_number='PO-20260828-54FB19E6'
+  and r.issue_key like 'motil:oc_sin_centro_costo:%'
   and r.status='open';
