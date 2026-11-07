@@ -11,8 +11,8 @@ test('Laudus fixed asset backlog is aggregated by accountable area', async () =>
   assert.match(sql, /group by t\.organization_id,c\.id,c\.name,t\.triage_bucket/);
   assert.match(sql, /human_action_now=false/);
   assert.match(sql, /laudus-fixed-asset-backlog:/);
-  assert.match(sql, /Jefe Departamento de Mantenimiento/i);
-  assert.match(sql, /Gerente de Finanzas/i);
-  assert.match(sql, /Jefe de Planificación/i);
+  assert.match(sql, /laudus_fixed_asset_triage_v1/);
+  assert.match(sql, /responsible_cargo_name/);
+  assert.match(sql, /upper\(c\.name\)=upper\(t\.responsible_cargo_name\)/i);
   assert.doesNotMatch(sql, /laudus-fixed-asset-backlog:'::text \|\| t\.external_id/);
 });
