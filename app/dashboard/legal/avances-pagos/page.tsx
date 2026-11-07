@@ -19,7 +19,7 @@ const fetcher = async (url:string) => {
   return payload as Payload;
 };
 
-function money(value:number,currency='CLP'){ return new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(value||0); }
+function money(value:number,currency='CLP'){ if(currency==='UF') return `${new Intl.NumberFormat('es-CL',{maximumFractionDigits:3}).format(value||0)} UF`; return new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(value||0); }
 function percent(value:number){ return new Intl.NumberFormat('es-CL',{style:'percent',maximumFractionDigits:1}).format(value||0); }
 function label(state:string){
   if(state==='paid') return 'Pagado';
@@ -90,7 +90,7 @@ export default function ContractPaymentsPage(){
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Avances y pagos</h1>
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Primero muestra qué significa cada estado y qué debe hacer Legal. Avance físico, facturación, retención y pago se mantienen separados.</p>
-      <p className="mt-2 text-xs text-muted-foreground">Cobertura contractual: IO-01…IO-09 y EP-01…EP-06. Detalle de hitos/facturas conciliadas disponible por ahora en IO-01 e IO-02.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Cobertura contractual: IO-01…IO-09 y EP-01…EP-06. Detalle estructurado disponible en IO-01…IO-09, EP-02 y EP-03; el resto queda en resumen hasta contar con evidencia de detalle.</p>
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
       <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
