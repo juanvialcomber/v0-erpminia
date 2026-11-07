@@ -36,8 +36,8 @@ test('contract OC reconciliation fails closed when canonical OC is absent or sup
 test('Legal OC reconciliation UI exposes verification states and provenance', () => {
   assert.match(page, /Conciliación contrato ↔ OC/);
   assert.match(page, /verificadas/i);
-  assert.match(page, /Conflictos/);
-  assert.match(page, /No encontradas/);
+  assert.match(page, /conflictos/i);
+  assert.match(page, /no encontradas/i);
   assert.match(page, /source_sheet/);
   assert.match(page, /source_cell/);
 });
