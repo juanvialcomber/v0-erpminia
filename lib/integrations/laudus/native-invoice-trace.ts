@@ -180,8 +180,8 @@ export async function recoverOpenInvoiceTraces(
     }
 
     try {
-      const detail = parseInvoice(await getLaudusReadOnly('/purchases/invoices/' + sourceId));
       apiCalls += 1;
+      const detail = parseInvoice(await getLaudusReadOnly('/purchases/invoices/' + sourceId));
       if (!detail) {
         errors += 1;
         continue;
