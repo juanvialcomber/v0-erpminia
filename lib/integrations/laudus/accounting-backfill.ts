@@ -216,6 +216,7 @@ export async function runLaudusAccountingBackfill(
   let rowsRead = 0;
   let rowsStaged = 0;
   let duplicatesRemoved = 0;
+  let lineRowsGrouped = 0;
 
   while (apiCalls < boundedMaxCalls) {
     try {
@@ -236,6 +237,7 @@ export async function runLaudusAccountingBackfill(
       const pageRows = rowsFrom(payload);
       const uniqueRows = normalizeAndDedupe(pageRows);
       const groupedLineRows = Math.max(pageRows.length - uniqueRows.length, 0);
+      lineRowsGrouped += groupedLineRows;
       const pageDuplicates = 0;
 
       if (uniqueRows.length > 0) {
@@ -278,7 +280,7 @@ export async function runLaudusAccountingBackfill(
       });
 
       if (status === 'completed') {
-        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, groupedLineRows, nextDateFrom };
+        return { organizationId, status, apiCalls, rowsRead, rowsStaged, duplicatesRemoved, lineRowsGrouped, nextDateFrom };
       }
 
       if (pageComplete) {
@@ -311,6 +313,7 @@ export async function runLaudusAccountingBackfill(
       rowsRead,
       rowsStaged,
       duplicatesRemoved,
+      lineRowsGrouped,
       nextDateFrom: windowFrom,
       nextOffset: offset,
       targetDate,
