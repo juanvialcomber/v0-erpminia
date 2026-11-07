@@ -253,8 +253,19 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const priorityRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  const actionScore = (item: (typeof legalItems)[number] | (typeof financeItems)[number] | (typeof progressItems)[number]) => {
+    let score = priorityRank[String(item.priority || 'medium')] || 0;
+    if (item.overdue) score += 10;
+    if (item.management_ready) score += 8;
+    if (item.evidence_status === 'pending') score += 4;
+    if (typeof item.days_until === 'number' && item.days_until >= 0 && item.days_until <= 7) score += 3;
+    return score;
+  };
+
   const data = [...legalItems, ...financeItems, ...progressItems].sort((a, b) => {
-    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    const scoreDiff = actionScore(b) - actionScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
     if (a.due_date) return -1;
     if (b.due_date) return 1;
