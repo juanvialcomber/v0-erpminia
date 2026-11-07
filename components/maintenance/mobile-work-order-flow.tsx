@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatePanel } from '@/components/ui/state-panel';
 import { formatWorkOrderNumber } from '@/lib/maintenance/work-order-display';
+import { optimizeEvidencePhoto } from '@/lib/maintenance/optimize-evidence-photo';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 
 type EvidenceResponse = {
@@ -183,7 +186,9 @@ export function MobileWorkOrderFlow({
     setMessage(null);
     try {
       const supabase = createSupabaseClient();
-      for (const file of Array.from(files)) {
+      for (const sourceFile of Array.from(files)) {
+        const optimized = await optimizeEvidencePhoto(sourceFile);
+        const file = optimized.file;
         const prepareResponse = await fetch(`/api/maintenance/work-orders/${workOrderId}/evidence`, {
           method: 'POST',
           credentials: 'include',
@@ -239,6 +244,7 @@ export function MobileWorkOrderFlow({
         if (!completeResponse.ok) throw new Error(completed?.error || 'La foto subió, pero no se pudo registrar.');
       }
       await mutateEvidence();
+      toast.success('Fotos cargadas', { description: 'Las imágenes grandes se optimizan automáticamente antes de subir.' });
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo guardar la evidencia.');
     } finally {
@@ -469,8 +475,16 @@ export function MobileWorkOrderFlow({
                   <a key={photo.id} href={photo.signed_url || '#'} target="_blank" rel="noreferrer" className="w-20 shrink-0">
                     <div className="h-16 overflow-hidden rounded-md border bg-muted">
                       {photo.signed_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photo.signed_url} alt={photo.file_name || 'Evidencia de OT'} className="h-full w-full object-cover" />
+                        <Image
+                          src={photo.signed_url}
+                          alt={photo.file_name || 'Evidencia de OT'}
+                          width={160}
+                          height={128}
+                          sizes="80px"
+                          quality={66}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
                       ) : null}
                     </div>
                   </a>

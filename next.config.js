@@ -19,6 +19,7 @@ const nextConfig = {
     ],
     unoptimized: false,
     formats: ['image/avif', 'image/webp'],
+    qualities: [66, 68, 75, 82],
   },
 
   // Headers for SEO and performance

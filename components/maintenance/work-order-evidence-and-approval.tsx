@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import useSWR from 'swr';
 import { AlertTriangle, CheckCircle2, Image as ImageIcon, RotateCcw } from 'lucide-react';
@@ -158,8 +159,16 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
             <div className="space-y-3">
               <a href={primaryPhoto?.signed_url || '#'} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border bg-muted">
                 {primaryPhoto?.signed_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={primaryPhoto.signed_url} alt={primaryPhoto.file_name || 'Evidencia principal de OT'} className="max-h-[560px] w-full object-contain" />
+                  <Image
+                    src={primaryPhoto.signed_url}
+                    alt={primaryPhoto.file_name || 'Evidencia principal de OT'}
+                    width={1280}
+                    height={960}
+                    sizes="(max-width: 768px) 100vw, 900px"
+                    quality={82}
+                    priority
+                    className="max-h-[560px] h-auto w-full object-contain"
+                  />
                 ) : <div className="flex min-h-64 items-center justify-center"><ImageIcon className="h-8 w-8 text-muted-foreground" /></div>}
               </a>
               <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
@@ -171,8 +180,16 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                   {photos.map((photo: { id: string; file_name?: string | null; signed_url?: string | null }, index: number) => (
                     <button key={photo.id} type="button" onClick={() => setSelectedPhotoId(photo.id)} aria-label={`Ver fotografía ${index + 1}`} aria-pressed={photo.id === primaryPhoto?.id} className={`h-20 w-24 shrink-0 overflow-hidden rounded-md border-2 bg-muted ${photo.id === primaryPhoto?.id ? 'border-primary' : 'border-transparent'}`}>
                       {photo.signed_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photo.signed_url} alt={photo.file_name || `Evidencia ${index + 1}`} className="h-full w-full object-cover" />
+                        <Image
+                          src={photo.signed_url}
+                          alt={photo.file_name || `Evidencia ${index + 1}`}
+                          width={192}
+                          height={160}
+                          sizes="96px"
+                          quality={68}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
                       ) : <ImageIcon className="mx-auto h-6 w-6 text-muted-foreground" />}
                     </button>
                   ))}
