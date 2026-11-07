@@ -41,8 +41,6 @@ const PUBLIC_API_ROUTES = new Set([
   '/api/cron/laudus-bank-statements-daily',
   '/api/cron/laudus-accounting-entries-daily',
   '/api/cron/laudus-waybills-daily',
-  // Recuperacion server-to-server: el handler valida MOTIL_LAUDUS_RECOVERY_TOKEN y no acepta organization_id del request.
-  '/api/integrations/laudus/missing-invoices-recovery',
 ]);
 
 const DASHBOARD_ROUTE_MODULES: Array<{ prefix: string; modules: string[] }> = [
