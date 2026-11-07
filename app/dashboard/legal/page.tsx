@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, CircleDollarSign, FolderCheck, Scale, Clock3 } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, FolderCheck, Clock3, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -17,11 +17,14 @@ type ContractorFolder = { id:string; empresa_nombre:string; status:string; carpe
 type ContractorPayload = { carpetas?: ContractorFolder[] };
 type EeccCoverage = { summary:{registered:number;with_folder:number;without_folder:number} };
 type InboxPayload = { summary?:{total:number;overdue:number;due_next_7_days:number;waiting_signatures:number;evidence_pending:number;ready_for_management:number}; warnings?:string[] };
+type LegalNotification = { id:string;title:string;message:string;read_at:string|null;created_at:string };
+type LegalNotificationsPayload = { notifications:LegalNotification[];summary:{total:number;unread:number} };
 
 export default function LegalPage() {
   const { data: inboxData, error: inboxError, mutate: mutateInbox } = useSWR<InboxPayload>('/api/legal/inbox', fetcher, { revalidateOnFocus:false });
   const { data: contractorData, error: contractorError } = useSWR<ContractorPayload>('/api/carpeta-arranque', fetcher, { revalidateOnFocus:false });
   const { data: coverage, error: coverageError } = useSWR<EeccCoverage>('/api/legal/eecc-coverage', fetcher, { revalidateOnFocus:false });
+  const { data: legalNotifications } = useSWR<LegalNotificationsPayload>('/api/legal/notifications', fetcher, { revalidateOnFocus:false });
 
   const l1Queue = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l1');
 
@@ -37,11 +40,10 @@ export default function LegalPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm"><Link href="/dashboard/legal/inbox">Abrir Hoy <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-          <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/asistente">Preguntar al asistente</Link></Button>
         </div>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-4" aria-label="Trabajo principal de Legal">
+      <section className="grid gap-3 md:grid-cols-3" aria-label="Trabajo principal de Legal">
         <Link href="/dashboard/legal/inbox" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
           <Clock3 className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Hoy</p>
@@ -56,11 +58,6 @@ export default function LegalPage() {
           <FolderCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Proveedores</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Cumplimiento mensual, documentos y subsanaciones.</p>
-        </Link>
-        <Link href="/dashboard/legal/asistente" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
-          <Scale className="h-4 w-4 text-muted-foreground" />
-          <p className="mt-3 text-sm font-semibold">Asistente</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Conclusión, siguiente acción y evidencia.</p>
         </Link>
       </section>
 
@@ -99,6 +96,25 @@ export default function LegalPage() {
           </>
         )}
       </section>
+
+      {legalNotifications?.notifications?.length ? (
+        <section className="overflow-hidden rounded-md border">
+          <div className="flex items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pagos confirmados</p>
+              <h2 className="mt-1 flex items-center gap-2 text-base font-semibold"><BellRing className="h-4 w-4" /> Notificaciones de Legal</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Transferencias registradas por Finanzas que requieren visibilidad de Elías.</p>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">{legalNotifications.summary.unread} sin leer</span>
+          </div>
+          <div className="divide-y">
+            {legalNotifications.notifications.slice(0,5).map((item)=><div key={item.id} className="px-4 py-3">
+              <p className="text-sm font-medium">{item.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.message}</p>
+            </div>)}
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="providers-title" className="overflow-hidden rounded-md border">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
