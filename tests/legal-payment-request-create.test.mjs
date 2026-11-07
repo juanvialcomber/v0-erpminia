@@ -30,3 +30,10 @@ test('Elias confirms request creation in two visible steps',()=>{
  assert.match(page,/pendiente de 2 firmas\. No ejecuta el pago/);
  assert.match(page,/\/api\/legal\/payment-requests/);
 });
+
+
+test('payment request creation writes value evidence without blocking the financial action',()=>{
+ assert.match(api,/audit_log/);
+ assert.match(api,/legal\.payment_request\.created/);
+ assert.match(api,/auditError/);
+});
