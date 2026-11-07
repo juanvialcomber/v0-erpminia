@@ -5,13 +5,13 @@ import { readFile } from 'node:fs/promises';
 const api = await readFile(new URL('../app/api/alertas/route.ts', import.meta.url), 'utf8');
 const header = await readFile(new URL('../components/layout/header.tsx', import.meta.url), 'utf8');
 
-test('Elias and Ariel are the only viewer profiles explicitly enabled for contract alerts', () => {
+test('contract alerts are restricted to the canonical Legal owner', () => {
   assert.match(api, /eliasfernandez@lapatagua\.cl/);
-  assert.match(api, /ariellopez@lapatagua\.cl/);
-  assert.match(api, /if \(isAriel && !contractNumber\.startsWith\('IO-'\)\) continue/);
-  assert.match(header, /legalOperationalAlertUser/);
-  assert.match(header, /eliasfernandez@lapatagua\.cl/);
-  assert.match(header, /ariellopez@lapatagua\.cl/);
+  assert.match(api, /RESPONSABLE DE LEGAL/);
+  assert.match(api, /isLegalOwner/);
+  assert.doesNotMatch(api, /ariellopez@lapatagua\.cl/);
+  assert.doesNotMatch(api, /isAriel/);
+  assert.match(header, /const canSeeAlerts=Boolean\(user\)/);
 });
 
 test('contract alerts use Elias source dates and incomplete structured progress', () => {
