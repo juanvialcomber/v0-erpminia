@@ -29,7 +29,7 @@ export function OfficialWeeklyWorkPlan(){
    const mismatch=payload?.summary?.mismatch===true;
    setUploadMessage(mismatch
     ? `Programa incorporado: ${payload?.automation?.created||0} OT creadas. El resumen declara ${payload.summary.declared} actividades y el detalle contiene ${payload.summary.parsed}; esa diferencia queda para revisión.`
-    : `Programa incorporado: ${payload?.automation?.created||0} OT creadas · ${payload?.summary?.matched||0} equipos vinculados · ${payload?.automation?.skippedIdentity||0} filas pendientes por identidad.`);
+    : `Programa incorporado: ${payload?.automation?.created||0} OT creadas · ${payload?.summary?.matched||0} equipos vinculados · ${payload?.automation?.skippedIdentity||0} pendientes por identidad · ${payload?.automation?.skippedClassification||0} por clasificación.`);
    await mutate();
   }catch(cause){setUploadMessage(cause instanceof Error?cause.message:'No se pudo incorporar el programa semanal');}
   finally{setUploading(false);}
