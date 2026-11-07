@@ -67,24 +67,78 @@ function normalizeNumberish(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function normalizeJournalRow(row: JsonRow): JsonRow {
-  const lines = Array.isArray(row.lines)
-    ? row.lines.map((line: JsonRow) => ({
-        ...line,
-        debit: normalizeNumberish(line?.debit),
-        credit: normalizeNumberish(line?.credit),
-      }))
-    : [];
-  return { ...row, lines };
-}
-
-function dedupeJournalRows(rows: JsonRow[]) {
+function normalizeJournalRows(rows: JsonRow[]) {
   const byId = new Map<string, JsonRow>();
+
   for (const row of rows) {
     const id = String(row.journalEntryId ?? row.id ?? '').trim();
     if (!id) continue;
-    byId.set(id, normalizeJournalRow(row));
+
+    const current = byId.get(id) || { ...row, lines: [] };
+    const existingLines = Array.isArray(current.lines) ? current.lines as JsonRow[] : [];
+    const lineMap = new Map<string, JsonRow>();
+
+    const lineKey = (line: JsonRow) => String(line?.lineId ?? [
+      line?.account?.accountNumber ?? line?.accountNumber ?? '',
+      line?.description ?? '',
+      line?.debit ?? '',
+      line?.credit ?? '',
+      line?.document ?? '',
+    ].join('|'));
+
+    for (const line of existingLines) lineMap.set(lineKey(line), line);
+
+    if (Array.isArray(row.lines)) {
+      for (const line of row.lines as JsonRow[]) {
+        const normalizedLine = {
+          ...line,
+          debit: normalizeNumberish(line?.debit),
+          credit: normalizeNumberish(line?.credit),
+        };
+        lineMap.set(lineKey(normalizedLine), normalizedLine);
+      }
+    }
+
+    const flatLineId = row.lines_lineId ?? row['lines.lineId'];
+    const flatAccountNumber = row.lines_account_accountNumber ?? row['lines.account.accountNumber'];
+    const flatAccountName = row.lines_account_name ?? row['lines.account.name'];
+    const flatDescription = row.lines_description ?? row['lines.description'];
+    const flatDebit = row.lines_debit ?? row['lines.debit'];
+    const flatCredit = row.lines_credit ?? row['lines.credit'];
+    const flatCurrency = row.lines_currencyCode ?? row['lines.currencyCode'];
+    const flatCostCenter = row.lines_costCenter_costCenterId ?? row['lines.costCenter.costCenterId'];
+    const flatDocument = row.lines_document ?? row['lines.document'];
+
+    if (
+      flatLineId != null
+      || flatAccountNumber != null
+      || flatDescription != null
+      || flatDebit != null
+      || flatCredit != null
+    ) {
+      const normalizedFlatLine: JsonRow = {
+        lineId: flatLineId ?? null,
+        account: {
+          accountNumber: flatAccountNumber ?? null,
+          name: flatAccountName ?? null,
+        },
+        description: flatDescription ?? null,
+        debit: normalizeNumberish(flatDebit),
+        credit: normalizeNumberish(flatCredit),
+        currencyCode: flatCurrency ?? null,
+        costCenter: flatCostCenter != null ? { costCenterId: flatCostCenter } : null,
+        document: flatDocument ?? null,
+      };
+      lineMap.set(lineKey(normalizedFlatLine), normalizedFlatLine);
+    }
+
+    byId.set(id, {
+      ...current,
+      ...row,
+      lines: [...lineMap.values()],
+    });
   }
+
   return [...byId.values()];
 }
 
@@ -137,14 +191,14 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
 
     const { data, error } = await db.rpc('motil_ingest_laudus_extended_finance', {
       p_organization_id: organizationId,
-      p_accounting_entries: dedupeJournalRows(listed.rows),
+      p_accounting_entries: normalizeJournalRows(listed.rows),
       p_bank_statements: [],
       p_dtes: [],
     });
     if (error) throw new Error('Laudus accounting entry staging failed');
 
     const result = (data || {}) as Record<string, unknown>;
-    const uniqueRows = dedupeJournalRows(listed.rows);
+    const uniqueRows = normalizeJournalRows(listed.rows);
     const processed = Number(result.accounting_entries_upserted || uniqueRows.length || 0);
     await markLaudusSyncSuccess(db, organizationId, 'accounting_entries', {
       processed,
@@ -157,7 +211,8 @@ export async function syncLaudusAccountingEntries(organizationId: string, db: Su
         latestLimit: 200,
         rowsRead: listed.rows.length,
         uniqueEntries: uniqueRows.length,
-        duplicatesRemoved: Math.max(listed.rows.length - uniqueRows.length, 0),
+        flattenedLineRowsGrouped: Math.max(listed.rows.length - uniqueRows.length, 0),
+        duplicatesRemoved: 0,
         canonicalMutated: false,
       },
     });
