@@ -11,6 +11,7 @@ type OpenInvoice = {
   laudus_purchase_invoice_id: number | string | null;
   doc_number: string | null;
   supplier_name: string | null;
+  total_amount: number | string | null;
   outstanding_amount: number | string | null;
   currency: string | null;
 };
@@ -39,6 +40,9 @@ type PurchaseInvoiceDto = {
   purchaseInvoiceId?: number | null;
   docNumber?: number | null;
   issuedDate?: string | null;
+  dueDate?: string | null;
+  totals?: { total?: number | string | null } | null;
+  totalAmount?: number | string | null;
   items?: PurchaseInvoiceItemDto[] | null;
 };
 
@@ -69,6 +73,8 @@ function invoiceDetailRows(detail: PurchaseInvoiceDto) {
     purchaseInvoiceId: detail.purchaseInvoiceId ?? null,
     docNumber: detail.docNumber ?? null,
     issuedDate: detail.issuedDate ?? null,
+    dueDate: detail.dueDate ?? null,
+    totals_total: detail.totals?.total ?? detail.totalAmount ?? null,
   };
 
   const items = Array.isArray(detail.items) ? detail.items : [];
@@ -130,12 +136,12 @@ export async function recoverOpenInvoiceTraces(
   const openResult = await db
     .from('laudus_purchase_invoice_payment_status_service_v1')
     .select(
-      'purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_name,outstanding_amount,currency',
+      'purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_name,total_amount,outstanding_amount,currency',
     )
     .eq('organization_id', organizationId)
     .in('payment_status', ['unpaid', 'partially_paid'])
-    .order('outstanding_amount', { ascending: false })
-    .limit(500);
+    .order('issued_date', { ascending: false })
+    .limit(2000);
 
   if (openResult.error) throw new Error(openResult.error.message);
 
@@ -162,6 +168,12 @@ export async function recoverOpenInvoiceTraces(
 
   const pending = openRows
     .filter((row) => !complete.has(String(row.purchase_invoice_external_id)))
+    .sort((a, b) => {
+      const aMissingTotal = a.total_amount == null ? 1 : 0;
+      const bMissingTotal = b.total_amount == null ? 1 : 0;
+      if (aMissingTotal !== bMissingTotal) return bMissingTotal - aMissingTotal;
+      return num(b.outstanding_amount) - num(a.outstanding_amount);
+    })
     .slice(0, limit);
 
   let recovered = 0;
