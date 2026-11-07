@@ -124,3 +124,13 @@ test('ejecutor interno usa POST same-origin y no incorpora secretos',()=>{
   assert.match(missingRecoveryPage,/credentials:\s*'same-origin'/);
   assert.doesNotMatch(missingRecoveryPage,/CRON_SECRET|LAUDUS_PASSWORD|Authorization:/);
 });
+
+
+test('recuperacion server-to-server usa token sensible y falla cerrado por organizacion',()=>{
+  assert.match(missingRecoveryRoute,/MOTIL_LAUDUS_RECOVERY_TOKEN/);
+  assert.match(missingRecoveryRoute,/timingSafeEqual/);
+  assert.match(missingRecoveryRoute,/getSupabaseServerClient/);
+  assert.match(missingRecoveryRoute,/organizationIds\.length !== 1/);
+  assert.match(missingRecoveryRoute,/organizationFromRequest:\s*false/);
+  assert.doesNotMatch(missingRecoveryRoute,/body\.organizationId|organization_id\s*:\s*body/);
+});
