@@ -27,6 +27,6 @@ test('finance readiness API is scoped to finance permissions', () => {
 
 test('finance readiness UI keeps MOTIL decisions primary and ERP as evidence', () => {
   assert.match(card, /Preparación financiera MOTIL/);
-  assert.match(card, /no puede aprobar, crear ni conciliar pagos automáticamente/);
+  assert.match(card, /MOTIL no aprueba, crea ni concilia pagos automáticamente sin autoridad humana/);
   assert.match(card, /Aprobación humana obligatoria/);
 });
