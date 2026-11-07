@@ -64,6 +64,14 @@ type Payload = {
       warehouseStock: number;
       sourceDate: string | null;
       syncedAt: string | null;
+      latestKardex: {
+        movementDate: string | null;
+        movementType: string | null;
+        description: string | null;
+        quantity: number | null;
+        resultingStock: number | null;
+        syncedAt: string | null;
+      } | null;
     }>;
   };
   authority: {
@@ -264,6 +272,16 @@ export function LaudusInventoryReadinessCard() {
                 <span className="font-mono">{row.sku}</span>
                 <div className="min-w-0">
                   <span className="block truncate" title={row.description}>{row.description}</span>
+                  {row.latestKardex ? (
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      Último movimiento: {row.latestKardex.movementType || 'Sin tipo'}
+                      {row.latestKardex.quantity == null ? '' : ` · ${row.latestKardex.quantity > 0 ? '+' : ''}${count(row.latestKardex.quantity)} ${row.unit}`}
+                      {row.latestKardex.resultingStock == null ? '' : ` · saldo ${count(row.latestKardex.resultingStock)} ${row.unit}`}
+                      {row.latestKardex.movementDate ? ` · ${dateTime(row.latestKardex.movementDate)}` : ''}
+                    </span>
+                  ) : (
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">Kardex aún no recuperado.</span>
+                  )}
                   {kardexMessage[row.sku] ? <span className="mt-0.5 block text-[11px] text-muted-foreground">{kardexMessage[row.sku]}</span> : null}
                 </div>
                 <span className="text-muted-foreground">{row.warehouseName}</span>
