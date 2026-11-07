@@ -6,12 +6,15 @@ const routePath = new URL('../app/api/integrations/laudus/fixed-asset-review/rou
 const componentPath = new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url);
 const pagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
 const financeCardPath = new URL('../components/integrations/laudus-finance-control-card.tsx', import.meta.url);
+const maintenancePagePath = new URL('../app/dashboard/mantenimiento/activos-laudus/page.tsx', import.meta.url);
+const inboxRoutePath = new URL('../app/api/actions/inbox/route.ts', import.meta.url);
 
 test('fixed asset review GET reuses canonical review queue and remains read-only', async () => {
   const route = await readFile(routePath, 'utf8');
 
   assert.match(route, /motil_laudus_fixed_asset_review_queue/);
   assert.match(route, /MODULE_KEYS\.FIN_FINANZAS/);
+  assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(route, /humanDecisionRequired: true/);
   assert.match(route, /noAutomaticLink: true/);
   assert.match(route, /noCanonicalMutation: true/);
@@ -58,4 +61,19 @@ test('fixed asset review records human decisions without canonical mutation', as
   assert.match(ui, /Rechazar/);
   assert.match(ui, /Diferir/);
   assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
+});
+
+
+test('Maintenance owns operational identity review without financial write access', async () => {
+  const page = await readFile(maintenancePagePath, 'utf8');
+  const route = await readFile(routePath, 'utf8');
+  const inbox = await readFile(inboxRoutePath, 'utf8');
+
+  assert.match(page, /LaudusFixedAssetReview area="maintenance"/);
+  assert.match(route, /requireReviewAccess/);
+  assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
+  assert.match(route, /data_reconciliation_reviews/);
+  assert.match(route, /laudus:fixed_asset_identity:/);
+  assert.match(inbox, /kind === 'laudus-fixed-asset'/);
+  assert.match(inbox, /\/dashboard\/mantenimiento\/activos-laudus/);
 });
