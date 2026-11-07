@@ -54,7 +54,7 @@ test('private media and vision crons require CRON_SECRET and do not modify inbox
   assert.match(route,/authorization/);
   assert.match(proxy,new RegExp('\\/api\\/cron\\/'+name));
   if(name==='whatsapp-media') assert.ok(schedule.length===0 || schedule.some(x=>x.path==='/api/cron/'+name));
-  else assert.ok(schedule.length===0 || schedule.some(x=>x.path==='/api/cron/'+name && x.schedule==='* * * * *'));
+  else assert.ok(schedule.length===0 || schedule.some(x=>x.path==='/api/cron/'+name && x.schedule==='*/3 * * * *'));
  }
 });
 
@@ -121,7 +121,7 @@ test('provider diagnostics never print signed media URL or source message ID', (
  assert.doesNotMatch(src,/console\.(?:log|warn|error)\(\s*(?:result|downloadUrl)\s*[,)]/);
  const schedule=JSON.parse(read('vercel.json')).crons ?? [];
  const job=schedule.find(x=>x.path==='/api/cron/whatsapp-media');
- if (schedule.length) assert.equal(job?.schedule,'1,6,11,16,21,26,31,36,41,46,51,56 * * * *');
+ if (schedule.length) assert.equal(job?.schedule,'1,11,21,31,41,51 * * * *');
 });
 
 
