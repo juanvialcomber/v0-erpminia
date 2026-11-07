@@ -424,6 +424,7 @@ export async function GET(request: NextRequest) {
           timestamp: sourceDate(sourceMeta.endDate),
           actionRequired: true,
           actionUrl: '/dashboard/legal/avances-pagos',
+          actionLabel: 'Revisar contrato',
         });
       }
     }
@@ -438,6 +439,7 @@ export async function GET(request: NextRequest) {
         timestamp: sourceDate(approval.document.createdAt),
         actionRequired: true,
         actionUrl: '/dashboard/documentos',
+        actionLabel: 'Revisar documento',
       });
     }
 
@@ -451,6 +453,7 @@ export async function GET(request: NextRequest) {
         timestamp: null,
         actionRequired: true,
         actionUrl: '/dashboard/legal',
+        actionLabel: 'Revisar contrato',
       });
     }
 
@@ -466,6 +469,7 @@ export async function GET(request: NextRequest) {
         timestamp: sourceDate(contract.end_date),
         actionRequired: true,
         actionUrl: '/dashboard/legal',
+        actionLabel: 'Revisar contrato',
       });
     }
 
@@ -481,6 +485,7 @@ export async function GET(request: NextRequest) {
         timestamp: sourceDate(document.expiry_date),
         actionRequired: true,
         actionUrl: '/dashboard/legal',
+        actionLabel: 'Revisar contrato',
       });
     }
 
@@ -495,7 +500,8 @@ export async function GET(request: NextRequest) {
         type: 'mantenimiento',
         timestamp: sourceDate(workOrder.created_at || workOrder.scheduled_date),
         actionRequired: severity !== 'media' || workOrder.status === 'open',
-        actionUrl: '/dashboard/mantenimiento/ordenes-trabajo',
+        actionUrl: `/dashboard/mantenimiento/ordenes-trabajo/${workOrder.id}`,
+        actionLabel: 'Resolver OT',
       });
     }
 
@@ -512,6 +518,7 @@ export async function GET(request: NextRequest) {
         timestamp: null,
         actionRequired: true,
         actionUrl: '/dashboard/inventario',
+        actionLabel: 'Revisar stock',
       });
     }
 
@@ -527,6 +534,7 @@ export async function GET(request: NextRequest) {
         timestamp: sourceDate(nc.target_closure_date),
         actionRequired: true,
         actionUrl: '/dashboard/sostenibilidad',
+        actionLabel: 'Resolver no conformidad',
       });
     }
 
@@ -544,6 +552,7 @@ export async function GET(request: NextRequest) {
         timestamp: sourceDate(ca.scheduled_completion_date),
         actionRequired: true,
         actionUrl: '/dashboard/sostenibilidad',
+        actionLabel: 'Completar acción correctiva',
       });
     }
 
