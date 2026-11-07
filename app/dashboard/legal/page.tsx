@@ -13,8 +13,6 @@ const fetcher = async (url: string) => {
   return payload;
 };
 
-type ContractorFolder = { id:string; empresa_nombre:string; status:string; carpeta_documentos?:Array<{file_name:string|null}> };
-type ContractorPayload = { carpetas?: ContractorFolder[] };
 type EeccCoverage = { period:string; summary:{registered:number;with_folder:number;without_folder:number;in_review:number;approved:number} };
 type InboxPayload = { summary?:{total:number;overdue:number;due_next_7_days:number;waiting_signatures:number;evidence_pending:number;ready_for_management:number}; warnings?:string[] };
 type LegalNotification = { id:string;title:string;message:string;read_at:string|null;created_at:string };
@@ -22,11 +20,8 @@ type LegalNotificationsPayload = { notifications:LegalNotification[];summary:{to
 
 export default function LegalPage() {
   const { data: inboxData, error: inboxError, mutate: mutateInbox } = useSWR<InboxPayload>('/api/legal/inbox', fetcher, { revalidateOnFocus:false });
-  const { data: contractorData, error: contractorError } = useSWR<ContractorPayload>('/api/carpeta-arranque', fetcher, { revalidateOnFocus:false });
   const { data: coverage, error: coverageError } = useSWR<EeccCoverage>('/api/legal/eecc-coverage', fetcher, { revalidateOnFocus:false });
   const { data: legalNotifications } = useSWR<LegalNotificationsPayload>('/api/legal/notifications', fetcher, { revalidateOnFocus:false });
-
-  const l1Queue = (contractorData?.carpetas || []).filter(c => c.status === 'en_revision_l1');
 
   return (
     <div className="space-y-5">
