@@ -239,7 +239,7 @@ export async function recoverOpenInvoiceTraces(
     conTrazabilidadNativa: withTrace,
     sinTrazabilidadNativa: withoutTrace,
     lineasRecuperadas: recoveredLines,
-    trazasPersistidas,
+    trazasPersistidas: tracesPersisted,
     errores: errors,
     apiCalls,
     presupuestoRestante: remaining,
