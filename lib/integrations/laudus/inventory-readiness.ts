@@ -178,18 +178,50 @@ export async function loadLaudusInventoryReadiness(
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
   const freshnessSummary = (freshnessSummaryResult.data || null) as LaudusFreshnessSummaryRow | null;
-  const negativePositions = ((negativePositionsResult.data || []) as LaudusNegativePositionRow[]).map((row) => ({
-    productId: String(row.product_external_id || ''),
-    sku: String(row.sku || ''),
-    description: String(row.description || row.sku || ''),
-    unit: String(row.unit_of_measure || ''),
-    totalStock: n(row.total_laudus_stock),
-    warehouseCode: String(row.warehouse_external_id || ''),
-    warehouseName: String(row.warehouse_name || row.warehouse_external_id || 'Bodega sin nombre'),
-    warehouseStock: n(row.warehouse_stock),
-    sourceDate: row.source_date_to || null,
-    syncedAt: row.synced_at || null,
-  }));
+  const negativeRaw = (negativePositionsResult.data || []) as LaudusNegativePositionRow[];
+  const negativeProductIds = [...new Set(negativeRaw.map((row) => String(row.product_external_id || '')).filter(Boolean))];
+  const { data: kardexRows, error: kardexError } = negativeProductIds.length
+    ? await db
+        .schema('integration')
+        .from('laudus_product_kardex')
+        .select('product_external_id,movement_date,movement_type,description,quantity,resulting_stock,synced_at')
+        .eq('organization_id', organizationId)
+        .in('product_external_id', negativeProductIds)
+        .order('movement_date', { ascending: false })
+        .limit(Math.min(negativeProductIds.length * 20, 200))
+    : { data: [], error: null };
+  if (kardexError) throw new Error(kardexError.message);
+
+  const latestKardexByProduct = new Map<string, Record<string, unknown>>();
+  for (const row of kardexRows || []) {
+    const productId = String((row as Record<string, unknown>).product_external_id || '');
+    if (productId && !latestKardexByProduct.has(productId)) latestKardexByProduct.set(productId, row as Record<string, unknown>);
+  }
+
+  const negativePositions = negativeRaw.map((row) => {
+    const productId = String(row.product_external_id || '');
+    const latest = latestKardexByProduct.get(productId);
+    return {
+      productId,
+      sku: String(row.sku || ''),
+      description: String(row.description || row.sku || ''),
+      unit: String(row.unit_of_measure || ''),
+      totalStock: n(row.total_laudus_stock),
+      warehouseCode: String(row.warehouse_external_id || ''),
+      warehouseName: String(row.warehouse_name || row.warehouse_external_id || 'Bodega sin nombre'),
+      warehouseStock: n(row.warehouse_stock),
+      sourceDate: row.source_date_to || null,
+      syncedAt: row.synced_at || null,
+      latestKardex: latest ? {
+        movementDate: latest.movement_date ? String(latest.movement_date) : null,
+        movementType: latest.movement_type ? String(latest.movement_type) : null,
+        description: latest.description ? String(latest.description) : null,
+        quantity: latest.quantity == null ? null : n(latest.quantity as number | string | null),
+        resultingStock: latest.resulting_stock == null ? null : n(latest.resulting_stock as number | string | null),
+        syncedAt: latest.synced_at ? String(latest.synced_at) : null,
+      } : null,
+    };
+  });
   const domainRank = (sku: string) => {
     if (sku.startsWith('COMBUSTIBLE') || sku.startsWith('EXPLOSIVO')) return 0;
     if (sku.startsWith('FORTIFIC')) return 1;
