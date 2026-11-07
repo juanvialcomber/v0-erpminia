@@ -362,3 +362,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L4 decisión/preparación asistida. No es L5 porque no existe ejecución autónoma.
 - Métrica siguiente: tiempo desde readiness a solicitud, tiempo a 2 firmas, tasa de rechazo, motivos de rechazo y tiempo a transferencia real.
 - Impacto económico: hipótesis de menor coordinación manual; aún no medido.
+
+
+## 2026-11-06 — Recuperación automática de trazabilidad factura → OC para Legal
+
+- Problema previo: 1.183 facturas abiertas estaban visibles en la fuente financiera, pero 0 tenían trazabilidad persistida factura → OC en staging; esto impedía promover obligaciones a CxP MOTIL con evidencia suficiente.
+- Causa: el sync procurement sólo traía cabecera de factura y no recuperaba items/traceFrom desde el detalle nativo.
+- Capacidad: el sync procurement ahora recupera automáticamente trazas sólo para facturas de contratos Legal conocidas, exige match exacto por contrato/proveedor RUT/factura y persiste líneas + traceFrom.
+- Control de costo: máximo 8 facturas faltantes por corrida; facturas ya sincronizadas se omiten mediante estado persistido.
+- Autoridad: la recuperación escribe sólo staging/evidencia. No crea CxP, no aprueba factura, no modifica contratos y no escribe en Laudus.
+- Resiliencia: si la recuperación Legal falla, el sync procurement principal no cae; la brecha queda explícita en metadata.
+- Nivel actual: L2/L3 habilitador de trazabilidad. El valor L4 se activa sólo después de three-way match y aprobación humana.
+- Métrica siguiente: facturas Legal con traza exacta de OC / facturas Legal observadas; líneas recuperadas; trazas recuperadas; llamadas API consumidas por corrida.
