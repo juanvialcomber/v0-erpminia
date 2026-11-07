@@ -325,3 +325,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Evidencia actual: E1 fuerte de cobertura. No existe todavía evidencia suficiente para declarar horas ahorradas o ROI.
 - Métrica siguiente: porcentaje de consultas financieras de Legal resueltas íntegramente en MOTIL, tiempo medio de resolución y cantidad de aperturas manuales de Laudus evitadas/observadas.
 - Hipótesis de valor: reducir búsqueda y doble navegación entre Excel/Gmail/Laudus. Debe medirse antes de monetizarse.
+
+
+## 2026-11-06 — Legal: preparación de estados de pago en MOTIL
+
+- Problema previo: Elías debía leer avance, pendiente de facturar, OC y evidencia en planillas antes de preparar un estado de pago.
+- Capacidad: MOTIL deriva candidatos de estado de pago desde hitos contractuales estructurados, monto ejecutado, facturado, pendiente de facturar, OC y provenance.
+- Regla determinística: monto candidato = pendiente de facturar informado por la evidencia contractual estructurada.
+- Autoridad: el candidato sólo prepara trabajo. No aprueba estado de pago, no emite factura, no solicita transferencia y no modifica la fuente financiera.
+- UX: los candidatos aparecen dentro de `Contratos y pagos`, priorizados por excepciones y con una siguiente acción humana.
+- Nivel actual: L4 habilitado como decisión/preparación asistida; evidencia E1 hasta medir revisiones humanas reales.
+- Métrica siguiente: candidatos revisados, tasa de aceptación/corrección, tiempo medio de preparación manual vs MOTIL y motivos de rechazo.
+- Impacto económico: no medido todavía; no se declara ahorro de tiempo hasta contar con baseline y uso real.
