@@ -307,7 +307,7 @@ export async function GET(request: NextRequest) {
   }
 
   // A missing cargo coverage row must never hide assigned work orders.
-  const coverageMissing = !coverageError && !coverage && !hasPrivateFinanceInbox;
+  const coverageMissing = !coverageError && !coverage && !hasPrivateFinanceInbox && personalWorkOrderTasks.length === 0;
   const escalationLookup = coverageMissing || (!coverageError && coverage && Number(coverage.escalations || 0) === 0)
     ? Promise.resolve({ data: [], error: null })
     : context.supabase
