@@ -24,6 +24,27 @@ export type LegalProgressMilestoneSource = {
 export const LEGAL_PROGRESS_SOURCE_FILE = 'Planilla Avance Contratos - Con resumen.xlsx';
 export const LEGAL_PROGRESS_SOURCE_SHA256 = 'b7eb275ec0b86e5867ece489a714c48a09033342403deb65fd719ad9c9c29317';
 
+export type LegalContractSourceMeta = {
+  startDate: string | null;
+  endDate: string | null;
+  sourceSheet: string;
+  note?: string;
+};
+
+export const LEGAL_CONTRACT_SOURCE_META: Partial<Record<LegalProgressMilestoneSource['contractNumber'], LegalContractSourceMeta>> = {
+  'IO-01': { startDate: '2026-04-20', endDate: '2027-06-14', sourceSheet: 'Control Contrato RPR Fase 1' },
+  'IO-02': { startDate: '2026-09-08', endDate: null, sourceSheet: 'Control Contrato RPR Fase 1 Mon', note: 'Fecha de término no informada en la hoja fuente.' },
+  'IO-03': { startDate: null, endDate: null, sourceSheet: 'RPR Suministro Ss Leasing', note: 'Fechas fuente no utilizables (valor cero).' },
+  'IO-04': { startDate: '2026-05-13', endDate: null, sourceSheet: 'Control SL Ingeniería', note: 'Fecha de término fuente no utilizable.' },
+  'IO-05': { startDate: '2026-04-20', endDate: '2026-07-31', sourceSheet: 'Control Contrato Petra' },
+  'IO-06': { startDate: '2025-07-21', endDate: '2026-07-31', sourceSheet: 'CONTROL SERV MINERÍA y ENERGÍA ' },
+  'IO-07': { startDate: '2026-02-09', endDate: '2026-08-31', sourceSheet: 'GEOPHYSICAL STUDIES ', note: 'Fecha término corresponde al último proyecto estructurado de la hoja.' },
+  'IO-08': { startDate: '2026-04-27', endDate: '2026-07-31', sourceSheet: 'CONSTRUCTORA 3D SPA' },
+  'IO-09': { startDate: '2026-03-19', endDate: '2026-10-31', sourceSheet: 'SPIN TECHNOLOGIES Leasing' },
+  'EP-02': { startDate: '2026-05-15', endDate: '2026-08-31', sourceSheet: 'Global Fire' },
+  'EP-03': { startDate: '2026-05-04', endDate: '2026-12-31', sourceSheet: 'Sustentable' },
+};
+
 export const LEGAL_PROGRESS_MILESTONES: LegalProgressMilestoneSource[] = [
   {
     contractNumber: 'IO-01', sequence: 1, title: 'Trabajos Preliminares', purchaseOrderNumber: '27712',
