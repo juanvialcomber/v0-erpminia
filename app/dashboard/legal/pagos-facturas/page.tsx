@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
+import { useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, CircleDollarSign, FileWarning } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,8 +27,8 @@ type Payload={
  policy:{source:string;warning:string};
 };
 type ReconPayload={data:Recon[];summary:{total:number;verified:number;pending:number;conflicts:number;not_found:number}};
-type RequestReadyItem={id:string;contract_number:string;milestone_title:string;invoice_number:string;invoice_amount_source:number;retention_amount_source:number;currency:string;readiness:'ready_for_request'|'needs_due_date'|'needs_payable_promotion'|'settled'|'conflict'|'missing_supplier';reason:string;next_action:string;payable:{id:string;supplier_name:string;approved_amount:number;paid_amount:number;outstanding_amount:number;due_date:string|null;status:string;days_to_due:number|null}|null;provenance:{source_file:string;source_sheet:string;source_row:number;source_text:string}};
-type RequestReadyPayload={data:RequestReadyItem[];summary:{invoices:number;ready_for_request:number;needs_due_date:number;needs_payable_promotion:number;conflicts:number;settled:number};policy:{gate:string;authority:string;source:string}};
+type RequestReadyItem={id:string;contract_number:string;milestone_title:string;invoice_number:string;invoice_amount_source:number;retention_amount_source:number;currency:string;readiness:'ready_for_request'|'needs_due_date'|'needs_payable_promotion'|'settled'|'request_active'|'conflict'|'missing_supplier';reason:string;next_action:string;active_request:{id:string;status:string;required_signatures:number;requested_payment_date:string|null;created_at:string}|null;payable:{id:string;supplier_name:string;approved_amount:number;paid_amount:number;outstanding_amount:number;due_date:string|null;status:string;days_to_due:number|null}|null;provenance:{source_file:string;source_sheet:string;source_row:number;source_text:string}};
+type RequestReadyPayload={data:RequestReadyItem[];summary:{invoices:number;ready_for_request:number;needs_due_date:number;needs_payable_promotion:number;request_active:number;conflicts:number;settled:number};policy:{gate:string;authority:string;source:string}};
 
 const fetcher=async<T,>(url:string)=>{const r=await fetch(url,{credentials:'include',cache:'no-store'});const p=await r.json().catch(()=>null);if(!r.ok)throw new Error(p?.error||'No se pudo cargar información financiera');return p as T};
 const money=(v:number,currency='CLP')=>new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(Number(v||0));
@@ -36,10 +37,27 @@ const date=(v:string|null)=>v?new Intl.DateTimeFormat('es-CL',{dateStyle:'medium
 export default function LegalPaymentsInvoicesPage(){
  const {data,error,isLoading}=useSWR<Payload>('/api/legal/laudus-bridge',fetcher,{revalidateOnFocus:false});
  const {data:recon}=useSWR<ReconPayload>('/api/legal/contract-po-reconciliation',fetcher,{revalidateOnFocus:false});
- const {data:requestReady}=useSWR<RequestReadyPayload>('/api/legal/payment-request-readiness',fetcher,{revalidateOnFocus:false});
+ const {data:requestReady,mutate:mutateRequestReady}=useSWR<RequestReadyPayload>('/api/legal/payment-request-readiness',fetcher,{revalidateOnFocus:false});
+ const [confirmRequestId,setConfirmRequestId]=useState<string|null>(null);
+ const [requestingId,setRequestingId]=useState<string|null>(null);
+ const [requestMessage,setRequestMessage]=useState<string|null>(null);
  if(isLoading)return <StatePanel tone="loading" title="Revisando pagos y facturas" description="Conciliando contratos, proveedores, órdenes de compra, facturas y pagos."/>;
  if(error||!data)return <StatePanel tone="error" title="Pagos y facturas no disponibles" description="MOTIL no concluye estados financieros cuando falta evidencia verificable."/>;
  const attention=data.partial_invoices+data.unpaid_invoices+(recon?.summary.conflicts||0)+(recon?.summary.not_found||0);
+ const createPaymentRequest=async(item:RequestReadyItem)=>{
+  if(!item.payable||item.readiness!=='ready_for_request')return;
+  setRequestingId(item.id);setRequestMessage(null);
+  try{
+   const response=await fetch('/api/legal/payment-requests',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({payableId:item.payable.id,requestNote:`Preparada desde Legal · ${item.contract_number} · Factura ${item.invoice_number}`})});
+   const payload=await response.json().catch(()=>null);
+   if(!response.ok)throw new Error(payload?.error||'No se pudo crear la solicitud');
+   setRequestMessage(`Solicitud creada para firmas: ${item.contract_number} · Factura ${item.invoice_number}.`);
+   setConfirmRequestId(null);
+   await mutateRequestReady();
+  }catch(error){
+   setRequestMessage(error instanceof Error?error.message:'No se pudo crear la solicitud');
+  }finally{setRequestingId(null);}
+ };
  return <div className="space-y-5">
   <Button asChild size="sm" variant="ghost"><Link href="/dashboard/legal"><ArrowLeft className="mr-2 h-4 w-4"/>Legal</Link></Button>
 
@@ -82,8 +100,9 @@ export default function LegalPaymentsInvoicesPage(){
      <h2 className="mt-1 text-base font-semibold">Listo para solicitar pago</h2>
      <p className="mt-1 text-sm text-muted-foreground">MOTIL exige factura exacta, proveedor, moneda, CxP con saldo y vencimiento antes de habilitar el flujo de firmas.</p>
     </div>
-    <div className="text-xs text-muted-foreground md:text-right"><p>{requestReady.summary.ready_for_request} listos</p><p>{requestReady.summary.needs_payable_promotion} requieren CxP · {requestReady.summary.needs_due_date} requieren vencimiento</p></div>
+    <div className="text-xs text-muted-foreground md:text-right"><p>{requestReady.summary.ready_for_request} listos · {requestReady.summary.request_active} en firmas</p><p>{requestReady.summary.needs_payable_promotion} requieren CxP · {requestReady.summary.needs_due_date} requieren vencimiento</p></div>
    </div>
+   {requestMessage?<p className="border-b px-4 py-2 text-xs text-muted-foreground">{requestMessage}</p>:null}
    <div className="divide-y">
     {requestReady.data.filter((item)=>item.readiness!=='settled').slice(0,10).map((item)=><article key={item.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]">
      <div>
@@ -91,7 +110,17 @@ export default function LegalPaymentsInvoicesPage(){
       <p className="mt-1 text-xs text-muted-foreground">{item.reason}</p>
       <p className="mt-2 text-sm"><span className="font-medium">Siguiente acción:</span> {item.next_action}</p>
      </div>
-     <div className="text-xs text-muted-foreground md:text-right"><p>{money(item.payable?.outstanding_amount??item.invoice_amount_source,item.currency)}</p><p className="mt-1">{item.payable?'Saldo MOTIL':'Monto fuente'}</p><p className="mt-2">{item.provenance.source_sheet} · fila {item.provenance.source_row}</p></div>
+     <div className="text-xs text-muted-foreground md:text-right">
+      <p>{money(item.payable?.outstanding_amount??item.invoice_amount_source,item.currency)}</p><p className="mt-1">{item.payable?'Saldo MOTIL':'Monto fuente'}</p>
+      {item.readiness==='ready_for_request'&&item.payable ? (
+       confirmRequestId===item.id ? <div className="mt-3 space-y-2">
+        <p className="max-w-[220px] text-left text-[11px] leading-relaxed md:text-right">Esto crea una solicitud pendiente de 2 firmas. No ejecuta el pago.</p>
+        <div className="flex gap-2 md:justify-end"><Button size="sm" variant="outline" onClick={()=>setConfirmRequestId(null)}>Cancelar</Button><Button size="sm" disabled={requestingId===item.id} onClick={()=>void createPaymentRequest(item)}>{requestingId===item.id?'Creando…':'Confirmar solicitud'}</Button></div>
+       </div> : <Button className="mt-3" size="sm" onClick={()=>setConfirmRequestId(item.id)}>Crear solicitud para firmas</Button>
+      ) : null}
+      {item.readiness==='request_active' ? <Badge className="mt-3" variant="secondary">Solicitud en firmas</Badge> : null}
+      <p className="mt-2">{item.provenance.source_sheet} · fila {item.provenance.source_row}</p>
+     </div>
     </article>)}
    </div>
    <div className="border-t px-4 py-3 text-xs text-muted-foreground"><p>{requestReady.policy.gate}</p><p className="mt-1">{requestReady.policy.authority}</p></div>
