@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await syncLegalContractInvoiceTraces(context.organizationId, context.supabase, { recover: false });
+    const recoverable = 'recoverable' in data ? data.recoverable : data.remaining;
+
     return NextResponse.json({
       data,
       conclusion: data.alreadySynced === data.matched
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
         : data.matched
           ? 'La identidad de factura está resuelta; falta recuperar trazabilidad de origen para algunas facturas.'
           : 'Todavía no hay facturas contractuales suficientes para recuperar trazabilidad.',
-      next_action: data.recoverable > 0
+      next_action: recoverable > 0
         ? 'La recuperación pendiente se ejecuta automáticamente en el próximo sync de procurement.'
         : 'No hay recuperación pendiente.',
       policy: {
