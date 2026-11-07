@@ -12,8 +12,8 @@ test('contract progress source preserves Elias workbook provenance', () => {
   assert.match(source, /b7eb275ec0b86e5867ece489a714c48a09033342403deb65fd719ad9c9c29317/);
   assert.match(source, /IO-01/);
   assert.match(source, /27712/);
-  assert.match(source, /IO-02/);
-  assert.match(source, /29503/);
+  assert.match(source, /IO-09/);
+  assert.match(source, /EP-03/);
   assert.match(source, /sourceSheet/);
   assert.match(source, /sourceRow/);
 });
@@ -33,9 +33,11 @@ test('retention classification requires Laudus outstanding to match source reten
   assert.match(api, /retención informada en la planilla/);
 });
 
-test('Legal exposes a dedicated advances and payments workspace', () => {
+test('Legal exposes action-first advances and payment control', () => {
   assert.match(page, /Avances y pagos/);
-  assert.match(page, /Facturado no se trata como pagado/);
+  assert.match(page, /Conclusión/);
+  assert.match(page, /Siguiente acción/);
+  assert.match(page, /Avance físico, facturación, retención y pago se mantienen separados/);
   assert.match(page, /Pagado · retención pendiente/);
   assert.match(page, /Pendiente de facturar/);
   assert.match(page, /Fuente:/);
