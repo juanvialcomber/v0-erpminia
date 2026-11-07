@@ -313,6 +313,65 @@ export async function syncLaudusSuppliers(organizationId: string, db: SupabaseCl
   }
 }
 
+
+export async function refreshRecentPurchaseInvoiceMetadata(
+  organizationId: string,
+  db: SupabaseClient,
+) {
+  const budgetResult = await db
+    .from('laudus_api_budget_service_v1')
+    .select('tracked_remaining,monthly_remaining_exact')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  const remaining = Number(budgetResult.data?.tracked_remaining ?? 0);
+  const exact = budgetResult.data?.monthly_remaining_exact === true;
+  if (!exact || remaining - 2 < MIN_LAUDUS_API_BUDGET_RESERVE) {
+    return {
+      estado: exact ? 'omitido_por_reserva_api' : 'omitido_presupuesto_no_exacto',
+      apiCalls: 0,
+      facturasLeidas: 0,
+      facturasActualizadas: 0,
+      presupuestoRestante: remaining,
+      canonicalMutationExecuted: false,
+      laudusMutationExecuted: false,
+      invoiceLinesPreserved: true,
+    };
+  }
+
+  const invoices = await listRecent(
+    '/purchases/invoices/list',
+    'issuedDate',
+    PURCHASE_INVOICE_FIELDS,
+    2,
+  );
+
+  const refreshed = await ingestChunks(
+    db,
+    'motil_refresh_laudus_purchase_invoice_metadata',
+    (chunk) => ({ p_organization_id: organizationId, p_rows: chunk }),
+    invoices.rows,
+  );
+
+  const financial = await db.rpc('motil_refresh_laudus_financial_staging', {
+    p_organization_id: organizationId,
+  });
+  if (financial.error) {
+    throw new Error('motil_refresh_laudus_financial_staging failed after invoice metadata refresh');
+  }
+
+  return {
+    estado: invoices.partial ? 'parcial' : 'completado',
+    apiCalls: invoices.calls,
+    facturasLeidas: invoices.rows.length,
+    facturasActualizadas: refreshed,
+    presupuestoRestante: remaining,
+    canonicalMutationExecuted: false,
+    laudusMutationExecuted: false,
+    invoiceLinesPreserved: true,
+  };
+}
+
 export async function syncLaudusProcurement(organizationId: string, db: SupabaseClient) {
   await markLaudusSyncRunning(db, organizationId, 'procurement');
   let apiCalls = 0;
