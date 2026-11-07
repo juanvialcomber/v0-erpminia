@@ -12,6 +12,7 @@ type OpenInvoice = {
   doc_number: string | null;
   supplier_name: string | null;
   total_amount: number | string | null;
+  paid_amount: number | string | null;
   outstanding_amount: number | string | null;
   currency: string | null;
 };
@@ -136,7 +137,7 @@ export async function recoverOpenInvoiceTraces(
   const openResult = await db
     .from('laudus_purchase_invoice_payment_status_service_v1')
     .select(
-      'purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_name,total_amount,outstanding_amount,currency',
+      'purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_name,total_amount,paid_amount,outstanding_amount,currency',
     )
     .eq('organization_id', organizationId)
     .in('payment_status', ['unpaid', 'partially_paid'])
@@ -167,11 +168,16 @@ export async function recoverOpenInvoiceTraces(
   );
 
   const pending = openRows
-    .filter((row) => row.total_amount == null || !complete.has(String(row.purchase_invoice_external_id)))
+    .filter((row) => {
+      const missingTotal = row.total_amount == null;
+      const hasPayments = num(row.paid_amount) > 0;
+      if (missingTotal && hasPayments) return false;
+      return missingTotal || !complete.has(String(row.purchase_invoice_external_id));
+    })
     .sort((a, b) => {
-      const aMissingTotal = a.total_amount == null ? 1 : 0;
-      const bMissingTotal = b.total_amount == null ? 1 : 0;
-      if (aMissingTotal !== bMissingTotal) return bMissingTotal - aMissingTotal;
+      const aUnknownUnpaid = a.total_amount == null && num(a.paid_amount) <= 0 ? 1 : 0;
+      const bUnknownUnpaid = b.total_amount == null && num(b.paid_amount) <= 0 ? 1 : 0;
+      if (aUnknownUnpaid !== bUnknownUnpaid) return bUnknownUnpaid - aUnknownUnpaid;
       return num(b.outstanding_amount) - num(a.outstanding_amount);
     })
     .slice(0, limit);
