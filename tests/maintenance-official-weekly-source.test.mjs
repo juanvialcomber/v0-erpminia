@@ -56,5 +56,50 @@ test('weekly import creates only current/future, matched and assigned OTs with s
  assert.match(importer,/linked_work_order_id/);
  assert.match(importer,/official_weekly_program_imported/);
  assert.match(importer,/source_sha256:sha256/);
- assert.match(importer,/status\.includes\('terminado'\)/);
+ assert.match(importer,/\['terminado','completado','cerrado','finalizado','ejecutado'\]/);
+});
+
+
+test('weekly import uses Chile calendar days and preserves worksheet provenance',async()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ const {chileTodayDateKey}=await import('../lib/maintenance/work-order-calendar-date.mjs');
+ assert.equal(chileTodayDateKey(new Date('2026-11-07T01:30:00.000Z')),'2026-11-06');
+ assert.equal(chileTodayDateKey(new Date('2026-11-07T03:30:00.000Z')),'2026-11-07');
+ assert.match(importer,/const today=chileTodayDateKey\(\)/);
+ assert.match(importer,/source_sheet:program\.sheetName/);
+ assert.match(importer,/\.eq\('source_sheet',program\.sheetName\)/);
+ assert.match(importer,/if\(parsed\.length>1\)/);
+});
+test('weekly import refuses missing or ambiguous responsible, stale dates and completed rows',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/assignees\.length===1/);
+ assert.match(importer,/Responsable ambiguo entre personas activas/);
+ assert.match(importer,/Responsable sin coincidencia única y activa/);
+ assert.match(importer,/item\.planned_date>=today/);
+ assert.match(importer,/reconciliation_status:ready\?'matched':ambiguous\?'ambiguous':'review_required'/);
+ assert.match(importer,/Actividad terminada en la fuente/);
+});
+test('weekly import preserves original evidence and reports partial audit failures',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/value==null\|\|String\(value\)\.trim\(\)===''\)return null/);
+ assert.match(importer,/if\(!cleaned\)return null/);
+ assert.match(importer,/if\(eventError\)automation\.errors\.push/);
+ assert.match(importer,/if\(persistedSourceId\)/);
+ assert.match(importer,/sourcePreserved:Boolean\(persistedSourceId\)/);
+});
+
+test('delayed source imports do not replace a newer official program or create expired OTs',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/const historical=program\.weekEnd<today/);
+ assert.match(importer,/const superseded=Boolean\(currentOfficial&&program\.weekStart<currentOfficial\.week_start\)/);
+ assert.match(importer,/const canPromote=!historical&&!superseded/);
+ assert.match(importer,/status:historical\?'archived'/);
+ assert.match(importer,/if\(canPromote\)/);
+ assert.match(importer,/if\(historical\)\{automation\.skippedPast/);
+ assert.match(importer,/if\(superseded\)\{automation\.skippedSuperseded/);
+});
+test('source progress 100 percent blocks automatic OT even if status text is stale',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/item\.source_progress!=null&&item\.source_progress>=1/);
+ assert.match(importer,/planned_hours,source_status,source_progress,materials/);
 });

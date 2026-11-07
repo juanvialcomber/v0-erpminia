@@ -7,13 +7,14 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { loadXlsxModule, sheetToMatrix, type XlsxCellValue } from '@/lib/xlsx';
 import { POST as createWorkOrder } from '@/app/api/maintenance/work-orders/route';
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const BUCKET = 'maintenance-work-order-evidence';
 
 const normalize=(value:unknown)=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const text=(value:XlsxCellValue)=>String(value??'').trim().replace(/\s+/g,' ');
-const num=(value:XlsxCellValue)=>{if(typeof value==='number'&&Number.isFinite(value))return value;const parsed=Number(String(value??'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''));return Number.isFinite(parsed)?parsed:null;};
+const num=(value:XlsxCellValue)=>{if(value==null||String(value).trim()==='')return null;if(typeof value==='number'&&Number.isFinite(value))return value;const cleaned=String(value).replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,'');if(!cleaned)return null;const parsed=Number(cleaned);return Number.isFinite(parsed)?parsed:null;};
 const date=(value:XlsxCellValue)=>{if(value instanceof Date&&!Number.isNaN(value.getTime()))return value.toISOString().slice(0,10);const raw=String(value??'').trim();const parsed=new Date(raw);return Number.isNaN(parsed.getTime())?null:parsed.toISOString().slice(0,10);};
 
 function detectMine(rows:XlsxCellValue[][],sheetName:string){
@@ -125,30 +126,46 @@ export async function POST(request:NextRequest){
  const sha256=createHash('sha256').update(bytes).digest('hex');
  const xlsx=await loadXlsxModule();
  const workbook=xlsx.read(bytes,{type:'buffer',cellDates:true});
- const parsed=workbook.SheetNames.map(sheetName=>{
+ const parsed=workbook.SheetNames.flatMap(sheetName=>{
   const sheet=workbook.Sheets[sheetName];
-  return sheet?parseProgram(sheetName,sheetToMatrix(xlsx,sheet,true)):null;
- }).filter(Boolean) as Array<ReturnType<typeof parseProgram> extends infer T ? Exclude<T,null> : never>;
+  const program=sheet?parseProgram(sheetName,sheetToMatrix(xlsx,sheet,true)):null;
+  return program?[{...program,sheetName}]:[];
+ });
  if(!parsed.length)return NextResponse.json({error:'No se encontró una hoja de programa semanal reconocible'},{status:422});
+ if(parsed.length>1)return NextResponse.json({error:'El archivo contiene varios programas semanales. Requiere revisión antes de incorporar alguna hoja; no se omitirán programas silenciosamente.',sheets:parsed.map(p=>p.sheetName)},{status:422});
  const program=parsed[0];
+ const today=chileTodayDateKey();
+
+ // Source freshness is a calendar decision in Chile. A delayed resend must
+ // never displace a newer active plan or reopen work from a past week.
+ const {data:currentOfficial,error:currentError}=await context.supabase
+  .from('planning_weekly_work_sources').select('id,week_start')
+  .eq('organization_id',context.organizationId).eq('mine',program.mine)
+  .eq('is_current',true).maybeSingle();
+ if(currentError)return NextResponse.json({error:'No se pudo comprobar vigencia del programa previo'},{status:503});
+ const historical=program.weekEnd<today;
+ const superseded=Boolean(currentOfficial&&program.weekStart<currentOfficial.week_start);
+ const canPromote=!historical&&!superseded;
 
  const {data:existing}=await context.supabase.from('planning_weekly_work_sources')
   .select('id,mine,week_start,week_end,is_current').eq('organization_id',context.organizationId)
-  .eq('source_sha256',sha256).eq('source_sheet',workbook.SheetNames[0]).maybeSingle();
+  .eq('source_sha256',sha256).eq('source_sheet',program.sheetName).maybeSingle();
  if(existing)return NextResponse.json({ok:true,duplicate:true,source:existing,summary:{parsed:program.items.length,declared:program.declaredCount,mismatch:program.declaredCount!=null&&program.declaredCount!==program.items.length}});
 
  const storagePath=`${context.organizationId}/weekly-programs/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g,'_')}`;
  const upload=await context.supabase.storage.from(BUCKET).upload(storagePath,bytes,{contentType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',upsert:false});
  if(upload.error)return NextResponse.json({error:'No se pudo preservar el archivo fuente'},{status:503});
 
+ let persistedSourceId:string|null=null;
  try{
   const mismatch=program.declaredCount!=null&&program.declaredCount!==program.items.length;
   const {data:source,error:sourceError}=await context.supabase.from('planning_weekly_work_sources').insert({
-   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:workbook.SheetNames[0],
+   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:program.sheetName,
    source_url:`storage:${BUCKET}/${storagePath}`,mine:program.mine,week_start:program.weekStart,week_end:program.weekEnd,
-   reported_at:new Date().toISOString(),source_owner:'Ariel López',status:mismatch?'review_required':'official_source',is_current:false,
+   reported_at:new Date().toISOString(),source_owner:'Ariel López',status:historical?'archived':(superseded||mismatch)?'review_required':'official_source',is_current:false,
   }).select('id,mine,week_start,week_end,status').single();
   if(sourceError)throw sourceError;
+  persistedSourceId=source.id;
 
   const [{data:assets,error:assetError},{data:people,error:peopleError},{data:historicalLinks,error:historicalError}]=await Promise.all([
    context.supabase.from('maintenance_canonical_assets_v1').select('id,asset_code,name,location').eq('organization_id',context.organizationId).eq('is_active',true).limit(5000),
@@ -168,25 +185,41 @@ export async function POST(request:NextRequest){
   for(const person of people||[]){const key=normalize(person.full_name);const list=peopleByName.get(key)||[];list.push(person);peopleByName.set(key,list);}
   const rows=program.items.map(item=>{
    const labelKey=normalize(item.asset_label);
-   const matches=byName.get(labelKey)||[];
+   const directIds=(byName.get(labelKey)||[]).map(asset=>String(asset.id));
    const historicalIds=Array.from(historicalByLabel.get(labelKey)||[]);
-   const exact=matches.length===1?matches[0]:historicalIds.length===1?assets?.find(asset=>asset.id===historicalIds[0])||null:null;
-   const ambiguous=matches.length>1||historicalIds.length>1;
+   const candidateIds=Array.from(new Set([...directIds,...historicalIds]));
+   const ambiguous=candidateIds.length>1;
+   const exact=candidateIds.length===1?assets?.find(asset=>asset.id===candidateIds[0])||null:null;
+   const assignees=peopleByName.get(normalize(item.assigned_name))||[];
+   const status=normalize(item.source_status);
+   const completed=['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag))||(item.source_progress!=null&&item.source_progress>=1);
+   const ready=canPromote&&Boolean(exact)&&!ambiguous&&assignees.length===1&&Boolean(item.planned_date)&&item.planned_date>=today&&!completed;
+   const reviewReason=ready?(directIds.length===0?'Vínculo reutilizado desde programas semanales oficiales previamente conciliados':null)
+    :historical?'Programa histórico: no se generan nuevas OT'
+    :superseded?'Programa anterior al oficial vigente; requiere revisión sin nuevas OT'
+    :ambiguous?'Más de un equipo canónico coincide con la etiqueta fuente o su historial'
+    :!exact?'Equipo fuente no coincide con un activo canónico vigente'
+    :assignees.length!==1?(assignees.length>1?'Responsable ambiguo entre personas activas':'Responsable sin coincidencia única y activa')
+    :completed?'Actividad terminada en la fuente; no corresponde generar OT'
+    :!item.planned_date?'Fecha programada ausente o inválida':'Fecha programada anterior a hoy en Chile';
    return {...item,organization_id:context.organizationId,source_id:source.id,canonical_asset_id:exact?.id||null,
-    reconciliation_status:exact?'matched':ambiguous?'ambiguous':'review_required',
-    review_reason:exact?(matches.length===1?null:'Vínculo reutilizado desde programas semanales oficiales previamente conciliados'):ambiguous?'Más de un equipo coincide con la etiqueta fuente':'Equipo fuente no coincide exactamente con maestro canónico'};
+    reconciliation_status:ready?'matched':ambiguous?'ambiguous':'review_required',review_reason:reviewReason};
   });
   let insertedItems:any[]=[];
-  if(rows.length){const {data,error:itemError}=await context.supabase.from('planning_weekly_work_items').insert(rows).select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,materials,reconciliation_status');if(itemError)throw itemError;insertedItems=data||[];}
-  await context.supabase.from('planning_weekly_work_sources').update({is_current:false}).eq('organization_id',context.organizationId).eq('mine',program.mine).eq('is_current',true).neq('id',source.id);
-  const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
-  if(promoteError)throw promoteError;
+  if(rows.length){const {data,error:itemError}=await context.supabase.from('planning_weekly_work_items').insert(rows).select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,source_progress,materials,reconciliation_status');if(itemError)throw itemError;insertedItems=data||[];}
+  if(canPromote){
+   const {error:retireError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:false}).eq('organization_id',context.organizationId).eq('mine',program.mine).eq('is_current',true).neq('id',source.id);
+   if(retireError)throw retireError;
+   const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
+   if(promoteError)throw promoteError;
+  }
 
-  const today=new Date().toISOString().slice(0,10);
-  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,errors:[] as string[]};
+  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedSuperseded:0,skippedIdentity:0,errors:[] as string[]};
   for(const item of insertedItems){
+   if(historical){automation.skippedPast+=1;continue;}
+   if(superseded){automation.skippedSuperseded+=1;continue;}
    const status=normalize(item.source_status);
-   if(status.includes('terminado')||status.includes('completado')||status.includes('cerrado')){automation.skippedCompleted+=1;continue;}
+   if(['terminado','completado','cerrado','finalizado','ejecutado'].some(flag=>status.includes(flag))||(item.source_progress!=null&&item.source_progress>=1)){automation.skippedCompleted+=1;continue;}
    if(!item.planned_date||item.planned_date<today){automation.skippedPast+=1;continue;}
    const assignees=peopleByName.get(normalize(item.assigned_name))||[];
    const assignee=assignees.length===1?assignees[0]:null;
@@ -206,14 +239,20 @@ export async function POST(request:NextRequest){
     automation.created+=1;
     const {error:linkError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:payload.data.id,updated_at:new Date().toISOString()}).eq('organization_id',context.organizationId).eq('id',item.id);
     if(linkError)automation.errors.push(`Fila ${item.source_row}: OT creada pero no vinculada`);
-    else await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:payload.data.id,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'OT creada automáticamente desde programa semanal oficial de Ariel',payload:{source_id:source.id,source_row:item.source_row,source_file:file.name,source_sha256:sha256,planned_date:item.planned_date}});
+    else {const {error:eventError}=await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:payload.data.id,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'OT creada automáticamente desde programa semanal oficial de Ariel',payload:{source_id:source.id,source_row:item.source_row,source_file:file.name,source_sha256:sha256,planned_date:item.planned_date}});
+      if(eventError)automation.errors.push(`Fila ${item.source_row}: OT vinculada, pero falta evento de auditoría`);}
    }else automation.errors.push(`Fila ${item.source_row}: ${payload?.error||'no se pudo crear OT'}`);
   }
 
+  if(automation.errors.length){await context.supabase.from('planning_weekly_work_sources').update({status:'review_required'}).eq('organization_id',context.organizationId).eq('id',source.id);}
   return NextResponse.json({ok:true,source,summary:{parsed:rows.length,declared:program.declaredCount,mismatch,matched:rows.filter(r=>r.reconciliation_status==='matched').length,review:rows.filter(r=>r.reconciliation_status!=='matched').length},automation,
    authority:mismatch?'Archivo preservado. Las filas válidas desde hoy generan OT automáticamente; la diferencia resumen/detalle queda marcada para revisión.':'Fuente semanal incorporada. Las filas válidas desde hoy generan OT automáticamente.'},{status:201});
  }catch(error){
-  await context.supabase.storage.from(BUCKET).remove([storagePath]).catch(()=>undefined);
-  return NextResponse.json({error:error instanceof Error?error.message:'No se pudo incorporar el programa semanal'},{status:500});
+  if(persistedSourceId){
+   await context.supabase.from('planning_weekly_work_sources').update({status:'review_required'}).eq('organization_id',context.organizationId).eq('id',persistedSourceId);
+  }else{
+   await context.supabase.storage.from(BUCKET).remove([storagePath]).catch(()=>undefined);
+  }
+  return NextResponse.json({error:error instanceof Error?error.message:'No se pudo incorporar el programa semanal',sourcePreserved:Boolean(persistedSourceId)},{status:500});
  }
 }
