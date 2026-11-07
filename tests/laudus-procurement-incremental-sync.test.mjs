@@ -9,6 +9,7 @@ const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laud
 const missingRecoveryMigration = fs.readFileSync('supabase/migrations/20261107170000_laudus_missing_invoice_recovery_candidates.sql','utf8');
 const evidenceMigration = fs.readFileSync('supabase/migrations/20261107152500_persist_laudus_90d_inconsistency_evidence.sql','utf8');
 const invoiceTotalPayloadMigration = fs.readFileSync('supabase/migrations/20261107194500_laudus_invoice_total_from_source_payload.sql','utf8');
+const invoiceMetadataMigration = fs.readFileSync('supabase/migrations/20261107200000_laudus_invoice_metadata_refresh.sql','utf8');
 const missingRecoveryRoute = fs.readFileSync('app/api/integrations/laudus/missing-invoices-recovery/route.ts','utf8');
 const missingRecoveryPage = fs.readFileSync('app/admin/laudus/missing-invoices-recovery/page.tsx','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
@@ -162,4 +163,15 @@ test('monto de factura se normaliza desde evidencia Laudus ya preservada',()=>{
   assert.match(invoiceTotalPayloadMigration,/new\.total_amount := v_total_text::numeric/);
   assert.match(invoiceTotalPayloadMigration,/where total_amount is null/);
   assert.doesNotMatch(invoiceTotalPayloadMigration,/canonical\./);
+});
+
+
+test('refresh reciente de facturas preserva lineas y solo actualiza cabecera',()=>{
+  assert.match(sync,/export async function refreshRecentPurchaseInvoiceMetadata/);
+  assert.match(sync,/motil_refresh_laudus_purchase_invoice_metadata/);
+  assert.match(sync,/invoiceLinesPreserved: true/);
+  assert.match(sync,/MIN_LAUDUS_API_BUDGET_RESERVE/);
+  assert.match(invoiceMetadataMigration,/invoice_lines_preserved/);
+  assert.doesNotMatch(invoiceMetadataMigration,/delete from integration\.laudus_purchase_invoice_lines/i);
+  assert.doesNotMatch(invoiceMetadataMigration,/canonical\./);
 });
