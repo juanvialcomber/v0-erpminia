@@ -95,28 +95,6 @@ export default function BodegaPage() {
       </div>
     </section> : null}
 
-    {!negativeStockMode ? <DataSourceStatusStrip
-      reviewHref="/dashboard/calidad-datos"
-      sources={[
-        sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
-        sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
-        sourceStatus.source('laudus', { key: 'laudus', label: 'Respaldo ERP', state: 'pending', detail: 'Verificando la última evidencia financiera de stock.' }),
-        sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
-      ]}
-    /> : null}
-
-    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
-
-    {!negativeStockMode ? <DataReceptionReadiness
-      description="Bodega está preparada para recibir stock y movimientos externos sin reemplazar saldos automáticamente. Cualquier diferencia entre fuentes quedará en conciliación."
-      items={[
-        { label: 'Productos', ready: true, detail: 'Catálogo canónico disponible.' },
-        { label: 'Stock por bodega', ready: true, detail: 'Modelo operacional disponible.' },
-        { label: 'Conciliación', ready: true, detail: 'Conflictos se muestran antes de corregir.' },
-        { label: 'Respaldo de stock', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Stock ERP y movimientos sincronizados.' : sourceStatus.state('laudus') === 'review' ? 'Stock ERP sincronizado; existen partidas pendientes de conciliación.' : sourceStatus.state('laudus') === 'syncing' ? 'Actualización ERP en curso.' : 'Verificando disponibilidad del respaldo ERP.' },
-      ]}
-    /> : null}
-
     {negativeStockMode ? <div className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive"/><div><p className="font-medium">Data Health · saldo negativo</p><p className="mt-1 text-muted-foreground">Esta vista filtra posiciones cuyo saldo disponible quedó bajo cero. Antes de corregir el saldo, concilia movimientos, reservas e importación fuente. MOTIL no ajusta cantidades automáticamente.</p></div></div> : null}
 
     {error ? <StatePanel tone="error" title="No fue posible cargar el inventario" description={error.message} actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} className="min-h-0 py-5" /> : null}
@@ -143,6 +121,34 @@ export default function BodegaPage() {
       <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Boxes className="h-4 w-4"/>Valor del inventario</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : valuationTrusted ? money(overview.total_stock_value) : 'En conciliación'}</p>{!valuationTrusted && !isLoading ? <p className="mt-1 text-xs text-muted-foreground">Petróleo impide una valorización confiable hasta conciliar fuentes.</p> : null}</div>
       <div className="bg-card px-5 py-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="h-4 w-4"/>Conteos pendientes</div><p className="mt-2 text-2xl font-semibold tracking-tight">{isLoading || error ? '—' : number(overview.count_overdue_products)}</p></div>
     </section> : null}
+
+    {!negativeStockMode ? <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer list-none px-5 py-4">
+        <p className="text-sm font-semibold">Fuentes y conciliación</p>
+        <p className="mt-1 text-xs text-muted-foreground">Revisa procedencia, frescura y conflictos sólo cuando necesites auditar una decisión MOTIL.</p>
+      </summary>
+      <div className="space-y-4 border-t p-4">
+        <DataSourceStatusStrip
+          reviewHref="/dashboard/calidad-datos"
+          sources={[
+            sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
+            sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
+            sourceStatus.source('laudus', { key: 'laudus', label: 'Respaldo ERP', state: 'pending', detail: 'Verificando la última evidencia financiera de stock.' }),
+            sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
+          ]}
+        />
+        <LaudusInventoryReadinessCard />
+        <DataReceptionReadiness
+          description="Bodega recibe stock y movimientos externos sin reemplazar saldos automáticamente. Las diferencias quedan en conciliación."
+          items={[
+            { label: 'Productos', ready: true, detail: 'Catálogo canónico disponible.' },
+            { label: 'Stock por bodega', ready: true, detail: 'Modelo operacional disponible.' },
+            { label: 'Conciliación', ready: true, detail: 'Conflictos se muestran antes de corregir.' },
+            { label: 'Respaldo de stock', ready: sourceStatus.state('laudus') === 'updated', detail: sourceStatus.state('laudus') === 'updated' ? 'Stock ERP y movimientos sincronizados.' : sourceStatus.state('laudus') === 'review' ? 'Stock ERP sincronizado; existen partidas pendientes de conciliación.' : sourceStatus.state('laudus') === 'syncing' ? 'Actualización ERP en curso.' : 'Verificando disponibilidad del respaldo ERP.' },
+          ]}
+        />
+      </div>
+    </details> : null}
 
     <section className="space-y-4">
       <div className="flex flex-col gap-1"><h2 className="text-lg font-semibold">Existencias</h2><p className="text-sm text-muted-foreground">Busca por producto o código y abre la posición para revisar su evidencia.</p></div>
