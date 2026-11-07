@@ -16,6 +16,13 @@ const fetcher = async (url: string) => {
   return Array.isArray(payload) ? payload : payload.documents || payload.data || [];
 };
 
+type PowderPermit = {
+  id:string; location_name:string; resolution_number:string|null; target_expiry_date:string|null;
+  mining_property:string|null; capacity:number|null; days_until:number|null; alert_15_days:boolean;
+  overdue:boolean; missing_evidence:boolean;
+};
+type PowderPayload = { data:PowderPermit[]; summary:{total:number;alert_15_days:number;overdue:number;missing_evidence:number}; policy:{alert_days:number;rule:string} };
+
 type LegalDocumentItem = {
   id: string | number;
   title?: string | null;
@@ -44,6 +51,12 @@ function matchesPermitLicense(document: LegalDocumentItem) {
 export default function PermisosLicenciasPage() {
   const [query, setQuery] = useState('');
   const { data } = useSWR('/api/legal/documentos', fetcher);
+  const { data: powder } = useSWR<PowderPayload>('/api/legal/powder-magazines', async (url:string) => {
+    const response = await fetch(url,{credentials:'include',cache:'no-store'});
+    const payload = await response.json().catch(()=>null);
+    if(!response.ok) throw new Error(payload?.error || 'No se pudieron cargar polvorines');
+    return payload;
+  }, { revalidateOnFocus:false });
   const handleUploadSuccess = () => {
     window.location.reload();
   };
@@ -158,6 +171,37 @@ export default function PermisosLicenciasPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Polvorines y consumidores habituales</CardTitle>
+              <CardDescription>Control de vencimiento solicitado por Elías. La alerta se activa 15 días antes de la fecha vigente informada.</CardDescription>
+            </div>
+            <Badge variant="outline">{powder?.summary.alert_15_days ?? '…'} alertas 15 días</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {powder?.data?.map((item)=><div key={item.id} className="grid gap-2 rounded-lg border p-3 md:grid-cols-[minmax(0,1fr)_180px_160px] md:items-center">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{item.location_name}</p>
+                {item.alert_15_days ? <Badge variant="destructive">Renovar</Badge> : null}
+                {item.overdue ? <Badge variant="destructive">Vencido</Badge> : null}
+                {item.missing_evidence ? <Badge variant="outline">Datos incompletos</Badge> : null}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{item.resolution_number ? `Resolución ${item.resolution_number}` : 'Resolución no informada'}{item.mining_property ? ` · ${item.mining_property}` : ''}</p>
+            </div>
+            <div className="text-sm md:text-right">
+              <p>{item.target_expiry_date || 'Fecha no informada'}</p>
+              <p className="text-xs text-muted-foreground">{item.days_until === null ? 'Sin cálculo' : item.days_until < 0 ? `Vencido hace ${Math.abs(item.days_until)} días` : `Faltan ${item.days_until} días`}</p>
+            </div>
+            <div className="text-xs text-muted-foreground md:text-right">{item.capacity !== null ? `Capacidad fuente: ${item.capacity.toLocaleString('es-CL')}` : 'Capacidad no informada'}</div>
+          </div>)}
+          {!powder?.data?.length ? <p className="text-sm text-muted-foreground">Cargando control de polvorines…</p> : null}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
