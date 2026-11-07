@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const migrationPath = new URL('../supabase/migrations/20261107194300_classify_dormant_future_laudus_cost_centers.sql', import.meta.url);
+const migrationPath = new URL('../supabase/migrations/20261107194700_fix_dormant_cost_center_resolution_method.sql', import.meta.url);
 const syncPath = new URL('../lib/integrations/laudus/financial-master-sync.ts', import.meta.url);
 
 test('future Laudus cost centers without real activity become dormant not human work', async () => {
   const sql = await readFile(migrationPath, 'utf8');
   assert.match(sql, /substring\(coalesce\(l\.name,''\) from '\(20\[0-9\]\{2\}\)'\)/);
   assert.match(sql, /reconciliation_status='ignored'/);
-  assert.match(sql, /future_master_without_activity/);
+  assert.match(sql, /deterministic_rule/);
   assert.match(sql, /laudus:cost_center_pending:/);
   assert.match(sql, /Centro Laudus futuro sin actividad financiera ni operacional/);
   assert.match(sql, /canonical_mutated',false/);
