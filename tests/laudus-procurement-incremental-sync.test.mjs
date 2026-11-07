@@ -8,6 +8,7 @@ const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_pro
 const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
 const missingRecoveryMigration = fs.readFileSync('supabase/migrations/20261107170000_laudus_missing_invoice_recovery_candidates.sql','utf8');
 const evidenceMigration = fs.readFileSync('supabase/migrations/20261107152500_persist_laudus_90d_inconsistency_evidence.sql','utf8');
+const invoiceTotalPayloadMigration = fs.readFileSync('supabase/migrations/20261107194500_laudus_invoice_total_from_source_payload.sql','utf8');
 const missingRecoveryRoute = fs.readFileSync('app/api/integrations/laudus/missing-invoices-recovery/route.ts','utf8');
 const missingRecoveryPage = fs.readFileSync('app/admin/laudus/missing-invoices-recovery/page.tsx','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
@@ -153,4 +154,12 @@ test('monto desconocido sin pagos se repara aunque la traza figure completa',()=
   assert.match(traceLib,/missingTotal \|\| !complete\.has/);
   assert.match(traceLib,/missingTotal && hasPayments\) return false/);
   assert.match(traceLib,/aUnknownUnpaid/);
+});
+
+
+test('monto de factura se normaliza desde evidencia Laudus ya preservada',()=>{
+  assert.match(invoiceTotalPayloadMigration,/source_payload->>'totals_total'/);
+  assert.match(invoiceTotalPayloadMigration,/new\.total_amount := v_total_text::numeric/);
+  assert.match(invoiceTotalPayloadMigration,/where total_amount is null/);
+  assert.doesNotMatch(invoiceTotalPayloadMigration,/canonical\./);
 });
