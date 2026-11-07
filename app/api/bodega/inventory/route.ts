@@ -111,6 +111,7 @@ export async function GET(request: NextRequest) {
             .from('bodega_inventory_operational_service_v1')
             .select('operational_category')
             .eq('organization_id', orgId)
+            .neq('reconciliation_state', 'laudus_only_zero')
             .order('operational_category')
             .range(from, from + chunk - 1);
 
@@ -139,7 +140,8 @@ export async function GET(request: NextRequest) {
           'canonical_product_id,laudus_product_external_id,sku,description,unit_of_measure,operational_category,operational_quantity,operational_resolution,laudus_synced_at',
           { count: 'exact' },
         )
-        .eq('organization_id', orgId);
+        .eq('organization_id', orgId)
+        .neq('reconciliation_state', 'laudus_only_zero');
 
       if (search) {
         operationalQuery = operationalQuery.or(
