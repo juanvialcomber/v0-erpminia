@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 
   const whatsappRows = (whatsappResult.data || []).filter((row) => {
     const text = safeText(row.body, row.file_name);
-    return LEGAL_HINT_RE.test(text) || CONTRACT_RE.test(text);
+    return LEGAL_HINT_RE.test(text) || CONTRACT_HINT_RE.test(text);
   }).slice(0, 100);
 
   const whatsappIds = whatsappRows.map((row) => row.id);
