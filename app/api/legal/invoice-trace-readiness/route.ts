@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await syncLegalContractInvoiceTraces(context.organizationId, context.supabase, { recover: false });
-    const recoverable = 'recoverable' in data ? data.recoverable : data.remaining;
+    const recoverable = 'recoverable' in data && typeof data.recoverable === 'number'\n      ? data.recoverable\n      : Number(data.remaining || 0);
 
     return NextResponse.json({
       data,
