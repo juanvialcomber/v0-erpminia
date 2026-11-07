@@ -68,7 +68,25 @@ export async function syncLegalContractInvoiceTraces(organizationId: string, db:
   const invoiceRefs = LEGAL_PROGRESS_MILESTONES.flatMap((milestone) =>
     milestone.invoices.map((invoice) => ({ contractNumber: milestone.contractNumber, docNumber: invoice.docNumber })),
   );
-  if (!invoiceRefs.length) return { examined: 0, matched: 0, recovered: 0, apiCalls: 0, alreadySynced: 0 };
+  if (!invoiceRefs.length) return {
+    examined: 0,
+    matched: 0,
+    ambiguous: 0,
+    missing: 0,
+    alreadySynced: 0,
+    recoverable: 0,
+    nextBatch: 0,
+    recovered: 0,
+    recoveredLines: 0,
+    recoveredTraces: 0,
+    apiCalls: 0,
+    remaining: 0,
+    errors: [],
+    canonicalMutationExecuted: false,
+    laudusMutationExecuted: false,
+    stagingOnly: true,
+    dryRun: options.recover === false,
+  };
 
   const { data: contracts, error: contractsError } = await db
     .from('contracts').select('id,contract_number,supplier_id')
