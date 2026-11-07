@@ -182,13 +182,10 @@ export async function loadLaudusInventoryReadiness(
   const negativeProductIds = [...new Set(negativeRaw.map((row) => String(row.product_external_id || '')).filter(Boolean))];
   const { data: kardexRows, error: kardexError } = negativeProductIds.length
     ? await db
-        .schema('integration')
-        .from('laudus_product_kardex')
+        .from('laudus_product_kardex_latest_service_v1')
         .select('product_external_id,movement_date,movement_type,description,quantity,resulting_stock,synced_at')
         .eq('organization_id', organizationId)
         .in('product_external_id', negativeProductIds)
-        .order('movement_date', { ascending: false })
-        .limit(Math.min(negativeProductIds.length * 20, 200))
     : { data: [], error: null };
   if (kardexError) throw new Error(kardexError.message);
 
