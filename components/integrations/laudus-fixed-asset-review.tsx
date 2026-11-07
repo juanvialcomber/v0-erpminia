@@ -45,6 +45,7 @@ type ReviewRow = {
 
 type Payload = {
   readOnly: boolean;
+  canDecide: boolean;
   summary: {
     laudusAssets: number;
     canonicalAssets: number;
@@ -323,11 +324,16 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
               placeholder={isMaintenance ? 'Motivo de la decisión operacional' : 'Observación opcional para Finanzas'}
               disabled={saving}
             />
+            {!data?.canDecide ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                La identidad operacional la resuelve Mantenimiento. Finanzas mantiene acceso de lectura a la evidencia.
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 size="sm"
                 onClick={() => decide('confirm_candidate')}
-                disabled={saving || !current.candidate.assetId}
+                disabled={saving || !data?.canDecide || !current.candidate.assetId}
               >
                 Confirmar candidato
               </Button>
@@ -335,7 +341,7 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
                 size="sm"
                 variant="outline"
                 onClick={() => decide('reject_candidate')}
-                disabled={saving}
+                disabled={saving || !data?.canDecide}
               >
                 Rechazar
               </Button>
@@ -343,7 +349,7 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
                 size="sm"
                 variant="ghost"
                 onClick={() => decide('defer')}
-                disabled={saving}
+                disabled={saving || !data?.canDecide}
               >
                 Diferir
               </Button>
