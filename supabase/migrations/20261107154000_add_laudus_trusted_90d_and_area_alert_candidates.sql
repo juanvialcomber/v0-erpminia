@@ -8,23 +8,23 @@ select
   ap.*,
   greatest(0, floor(extract(epoch from (now() - ap.issued_date)) / 86400))::bigint as age_days,
   case
-    when ap.synced_at >= now() - interval '7 days' then 'fresh'
-    else 'stale'
+    when ap.synced_at >= now() - interval '7 days' then 'vigente'
+    else 'desactualizado'
   end as freshness_status,
   case
-    when ap.issued_date is null then 'invalid_missing_issued_date'
-    when ap.due_date is null then 'invalid_missing_due_date'
-    when ap.due_date < ap.issued_date then 'invalid_due_before_issue'
-    when ap.original_amount < 0 then 'invalid_negative_original'
-    when ap.outstanding_amount < 0 then 'invalid_negative_outstanding'
-    when ap.outstanding_amount > ap.original_amount then 'invalid_outstanding_gt_original'
-    when ap.supplier_external_id is null then 'invalid_missing_supplier'
-    when nullif(btrim(ap.document_number),'') is null then 'invalid_missing_document_number'
-    when nullif(btrim(ap.currency_code),'') is null then 'invalid_missing_currency'
+    when ap.issued_date is null then 'invalido_sin_fecha_emision'
+    when ap.due_date is null then 'invalido_sin_fecha_vencimiento'
+    when ap.due_date < ap.issued_date then 'invalido_vencimiento_anterior_emision'
+    when ap.original_amount < 0 then 'invalido_monto_original_negativo'
+    when ap.outstanding_amount < 0 then 'invalido_saldo_negativo'
+    when ap.outstanding_amount > ap.original_amount then 'invalido_saldo_mayor_original'
+    when ap.supplier_external_id is null then 'invalido_sin_proveedor'
+    when nullif(btrim(ap.document_number),'') is null then 'invalido_sin_numero_documento'
+    when nullif(btrim(ap.currency_code),'') is null then 'invalido_sin_moneda'
     when ps.purchase_invoice_external_id is not null
-         and ps.outstanding_amount is distinct from ap.outstanding_amount then 'conflict_payment_balance'
-    when ps.purchase_invoice_external_id is not null then 'verified'
-    else 'valid_unverified'
+         and ps.outstanding_amount is distinct from ap.outstanding_amount then 'conflicto_saldo_pago'
+    when ps.purchase_invoice_external_id is not null then 'verificado'
+    else 'valido_sin_verificacion_cruzada'
   end as quality_status,
   ps.payment_status as corroborated_payment_status,
   ps.paid_amount as corroborated_paid_amount,
@@ -39,16 +39,16 @@ left join public.laudus_purchase_invoice_payment_status_service_v1 ps
 create or replace view public.laudus_accounts_payable_trusted_v1 as
 select *
 from public.laudus_accounts_payable_quality_v1
-where freshness_status='fresh'
-  and quality_status in ('verified','valid_unverified');
+where freshness_status='vigente'
+  and quality_status in ('verificado','valido_sin_verificacion_cruzada');
 
--- Compatibility/detail slice: retain the 90-day view for consumers that explicitly need recent documents.
+-- Vista de compatibilidad: conserva el corte de 90 dias para consumidores que necesiten expresamente documentos recientes.
 create or replace view public.laudus_accounts_payable_trusted_90d_v1 as
 select *
 from public.laudus_accounts_payable_trusted_v1
 where coalesce(issued_date, source_updated_at, observed_at) >= now() - interval '90 days';
 
--- Inventory is a current-state domain: only aligned, recently observed stock is trusted.
+-- Inventario representa estado actual: solo se confia en stock alineado y observado recientemente.
 create or replace view public.laudus_inventory_trusted_90d_v1 as
 select *
 from public.laudus_inventory_reconciliation_service_v1
@@ -142,8 +142,8 @@ with candidates as (
          coalesce(sum(outstanding_amount),0)::numeric,max(synced_at),
          'Revisar estas obligaciones antes de usarlas en caja, programación de pagos o reportes.'
   from public.laudus_accounts_payable_quality_v1
-  where freshness_status='fresh'
-    and quality_status not in ('verified','valid_unverified')
+  where freshness_status='vigente'
+    and quality_status not in ('verificado','valido_sin_verificacion_cruzada')
   group by organization_id
 )
 select * from candidates where exception_count>0;
