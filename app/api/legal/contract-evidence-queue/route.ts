@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 
 const CONTRACT_RE = /\b(?:IO|EP)-\d{2}\b/gi;
+const CONTRACT_HINT_RE = /\b(?:IO|EP)-\d{2}\b/i;
 const OC_RE = /\b(?:OC[-\s:]*)?(\d{5})\b/gi;
 const LEGAL_HINT_RE = /\b(contrato|estado de pago|avance|factura|oc\b|orden de compra|retenci[oó]n|hito|proveedor|transportista|polvor[ií]n|regal[ií]a|patente)\b/i;
 
