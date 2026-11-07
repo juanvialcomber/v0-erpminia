@@ -224,7 +224,7 @@ export function LaudusFinanceControlCard() {
     return (
       <Card className="shadow-none">
         <CardContent className="p-5">
-          <LaudusSourceMark state="offline" className="mb-3" />
+          <LaudusSourceMark state="offline" compact className="mb-3" />
           <p className="text-sm font-medium">Respaldo financiero no disponible</p>
           <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
         </CardContent>
@@ -413,7 +413,7 @@ export function LaudusFinanceControlCard() {
       <CardContent className="space-y-5 p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex flex-wrap items-center gap-2">
-            <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} />
+            <LaudusSourceMark state={isLoading ? 'syncing' : freshnessIsStale ? 'review' : 'connected'} compact />
             <p className="text-xs font-medium text-muted-foreground">Respaldo financiero · sólo lectura</p>
           </div>
           <div className="flex items-center gap-2">
