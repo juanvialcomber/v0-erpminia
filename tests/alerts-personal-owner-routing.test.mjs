@@ -15,7 +15,7 @@ test('personal alert center scopes each source to its responsible user', async (
   assert.match(api, /\.eq\('assigned_to', context\.userId\)/);
   assert.match(api, /\.eq\('responsible_person', context\.userId\)/);
   assert.match(api, /isBodegaOwner\s*\?/);
-  assert.match(api, /isElias\s*\?/);
+  assert.match(api, /isLegalOwner\s*\?/);
 });
 
 test('alerts expose concrete next-action language instead of a generic source link', async () => {
