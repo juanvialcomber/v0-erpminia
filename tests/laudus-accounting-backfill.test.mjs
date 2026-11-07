@@ -97,3 +97,10 @@ test('accounting backfill preserves multiple flattened lines for the same journa
   assert.match(backfill,/lines: \[\.\.\.lineMap\.values\(\)\]/);
   assert.doesNotMatch(backfill,/byId\.set\(id, \{ \.\.\.row, lines \}\)/);
 });
+
+
+test('grouped journal rows are not mislabeled as duplicates',()=>{
+  assert.match(backfill,/lineRowsGrouped/);
+  assert.match(backfill,/const pageDuplicates = 0/);
+  assert.match(backfill,/lineRowsGrouped \+= groupedLineRows/);
+});
