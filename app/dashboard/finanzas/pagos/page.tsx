@@ -44,6 +44,7 @@ type PaymentRequestsPayload={data:PaymentRequest[];policy:{separation:string;exe
 
 export default function PayablesPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/finance/payables', fetcher);
+  const canEdit = data?.canEdit === true;
   const { data: paymentRequestsData, mutate: mutatePaymentRequests } = useSWR<PaymentRequestsPayload>(canEdit ? '/api/finance/payment-requests' : null, fetcher);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -62,7 +63,6 @@ export default function PayablesPage() {
 
   const payables: Payable[] = data?.payables || [];
   const payments: Payment[] = data?.payments || [];
-  const canEdit = data?.canEdit === true;
   const observedPayables: ObservedPayables | null = data?.observedPayables || null;
   const paymentReview: PaymentReview | null = data?.paymentReview || null;
 
