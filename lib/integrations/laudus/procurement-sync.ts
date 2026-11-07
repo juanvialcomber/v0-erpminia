@@ -173,7 +173,7 @@ function purchaseInvoiceDetailRows(detail: JsonRow): JsonRow[] {
   }));
 }
 
-async function recoverMissingPurchaseInvoices(organizationId: string, db: SupabaseClient) {
+export async function recoverMissingPurchaseInvoices(organizationId: string, db: SupabaseClient) {
   const budgetResult = await db
     .from('laudus_api_budget_service_v1')
     .select('tracked_remaining')
