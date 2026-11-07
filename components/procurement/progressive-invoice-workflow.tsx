@@ -206,7 +206,7 @@ export function ProgressiveInvoiceWorkflow() {
     <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Abastecimiento · Control de factura</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Factura → match → aprobación → pago</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola decisión principal por vez. El three-way match controla OC, recepción aceptada, factura actual y facturación acumulada previa.</p></section>
     {actionError ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{actionError}</div> : null}
     {error || invoiceableError ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error?.message || invoiceableError?.message}</div> : null}
-    {laudusInvoiceError ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">La evidencia de facturas Laudus no está disponible. El flujo operacional MOTIL sigue separado y no se reemplaza por cero.</div> : null}
+    {laudusInvoiceError ? <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">El respaldo financiero externo no está disponible. Las decisiones de compra, recepción, match y aprobación de MOTIL siguen operativas.</div> : null}
 
     <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextActionLabel}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextActionDescription}</p></div>{nextActionControl}</CardContent></Card>
 
@@ -214,31 +214,31 @@ export function ProgressiveInvoiceWorkflow() {
       {[['Facturas MOTIL', counts.total], ['Coinciden', counts.matched], ['Esperan recepción', counts.pending], ['Excepciones abiertas', counts.exceptions], ['Aprobadas pago', counts.approved]].map(([label, value]) => <Card key={String(label)} className="shadow-none"><CardContent className="p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></CardContent></Card>)}
     </div>
 
-    <Card className="shadow-none">
-      <CardHeader>
-        <CardTitle>Facturas Laudus</CardTitle>
-        <CardDescription>Evidencia ERP en sólo lectura. Una factura Laudus no se convierte automáticamente en factura operacional MOTIL, three-way match ni aprobación de pago.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer list-none px-5 py-4">
+        <p className="text-sm font-semibold">Respaldo financiero</p>
+        <p className="mt-1 text-xs text-muted-foreground">Evidencia externa de sólo lectura para contrastar decisiones MOTIL cuando sea necesario.</p>
+      </summary>
+      <div className="space-y-4 border-t px-5 py-4">
         {laudusSummary ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ['Total fuente', laudusSummary.total],
+            ['Registros fuente', laudusSummary.total],
             ['Pagadas', laudusSummary.paid],
             ['Pago parcial', laudusSummary.partiallyPaid],
             ['Impagas', laudusSummary.unpaid],
           ].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{Number(value || 0).toLocaleString('es-CL')}</p></div>)}
-        </div> : <p className="text-sm text-muted-foreground">Consultando evidencia Laudus…</p>}
+        </div> : <p className="text-sm text-muted-foreground">Consultando respaldo financiero…</p>}
         {laudusInvoices.length ? <div className="divide-y rounded-lg border">
           {laudusInvoices.slice(0, 10).map((row) => <div key={row.externalId} className="grid gap-2 p-3 text-sm lg:grid-cols-[120px_1fr_130px_150px] lg:items-center">
-            <div><p className="font-medium">Factura {row.documentNumber || row.externalId}</p><p className="text-xs text-muted-foreground">Fuente Laudus</p></div>
+            <div><p className="font-medium">Factura {row.documentNumber || row.externalId}</p><p className="text-xs text-muted-foreground">Fuente financiera</p></div>
             <div><p className="font-medium">{row.supplierName || 'Proveedor sin nombre'}</p><p className="text-xs text-muted-foreground">{row.dueDate ? `Vence ${new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(row.dueDate))}` : 'Sin vencimiento acreditado'}</p></div>
             <Badge variant="outline">{row.paymentStatus === 'partially_paid' ? 'Pago parcial' : 'Impaga'}</Badge>
             <p className="font-medium tabular-nums lg:text-right">{money(row.outstandingAmount, row.currency || 'CLP')}</p>
           </div>)}
-        </div> : laudusSummary && laudusSummary.open === 0 ? <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Laudus no reporta facturas abiertas.</p> : null}
-        {laudusSummary?.open > laudusInvoices.length ? <p className="text-xs text-muted-foreground">Se muestran las obligaciones abiertas de mayor saldo, hasta {laudusSummary.rowsShown}. El universo fuente permanece en Laudus y no se duplica en MOTIL.</p> : null}
-      </CardContent>
-    </Card>
+        </div> : laudusSummary && laudusSummary.open === 0 ? <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">La fuente financiera no reporta obligaciones abiertas.</p> : null}
+        {laudusSummary?.open > laudusInvoices.length ? <p className="text-xs text-muted-foreground">Se muestran las obligaciones abiertas de mayor saldo, hasta {laudusSummary.rowsShown}. La fuente financiera conserva el universo contable; MOTIL usa sólo la evidencia necesaria para decidir.</p> : null}
+      </div>
+    </details>
 
     <Card className="shadow-none"><CardHeader><CardTitle>Expedientes MOTIL</CardTitle><CardDescription>El detalle conserva evidencia de esta factura y del acumulado de la OC, sin competir con la acción principal.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando facturas...</p> : null}
