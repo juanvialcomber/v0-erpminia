@@ -130,7 +130,7 @@ export default function PayablesPage() {
   };
 
   let nextTitle = 'Sin CxP MOTIL pendientes';
-  let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en Laudus se revisa en Resumen y Proveedores.';
+  let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en la fuente financiera se revisa en Resumen y Proveedores.';
   let nextControl: React.ReactNode = null;
   if (dueMissing.length) {
     nextTitle = 'Definir vencimiento';
@@ -163,10 +163,10 @@ export default function PayablesPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición observada</p>
-              <CardTitle className="mt-1">CxP visible desde Laudus</CardTitle>
+              <CardTitle className="mt-1">Exposición financiera observada</CardTitle>
               <CardDescription>{observedPayables.semantics}</CardDescription>
             </div>
-            <Badge variant="outline">Laudus · sólo lectura</Badge>
+            <Badge variant="outline">Fuente financiera · sólo lectura</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -210,7 +210,7 @@ export default function PayablesPage() {
               <CardTitle className="mt-1">Aplicaciones de pago por revisar</CardTitle>
               <CardDescription>{paymentReview.semantics}</CardDescription>
             </div>
-            <Badge variant="outline">Laudus · sólo lectura</Badge>
+            <Badge variant="outline">Fuente financiera · sólo lectura</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -243,7 +243,7 @@ export default function PayablesPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">Revisar comprobantes, anticipos y notas de crédito antes de cualquier ajuste. MOTIL no modifica estos pagos.</p>
+          <p className="text-xs text-muted-foreground">Revisar comprobantes, anticipos y notas de crédito antes de cualquier ajuste. MOTIL no modifica los registros contables de origen.</p>
         </CardContent>
       </Card>
     ) : null}
@@ -292,7 +292,7 @@ export default function PayablesPage() {
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
-      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que Laudus no tenga exposición abierta.</p> : null}
+      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
 
