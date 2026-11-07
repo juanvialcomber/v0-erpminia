@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const helper = await readFile(new URL('../lib/api/eecc-profile-access.ts', import.meta.url), 'utf8');
 const collection = await readFile(new URL('../app/api/eecc/route.ts', import.meta.url), 'utf8');
 const item = await readFile(new URL('../app/api/eecc/[id]/route.ts', import.meta.url), 'utf8');
+const importRoute = await readFile(new URL('../app/api/eecc/import/route.ts', import.meta.url), 'utf8');
 const page = await readFile(new URL('../app/dashboard/documentos-gestion/eecc/page.tsx', import.meta.url), 'utf8');
 const legal = await readFile(new URL('../app/dashboard/legal/contratistas-documentos/page.tsx', import.meta.url), 'utf8');
 
@@ -15,6 +16,8 @@ test('supplier profile writes are explicitly scoped to approved managers', () =>
   assert.match(helper, /legalAccess === 'ED'/);
   assert.match(collection, /requireEeccProfileManager/);
   assert.match(item, /requireEeccProfileManager/);
+  assert.match(importRoute, /requireEeccProfileManager/);
+  assert.match(importRoute, /const organizationId = auth\.organizationId/);
 });
 
 test('supplier profile deletion remains more restrictive than create or edit', () => {
