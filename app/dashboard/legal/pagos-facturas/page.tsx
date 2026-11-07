@@ -45,7 +45,7 @@ export default function LegalPaymentsInvoicesPage(){
  const [requestMessage,setRequestMessage]=useState<string|null>(null);
  if(isLoading)return <StatePanel tone="loading" title="Revisando pagos y facturas" description="Conciliando contratos, proveedores, órdenes de compra, facturas y pagos."/>;
  if(error||!data)return <StatePanel tone="error" title="Pagos y facturas no disponibles" description="MOTIL no concluye estados financieros cuando falta evidencia verificable."/>;
- const attention=data.partial_invoices+data.unpaid_invoices+(recon?.summary.conflicts||0)+(recon?.summary.not_found||0);
+ const attention=data.summary.partial_invoices+data.summary.unpaid_invoices+(recon?.summary.conflicts||0)+(recon?.summary.not_found||0);
  const createPaymentRequest=async(item:RequestReadyItem)=>{
   if(!item.payable||item.readiness!=='ready_for_request')return;
   setRequestingId(item.id);setRequestMessage(null);
