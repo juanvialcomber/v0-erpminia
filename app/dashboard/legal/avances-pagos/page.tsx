@@ -9,8 +9,8 @@ import { StatePanel } from '@/components/ui/state-panel';
 
 type Invoice = { doc_number:string; source_net_amount:number; source_retention_amount:number; payment_state:string; laudus:{outstanding_amount:number}|null };
 type Milestone = { contract_number:string; contractor_name:string|null; sequence:number; title:string; purchase_order_number:string; currency:string; total_amount:number; progress_ratio:number; executed_amount:number; invoiced_amount:number; pending_to_invoice:number; payment_state:string; invoices:Invoice[]; provenance:{source_sheet:string;source_row:number} };
-type ContractSummary = { contract_number:string; title:string|null; contractor_name:string|null; contract_value:number; contract_paid_amount:number; milestones:number; milestones_started:number; milestones_paid:number; milestones_retained:number; invoice_matches:number; invoice_expected:number; detail_available:boolean };
-type Payload = { data:Milestone[]; contracts:ContractSummary[]; summary:{contracts:number;milestones:number;invoices_expected:number;invoices_matched:number;retained_milestones:number}; policy:{retention:string;no_inference:string} };
+type ContractSummary = { contract_number:string; title:string|null; contractor_name:string|null; contract_value:number; contract_currency:string; contract_paid_amount:number; milestones:number; milestones_started:number; milestones_paid:number; milestones_retained:number; invoice_matches:number; invoice_expected:number; detail_available:boolean; source_start_date:string|null; source_end_date:string|null; source_schedule_note:string|null; source_progress_ratio:number|null; days_to_end:number|null; budget_overrun:boolean; attention_state:'green'|'yellow'|'red'|'neutral'; attention_reasons:string[] };
+type Payload = { data:Milestone[]; contracts:ContractSummary[]; summary:{contracts:number;milestones:number;invoices_expected:number;invoices_matched:number;retained_milestones:number;contracts_red:number;contracts_yellow:number;contracts_green:number}; policy:{retention:string;no_inference:string;schedule:string} };
 
 const fetcher = async (url:string) => {
   const response = await fetch(url,{credentials:'include',cache:'no-store'});
@@ -28,6 +28,12 @@ function label(state:string){
   if(state==='unpaid') return 'Factura pendiente';
   if(state==='not_invoiced') return 'Sin facturar';
   return 'Revisar conciliación';
+}
+function attentionBadge(state:ContractSummary['attention_state']){
+  if(state==='green') return <Badge className="border-emerald-600/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-300">100% verificado</Badge>;
+  if(state==='yellow') return <Badge className="border-amber-600/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300">≤15 días</Badge>;
+  if(state==='red') return <Badge variant="destructive">Revisar</Badge>;
+  return <Badge variant="outline">Sin señal de fecha</Badge>;
 }
 function variant(state:string):'default'|'secondary'|'destructive'|'outline'{
   if(state==='paid') return 'secondary';
@@ -94,14 +100,22 @@ export default function ContractPaymentsPage(){
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
       <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
-      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Hitos</p><p className="mt-1 text-xl font-semibold">{data.summary.milestones}</p></div>
-      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Facturas conciliadas</p><p className="mt-1 text-xl font-semibold">{data.summary.invoices_matched}/{data.summary.invoices_expected}</p></div>
-      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Con retención</p><p className="mt-1 text-xl font-semibold">{data.summary.retained_milestones}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Revisión roja</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts_red}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">≤15 días</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts_yellow}</p></div>
+      <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">100% verificado</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts_green}</p></div>
     </section>
     <section className="grid gap-3 lg:grid-cols-2">
       {data.contracts.map((contract)=><article key={contract.contract_number} className="rounded-md border p-4">
-        <div className="flex items-start justify-between gap-3"><div><Badge variant="outline">{contract.contract_number}</Badge><h2 className="mt-2 text-sm font-semibold">{contract.title || contract.contractor_name}</h2></div><div className="text-right text-xs text-muted-foreground"><p>{money(contract.contract_value)}</p><p className="mt-1">Pagado resumen: {money(contract.contract_paid_amount)}</p></div></div>
-        {contract.detail_available ? <div className="mt-4 grid grid-cols-3 gap-2 text-xs"><div><span className="text-muted-foreground">Iniciados</span><p className="mt-1 font-semibold">{contract.milestones_started}/{contract.milestones}</p></div><div><span className="text-muted-foreground">Pagados</span><p className="mt-1 font-semibold">{contract.milestones_paid}</p></div><div><span className="text-muted-foreground">Retención</span><p className="mt-1 font-semibold">{contract.milestones_retained}</p></div></div> : <p className="mt-4 text-xs text-muted-foreground">Resumen contractual cargado. Detalle de hitos/facturas aún no estructurado.</p>}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{contract.contract_number}</Badge>{attentionBadge(contract.attention_state)}</div>
+            <h2 className="mt-2 text-sm font-semibold">{contract.title || contract.contractor_name}</h2>
+            {contract.source_end_date ? <p className="mt-1 text-xs text-muted-foreground">Término fuente: {contract.source_end_date}{contract.days_to_end!==null ? contract.days_to_end < 0 ? ` · venció hace ${Math.abs(contract.days_to_end)} días` : ` · faltan ${contract.days_to_end} días` : ''}</p> : <p className="mt-1 text-xs text-muted-foreground">Fecha de término no informada/utilizable en la fuente.</p>}
+          </div>
+          <div className="text-right text-xs text-muted-foreground"><p>{money(contract.contract_value,contract.contract_currency)}</p><p className="mt-1">Pagado resumen: {money(contract.contract_paid_amount,contract.contract_currency)}</p></div>
+        </div>
+        {contract.attention_reasons.length ? <div className="mt-3 rounded-md bg-muted/30 px-3 py-2 text-xs">{contract.attention_reasons.map((reason)=><p key={reason}>{reason}</p>)}</div> : null}
+        {contract.detail_available ? <div className="mt-4 grid grid-cols-4 gap-2 text-xs"><div><span className="text-muted-foreground">Avance</span><p className="mt-1 font-semibold">{contract.source_progress_ratio===null?'—':percent(contract.source_progress_ratio)}</p></div><div><span className="text-muted-foreground">Iniciados</span><p className="mt-1 font-semibold">{contract.milestones_started}/{contract.milestones}</p></div><div><span className="text-muted-foreground">Pagados</span><p className="mt-1 font-semibold">{contract.milestones_paid}</p></div><div><span className="text-muted-foreground">Retención</span><p className="mt-1 font-semibold">{contract.milestones_retained}</p></div></div> : <p className="mt-4 text-xs text-muted-foreground">Resumen contractual cargado. Detalle de hitos/facturas aún no estructurado.</p>}
       </article>)}
     </section>
     <section className="space-y-3">
@@ -123,6 +137,6 @@ export default function ContractPaymentsPage(){
         </div>
       </article>)}
     </section>
-    <section className="rounded-md border p-4"><ShieldCheck className="h-4 w-4 text-muted-foreground"/><h2 className="mt-3 text-sm font-semibold">Regla de verdad</h2><p className="mt-2 text-xs text-muted-foreground">{data.policy.no_inference}</p><p className="mt-2 text-xs text-muted-foreground">{data.policy.retention}</p></section>
+    <section className="rounded-md border p-4"><ShieldCheck className="h-4 w-4 text-muted-foreground"/><h2 className="mt-3 text-sm font-semibold">Regla de verdad</h2><p className="mt-2 text-xs text-muted-foreground">{data.policy.no_inference}</p><p className="mt-2 text-xs text-muted-foreground">{data.policy.retention}</p><p className="mt-2 text-xs text-muted-foreground">{data.policy.schedule}</p></section>
   </div>;
 }
