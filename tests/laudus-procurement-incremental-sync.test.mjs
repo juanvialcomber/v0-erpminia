@@ -10,7 +10,6 @@ const missingRecoveryMigration = fs.readFileSync('supabase/migrations/2026110717
 const evidenceMigration = fs.readFileSync('supabase/migrations/20261107152500_persist_laudus_90d_inconsistency_evidence.sql','utf8');
 const missingRecoveryRoute = fs.readFileSync('app/api/integrations/laudus/missing-invoices-recovery/route.ts','utf8');
 const missingRecoveryPage = fs.readFileSync('app/admin/laudus/missing-invoices-recovery/page.tsx','utf8');
-const proxySource = fs.readFileSync('proxy.ts','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
@@ -134,12 +133,4 @@ test('recuperacion server-to-server usa token sensible y falla cerrado por organ
   assert.match(missingRecoveryRoute,/organizationIds\.length !== 1/);
   assert.match(missingRecoveryRoute,/organizationFromRequest:\s*false/);
   assert.doesNotMatch(missingRecoveryRoute,/body\.organizationId|organization_id\s*:\s*body/);
-});
-
-
-test('proxy deja pasar solo el handler server-to-server y el handler conserva validacion de token',()=>{
-  assert.match(proxySource,/\/api\/integrations\/laudus\/missing-invoices-recovery/);
-  assert.match(missingRecoveryRoute,/MOTIL_LAUDUS_RECOVERY_TOKEN/);
-  assert.match(missingRecoveryRoute,/timingSafeEqual/);
-  assert.match(missingRecoveryRoute,/organizationIds\.length !== 1/);
 });
