@@ -40,21 +40,57 @@ set entity_id=excluded.entity_id,evidence_reference=excluded.evidence_reference,
 
 insert into public.data_reconciliation_reviews
   (organization_id, issue_key, entity_type, entity_id, issue_type, field_name, status, evidence_reference, updated_at)
-select organization_id,'laudus:ap_due_before_issue:'||external_id,'invoice',null,
-  'invalid_source_date_order','due_date','open',
+select
+  organization_id,
+  'laudus:cxp_inconsistente:' || external_id || ':' || tipo_inconsistencia,
+  'invoice',
+  null,
+  tipo_inconsistencia,
+  campo_afectado,
+  'open',
   concat('laudus_accounts_payable_service_v1:',external_id,
-         ' | document=',coalesce(document_number,''),
-         ' | issued=',coalesce(issued_date::text,'null'),
-         ' | due=',coalesce(due_date::text,'null'),
-         ' | original=',coalesce(original_amount::text,'null'),
-         ' | outstanding=',coalesce(outstanding_amount::text,'null'),
-         ' | sync=',coalesce(synced_at::text,'null')),
+         ' | documento=',coalesce(document_number,''),
+         ' | fecha_emision=',coalesce(issued_date::text,'sin_dato'),
+         ' | fecha_vencimiento=',coalesce(due_date::text,'sin_dato'),
+         ' | monto_original=',coalesce(original_amount::text,'sin_dato'),
+         ' | saldo_pendiente=',coalesce(outstanding_amount::text,'sin_dato'),
+         ' | proveedor=',coalesce(supplier_external_id,'sin_dato'),
+         ' | moneda=',coalesce(currency_code,'sin_dato'),
+         ' | sincronizado=',coalesce(synced_at::text,'sin_dato')),
   now()
-from public.laudus_accounts_payable_service_v1
-where coalesce(issued_date,source_updated_at,observed_at)>=now()-interval '90 days'
-  and due_date<issued_date
+from (
+  select ap.*,
+    case
+      when issued_date is null then 'sin_fecha_emision'
+      when due_date is null then 'sin_fecha_vencimiento'
+      when due_date < issued_date then 'vencimiento_anterior_emision'
+      when original_amount < 0 then 'monto_original_negativo'
+      when outstanding_amount < 0 then 'saldo_pendiente_negativo'
+      when outstanding_amount > original_amount then 'saldo_mayor_monto_original'
+      when supplier_external_id is null then 'sin_proveedor'
+      when nullif(btrim(document_number),'') is null then 'sin_numero_documento'
+      when nullif(btrim(currency_code),'') is null then 'sin_moneda'
+      else null
+    end as tipo_inconsistencia,
+    case
+      when issued_date is null then 'fecha_emision'
+      when due_date is null or due_date < issued_date then 'fecha_vencimiento'
+      when original_amount < 0 then 'monto_original'
+      when outstanding_amount < 0 or outstanding_amount > original_amount then 'saldo_pendiente'
+      when supplier_external_id is null then 'proveedor'
+      when nullif(btrim(document_number),'') is null then 'numero_documento'
+      when nullif(btrim(currency_code),'') is null then 'moneda'
+      else null
+    end as campo_afectado
+  from public.laudus_accounts_payable_service_v1 ap
+  where ap.synced_at >= now()-interval '7 days'
+) q
+where tipo_inconsistencia is not null
 on conflict (organization_id,issue_key) do update
-set evidence_reference=excluded.evidence_reference,updated_at=now(),
+set issue_type=excluded.issue_type,
+    field_name=excluded.field_name,
+    evidence_reference=excluded.evidence_reference,
+    updated_at=now(),
     status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
 
 insert into public.data_reconciliation_reviews
