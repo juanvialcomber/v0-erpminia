@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getLaudusReadOnly, listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import { syncLegalContractInvoiceTraces } from '@/lib/legal/contract-invoice-trace-sync';
+import { recoverOpenInvoiceTraces } from '@/lib/integrations/laudus/native-invoice-trace';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -360,6 +361,9 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
     const missingInvoiceRecovery = await recoverMissingPurchaseInvoices(organizationId, db);
     apiCalls += Number(missingInvoiceRecovery.apiCalls || 0);
 
+    const openInvoiceTraceRecovery = await recoverOpenInvoiceTraces(db, organizationId);
+    apiCalls += Number(openInvoiceTraceRecovery.apiCalls || 0);
+
     const refresh = await db.rpc('motil_refresh_laudus_financial_staging', {
       p_organization_id: organizationId,
     });
@@ -391,6 +395,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         paymentAllocations: flattenedPayments.length,
         paymentCoverage: 'verified_v2_list',
         accountsPayableDerived: true,
+        openInvoiceTraceRecovery,
         legalTraceRecovery,
         legalTraceRecoveryError,
         futureIssuedDateIncidents: futureDateIncidents.length,
@@ -413,6 +418,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       accountsPayableDerived: true,
       futureIssuedDateIncidents: futureDateIncidents.length,
       recuperacionFacturasFaltantes: missingInvoiceRecovery,
+      recuperacionTrazabilidadFacturasAbiertas: openInvoiceTraceRecovery,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
