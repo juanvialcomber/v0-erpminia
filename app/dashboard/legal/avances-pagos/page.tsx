@@ -90,7 +90,7 @@ export default function ContractPaymentsPage(){
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Avances y pagos</h1>
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Primero muestra qué significa cada estado y qué debe hacer Legal. Avance físico, facturación, retención y pago se mantienen separados.</p>
-      <p className="mt-2 text-xs text-muted-foreground">Cobertura contractual: IO-01…IO-09 y EP-01…EP-06. Detalle estructurado disponible en IO-01…IO-09, EP-02 y EP-03; el resto queda en resumen hasta contar con evidencia de detalle.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Cobertura contractual: IO-01…IO-09 y EP-01…EP-06. Detalle estructurado disponible en IO-01…IO-09, EP-02 y EP-03. EP-01, EP-04, EP-05 y EP-06 permanecen en resumen hasta contar con evidencia de hitos/facturas.</p>
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
       <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
