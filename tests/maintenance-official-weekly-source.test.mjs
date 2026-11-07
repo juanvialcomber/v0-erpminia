@@ -15,13 +15,12 @@ test('programas semanales tienen una sola version activa por faena y conservan f
  assert.match(migration,/reconciliation_status/);
  assert.match(migration,/on delete restrict/);
 });
-test('work program remains evidence and does not create or close OT',()=>{
+test('official weekly program stays source evidence while import auto-creates eligible OTs',()=>{
  assert.match(route,/requireModuleAccess\(request, MODULE_KEYS.MANT_OPERACIONES\)/);
  assert.match(route,/\.eq\('organization_id',context.organizationId\)/);
  assert.match(route,/\.eq\('is_current',true\)/);
- assert.doesNotMatch(route,/\.insert\(|\.upsert\(|\.update\(/);
- assert.match(screen,/no crea ni cierra órdenes automáticamente/i);
- assert.match(screen,/review/);
+ assert.match(screen,/genera su OT automáticamente/i);
+ assert.match(screen,/cierre y la aprobación siguen siendo humanos/i);
 });
 test('official program is in Ariel current planning surface',()=>{
  assert.match(planning,/OfficialWeeklyWorkPlan/);
@@ -36,4 +35,19 @@ test('urgencias oficiales preservan filas P1/P2 aunque falte vinculación de equ
  assert.match(route,/pending:priorityRows\.filter\(r=>!r\.matched\)/);
  assert.match(screen,/Prioridades del maestro/);
  assert.match(screen,/Pendientes de vincular/);
+});
+
+
+test('weekly import creates only current/future, matched and assigned OTs with source linkage',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/item\.planned_date<today/);
+ assert.match(importer,/reconciliation_status!=='matched'/);
+ assert.match(importer,/peopleByName/);
+ assert.match(importer,/historicalByLabel/);
+ assert.match(importer,/programas semanales oficiales previamente conciliados/);
+ assert.match(importer,/idempotency-key',item\.id/);
+ assert.match(importer,/linked_work_order_id/);
+ assert.match(importer,/official_weekly_program_imported/);
+ assert.match(importer,/source_sha256:sha256/);
+ assert.match(importer,/status\.includes\('terminado'\)/);
 });
