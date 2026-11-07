@@ -247,7 +247,6 @@ export async function GET(request: NextRequest) {
 
     const currentEmail = String(currentProfile?.email || '').trim().toLowerCase();
     const isElias = currentEmail === 'eliasfernandez@lapatagua.cl';
-    const isAriel = currentEmail === 'ariellopez@lapatagua.cl';
 
     const [{ data: currentCargo }, { data: currentPerson }] = await Promise.all([
       currentProfile?.cargo_id
@@ -265,6 +264,7 @@ export async function GET(request: NextRequest) {
     const currentCargoName = String(currentCargo?.name || '').trim().toUpperCase();
     const currentPersonId = currentPerson?.id || null;
     const isBodegaOwner = currentCargoName === 'JEFE BODEGA';
+    const isLegalOwner = currentCargoName === 'RESPONSABLE DE LEGAL' || isElias;
 
     const ownerTasksSource = await querySource(
       'Mis alertas operacionales',
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
         ),
         querySource(
           'Legal y cumplimiento',
-          () => isElias
+          () => isLegalOwner
             ? getLegalComplianceOverview(context.organizationId) as Promise<LegalComplianceOverview>
             : Promise.resolve({ contracts_pending_review: [], expiring_contracts: [], expiring_documents: [] } as LegalComplianceOverview),
           { contracts_pending_review: [], expiring_contracts: [], expiring_documents: [] } as LegalComplianceOverview,
@@ -393,10 +393,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (isElias || isAriel) {
+    if (isLegalOwner) {
       for (const [contractNumber, sourceMeta] of Object.entries(LEGAL_CONTRACT_SOURCE_META)) {
         if (!sourceMeta?.endDate) continue;
-        if (isAriel && !contractNumber.startsWith('IO-')) continue;
 
         const progress = sourceContractProgress(contractNumber);
         if (!progress.detailed || progress.progressRatio === null || progress.progressRatio >= 0.999) continue;
