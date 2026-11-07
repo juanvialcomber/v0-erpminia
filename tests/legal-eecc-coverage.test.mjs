@@ -16,7 +16,7 @@ test('EECC coverage is explicitly scoped to the current compliance month',()=>{
  assert.match(api,/eq\('compliance_period',period\)/);
  assert.match(api,/without_folder:entries\.filter/);
  assert.match(api,/in_review:/);
- assert.match(home,/coverage\?\.summary\.in_review/);
+ assert.match(home,/coverage\.summary\.in_review/);
 });
 
 
