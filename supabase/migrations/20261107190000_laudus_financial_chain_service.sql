@@ -54,6 +54,7 @@ select
   end as estado_origen,
   case
     when p.payment_status='credit_adjustment' then 'ajuste_credito'
+    when i.total_amount is null then 'factura_sin_monto_fuente'
     when ap.quality_status='verificado'
       and abs(coalesce(ap.outstanding_amount,0)-coalesce(p.outstanding_amount,0))<=0.01
       then 'cxp_pago_saldo_conciliados'
@@ -62,6 +63,7 @@ select
   end as estado_financiero,
   case
     when p.payment_status='credit_adjustment' then 'ajuste_credito'
+    when i.total_amount is null then 'requiere_reparar_factura'
     when ap.quality_status<>'verificado' or ap.quality_status is null then 'requiere_revision_financiera'
     when abs(coalesce(ap.outstanding_amount,0)-coalesce(p.outstanding_amount,0))>0.01 then 'conflicto_saldo'
     when coalesce(t.trace_rows,0)=0 then 'finanzas_conciliadas_sin_origen'
