@@ -43,6 +43,8 @@ test('weekly import creates only current/future, matched and assigned OTs with s
  assert.match(importer,/item\.planned_date<today/);
  assert.match(importer,/reconciliation_status!=='matched'/);
  assert.match(importer,/peopleByName/);
+ assert.match(importer,/historicalByLabel/);
+ assert.match(importer,/programas semanales oficiales previamente conciliados/);
  assert.match(importer,/idempotency-key',item\.id/);
  assert.match(importer,/linked_work_order_id/);
  assert.match(importer,/official_weekly_program_imported/);
