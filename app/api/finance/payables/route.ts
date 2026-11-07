@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
           context.supabase
             .from('profiles')
             .select('id,email')
+            .eq('organization_id', context.organizationId)
             .ilike('email', 'eliasfernandez@lapatagua.cl')
             .maybeSingle(),
         ]);
