@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireEeccProfileManager } from '@/lib/api/eecc-profile-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const runtime = 'nodejs';
@@ -16,19 +16,11 @@ type XlsxModule = {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get auth context
-    const auth = await resolveAuthContext(request);
-    if (!auth?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const manager = await requireEeccProfileManager(request);
+    if (!manager.authorized || !manager.auth.user || !manager.auth.organizationId) {
+      return manager.response;
     }
-
-    // Check if user is admin or manager
-    if (!['superadmin', 'admin', 'manager'].includes(auth.role || '')) {
-      return NextResponse.json(
-        { error: 'Forbidden: Only admins and managers can import EECC' },
-        { status: 403 }
-      );
-    }
+    const auth = manager.auth;
 
     // Get form data with file
     const formData = await request.formData();
@@ -65,21 +57,7 @@ export async function POST(request: NextRequest) {
     // Get organization ID from user's org
     const supabase = getSupabaseServerClient();
 
-    // Get user's organization
-    const { data: userOrg, error: orgError } = await supabase
-      .from('user_roles')
-      .select('organization_id')
-      .eq('user_id', auth.user.id)
-      .single();
-
-    if (orgError || !userOrg?.organization_id) {
-      return NextResponse.json(
-        { error: 'User has no organization' },
-        { status: 400 }
-      );
-    }
-
-    const organizationId = userOrg.organization_id;
+    const organizationId = auth.organizationId;
 
     // Parse and validate rows
     const eeccRecords: Array<{
