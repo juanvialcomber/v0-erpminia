@@ -60,6 +60,7 @@ test('fixed asset review records human decisions without canonical mutation', as
   assert.match(ui, /Confirmar candidato/);
   assert.match(ui, /Rechazar/);
   assert.match(ui, /Diferir/);
+  assert.match(ui, /La identidad operacional la resuelve Mantenimiento/);
   assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
 });
 
@@ -70,8 +71,10 @@ test('Maintenance owns operational identity review without financial write acces
   const inbox = await readFile(inboxRoutePath, 'utf8');
 
   assert.match(page, /LaudusFixedAssetReview area="maintenance"/);
-  assert.match(route, /requireReviewAccess/);
+  assert.match(route, /requireReviewReadAccess/);
   assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
+  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES, true\)/);
+  assert.match(route, /canDecide: false/);
   assert.match(route, /data_reconciliation_reviews/);
   assert.match(route, /laudus:fixed_asset_identity:/);
   assert.match(inbox, /kind === 'laudus-fixed-asset'/);
