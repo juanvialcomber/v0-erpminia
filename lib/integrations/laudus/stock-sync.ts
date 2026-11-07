@@ -1,6 +1,7 @@
 import { getLaudusStockSnapshot, LaudusApiError } from '@/lib/integrations/laudus/client';
 import { chunkLaudusStockRows, toLaudusStockStageRows } from '@/lib/integrations/laudus/inventory';
 import { markLaudusSyncFailure, markLaudusSyncRunning, markLaudusSyncSuccess, retryPolicy } from '@/lib/integrations/laudus/sync-policy';
+import { syncNegativeLaudusKardex } from '@/lib/integrations/laudus/negative-kardex-sync';
 
 type WarehouseRow = {
   external_id: string;
@@ -150,6 +151,17 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
     throw error;
   }
 
+  let negativeKardex: Record<string, unknown> = { status: 'skipped', reason: 'not_run' };
+  try {
+    negativeKardex = await syncNegativeLaudusKardex(organizationId, supabase);
+  } catch (error) {
+    console.error('[laudus-stock-daily] negative Kardex recovery failed', {
+      organizationId,
+      message: error instanceof Error ? error.message : 'unknown',
+    });
+    negativeKardex = { status: 'failed' };
+  }
+
   return {
     status: 'completed' as const,
     organizationId,
@@ -162,6 +174,7 @@ export async function syncLaudusStockDaily(organizationId: string, supabase: any
     unchanged,
     productResolved,
     productUnresolved,
+    negativeKardex,
     canonicalInventoryMutated: false,
     laudusMutated: false,
   };

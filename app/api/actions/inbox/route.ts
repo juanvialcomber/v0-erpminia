@@ -99,6 +99,10 @@ function resolveTaskRoute(task: RoleTask, reviewRoutes: Map<string, ReviewRouteR
     }
   }
 
+  if (kind === 'laudus-fixed-asset' && rawId) {
+    return '/dashboard/mantenimiento/activos-laudus';
+  }
+
   if (kind === 'work_order' && rawId && rest.length === 0 && UUID_PATTERN.test(rawId)) {
     return `/dashboard/mantenimiento/ordenes-trabajo/${rawId}`;
   }

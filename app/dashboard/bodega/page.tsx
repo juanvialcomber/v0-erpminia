@@ -17,6 +17,7 @@ import { DataReceptionReadiness } from '@/components/data/data-reception-readine
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
 import { LaudusInventoryReconciliationQueue } from '@/components/integrations/laudus-inventory-reconciliation-queue';
+import { ProcurementReceiptInbox } from '@/components/procurement/procurement-receipt-inbox';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -109,6 +110,8 @@ export default function BodegaPage() {
     {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
+
+    {!negativeStockMode ? <ProcurementReceiptInbox /> : null}
 
     {!negativeStockMode ? <DataReceptionReadiness
       description="Bodega está preparada para recibir stock y movimientos externos sin reemplazar saldos automáticamente. Cualquier diferencia entre fuentes quedará en conciliación."

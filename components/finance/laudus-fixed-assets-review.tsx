@@ -21,6 +21,12 @@ type SourceRow = {
 
 type ReviewRow = SourceRow & {
   reviewTier: { key: string; label: string; rank: number };
+  triage?: {
+    triage_bucket?: string | null;
+    responsible_cargo_name?: string | null;
+    human_action_now?: boolean | null;
+    next_action?: string | null;
+  } | null;
 };
 
 type MatchedRow = SourceRow & {
@@ -43,12 +49,16 @@ type Response = {
     conflict: number;
     ignored: number;
     activePending: number;
+    humanActionsNow: number;
+    classifiedBacklog: number;
+    unowned: number;
     activePendingWithSerial: number;
     activePendingWithModel: number;
     retiredPending: number;
     acquisitionCostAvailable: number;
   };
   reviewRows: ReviewRow[];
+  classifiedRows: ReviewRow[];
   matchedRows: MatchedRow[];
   semantics: Record<string,string>;
 };
@@ -89,8 +99,8 @@ export function LaudusFixedAssetsReview(){
 
     <div className="grid gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={Link2} label="Vinculados" value={number(data.summary.matched)} detail="Con contraparte canónica verificada" />
-      <Metric icon={ScanSearch} label="Pendientes sin retiro" value={number(data.summary.activePending)} detail={number(data.summary.activePendingWithSerial)+' con serie · '+number(data.summary.activePendingWithModel)+' con marca/modelo'} />
-      <Metric icon={CircleAlert} label="Conflictos" value={number(data.summary.conflict)} detail="Requieren decisión humana; no se sobreescriben" />
+      <Metric icon={ScanSearch} label="Acciones humanas" value={number(data.summary.humanActionsNow)} detail="Sólo decisiones inmediatas de identidad" />
+      <Metric icon={CircleAlert} label="Backlog clasificado" value={number(data.summary.classifiedBacklog)} detail={data.summary.unowned === 0 ? 'Todos con responsable y próxima acción' : number(data.summary.unowned)+' sin responsable'} />
       <Metric icon={Database} label="Pendientes históricos" value={number(data.summary.retiredPending)} detail="Con retiro informado en la fuente" />
     </div>
 
@@ -107,7 +117,7 @@ export function LaudusFixedAssetsReview(){
             <h3 className="text-sm font-semibold">Prioridad de conciliación</h3>
             <p className="mt-1 text-xs text-muted-foreground">Primero serie física; después marca/modelo; finalmente referencia documental.</p>
           </div>
-          <Badge variant="secondary">{number(data.summary.activePending)} sin retiro por revisar</Badge>
+          <Badge variant="secondary">{number(data.summary.humanActionsNow)} requieren decisión ahora</Badge>
         </div>
         <div className="divide-y border-t">
           {data.reviewRows.slice(0,12).map((row)=>{
@@ -123,6 +133,26 @@ export function LaudusFixedAssetsReview(){
           })}
         </div>
       </div>
+    ) : null}
+
+    {data.classifiedRows?.length ? (
+      <details className="border-t">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
+          Ver backlog clasificado ({number(data.summary.classifiedBacklog)})
+        </summary>
+        <div className="divide-y border-t">
+          {data.classifiedRows.slice(0,12).map((row)=>(
+            <div key={row.external_id} className="grid gap-2 px-4 py-3 lg:grid-cols-[minmax(0,1.5fr)_180px_minmax(0,1fr)] lg:items-center">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{row.name||'Activo fijo sin nombre'}</p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">Clasificado; no requiere decisión individual ahora.</p>
+              </div>
+              <Badge variant="outline">{row.triage?.responsible_cargo_name || 'Responsable asignado'}</Badge>
+              <p className="truncate text-xs text-muted-foreground lg:text-right">{row.triage?.next_action || 'Enriquecimiento pendiente'}</p>
+            </div>
+          ))}
+        </div>
+      </details>
     ) : null}
 
     {data.matchedRows.length ? (
