@@ -88,3 +88,12 @@ test('known stock cron provides a budgeted fallback for accounting backfill',()=
   assert.match(stockRoute,/after\(async \(\) =>/);
   assert.match(stockRoute,/accounting backfill fallback completed/);
 });
+
+
+test('accounting backfill preserves multiple flattened lines for the same journal entry',()=>{
+  assert.match(backfill,/flatLineId = row\.lines_lineId/);
+  assert.match(backfill,/flatAccountNumber = row\.lines_account_accountNumber/);
+  assert.match(backfill,/lineMap\.set\(lineKey\(normalizedFlatLine\), normalizedFlatLine\)/);
+  assert.match(backfill,/lines: \[\.\.\.lineMap\.values\(\)\]/);
+  assert.doesNotMatch(backfill,/byId\.set\(id, \{ \.\.\.row, lines \}\)/);
+});
