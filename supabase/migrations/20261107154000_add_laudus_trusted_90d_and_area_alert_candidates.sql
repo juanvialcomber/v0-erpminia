@@ -56,7 +56,7 @@ where reconciliation_state='aligned'
   and laudus_synced_at >= now()-interval '90 days'
   and motil_updated_at >= now()-interval '90 days';
 
-create or replace view public.laudus_area_alert_candidates_90d_v1 as
+create or replace view public.laudus_area_alert_candidates_v1 as
 with candidates as (
   select organization_id,'finance'::text area,'Gerente de Finanzas'::text owner_cargo,
          'laudus:finance:overdue_trusted'::text alert_key,'warning'::text severity,
@@ -147,3 +147,8 @@ with candidates as (
   group by organization_id
 )
 select * from candidates where exception_count>0;
+
+
+-- Alias de compatibilidad para consumidores existentes; la vista principal ya no limita Finanzas a 90 dias.
+create or replace view public.laudus_area_alert_candidates_90d_v1 as
+select * from public.laudus_area_alert_candidates_v1;
