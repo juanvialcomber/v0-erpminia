@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
+import { getLaudusReadOnly, listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
 import { syncLegalContractInvoiceTraces } from '@/lib/legal/contract-invoice-trace-sync';
 import {
@@ -25,6 +25,9 @@ const PURCHASE_INVOICE_FIELDS = [
   'warehouse.warehouseId','warehouse.name',
   'totals.total',
 ] as const;
+const MAX_MISSING_INVOICE_RECOVERY_PER_RUN = 12;
+const MIN_LAUDUS_API_BUDGET_RESERVE = 200;
+
 const PURCHASE_PAYMENT_FIELDS = [
   'paymentId','issuedDate','dueDate','document','deposited',
   'paymentType.code','paymentType.description',
@@ -140,6 +143,128 @@ async function listAllSuppliers() {
   return { rows, calls, partial };
 }
 
+
+function purchaseInvoiceDetailRows(detail: JsonRow): JsonRow[] {
+  const base = {
+    purchaseInvoiceId: detail.purchaseInvoiceId ?? detail.id ?? null,
+    docNumber: detail.docNumber ?? null,
+    issuedDate: detail.issuedDate ?? null,
+    dueDate: detail.dueDate ?? null,
+    supplier_supplierId: detail.supplier?.supplierId ?? null,
+    supplier_name: detail.supplier?.name ?? null,
+    supplier_legalName: detail.supplier?.legalName ?? null,
+    supplier_VATId: detail.supplier?.VATId ?? null,
+    warehouse_warehouseId: detail.warehouse?.warehouseId ?? null,
+    warehouse_name: detail.warehouse?.name ?? null,
+  };
+
+  const items = Array.isArray(detail.items) ? detail.items : [];
+  if (!items.length) return [base];
+
+  return items.map((item: JsonRow) => ({
+    ...base,
+    items_itemId: item.itemId ?? null,
+    items_product_productId: item.product?.productId ?? null,
+    items_product_sku: item.product?.sku ?? null,
+    items_product_description: item.product?.description ?? null,
+    items_product_unitOfMeasure: item.product?.unitOfMeasure ?? null,
+    items_quantity: item.quantity ?? null,
+    items_unitCost: item.unitCost ?? null,
+  }));
+}
+
+async function recoverMissingPurchaseInvoices(organizationId: string, db: SupabaseClient) {
+  const budgetResult = await db
+    .from('laudus_api_budget_service_v1')
+    .select('tracked_remaining')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+
+  const remaining = Number(budgetResult.data?.tracked_remaining ?? 0);
+  const availableForRecovery = Math.max(0, remaining - MIN_LAUDUS_API_BUDGET_RESERVE);
+  const limit = Math.min(MAX_MISSING_INVOICE_RECOVERY_PER_RUN, availableForRecovery);
+
+  if (limit <= 0) {
+    return {
+      estado: 'omitido_por_presupuesto',
+      candidatos: 0,
+      recuperadas: 0,
+      errores: 0,
+      apiCalls: 0,
+      presupuestoRestante: remaining,
+    };
+  }
+
+  const candidatesResult = await db
+    .from('laudus_missing_purchase_invoice_recovery_candidates_v1')
+    .select('purchase_invoice_external_id,recovery_class')
+    .eq('organization_id', organizationId)
+    .order('recovery_priority', { ascending: true })
+    .order('last_reference_synced_at', { ascending: false })
+    .limit(limit);
+
+  if (candidatesResult.error) {
+    return {
+      estado: 'cola_no_disponible',
+      candidatos: 0,
+      recuperadas: 0,
+      errores: 1,
+      apiCalls: 0,
+      presupuestoRestante: remaining,
+    };
+  }
+
+  const candidates = candidatesResult.data || [];
+  let apiCalls = 0;
+  let recovered = 0;
+  let errors = 0;
+  const porClase: Record<string, number> = {};
+
+  for (const candidate of candidates) {
+    const externalId = String(candidate.purchase_invoice_external_id || '').trim();
+    if (!/^\d{1,12}$/.test(externalId)) {
+      errors += 1;
+      continue;
+    }
+
+    try {
+      const detail = await getLaudusReadOnly('/purchases/invoices/' + externalId);
+      apiCalls += 1;
+      if (!detail || typeof detail !== 'object' || Array.isArray(detail)) {
+        errors += 1;
+        continue;
+      }
+
+      const rows = purchaseInvoiceDetailRows(detail as JsonRow);
+      const ingest = await db.rpc('motil_ingest_laudus_invoice_rows', {
+        p_organization_id: organizationId,
+        p_rows: rows,
+      });
+      if (ingest.error) {
+        errors += 1;
+        continue;
+      }
+
+      recovered += 1;
+      const clase = String(candidate.recovery_class || 'sin_clasificar');
+      porClase[clase] = (porClase[clase] || 0) + 1;
+    } catch {
+      apiCalls += 1;
+      errors += 1;
+    }
+  }
+
+  return {
+    estado: errors > 0 ? 'parcial' : 'completado',
+    candidatos: candidates.length,
+    recuperadas: recovered,
+    errores: errors,
+    apiCalls,
+    porClase,
+    presupuestoRestante: remaining,
+  };
+}
+
 async function ingestChunks(
   db: SupabaseClient,
   rpc: string,
@@ -232,6 +357,9 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       flattenedPayments,
     );
 
+    const missingInvoiceRecovery = await recoverMissingPurchaseInvoices(organizationId, db);
+    apiCalls += Number(missingInvoiceRecovery.apiCalls || 0);
+
     const refresh = await db.rpc('motil_refresh_laudus_financial_staging', {
       p_organization_id: organizationId,
     });
@@ -267,6 +395,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         legalTraceRecoveryError,
         futureIssuedDateIncidents: futureDateIncidents.length,
         futureIssuedDateQuality: quality,
+        recuperacionFacturasFaltantes: missingInvoiceRecovery,
       },
     });
 
@@ -283,6 +412,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
       paymentCoverage: 'verified_v2_list',
       accountsPayableDerived: true,
       futureIssuedDateIncidents: futureDateIncidents.length,
+      recuperacionFacturasFaltantes: missingInvoiceRecovery,
     };
   } catch (error) {
     await markLaudusSyncFailure(db, organizationId, 'procurement', error, { apiCalls });
