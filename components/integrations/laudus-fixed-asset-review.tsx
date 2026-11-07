@@ -175,10 +175,10 @@ export function LaudusFixedAssetReview() {
             Finanzas
           </Link>
         </Button>
-        <LaudusSourceMark state={isLoading ? 'syncing' : error ? 'review' : 'connected'} className="mb-2" />
-        <h1 className="text-2xl font-semibold tracking-tight">Revisión de activos Laudus</h1>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">MOTIL · Conciliación de activos</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Revisar identidad de activos</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-          Prioriza candidatos por evidencia de identidad. Esta vista no enlaza activos automáticamente ni modifica Laudus o el maestro MOTIL.
+          MOTIL prioriza candidatos por evidencia de identidad y deja la decisión final a Finanzas. La fuente contable se usa sólo como respaldo.
         </p>
       </section>
 
@@ -190,7 +190,7 @@ export function LaudusFixedAssetReview() {
 
       <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ['Activos Laudus', data?.summary.laudusAssets],
+          ['Registros financieros', data?.summary.laudusAssets],
           ['Enlazados a MOTIL', data ? `${data.summary.linkedToMotil} / ${data.summary.laudusAssets}` : undefined],
           ['Candidatos fuertes', data?.summary.strongIdentifierCandidates],
           ['Revisiones registradas', data?.summary.reviewsRecorded],
@@ -270,7 +270,7 @@ export function LaudusFixedAssetReview() {
               </div>
               <h2 className="mt-2 text-lg font-semibold">{field(current.laudus.name)}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Laudus · adquirido {date(current.laudus.acquisitionDate)}
+                Respaldo financiero · adquirido {date(current.laudus.acquisitionDate)}
                 {current.laudus.supplierName ? ` · ${current.laudus.supplierName}` : ''}
               </p>
             </div>
@@ -284,7 +284,7 @@ export function LaudusFixedAssetReview() {
             <div className="bg-card p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Database className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-medium">Laudus</p>
+                <p className="text-sm font-medium">Fuente financiera</p>
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div><dt className="text-xs text-muted-foreground">Nombre</dt><dd className="mt-1">{field(current.laudus.name)}</dd></div>
@@ -311,7 +311,7 @@ export function LaudusFixedAssetReview() {
           <div className="border-t px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Decisión</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Registra una decisión trazable. Confirmar no modifica automáticamente el activo canónico ni escribe en Laudus.
+              Registra una decisión trazable. Confirmar registra la decisión de conciliación; no modifica automáticamente el activo operacional ni la fuente financiera.
             </p>
             <Input
               value={rationale}
@@ -364,7 +364,7 @@ export function LaudusFixedAssetReview() {
               ) : null}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              La evidencia ayuda a priorizar la revisión, pero no confirma identidad por sí sola. No se modifica el activo canónico ni Laudus desde esta pantalla.
+              La evidencia ayuda a priorizar la revisión, pero no confirma identidad por sí sola. No se modifica automáticamente el activo operacional ni la fuente financiera desde esta pantalla.
             </p>
           </div>
         </section>
