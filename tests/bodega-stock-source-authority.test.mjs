@@ -3,20 +3,23 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync(
-  new URL('../supabase/migrations/20261029134500_bodega_stock_source_authority_gate.sql', import.meta.url),
+  new URL('../supabase/migrations/20261029152000_bodega_relative_stock_authority.sql', import.meta.url),
   'utf8',
 );
 
-test('Bodega authority gate makes Laudus primary only when no newer unresolved source evidence exists', () => {
+test('Bodega authority gate uses the newest trustworthy stock source', () => {
   assert.match(migration, /laudus_primary/);
-  assert.match(migration, /review_laudus_stale/);
+  assert.doesNotMatch(migration, /review_laudus_stale/);
+  assert.match(migration, /motil_primary/);
+  assert.match(migration, /latest_motil_stock_update/);
+  assert.match(migration, /latest_laudus_stock_sync >= s\.latest_motil_stock_update/);
   assert.match(migration, /review_official_email/);
   assert.match(migration, /review_whatsapp_evidence/);
   assert.match(migration, /motil_email_source_manifest/);
   assert.match(migration, /motil_whatsapp_messages/);
   assert.match(migration, /m\.domain = 'warehouse'/);
   assert.doesNotMatch(migration, /m\.domain = 'production_stock'/);
-  assert.match(migration, /Mineral\/production stock is excluded from this authority domain/);
+  assert.match(migration, /Mineral\/production stock is excluded/);
   assert.match(migration, /ingest_state/);
   assert.match(migration, /latest_email_stock_cutoff/);
   assert.match(migration, /whatsapp_stock_evidence_since_laudus/);
