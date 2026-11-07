@@ -39,12 +39,19 @@ export default function LegalContractorDocumentsPage() {
             Verifica que cada proveedor haya cargado la documentación correspondiente al mes en curso.
           </p>
         </div>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/dashboard/documentos-gestion/eecc">
-            <UserRoundCog className="mr-2 h-4 w-4" />
-            Gestionar proveedores
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/compras/proveedores-360">
+              Proveedor 360
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/dashboard/documentos-gestion/eecc">
+              <UserRoundCog className="mr-2 h-4 w-4" />
+              Gestionar proveedores
+            </Link>
+          </Button>
+        </div>
       </header>
 
       {error ? (
