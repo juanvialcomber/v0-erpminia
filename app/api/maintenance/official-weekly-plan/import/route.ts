@@ -150,25 +150,31 @@ export async function POST(request:NextRequest){
   }).select('id,mine,week_start,week_end,status').single();
   if(sourceError)throw sourceError;
 
-  const [{data:assets,error:assetError},{data:people,error:peopleError}]=await Promise.all([
+  const [{data:assets,error:assetError},{data:people,error:peopleError},{data:historicalLinks,error:historicalError}]=await Promise.all([
    context.supabase.from('maintenance_canonical_assets_v1').select('id,asset_code,name,location').eq('organization_id',context.organizationId).eq('is_active',true).limit(5000),
    context.supabase.from('people').select('id,full_name,role_title,profile_id').eq('organization_id',context.organizationId).eq('employment_status','active').not('profile_id','is',null).limit(2000),
+   context.supabase.from('planning_weekly_work_items').select('asset_label,canonical_asset_id').eq('organization_id',context.organizationId).eq('reconciliation_status','matched').not('canonical_asset_id','is',null).limit(5000),
   ]);
-  if(assetError)throw assetError;if(peopleError)throw peopleError;
+  if(assetError)throw assetError;if(peopleError)throw peopleError;if(historicalError)throw historicalError;
   const byName=new Map<string,Array<any>>();
   for(const asset of assets||[]){
    for(const key of [normalize(asset.name),normalize(asset.asset_code)].filter(Boolean)){
     const list=byName.get(key)||[];list.push(asset);byName.set(key,list);
    }
   }
+  const historicalByLabel=new Map<string,Set<string>>();
+  for(const row of historicalLinks||[]){const key=normalize(row.asset_label);if(!key||!row.canonical_asset_id)continue;const ids=historicalByLabel.get(key)||new Set<string>();ids.add(String(row.canonical_asset_id));historicalByLabel.set(key,ids);}
   const peopleByName=new Map<string,Array<any>>();
   for(const person of people||[]){const key=normalize(person.full_name);const list=peopleByName.get(key)||[];list.push(person);peopleByName.set(key,list);}
   const rows=program.items.map(item=>{
-   const matches=byName.get(normalize(item.asset_label))||[];
-   const exact=matches.length===1?matches[0]:null;
+   const labelKey=normalize(item.asset_label);
+   const matches=byName.get(labelKey)||[];
+   const historicalIds=Array.from(historicalByLabel.get(labelKey)||[]);
+   const exact=matches.length===1?matches[0]:historicalIds.length===1?assets?.find(asset=>asset.id===historicalIds[0])||null:null;
+   const ambiguous=matches.length>1||historicalIds.length>1;
    return {...item,organization_id:context.organizationId,source_id:source.id,canonical_asset_id:exact?.id||null,
-    reconciliation_status:exact?'matched':matches.length>1?'ambiguous':'review_required',
-    review_reason:exact?null:matches.length>1?'Más de un equipo coincide con la etiqueta fuente':'Equipo fuente no coincide exactamente con maestro canónico'};
+    reconciliation_status:exact?'matched':ambiguous?'ambiguous':'review_required',
+    review_reason:exact?(matches.length===1?null:'Vínculo reutilizado desde programas semanales oficiales previamente conciliados'):ambiguous?'Más de un equipo coincide con la etiqueta fuente':'Equipo fuente no coincide exactamente con maestro canónico'};
   });
   let insertedItems:any[]=[];
   if(rows.length){const {data,error:itemError}=await context.supabase.from('planning_weekly_work_items').insert(rows).select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,materials,reconciliation_status');if(itemError)throw itemError;insertedItems=data||[];}
