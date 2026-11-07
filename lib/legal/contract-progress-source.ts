@@ -6,11 +6,11 @@ export type LegalProgressInvoiceSource = {
 };
 
 export type LegalProgressMilestoneSource = {
-  contractNumber: 'IO-01' | 'IO-02';
+  contractNumber: 'IO-01' | 'IO-02' | 'IO-03' | 'IO-04' | 'IO-05' | 'IO-06' | 'IO-07' | 'IO-08' | 'IO-09';
   sequence: number;
   title: string;
   purchaseOrderNumber: string;
-  currency: 'CLP';
+  currency: 'CLP' | 'USD';
   totalAmount: number;
   progressRatio: number;
   executedAmount: number;
@@ -134,5 +134,108 @@ export const LEGAL_PROGRESS_MILESTONES: LegalProgressMilestoneSource[] = [
     contractNumber: 'IO-02', sequence: 8, title: 'Montaje de chancador terciario mecánico estructural', purchaseOrderNumber: '29513',
     currency: 'CLP', totalAmount: 55775000, progressRatio: 0, executedAmount: 0, invoicedAmount: 0,
     pendingToInvoice: 55775000, invoices: [], sourceSheet: 'Control Contrato RPR Fase 1 Mon', sourceRow: 153,
+  },,
+  {
+    contractNumber: 'IO-03', sequence: 1, title: 'Suministro equipos Molino 9 x 12 N° 1 y 2', purchaseOrderNumber: '27602',
+    currency: 'CLP', totalAmount: 149500000, progressRatio: 0.2, executedAmount: 29900000,
+    invoicedAmount: 0, pendingToInvoice: 119600000, invoices: [],
+    sourceSheet: 'RPR Suministro Ss Leasing', sourceRow: 18,
   },
+  {
+    contractNumber: 'IO-03', sequence: 2, title: 'Suministro cintas transportadoras 24 pies', purchaseOrderNumber: '27604',
+    currency: 'CLP', totalAmount: 299460000, progressRatio: 0.2, executedAmount: 59892000,
+    invoicedAmount: 0, pendingToInvoice: 239568000, invoices: [],
+    sourceSheet: 'RPR Suministro Ss Leasing', sourceRow: 36,
+  },
+  {
+    contractNumber: 'IO-04', sequence: 1, title: 'Construcción Galpón 20x42x6 - cubierta techo y lateral', purchaseOrderNumber: '27849',
+    currency: 'CLP', totalAmount: 105000000, progressRatio: 0.35, executedAmount: 36750000,
+    invoicedAmount: 36750000, pendingToInvoice: 68250000,
+    invoices: [{ docNumber: '494', sourceAmount: 36750000, retentionAmount: 0, sourceText: 'F-494' }],
+    sourceSheet: 'Control SL Ingeniería', sourceRow: 13,
+  },
+  {
+    contractNumber: 'IO-05', sequence: 1, title: 'Base Bodega - conjunto de órdenes de compra', purchaseOrderNumber: '27868 / 28099 / 28993 / 28995',
+    currency: 'CLP', totalAmount: 107311515.872, progressRatio: 1, executedAmount: 107311515.872,
+    invoicedAmount: 107311516, pendingToInvoice: -0.12800000607967377,
+    invoices: [
+      { docNumber: '2', sourceAmount: 10000000, retentionAmount: 0, sourceText: 'F-2 12-05-26' },
+      { docNumber: '3', sourceAmount: 20000000, retentionAmount: 1000000, sourceText: 'F-3 26-05-26' },
+      { docNumber: '5', sourceAmount: 14900000, retentionAmount: 745000, sourceText: 'F-5 24-06-26' },
+      { docNumber: '7', sourceAmount: 26800000, retentionAmount: 1340000, sourceText: 'F-7 13-07-26' },
+      { docNumber: '8', sourceAmount: 16056227, retentionAmount: 802811.35, sourceText: 'F-8 27-07-26' },
+      { docNumber: '10', sourceAmount: 10731152, retentionAmount: 536557.6, sourceText: 'F-10 13-08-26' },
+      { docNumber: '11', sourceAmount: 8824137, retentionAmount: 441206.85, sourceText: 'F-11 04-09-26' },
+    ],
+    sourceSheet: 'Control Contrato Petra', sourceRow: 137,
+  },
+  {
+    contractNumber: 'IO-06', sequence: 1, title: 'Contrato marco eficiencia energética y descarbonización', purchaseOrderNumber: '25669 / 26770 / 27751',
+    currency: 'CLP', totalAmount: 10950000, progressRatio: 0.7857142857142857, executedAmount: 8955000,
+    invoicedAmount: 8330000, pendingToInvoice: 1995000,
+    invoices: [
+      { docNumber: '14', sourceAmount: 1817500, retentionAmount: 0, sourceText: 'F-14' },
+      { docNumber: '19', sourceAmount: 1817500, retentionAmount: 0, sourceText: 'F-19' },
+      { docNumber: '23', sourceAmount: 2325000, retentionAmount: 0, sourceText: 'F-23' },
+      { docNumber: '32', sourceAmount: 1185000, retentionAmount: 0, sourceText: 'F-32' },
+      { docNumber: '35', sourceAmount: 1185000, retentionAmount: 0, sourceText: 'F-35' },
+    ],
+    sourceSheet: 'CONTROL SERV MINERÍA y ENERGÍA ', sourceRow: 28,
+  },
+  {
+    contractNumber: 'IO-06', sequence: 2, title: 'Diagramas Unilineales Planta', purchaseOrderNumber: '28072',
+    currency: 'CLP', totalAmount: 2111611, progressRatio: 0.5, executedAmount: 1055805.5,
+    invoicedAmount: 1055805.5, pendingToInvoice: 1055805.5,
+    invoices: [{ docNumber: '34', sourceAmount: 1055805.5, retentionAmount: 0, sourceText: 'F-34' }],
+    sourceSheet: 'CONTROL SERV MINERÍA y ENERGÍA ', sourceRow: 47,
+  },
+  {
+    contractNumber: 'IO-06', sequence: 3, title: 'Normalización eléctrica faena Peumo y Don Jaime', purchaseOrderNumber: '28167',
+    currency: 'CLP', totalAmount: 14810852, progressRatio: 0.6, executedAmount: 8886511.2,
+    invoicedAmount: 8886511.4, pendingToInvoice: 5924340.8,
+    invoices: [
+      { docNumber: '36', sourceAmount: 2962170.4, retentionAmount: 0, sourceText: 'F-36' },
+      { docNumber: '38', sourceAmount: 5924341, retentionAmount: 0, sourceText: 'F-38' },
+    ],
+    sourceSheet: 'CONTROL SERV MINERÍA y ENERGÍA ', sourceRow: 66,
+  },
+  {
+    contractNumber: 'IO-06', sequence: 4, title: 'Desarrollo de ingeniería eléctrica Planta Minera La Patagua', purchaseOrderNumber: '28822',
+    currency: 'CLP', totalAmount: 18000000, progressRatio: 0.3333333333333333, executedAmount: 3600000,
+    invoicedAmount: 3600000, pendingToInvoice: 14400000,
+    invoices: [{ docNumber: '40', sourceAmount: 3600000, retentionAmount: 180000, sourceText: 'F-40' }],
+    sourceSheet: 'CONTROL SERV MINERÍA y ENERGÍA ', sourceRow: 87,
+  },
+  {
+    contractNumber: 'IO-07', sequence: 1, title: 'Levantamiento geofísico Chaparro', purchaseOrderNumber: '27091',
+    currency: 'CLP', totalAmount: 41580000, progressRatio: 0.5, executedAmount: 20790000,
+    invoicedAmount: 20790000, pendingToInvoice: 20790000, invoices: [],
+    sourceSheet: 'GEOPHYSICAL STUDIES ', sourceRow: 24,
+  },
+  {
+    contractNumber: 'IO-07', sequence: 2, title: 'Levantamiento geofísico Elsa, Ánimas, Greda, Pataguita y Mantos', purchaseOrderNumber: '28402',
+    currency: 'CLP', totalAmount: 49480000, progressRatio: 0.5, executedAmount: 24740000,
+    invoicedAmount: 24740000, pendingToInvoice: 24740000, invoices: [],
+    sourceSheet: 'GEOPHYSICAL STUDIES ', sourceRow: 52,
+  },
+  {
+    contractNumber: 'IO-08', sequence: 1, title: 'Construcción muestrera, laboratorio y baños planta', purchaseOrderNumber: '27865 / 27939 / 27940 / 27943 / 27949 / 28071',
+    currency: 'CLP', totalAmount: 93174633, progressRatio: 0.7577775811339536, executedAmount: 70605646.8713333,
+    invoicedAmount: 70604875, pendingToInvoice: 22568988.528239697,
+    invoices: [
+      { docNumber: '29', sourceAmount: 12116676, retentionAmount: 605833.8, sourceText: 'F-29' },
+      { docNumber: '30', sourceAmount: 11495059, retentionAmount: 574752.95, sourceText: 'F-30' },
+      { docNumber: '31', sourceAmount: 15721770, retentionAmount: 786088.5, sourceText: 'F-31' },
+      { docNumber: '32', sourceAmount: 19507740, retentionAmount: 975387, sourceText: 'F-32' },
+      { docNumber: '33', sourceAmount: 3415499, retentionAmount: 170774.95, sourceText: 'F-33' },
+      { docNumber: '34', sourceAmount: 8348131, retentionAmount: 417406.55, sourceText: 'F-34' },
+    ],
+    sourceSheet: 'CONSTRUCTORA 3D SPA', sourceRow: 228,
+  },
+  {
+    contractNumber: 'IO-09', sequence: 1, title: 'Chancadores cono HC300, molinos 9 x 12 y bombas', purchaseOrderNumber: '27574',
+    currency: 'USD', totalAmount: 1588826, progressRatio: 0.4, executedAmount: 635530.4,
+    invoicedAmount: 0, pendingToInvoice: 953295.6, invoices: [],
+    sourceSheet: 'SPIN TECHNOLOGIES Leasing', sourceRow: 20,
+  }
 ];
