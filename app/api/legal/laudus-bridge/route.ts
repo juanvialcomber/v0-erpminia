@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     financeBySupplier.set(key, current);
   }
 
-  const [settlementCountResult, latestSettlementResult] = await Promise.all([
+  const [settlementCountResult, latestSettlementResult, procurementHealthResult] = await Promise.all([
     context.supabase
       .from('transport_settlements')
       .select('id', { count: 'exact', head: true })
@@ -131,6 +131,12 @@ export async function GET(request: NextRequest) {
       .eq('organization_id', context.organizationId)
       .order('updated_at', { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    context.supabase
+      .from('laudus_sync_health_service_v1')
+      .select('health_status,last_success_at,freshness_observed_at,records_processed,conflicts')
+      .eq('organization_id', context.organizationId)
+      .eq('domain', 'procurement')
       .maybeSingle(),
   ]);
 
@@ -193,6 +199,13 @@ export async function GET(request: NextRequest) {
       contracts_without_laudus_supplier: items.filter((item) => !item.laudus).length,
       supplier_level_paid_amount: totalPaidSupplierLevel,
       supplier_level_outstanding_amount: totalOutstandingSupplierLevel,
+      contract_supplier_invoices: (invoiceStatuses || []).length,
+      paid_invoices: (invoiceStatuses || []).filter((row) => String(row.payment_status || '').toLowerCase() === 'paid').length,
+      partial_invoices: (invoiceStatuses || []).filter((row) => String(row.payment_status || '').toLowerCase() === 'partially_paid').length,
+      unpaid_invoices: (invoiceStatuses || []).filter((row) => ['unpaid','pending'].includes(String(row.payment_status || '').toLowerCase())).length,
+      procurement_health_status: procurementHealthResult.data?.health_status || 'unknown',
+      procurement_freshness_at: procurementHealthResult.data?.freshness_observed_at || procurementHealthResult.data?.last_success_at || null,
+      procurement_conflicts: Number(procurementHealthResult.data?.conflicts || 0),
       transport_settlements: settlementCountResult.count || 0,
       transport_latest_period_end: latestSettlementResult.data?.period_end || null,
       transport_latest_updated_at: latestSettlementResult.data?.updated_at || null,
@@ -215,8 +228,8 @@ export async function GET(request: NextRequest) {
       ],
     },
     policy: {
-      source: 'Laudus se usa como fuente financiera de solo lectura. Legal opera y decide en MOTIL.',
-      warning: 'Los montos Laudus mostrados son a nivel proveedor y no reemplazan el pagado contractual hasta vincular OC/factura.',
+      source: 'La fuente financiera ERP se usa en segundo plano y en modo solo lectura. Legal opera y decide en MOTIL.',
+      warning: 'Los montos financieros a nivel proveedor no reemplazan el pagado contractual hasta vincular OC/factura de forma verificable.',
     },
   });
 }
