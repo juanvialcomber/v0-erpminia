@@ -19,6 +19,17 @@ type AlertItem = {
   timestamp: string | null;
   actionRequired: boolean;
   actionUrl: string;
+  actionLabel?: string;
+};
+
+type PersonalOwnerTaskRow = {
+  task_key: string;
+  domain: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  evidence_summary?: string | null;
+  occurred_at?: string | null;
+  role_action?: string | null;
 };
 
 type PendingApprovalItem = {
@@ -135,6 +146,29 @@ function sourceContractDays(endDate: string | null | undefined) {
   return Math.round((target - base) / 86400000);
 }
 
+function severityFromOwnerTask(severity: PersonalOwnerTaskRow['severity']): AlertSeverity {
+  if (severity === 'critical') return 'critica';
+  if (severity === 'warning') return 'alta';
+  return 'media';
+}
+
+function ownerTaskAction(taskKey: string) {
+  const [kind, rawId] = taskKey.split(':');
+  if (kind === 'work_order' && rawId) {
+    return { label: 'Resolver OT', url: `/dashboard/mantenimiento/ordenes-trabajo/${rawId}` };
+  }
+  if (kind === 'work_order_material') {
+    return { label: 'Resolver material', url: '/dashboard/mantenimiento/ordenes-trabajo' };
+  }
+  if (kind === 'maintenance_review') {
+    return { label: 'Revisar mantenimiento', url: '/dashboard/mantenimiento' };
+  }
+  if ((kind === 'incident' || kind === 'inspection' || kind === 'risk') && rawId) {
+    return { label: kind === 'incident' ? 'Investigar incidente' : kind === 'inspection' ? 'Completar inspección' : 'Revisar riesgo', url: `/dashboard/sostenibilidad/prevencion-riesgos/acciones/${kind}/${rawId}` };
+  }
+  return { label: 'Resolver alerta', url: '/dashboard' };
+}
+
 function severityFromPriority(priority: string | null | undefined): AlertSeverity {
   const normalized = String(priority || '').toLowerCase();
   if (normalized.includes('crit')) return 'critica';
@@ -206,7 +240,7 @@ export async function GET(request: NextRequest) {
 
     const { data: currentProfile } = await context.supabase
       .from('profiles')
-      .select('email')
+      .select('email,cargo_id')
       .eq('id', context.userId)
       .eq('organization_id', context.organizationId)
       .maybeSingle();
@@ -214,6 +248,41 @@ export async function GET(request: NextRequest) {
     const currentEmail = String(currentProfile?.email || '').trim().toLowerCase();
     const isElias = currentEmail === 'eliasfernandez@lapatagua.cl';
     const isAriel = currentEmail === 'ariellopez@lapatagua.cl';
+
+    const [{ data: currentCargo }, { data: currentPerson }] = await Promise.all([
+      currentProfile?.cargo_id
+        ? context.supabase.from('cargos').select('name').eq('id', currentProfile.cargo_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      context.supabase
+        .from('people')
+        .select('id')
+        .eq('organization_id', context.organizationId)
+        .eq('profile_id', context.userId)
+        .eq('employment_status', 'active')
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const currentCargoName = String(currentCargo?.name || '').trim().toUpperCase();
+    const currentPersonId = currentPerson?.id || null;
+    const isBodegaOwner = currentCargoName === 'JEFE BODEGA';
+
+    const ownerTasksSource = await querySource(
+      'Mis alertas operacionales',
+      async () => {
+        const { data, error } = await context.supabase
+          .from('operational_task_inbox_by_user_v2')
+          .select('task_key,domain,severity,title,evidence_summary,occurred_at,role_action')
+          .eq('organization_id', context.organizationId)
+          .eq('profile_id', context.userId)
+          .eq('responsibility', 'owner')
+          .eq('visible_now', true)
+          .order('priority_score', { ascending: false })
+          .limit(50);
+        if (error) throw error;
+        return (data || []) as PersonalOwnerTaskRow[];
+      },
+      [] as PersonalOwnerTaskRow[],
+    );
 
     const [pendingApprovalsSource, legalSource, workOrdersSource, stockSource, overdueNCSource, overdueCASource] =
       await Promise.all([
@@ -224,16 +293,20 @@ export async function GET(request: NextRequest) {
         ),
         querySource(
           'Legal y cumplimiento',
-          () => getLegalComplianceOverview(context.organizationId) as Promise<LegalComplianceOverview>,
+          () => isElias
+            ? getLegalComplianceOverview(context.organizationId) as Promise<LegalComplianceOverview>
+            : Promise.resolve({ contracts_pending_review: [], expiring_contracts: [], expiring_documents: [] } as LegalComplianceOverview),
           { contracts_pending_review: [], expiring_contracts: [], expiring_documents: [] } as LegalComplianceOverview,
         ),
         querySource(
           'Órdenes de trabajo',
           async () => {
+            if (!currentPersonId) return [] as WorkOrderAlertRow[];
             const { data, error } = await context.supabase
               .from('maintenance_work_orders')
               .select('id, work_order_number, title, description, priority, status, created_at, scheduled_date, canonical_asset_id')
               .eq('organization_id', context.organizationId)
+              .eq('assigned_person_id', currentPersonId)
               .in('status', ['open', 'in_progress'])
               .order('created_at', { ascending: false })
               .limit(20);
@@ -260,7 +333,9 @@ export async function GET(request: NextRequest) {
         ),
         querySource(
           'Inventario',
-          () => listInventoryStockAlerts({ organizationId: context.organizationId, supabase: context.supabase }),
+          () => isBodegaOwner
+            ? listInventoryStockAlerts({ organizationId: context.organizationId, supabase: context.supabase })
+            : Promise.resolve({ items: [], evaluatedItems: 0, dataSource: 'warehouse' as const }),
           { items: [], evaluatedItems: 0, dataSource: 'warehouse' as const },
         ),
         querySource(
@@ -270,6 +345,7 @@ export async function GET(request: NextRequest) {
               .from('sostenibilidad_nonconformances')
               .select('id, nc_number, title, severity, target_closure_date, status')
               .eq('organization_id', context.organizationId)
+              .eq('assigned_to', context.userId)
               .lt('target_closure_date', new Date().toLocaleDateString('en-CA'))
               .neq('status', 'cerrada')
               .limit(20);
@@ -284,6 +360,7 @@ export async function GET(request: NextRequest) {
             const { data, error } = await context.supabase
               .from('sostenibilidad_corrective_actions')
               .select('id, ca_number, action_description, scheduled_completion_date, status, nonconformance:sostenibilidad_nonconformances!inner(title, severity, organization_id)')
+              .eq('responsible_person', context.userId)
               .lt('scheduled_completion_date', new Date().toLocaleDateString('en-CA'))
               .neq('status', 'verificada')
               .limit(20);
@@ -297,9 +374,24 @@ export async function GET(request: NextRequest) {
         ),
       ]);
 
-    const sources = [pendingApprovalsSource, legalSource, workOrdersSource, stockSource, overdueNCSource, overdueCASource];
+    const sources = [ownerTasksSource, pendingApprovalsSource, legalSource, workOrdersSource, stockSource, overdueNCSource, overdueCASource];
     const unavailable = sources.filter((source) => !source.available).map((source) => source.name);
     const alerts: AlertItem[] = [];
+
+    for (const task of ownerTasksSource.data) {
+      const action = ownerTaskAction(task.task_key);
+      alerts.push({
+        id: `owner-${task.task_key}`,
+        title: task.title,
+        description: task.role_action || task.evidence_summary || 'Resolver la condición operacional indicada y registrar el resultado.',
+        severity: severityFromOwnerTask(task.severity),
+        type: task.domain === 'hse' ? 'sostenibilidad' : task.domain === 'inventory' ? 'inventario' : 'mantenimiento',
+        timestamp: sourceDate(task.occurred_at),
+        actionRequired: true,
+        actionUrl: action.url,
+        actionLabel: action.label,
+      });
+    }
 
     if (isElias || isAriel) {
       for (const [contractNumber, sourceMeta] of Object.entries(LEGAL_CONTRACT_SOURCE_META)) {
