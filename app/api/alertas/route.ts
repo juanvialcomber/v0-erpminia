@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { listPendingApprovalsForUser } from '@/lib/api/documents';
 import { getLegalComplianceOverview } from '@/lib/api/contracts';
 import { listInventoryStockAlerts } from '@/lib/api/inventory-stock-alerts';
+import { LEGAL_CONTRACT_SOURCE_META, LEGAL_PROGRESS_MILESTONES } from '@/lib/legal/contract-progress-source';
 
 type AlertSeverity = 'critica' | 'alta' | 'media' | 'baja' | 'info';
 type AlertType = 'documento' | 'mantenimiento' | 'inventario' | 'sostenibilidad' | 'contrato';
@@ -110,6 +111,30 @@ function daysUntil(value: string | null | undefined) {
   return Math.max(0, Math.ceil((parsed.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
+function sourceContractProgress(contractNumber: string) {
+  const rows = LEGAL_PROGRESS_MILESTONES.filter((item) => item.contractNumber === contractNumber);
+  const total = rows.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+  const executed = rows.reduce((sum, item) => sum + Number(item.executedAmount || 0), 0);
+  return {
+    detailed: rows.length > 0,
+    progressRatio: total > 0 ? executed / total : null,
+  };
+}
+
+function sourceContractDays(endDate: string | null | undefined) {
+  if (!endDate) return null;
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+  const base = new Date(`${today}T12:00:00Z`).getTime();
+  const target = new Date(`${endDate}T12:00:00Z`).getTime();
+  if (!Number.isFinite(base) || !Number.isFinite(target)) return null;
+  return Math.round((target - base) / 86400000);
+}
+
 function severityFromPriority(priority: string | null | undefined): AlertSeverity {
   const normalized = String(priority || '').toLowerCase();
   if (normalized.includes('crit')) return 'critica';
@@ -178,6 +203,17 @@ export async function GET(request: NextRequest) {
         generatedAt: new Date().toISOString(),
       });
     }
+
+    const { data: currentProfile } = await context.supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', context.userId)
+      .eq('organization_id', context.organizationId)
+      .maybeSingle();
+
+    const currentEmail = String(currentProfile?.email || '').trim().toLowerCase();
+    const isElias = currentEmail === 'eliasfernandez@lapatagua.cl';
+    const isAriel = currentEmail === 'ariellopez@lapatagua.cl';
 
     const [pendingApprovalsSource, legalSource, workOrdersSource, stockSource, overdueNCSource, overdueCASource] =
       await Promise.all([
@@ -264,6 +300,42 @@ export async function GET(request: NextRequest) {
     const sources = [pendingApprovalsSource, legalSource, workOrdersSource, stockSource, overdueNCSource, overdueCASource];
     const unavailable = sources.filter((source) => !source.available).map((source) => source.name);
     const alerts: AlertItem[] = [];
+
+    if (isElias || isAriel) {
+      for (const [contractNumber, sourceMeta] of Object.entries(LEGAL_CONTRACT_SOURCE_META)) {
+        if (!sourceMeta?.endDate) continue;
+        if (isAriel && !contractNumber.startsWith('IO-')) continue;
+
+        const progress = sourceContractProgress(contractNumber);
+        if (!progress.detailed || progress.progressRatio === null || progress.progressRatio >= 0.999) continue;
+
+        const days = sourceContractDays(sourceMeta.endDate);
+        if (days === null || days > 15) continue;
+
+        const overdue = days < 0;
+        const title = overdue
+          ? `Contrato atrasado según fecha fuente - ${contractNumber}`
+          : `Contrato próximo a fecha fuente - ${contractNumber}`;
+        const timing = overdue
+          ? `la fecha fuente venció hace ${Math.abs(days)} día${Math.abs(days) === 1 ? '' : 's'}`
+          : `faltan ${days} día${days === 1 ? '' : 's'} para la fecha fuente`;
+        const progressLabel = new Intl.NumberFormat('es-CL', {
+          style: 'percent',
+          maximumFractionDigits: 1,
+        }).format(progress.progressRatio);
+
+        alerts.push({
+          id: `elias-contract-schedule-${contractNumber}`,
+          title,
+          description: `Fecha fuente Elías: ${sourceMeta.endDate}; ${timing}; avance físico estructurado ${progressLabel}. Señal para revisión, no declaración automática de incumplimiento.`,
+          severity: overdue ? 'alta' : days <= 7 ? 'alta' : 'media',
+          type: 'contrato',
+          timestamp: sourceDate(sourceMeta.endDate),
+          actionRequired: true,
+          actionUrl: '/dashboard/legal/avances-pagos',
+        });
+      }
+    }
 
     for (const approval of pendingApprovalsSource.data) {
       alerts.push({
