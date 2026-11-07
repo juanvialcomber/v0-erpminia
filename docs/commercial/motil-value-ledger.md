@@ -337,3 +337,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L4 habilitado como decisión/preparación asistida; evidencia E1 hasta medir revisiones humanas reales.
 - Métrica siguiente: candidatos revisados, tasa de aceptación/corrección, tiempo medio de preparación manual vs MOTIL y motivos de rechazo.
 - Impacto económico: no medido todavía; no se declara ahorro de tiempo hasta contar con baseline y uso real.
+
+
+## 2026-11-06 — Legal: gate de solicitud de pago en MOTIL
+
+- Problema previo: para saber si una factura podía avanzar a pago era necesario investigar manualmente contrato, proveedor, factura, saldo y vencimiento entre planillas y ERP.
+- Capacidad: MOTIL calcula un estado read-only por factura contractual: lista para solicitar pago, falta vencimiento, falta promoción a CxP MOTIL, conflicto, proveedor faltante o saldada.
+- Gate determinístico: proveedor contractual exacto + número de factura exacto + misma moneda + una única CxP MOTIL + saldo pendiente + vencimiento definido.
+- Autoridad: “lista para solicitar pago” no aprueba, firma ni ejecuta pago. El paso siguiente continúa bajo firmas y Finanzas.
+- Evidencia de brecha actual: producción tiene 2 CxP MOTIL y 0 abiertas, por lo que el cuello de botella verificable es la promoción/aprobación de obligaciones, no la falta de datos financieros externos.
+- Nivel actual: L4 de preparación/decisión asistida. No es L5.
+- Métrica siguiente: porcentaje de facturas contractuales que alcanzan readiness, motivo de bloqueo, tiempo desde factura observada a CxP aprobada y tiempo desde CxP a transferencia confirmada.
+- Impacto económico: no medido todavía; la hipótesis es reducir búsqueda manual y ciclos de coordinación, pendiente de baseline.
