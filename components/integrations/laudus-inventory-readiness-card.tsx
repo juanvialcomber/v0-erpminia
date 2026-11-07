@@ -186,7 +186,7 @@ export function LaudusInventoryReadinessCard() {
           <LaudusSourceMark state={sourceState} compact />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          MOTIL decide disponibilidad usando la mejor evidencia vigente. El ERP aporta el saldo base cuando está fresco; correo y WhatsApp actúan como contraste y abren conciliación ante diferencias.
+          MOTIL decide disponibilidad usando la mejor evidencia vigente. El ERP aporta el saldo base cuando está fresco. Correo y WhatsApp actúan como contraste y abren conciliación ante diferencias.
         </p>
       </div>
 
