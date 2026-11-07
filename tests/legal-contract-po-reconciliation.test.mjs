@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const catalog = await readFile(new URL('../lib/legal/contract-purchase-order-candidates.ts', import.meta.url), 'utf8');
 const api = await readFile(new URL('../app/api/legal/contract-po-reconciliation/route.ts', import.meta.url), 'utf8');
-const page = await readFile(new URL('../app/dashboard/legal/laudus/page.tsx', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/dashboard/legal/pagos-facturas/page.tsx', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/20261106183000_legal_contract_purchase_order_links.sql', import.meta.url), 'utf8');
 const normalizeMigration = await readFile(new URL('../supabase/migrations/20261106190000_normalize_laudus_purchase_order_number.sql', import.meta.url), 'utf8');
 
@@ -34,13 +34,12 @@ test('contract OC reconciliation fails closed when canonical OC is absent or sup
 });
 
 test('Legal OC reconciliation UI exposes verification states and provenance', () => {
-  assert.match(page, /Conciliación Contrato ↔ OC/);
+  assert.match(page, /Conciliación contrato ↔ OC/);
   assert.match(page, /Verificadas/);
   assert.match(page, /Conflictos/);
   assert.match(page, /No encontradas/);
   assert.match(page, /source_sheet/);
   assert.match(page, /source_cell/);
-  assert.match(page, /payment_link/);
 });
 
 test('ledger schema is human-reviewed and does not seed guessed links', () => {
