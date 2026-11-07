@@ -9,10 +9,10 @@ const primary = [
   { href: '/dashboard/legal', label: 'Hoy' },
   { href: '/dashboard/legal/avances-pagos', label: 'Contratos y pagos' },
   { href: '/dashboard/legal/contratistas-documentos', label: 'Proveedores' },
+  { href: '/dashboard/legal/pagos-facturas', label: 'Pagos y facturas' },
   { href: '/dashboard/legal/transportistas', label: 'Transportistas' },
 ];
 const secondary = [
-  { href: '/dashboard/legal/laudus', label: 'Evidencia financiera' },
   { href: '/dashboard/legal/control-contractual', label: 'Control contractual' },
   { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
   { href: '/dashboard/legal/documentos', label: 'Archivo Legal' },
