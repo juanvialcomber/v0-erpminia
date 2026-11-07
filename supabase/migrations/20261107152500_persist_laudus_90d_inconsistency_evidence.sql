@@ -108,7 +108,7 @@ select organization_id,'laudus:purchase_order_unresolved:'||purchase_order_id::t
          ' | total=',coalesce(total_amount::text,'null'),' ',coalesce(currency,'')),
   now()
 from public.purchase_order_reconciliation_preview_service_v1
-where order_date>=current_date-90 and fully_resolvable=false
+where fully_resolvable=false
 on conflict (organization_id,issue_key) do update
 set entity_id=excluded.entity_id,issue_type=excluded.issue_type,field_name=excluded.field_name,
     evidence_reference=excluded.evidence_reference,updated_at=now(),
@@ -128,4 +128,65 @@ from public.laudus_cost_centers_service_v1
 where reconciliation_status='pending'
 on conflict (organization_id,issue_key) do update
 set entity_id=excluded.entity_id,evidence_reference=excluded.evidence_reference,updated_at=now(),
+    status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
+
+
+-- Proveedores nuevos o no conciliados: conservar como candidatos de revision, nunca promover automaticamente.
+insert into public.data_reconciliation_reviews
+  (organization_id, issue_key, entity_type, entity_id, issue_type, field_name, status, evidence_reference, updated_at)
+select
+  organization_id,
+  'laudus:proveedor_candidato:' || external_id,
+  'supplier',
+  canonical_supplier_id,
+  'proveedor_por_conciliar',
+  'proveedor',
+  'open',
+  concat('laudus_suppliers_service_v1:',external_id,
+         ' | rut=',coalesce(tax_id,'sin_dato'),
+         ' | nombre=',coalesce(name,'sin_dato'),
+         ' | razon_social=',coalesce(legal_name,'sin_dato'),
+         ' | estado=',coalesce(reconciliation_status,'sin_dato'),
+         ' | sincronizado=',coalesce(synced_at::text,'sin_dato')),
+  now()
+from public.laudus_suppliers_service_v1
+where reconciliation_status='new_candidate'
+on conflict (organization_id,issue_key) do update
+set entity_id=excluded.entity_id,
+    evidence_reference=excluded.evidence_reference,
+    updated_at=now(),
+    status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
+
+
+-- Asignaciones de pago cuya factura referenciada aun no esta disponible en la capa Laudus local.
+-- No invalida el pago: conserva la relacion como evidencia hasta completar o reconciliar la factura.
+insert into public.data_reconciliation_reviews
+  (organization_id, issue_key, entity_type, entity_id, issue_type, field_name, status, evidence_reference, updated_at)
+select
+  a.organization_id,
+  'laudus:asignacion_pago_factura_no_resuelta:' ||
+    a.payment_external_id || ':' || coalesce(a.payment_item_id,'sin_item') || ':' || a.purchase_invoice_external_id,
+  'payment',
+  null,
+  'factura_referenciada_no_disponible',
+  'factura',
+  'open',
+  concat('laudus_purchase_payment_allocations:',
+         'pago=',a.payment_external_id,
+         ' | item=',coalesce(a.payment_item_id,'sin_dato'),
+         ' | factura=',a.purchase_invoice_external_id,
+         ' | documento=',coalesce(a.doc_number,'sin_dato'),
+         ' | proveedor=',coalesce(a.supplier_name,a.supplier_external_id,'sin_dato'),
+         ' | monto_aplicado=',a.applied_amount::text,
+         ' | moneda=',a.currency_code,
+         ' | sincronizado=',coalesce(a.synced_at::text,'sin_dato')),
+  now()
+from integration.laudus_purchase_payment_allocations a
+left join integration.laudus_purchase_invoices i
+  on i.organization_id=a.organization_id
+ and i.external_id=a.purchase_invoice_external_id
+where i.id is null
+on conflict (organization_id,issue_key) do update
+set evidence_reference=excluded.evidence_reference,
+    updated_at=now(),
     status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
