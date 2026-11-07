@@ -40,11 +40,6 @@ type PriceBenchmarkRow = {
   latest_observed_unit_cost: number | string | null;
   latest_observed_order_number: string | null;
   latest_observed_supplier_name: string | null;
-  source_only?: boolean;
-  read_only?: boolean;
-  source?: string;
-  operational_resolution?: string | null;
-  source_synced_at?: string | null;
 };
 
 type WarehouseBinRow = {
@@ -87,6 +82,11 @@ type WarehouseStockItem = {
   latest_observed_unit_cost: number | null;
   latest_observed_order_number: string | null;
   latest_observed_supplier_name: string | null;
+  source_only?: boolean;
+  read_only?: boolean;
+  source?: string;
+  operational_resolution?: string | null;
+  source_synced_at?: string | null;
 };
 
 type OrgContext = Extract<Awaited<ReturnType<typeof getOrganizationContext>>, { ok: true }>;
