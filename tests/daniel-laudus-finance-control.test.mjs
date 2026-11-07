@@ -218,3 +218,38 @@ test('Daniel finance runtime never queries the private integration schema direct
   assert.match(loader, /laudus_fixed_assets_service_v1/);
   assert.match(loader, /laudus_suppliers_service_v1/);
 });
+
+
+test('Daniel finance manager can access Finance Assets APIs through the cargo proxy boundary', () => {
+  const proxy = fs.readFileSync('proxy.ts','utf8');
+  for (const route of [
+    '/api/finance/asset-economics',
+    '/api/finance/asset-reconciliation-review',
+    '/api/finance/laudus-fixed-assets-review',
+    '/api/finance/asset-register',
+    '/api/finance/missing-asset-candidates',
+  ]) {
+    assert.match(proxy, new RegExp(route.replaceAll('/', '\\/')));
+  }
+  assert.match(proxy, /financeAssetRoutes\.has\(path\)/);
+  assert.match(proxy, /if \(path\.startsWith\('\/api\/finance\/'\)\) return false/);
+});
+
+test('Finance Assets candidate decisions remain ED-only', () => {
+  const route = fs.readFileSync('app/api/finance/missing-asset-candidates/route.ts','utf8');
+  assert.match(route, /export async function POST[\s\S]*requireModuleAccess\(request, MODULE_KEYS\.FIN_FINANZAS, true\)/);
+});
+
+
+test('Daniel finance manager can read finance calendar, documents and Laudus asset review without broadening writes', () => {
+  const proxy = fs.readFileSync('proxy.ts','utf8');
+  assert.match(proxy, /path === '\/api\/calendar\/operational'/);
+  assert.match(proxy, /path === '\/api\/documents\/list' \|\| path === '\/api\/documents\/stats'/);
+  assert.match(proxy, /path === '\/api\/integrations\/laudus\/fixed-asset-review'/);
+  assert.match(proxy, /return readOnly/);
+});
+
+test('Laudus fixed asset review decisions remain ED-only', () => {
+  const route = fs.readFileSync('app/api/integrations/laudus/fixed-asset-review/route.ts','utf8');
+  assert.match(route, /export async function POST[\s\S]*requireModuleAccess\(request, MODULE_KEYS\.FIN_FINANZAS, true\)/);
+});

@@ -334,7 +334,7 @@ export async function GET(request: NextRequest) {
 
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
