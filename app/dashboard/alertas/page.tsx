@@ -29,6 +29,7 @@ type Alert = {
   timestamp: string | null;
   actionRequired: boolean;
   actionUrl: string;
+  actionLabel?: string;
 };
 type AlertResponse = {
   alerts?: Alert[];
@@ -60,6 +61,14 @@ function typeLabel(type: AlertType) {
     contrato: 'Legal',
   };
   return labels[type];
+}
+
+function defaultActionLabel(type: AlertType) {
+  if (type === 'mantenimiento') return 'Resolver OT';
+  if (type === 'inventario') return 'Revisar stock';
+  if (type === 'sostenibilidad') return 'Resolver';
+  if (type === 'contrato') return 'Revisar contrato';
+  return 'Revisar documento';
 }
 
 function formatTime(timestamp: string | null) {
@@ -193,7 +202,7 @@ export default function AlertasPage() {
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" asChild><Link href={alert.actionUrl}>Abrir fuente</Link></Button>
+                  <Button size="sm" asChild><Link href={alert.actionUrl}>{alert.actionLabel || defaultActionLabel(alert.type)}</Link></Button>
                 </article>
               );
             })}
