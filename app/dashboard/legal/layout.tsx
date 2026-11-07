@@ -12,7 +12,6 @@ const primary = [
   { href: '/dashboard/legal/transportistas', label: 'Transportistas' },
 ];
 const secondary = [
-  { href: '/dashboard/legal/inbox', label: 'Pendientes' },
   { href: '/dashboard/legal/laudus', label: 'Evidencia financiera' },
   { href: '/dashboard/legal/control-contractual', label: 'Control contractual' },
   { href: '/dashboard/legal/aplicabilidad-eecc', label: 'Requisitos EECC' },
@@ -40,7 +39,7 @@ export default function LegalLayout({ children }: {children:ReactNode}) {
   <div className="rounded-lg border border-border/70 bg-background p-2">
    <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
      <Link href="/dashboard/legal" className="text-xs font-semibold uppercase tracking-[0.12em]">Legal / Elías</Link>
-     <span className="text-xs text-muted-foreground">Avances · Pagos · Proveedores · Evidencia</span>
+     <span className="text-xs text-muted-foreground">Prioridades · Contratos · Proveedores · Evidencia</span>
    </div>
    <nav className="flex flex-wrap gap-1" aria-label="Navegación principal de Legal">
     {primary.map(link)}
