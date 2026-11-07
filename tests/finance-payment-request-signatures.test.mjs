@@ -34,3 +34,11 @@ test('Treasury exposes explicit approve/reject controls without transfer executi
  assert.match(page,/Motivo del rechazo/);
  assert.match(page,/Esperando otra firma/);
 });
+
+
+test('payment request decisions write auditable value evidence',()=>{
+ assert.match(api,/audit_log/);
+ assert.match(api,/finance\.payment_request\.signed/);
+ assert.match(api,/decision:'rejected'/);
+ assert.match(api,/decision:'approved'/);
+});
