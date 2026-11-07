@@ -130,6 +130,17 @@ export async function POST(request: NextRequest){
       .eq('id',requestId)
       .eq('status','pending_signatures');
     if(updateError)return NextResponse.json({error:'La firma quedó registrada, pero no se pudo cerrar la solicitud rechazada'},{status:503});
+    const { error:auditError }=await auth.context.supabase.from('audit_log').insert({
+      organization_id:auth.context.organizationId,
+      user_id:auth.context.userId,
+      action:'finance.payment_request.signed',
+      resource_type:'finance_payment_request',
+      resource_id:requestId,
+      resource_identifier:requestId,
+      new_values:{decision:'rejected',status:'rejected',note},
+      status:'completed',
+    });
+    if(auditError)console.error('[finance/payment-requests:audit]',auditError);
     return NextResponse.json({status:'rejected',execution:false});
   }
 
@@ -153,6 +164,18 @@ export async function POST(request: NextRequest){
     if(updateError)return NextResponse.json({error:'Las firmas están completas, pero no se pudo actualizar la solicitud'},{status:503});
     status='approved';
   }
+
+  const { error:auditError }=await auth.context.supabase.from('audit_log').insert({
+    organization_id:auth.context.organizationId,
+    user_id:auth.context.userId,
+    action:'finance.payment_request.signed',
+    resource_type:'finance_payment_request',
+    resource_id:requestId,
+    resource_identifier:requestId,
+    new_values:{decision:'approved',approved_signatures:approvedCount,required_signatures:paymentRequest.required_signatures,status},
+    status:'completed',
+  });
+  if(auditError)console.error('[finance/payment-requests:audit]',auditError);
 
   return NextResponse.json({
     status,
