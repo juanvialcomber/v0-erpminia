@@ -45,3 +45,12 @@ test('technical Laudus integration contracts remain intact behind the UI', () =>
   assert.match(assets, /\/api\/integrations\/laudus\/fixed-asset-review/);
   assert.match(finance, /\/api\/integrations\/laudus\/finance-control/);
 });
+
+
+test('Bodega renders decision-first before source diagnostics', () => {
+  const decisionIndex = bodega.indexOf('Qué requiere atención hoy');
+  const sourceIndex = bodega.indexOf('Fuentes y conciliación');
+  assert.ok(decisionIndex >= 0, 'decision section must exist');
+  assert.ok(sourceIndex > decisionIndex, 'source diagnostics must follow MOTIL decisions');
+  assert.match(bodega, /Revisa procedencia, frescura y conflictos sólo cuando necesites auditar una decisión MOTIL/);
+});
