@@ -15,7 +15,7 @@ type FinanceControl = {
 const fetcher = async (url: string): Promise<FinanceControl> => {
   const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || 'No se pudo cargar Laudus.');
+  if (!response.ok) throw new Error(payload?.error || 'No se pudo confirmar la fuente financiera.');
   return payload as FinanceControl;
 };
 
@@ -50,13 +50,13 @@ export function LaudusFinanceStatusStrip({ compact = false }: { compact?: boolea
   ].filter(Boolean) as string[];
 
   return (
-    <section className={compact ? 'rounded-lg border bg-card px-4 py-3' : 'rounded-lg border bg-card px-4 py-4'} aria-label="Conexión financiera Laudus">
+    <section className={compact ? 'rounded-lg border bg-card px-4 py-3' : 'rounded-lg border bg-card px-4 py-4'} aria-label="Estado de la fuente financiera">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <LaudusSourceMark state={state} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold">Laudus · fuente financiera</p>
+              <p className="text-sm font-semibold">Fuente financiera</p>
               <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">solo lectura</span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -71,7 +71,7 @@ export function LaudusFinanceStatusStrip({ compact = false }: { compact?: boolea
         {!compact ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Landmark className="h-4 w-4" />
-            <span>Laudus sigue siendo autoridad financiera; MOTIL organiza y concilia.</span>
+            <span>La fuente contable conserva la autoridad; MOTIL organiza, concilia y prepara decisiones.</span>
           </div>
         ) : null}
       </div>
