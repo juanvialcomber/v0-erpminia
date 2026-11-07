@@ -1,5 +1,5 @@
-import { LaudusFixedAssetReview } from '@/components/integrations/laudus-fixed-asset-review';
+import { redirect } from 'next/navigation';
 
-export default function LaudusFixedAssetsReviewPage() {
-  return <LaudusFixedAssetReview />;
+export default function LegacyLaudusAssetReviewRoute() {
+  redirect('/dashboard/finanzas/activos/conciliacion');
 }
