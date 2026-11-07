@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { MODULE_KEYS, getUserModuleAccess, isAdminRole, requireModuleAccess } from '@/lib/api/module-access';
 
 type ReviewRow = {
   decision?: string | null;
@@ -38,9 +38,21 @@ function n(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+async function canDecideOperationalIdentity(userId: string, role: string | null) {
+  if (isAdminRole(role)) return true;
+  const access = await getUserModuleAccess(userId);
+  return access.cargoName?.trim().toUpperCase() === 'JEFE DEPARTAMENTO DE MANTENIMIENTO'
+    && access.access[MODULE_KEYS.MANT_OPERACIONES] === 'ED';
+}
+
 async function requireReviewReadAccess(request: NextRequest) {
   const maintenance = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
-  if (maintenance.authorized) return { access: maintenance, canDecide: maintenance.canWrite };
+  if (maintenance.authorized) {
+    return {
+      access: maintenance,
+      canDecide: await canDecideOperationalIdentity(maintenance.user.id, maintenance.role),
+    };
+  }
   const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
   return { access: finance, canDecide: false };
 }
@@ -178,6 +190,9 @@ type ReviewDecision = 'confirm_candidate' | 'reject_candidate' | 'defer';
 export async function POST(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
+  if (!(await canDecideOperationalIdentity(access.user.id, access.role))) {
+    return NextResponse.json({ error: 'La identidad operacional la resuelve el Jefe Departamento de Mantenimiento.' }, { status: 403 });
+  }
 
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
