@@ -29,6 +29,7 @@ type Payload={
 type ReconPayload={data:Recon[];summary:{total:number;verified:number;pending:number;conflicts:number;not_found:number}};
 type RequestReadyItem={id:string;contract_number:string;milestone_title:string;invoice_number:string;invoice_amount_source:number;retention_amount_source:number;currency:string;readiness:'ready_for_request'|'needs_due_date'|'needs_payable_promotion'|'settled'|'request_active'|'conflict'|'missing_supplier';reason:string;next_action:string;active_request:{id:string;status:string;required_signatures:number;requested_payment_date:string|null;created_at:string}|null;payable:{id:string;supplier_name:string;approved_amount:number;paid_amount:number;outstanding_amount:number;due_date:string|null;status:string;days_to_due:number|null}|null;provenance:{source_file:string;source_sheet:string;source_row:number;source_text:string}};
 type RequestReadyPayload={data:RequestReadyItem[];summary:{invoices:number;ready_for_request:number;needs_due_date:number;needs_payable_promotion:number;request_active:number;conflicts:number;settled:number};policy:{gate:string;authority:string;source:string}};
+type TraceReadinessPayload={data:{examined:number;matched:number;ambiguous:number;missing:number;alreadySynced:number;recoverable:number;nextBatch:number;dryRun:boolean};conclusion:string;next_action:string;policy:{read_only:boolean;no_external_calls:boolean;no_canonical_mutation:boolean}};
 
 const fetcher=async<T,>(url:string)=>{const r=await fetch(url,{credentials:'include',cache:'no-store'});const p=await r.json().catch(()=>null);if(!r.ok)throw new Error(p?.error||'No se pudo cargar información financiera');return p as T};
 const money=(v:number,currency='CLP')=>new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(Number(v||0));
@@ -38,6 +39,7 @@ export default function LegalPaymentsInvoicesPage(){
  const {data,error,isLoading}=useSWR<Payload>('/api/legal/laudus-bridge',fetcher,{revalidateOnFocus:false});
  const {data:recon}=useSWR<ReconPayload>('/api/legal/contract-po-reconciliation',fetcher,{revalidateOnFocus:false});
  const {data:requestReady,mutate:mutateRequestReady}=useSWR<RequestReadyPayload>('/api/legal/payment-request-readiness',fetcher,{revalidateOnFocus:false});
+ const {data:traceReadiness}=useSWR<TraceReadinessPayload>('/api/legal/invoice-trace-readiness',fetcher,{revalidateOnFocus:false});
  const [confirmRequestId,setConfirmRequestId]=useState<string|null>(null);
  const [requestingId,setRequestingId]=useState<string|null>(null);
  const [requestMessage,setRequestMessage]=useState<string|null>(null);
@@ -83,6 +85,21 @@ export default function LegalPaymentsInvoicesPage(){
     </div>
    </div>
   </section>
+
+  {traceReadiness ? <section className="rounded-md border p-4">
+   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div>
+     <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Trazabilidad contractual</p>
+     <h2 className="mt-1 text-base font-semibold">{traceReadiness.conclusion}</h2>
+     <p className="mt-1 text-sm text-muted-foreground">{traceReadiness.next_action}</p>
+    </div>
+    <div className="grid grid-cols-3 gap-4 text-right text-xs">
+     <div><p className="text-muted-foreground">Identificadas</p><p className="mt-1 text-lg font-semibold text-foreground">{traceReadiness.data.matched}</p></div>
+     <div><p className="text-muted-foreground">Con traza</p><p className="mt-1 text-lg font-semibold text-foreground">{traceReadiness.data.alreadySynced}</p></div>
+     <div><p className="text-muted-foreground">Pendientes</p><p className="mt-1 text-lg font-semibold text-foreground">{traceReadiness.data.recoverable}</p></div>
+    </div>
+   </div>
+  </section> : null}
 
   <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
    {[
