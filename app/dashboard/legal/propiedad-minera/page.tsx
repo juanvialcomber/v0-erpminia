@@ -29,8 +29,19 @@ type PropertyItem = {
   has_evidence: boolean;
 };
 
+type PropertyControl = {
+  id:string; link_status:string; source_property_name:string; national_role:string|null; tenant_name:string|null; contact_name:string|null;
+  patent_value_clp_source:number|null; patent_payment_clp:number|null; patent_payment_status:string|null; patent_pending:boolean;
+  effective_lease_end:string|null; lease_days_until:number|null; lease_overdue:boolean;
+  sernageomin_expiry_date:string|null; sernageomin_expiry_raw:string|null; sernageomin_days_until:number|null; sernageomin_overdue:boolean; sernageomin_due_30:boolean;
+  servitude_status:string|null; powder_magazine_status:string|null; royalty_count:number; royalty_paid_count:number; royalty_amount_clp:number;
+  source_sheet:string;
+};
+
 type Response = {
   data: PropertyItem[];
+  controls: PropertyControl[];
+  controls_summary: { total:number; exact_links:number; conflicts:number; sernageomin_overdue:number; sernageomin_due_30:number; patent_pending:number; lease_overdue:number };
   summary: {
     total: number;
     with_property: number;
@@ -92,6 +103,50 @@ export default function MiningPropertyPage() {
             <p className="mt-1 text-xl font-semibold">{value}</p>
           </div>
         ))}
+      </section>
+
+      <section className="overflow-hidden rounded-md border">
+        <div className="border-b bg-muted/20 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Control Elías</p>
+          <h2 className="mt-1 text-base font-semibold">Permisos, patentes y arriendos</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Datos directos de la planilla de control. Los conflictos de identidad quedan visibles y no sobrescriben la propiedad canónica.</p>
+        </div>
+        <div className="grid sm:grid-cols-4">
+          {[
+            ['Propiedades fuente', data.controls_summary.total],
+            ['SERNAGEOMIN vencidos', data.controls_summary.sernageomin_overdue],
+            ['Patentes pendientes', data.controls_summary.patent_pending],
+            ['Identidad a revisar', data.controls_summary.conflicts],
+          ].map(([label,value],index)=><div key={String(label)} className={`px-4 py-3 ${index?'border-t sm:border-l sm:border-t-0':''}`}><p className="text-[11px] uppercase text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>)}
+        </div>
+        <div className="divide-y border-t">
+          {data.controls.map((item)=><article key={item.id} className="p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">{item.source_property_name}</Badge>
+                  {item.link_status!=='exact'?<Badge variant="destructive">Revisar identidad</Badge>:null}
+                  {item.sernageomin_overdue?<Badge variant="destructive">SERNAGEOMIN vencido</Badge>:item.sernageomin_due_30?<Badge variant="secondary">SERNAGEOMIN ≤30 días</Badge>:null}
+                  {item.patent_pending?<Badge variant="outline">Patente pendiente</Badge>:null}
+                  {item.lease_overdue?<Badge variant="outline">Arriendo vencido</Badge>:null}
+                </div>
+                <p className="mt-2 text-sm font-medium">{item.tenant_name || 'Arrendatario no informado'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.national_role ? `Rol ${item.national_role} · ` : ''}{item.contact_name || 'Contacto no informado'}</p>
+              </div>
+              <div className="text-xs text-muted-foreground md:text-right">
+                <p>{item.sernageomin_expiry_date ? `SERNAGEOMIN: ${item.sernageomin_expiry_date}` : item.sernageomin_expiry_raw ? `SERNAGEOMIN fuente: ${item.sernageomin_expiry_raw}` : 'SERNAGEOMIN sin fecha'}</p>
+                <p className="mt-1">{item.effective_lease_end ? `Arriendo/anexo hasta: ${item.effective_lease_end}` : 'Sin término vigente informado'}</p>
+                <p className="mt-1">Fuente: {item.source_sheet}</p>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2 border-t pt-3 text-xs text-muted-foreground md:grid-cols-4">
+              <p><span className="font-medium text-foreground">Patente fuente</span><br/>{money(item.patent_value_clp_source,'CLP') || 'Sin monto'}</p>
+              <p><span className="font-medium text-foreground">Pago patente</span><br/>{item.patent_payment_status || 'Sin estado'}{item.patent_payment_clp ? ` · ${money(item.patent_payment_clp,'CLP')}` : ''}</p>
+              <p><span className="font-medium text-foreground">Regalías</span><br/>{item.royalty_paid_count}/{item.royalty_count} pagadas · {money(item.royalty_amount_clp,'CLP')}</p>
+              <p><span className="font-medium text-foreground">Polvorín</span><br/>{item.powder_magazine_status || 'No informado'}</p>
+            </div>
+          </article>)}
+        </div>
       </section>
 
       <section className="divide-y overflow-hidden rounded-md border">
