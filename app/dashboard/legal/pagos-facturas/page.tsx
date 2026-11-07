@@ -26,6 +26,8 @@ type Payload={
  policy:{source:string;warning:string};
 };
 type ReconPayload={data:Recon[];summary:{total:number;verified:number;pending:number;conflicts:number;not_found:number}};
+type RequestReadyItem={id:string;contract_number:string;milestone_title:string;invoice_number:string;invoice_amount_source:number;retention_amount_source:number;currency:string;readiness:'ready_for_request'|'needs_due_date'|'needs_payable_promotion'|'settled'|'conflict'|'missing_supplier';reason:string;next_action:string;payable:{id:string;supplier_name:string;approved_amount:number;paid_amount:number;outstanding_amount:number;due_date:string|null;status:string;days_to_due:number|null}|null;provenance:{source_file:string;source_sheet:string;source_row:number;source_text:string}};
+type RequestReadyPayload={data:RequestReadyItem[];summary:{invoices:number;ready_for_request:number;needs_due_date:number;needs_payable_promotion:number;conflicts:number;settled:number};policy:{gate:string;authority:string;source:string}};
 
 const fetcher=async<T,>(url:string)=>{const r=await fetch(url,{credentials:'include',cache:'no-store'});const p=await r.json().catch(()=>null);if(!r.ok)throw new Error(p?.error||'No se pudo cargar información financiera');return p as T};
 const money=(v:number,currency='CLP')=>new Intl.NumberFormat('es-CL',{style:'currency',currency,maximumFractionDigits:currency==='CLP'?0:2}).format(Number(v||0));
@@ -34,6 +36,7 @@ const date=(v:string|null)=>v?new Intl.DateTimeFormat('es-CL',{dateStyle:'medium
 export default function LegalPaymentsInvoicesPage(){
  const {data,error,isLoading}=useSWR<Payload>('/api/legal/laudus-bridge',fetcher,{revalidateOnFocus:false});
  const {data:recon}=useSWR<ReconPayload>('/api/legal/contract-po-reconciliation',fetcher,{revalidateOnFocus:false});
+ const {data:requestReady}=useSWR<RequestReadyPayload>('/api/legal/payment-request-readiness',fetcher,{revalidateOnFocus:false});
  if(isLoading)return <StatePanel tone="loading" title="Revisando pagos y facturas" description="Conciliando contratos, proveedores, órdenes de compra, facturas y pagos."/>;
  if(error||!data)return <StatePanel tone="error" title="Pagos y facturas no disponibles" description="MOTIL no concluye estados financieros cuando falta evidencia verificable."/>;
  const attention=data.partial_invoices+data.unpaid_invoices+(recon?.summary.conflicts||0)+(recon?.summary.not_found||0);
@@ -71,6 +74,28 @@ export default function LegalPaymentsInvoicesPage(){
     ['Impagas',data.summary.unpaid_invoices],
    ].map(([label,value],i)=><div key={String(label)} className={`px-4 py-3 ${i?'border-t sm:border-l sm:border-t-0':''}`}><p className="text-[11px] uppercase text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></div>)}
   </section>
+
+  {requestReady ? <section className="overflow-hidden rounded-md border">
+   <div className="flex flex-col gap-3 border-b bg-muted/20 px-4 py-3 md:flex-row md:items-start md:justify-between">
+    <div>
+     <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Siguiente gate</p>
+     <h2 className="mt-1 text-base font-semibold">Listo para solicitar pago</h2>
+     <p className="mt-1 text-sm text-muted-foreground">MOTIL exige factura exacta, proveedor, moneda, CxP con saldo y vencimiento antes de habilitar el flujo de firmas.</p>
+    </div>
+    <div className="text-xs text-muted-foreground md:text-right"><p>{requestReady.summary.ready_for_request} listos</p><p>{requestReady.summary.needs_payable_promotion} requieren CxP · {requestReady.summary.needs_due_date} requieren vencimiento</p></div>
+   </div>
+   <div className="divide-y">
+    {requestReady.data.filter((item)=>item.readiness!=='settled').slice(0,10).map((item)=><article key={item.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]">
+     <div>
+      <div className="flex flex-wrap items-center gap-2"><Badge variant="outline">{item.contract_number}</Badge><span className="text-sm font-medium">Factura {item.invoice_number}</span><Badge variant={item.readiness==='ready_for_request'?'secondary':item.readiness==='conflict'||item.readiness==='missing_supplier'?'destructive':'outline'}>{item.readiness==='ready_for_request'?'Lista':item.readiness==='needs_due_date'?'Falta vencimiento':item.readiness==='needs_payable_promotion'?'Falta CxP MOTIL':'Revisar'}</Badge></div>
+      <p className="mt-1 text-xs text-muted-foreground">{item.reason}</p>
+      <p className="mt-2 text-sm"><span className="font-medium">Siguiente acción:</span> {item.next_action}</p>
+     </div>
+     <div className="text-xs text-muted-foreground md:text-right"><p>{money(item.payable?.outstanding_amount??item.invoice_amount_source,item.currency)}</p><p className="mt-1">{item.payable?'Saldo MOTIL':'Monto fuente'}</p><p className="mt-2">{item.provenance.source_sheet} · fila {item.provenance.source_row}</p></div>
+    </article>)}
+   </div>
+   <div className="border-t px-4 py-3 text-xs text-muted-foreground"><p>{requestReady.policy.gate}</p><p className="mt-1">{requestReady.policy.authority}</p></div>
+  </section> : null}
 
   <section className="grid gap-3 md:grid-cols-3">
    <article className="rounded-md border p-4"><CheckCircle2 className="h-4 w-4 text-muted-foreground"/><p className="mt-3 text-sm font-semibold">Pagado</p><p className="mt-1 text-xs text-muted-foreground">{data.summary.paid_invoices} facturas con pago verificado en la fuente financiera.</p></article>
