@@ -87,3 +87,19 @@ test('weekly import preserves original evidence and reports partial audit failur
  assert.match(importer,/if\(persistedSourceId\)/);
  assert.match(importer,/sourcePreserved:Boolean\(persistedSourceId\)/);
 });
+
+test('delayed source imports do not replace a newer official program or create expired OTs',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/const historical=program\.weekEnd<today/);
+ assert.match(importer,/const superseded=Boolean\(currentOfficial&&program\.weekStart<currentOfficial\.week_start\)/);
+ assert.match(importer,/const canPromote=!historical&&!superseded/);
+ assert.match(importer,/status:historical\?'archived'/);
+ assert.match(importer,/if\(canPromote\)/);
+ assert.match(importer,/if\(historical\)\{automation\.skippedPast/);
+ assert.match(importer,/if\(superseded\)\{automation\.skippedSuperseded/);
+});
+test('source progress 100 percent blocks automatic OT even if status text is stale',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/item\.source_progress!=null&&item\.source_progress>=1/);
+ assert.match(importer,/planned_hours,source_status,source_progress,materials/);
+});
