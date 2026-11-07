@@ -5,38 +5,31 @@ import { readFile } from 'node:fs/promises';
 const layout = await readFile(new URL('../app/dashboard/legal/layout.tsx', import.meta.url), 'utf8');
 const home = await readFile(new URL('../app/dashboard/legal/page.tsx', import.meta.url), 'utf8');
 const assistant = await readFile(new URL('../app/dashboard/legal/asistente/page.tsx', import.meta.url), 'utf8');
-const skill = await readFile(new URL('../skills/motil-legal-contract-control/SKILL.md', import.meta.url), 'utf8');
-const workspace = await readFile(new URL('../skills/motil-legal-contract-control/references/workspace.md', import.meta.url), 'utf8');
+const widget = await readFile(new URL('../components/intelligence/senior-assistant-widget.tsx', import.meta.url), 'utf8');
+const context = await readFile(new URL('../lib/intelligence/assistant-context.ts', import.meta.url), 'utf8');
 
-test('Elias workspace primary navigation follows daily jobs instead of technical modules', () => {
+test('Elias workspace primary navigation follows requested daily jobs', () => {
   assert.match(layout, /label: 'Hoy'/);
   assert.match(layout, /label: 'Contratos y pagos'/);
   assert.match(layout, /label: 'Proveedores'/);
-  assert.match(layout, /label: 'Asistente'/);
+  assert.match(layout, /label: 'Transportistas'/);
+  assert.doesNotMatch(layout, /label: 'Asistente'/);
   assert.match(layout, /label: 'Evidencia financiera'/);
   assert.match(layout, /Legal \/ Elías/);
 });
 
-test('Legal home surfaces the four primary Elias work areas', () => {
+test('Legal home surfaces Elias operational work instead of a standalone assistant', () => {
   assert.match(home, /Contratos y pagos/);
   assert.match(home, /Cumplimiento mensual/);
-  assert.match(home, /conclusión, siguiente acción y evidencia/i);
+  assert.match(home, /Transportistas/);
+  assert.doesNotMatch(home, /Preguntar al asistente/);
+  assert.doesNotMatch(home, /href="\/dashboard\/legal\/asistente"/);
 });
 
-test('Legal assistant copy covers contracts payments providers and documents', () => {
-  assert.match(assistant, /Asistente de Elías/);
-  assert.match(assistant, /contratos, avances, pagos, proveedores o documentos/i);
-  assert.match(assistant, /¿Qué contratos requieren atención hoy\?/);
-  assert.match(assistant, /¿Qué falta pagar de IO-01\?/);
-});
-
-test('Legal skill documents the workspace operating model from the Nov 6 requirements', () => {
-  assert.match(skill, /references\/workspace\.md/);
-  assert.match(workspace, /cálculo automático de estados de pago y fechas/);
-  assert.match(workspace, /rojo = `Vencido`/);
-  assert.match(workspace, /amarillo = `Próximo`/);
-  assert.match(workspace, /verde = `En plazo`/);
-  assert.match(workspace, /foto, PDF, email, WhatsApp o planilla/);
-  assert.match(workspace, /aviso a Gerencia cuando una transferencia\/pago esté listo/);
-  assert.match(workspace, /No exponer "Laudus", "staging", "sync", "RLS", "canonical"/);
+test('Legal assistant exists only as the global floating specialist', () => {
+  assert.match(assistant, /redirect\('\/dashboard\/legal'\)/);
+  assert.match(widget, /endpoint: '\/api\/legal\/asistente'/);
+  assert.match(widget, /Pregunta al Asistente Legal MOTIL/);
+  assert.match(context, /prefixes: \['\/dashboard\/legal'\]/);
+  assert.match(context, /title: 'Asistente Legal MOTIL'/);
 });
