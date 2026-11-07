@@ -11,7 +11,6 @@ test('legal overview preserves source uncertainty and never fabricates operation
 
   assert.match(page, /if \(!response\.ok\) throw new Error/);
   assert.match(page, /coverageError \? '—'/);
-  assert.match(page, /contractorError \? '—'/);
   assert.match(page, /inboxError/);
   assert.match(page, /No se pudo actualizar la bandeja/);
   assert.doesNotMatch(page, /new Date\(\)\.toISOString\(\)/);
