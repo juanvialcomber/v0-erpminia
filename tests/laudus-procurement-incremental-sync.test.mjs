@@ -134,3 +134,15 @@ test('recuperacion server-to-server usa token sensible y falla cerrado por organ
   assert.match(missingRecoveryRoute,/organizationFromRequest:\s*false/);
   assert.doesNotMatch(missingRecoveryRoute,/body\.organizationId|organization_id\s*:\s*body/);
 });
+
+
+test('recuperacion puntual de factura preserva el monto total fuente',()=>{
+  assert.match(sync,/totals_total: detail\.totals\?\.total \?\? detail\.totals_total \?\? detail\.totalAmount \?\? null/);
+});
+
+test('trazabilidad de facturas abiertas prioriza montos fuente incompletos',()=>{
+  const traceLib=fs.readFileSync('lib/integrations/laudus/native-invoice-trace.ts','utf8');
+  assert.match(traceLib,/a\.total_amount == null \? 1 : 0/);
+  assert.match(traceLib,/b\.total_amount == null \? 1 : 0/);
+  assert.match(traceLib,/totals_total: detail\.totals\?\.total \?\? detail\.totalAmount \?\? null/);
+});
