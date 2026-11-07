@@ -146,3 +146,9 @@ test('trazabilidad de facturas abiertas prioriza montos fuente incompletos',()=>
   assert.match(traceLib,/b\.total_amount == null \? 1 : 0/);
   assert.match(traceLib,/totals_total: detail\.totals\?\.total \?\? detail\.totalAmount \?\? null/);
 });
+
+
+test('monto incompleto no se omite aunque la traza figure completa',()=>{
+  const traceLib=fs.readFileSync('lib/integrations/laudus/native-invoice-trace.ts','utf8');
+  assert.match(traceLib,/row\.total_amount == null \|\| !complete\.has/);
+});
