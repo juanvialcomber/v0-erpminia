@@ -428,7 +428,7 @@ export function LaudusFinanceControlCard() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Exposición abierta</p>
             <p className="mt-3 text-4xl font-semibold tracking-tight">{isLoading ? '—' : compactMoney(openPayableAmount)}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {number(openPayables)} partidas abiertas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
+              {number(openPayables)} partidas abiertas en la fuente financiera. {number(overdueSharePct)}% del saldo está vencido.
             </p>
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <span><strong className="font-semibold text-destructive">{compactMoney(overduePayableAmount)}</strong> <span className="text-muted-foreground">vencido</span></span>
@@ -500,7 +500,7 @@ export function LaudusFinanceControlCard() {
         ) : (
           <div className="flex items-center gap-2 rounded-lg border p-4 text-sm">
             <BadgeCheck className="h-4 w-4"/>
-            Sin decisiones financieras urgentes detectadas en la evidencia Laudus disponible.
+            Sin decisiones financieras urgentes detectadas en la evidencia financiera disponible.
           </div>
         )}
 
@@ -604,7 +604,7 @@ export function LaudusFinanceControlCard() {
             <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
             <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
           </summary>
-          <section className="space-y-4 border-t p-4" aria-label="Lectura ejecutiva Laudus">
+          <section className="space-y-4 border-t p-4" aria-label="Lectura ejecutiva financiera">
           <div className="grid gap-4 xl:grid-cols-2">
             <div className="rounded-lg border bg-card p-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Cambios observables · 7 días</p>
@@ -629,7 +629,7 @@ export function LaudusFinanceControlCard() {
                 <div className="flex items-center justify-between gap-3 px-3 py-3">
                   <div>
                     <p className="text-sm font-medium">Pagos por verificar</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros con estado Laudus por revisar</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros financieros por revisar</p>
                   </div>
                   <Button asChild size="sm" variant="outline">
                     <Link href="/dashboard/finanzas/pagos">Revisar</Link>
@@ -670,7 +670,7 @@ export function LaudusFinanceControlCard() {
                             <div className="mb-4">
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Riesgo</p>
                               <h3 className="mt-1 text-base font-semibold">Aging de CxP abierta</h3>
-                              <p className="mt-1 text-xs text-muted-foreground">Distribución actual por antigüedad de vencimiento. Laudus · {shortDate(data?.accountsPayable?.latestSync)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">Distribución actual por antigüedad de vencimiento. Fuente financiera · {shortDate(data?.accountsPayable?.latestSync)}</p>
                             </div>
                             <div className="h-64 w-full">
                               <ResponsiveContainer width="100%" height="100%">
@@ -712,7 +712,7 @@ export function LaudusFinanceControlCard() {
                             {' '}El proveedor con mayor saldo abierto concentra {number(data?.accountsPayable?.topSupplierSharePct || 0)}%.
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Son concentraciones observadas en Laudus. No implican causalidad, prioridad de pago ni riesgo financiero definitivo sin conciliación.
+                            Son concentraciones observadas en la fuente financiera. No implican causalidad, prioridad de pago ni riesgo financiero definitivo sin conciliación.
                           </p>
                         </div>
               
@@ -775,7 +775,7 @@ export function LaudusFinanceControlCard() {
                   <div className="divide-y rounded-md border">
                     {(data?.accountsPayable?.oldestOpenItems || []).map((item) => (
                       <div key={item.externalId || item.documentNumber || item.dueDate || 'cxp'} className="grid gap-2 px-3 py-2 text-xs md:grid-cols-[minmax(0,1fr)_100px_120px_auto] md:items-center">
-                        <span className="truncate font-medium">{item.supplierName || 'Proveedor Laudus'}</span>
+                        <span className="truncate font-medium">{item.supplierName || 'Proveedor sin nombre'}</span>
                         <span className="text-muted-foreground">{item.documentNumber || 'Sin doc.'}</span>
                         <span className="text-muted-foreground">Vence {shortDate(item.dueDate)}</span>
                         <span className="text-right font-medium">
@@ -796,7 +796,7 @@ export function LaudusFinanceControlCard() {
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
                   <div>
                     <p className="text-sm font-medium">Pagos por verificar</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros con estado “no depositado” en Laudus</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{number(pendingDeposit)} registros con estado “no depositado” en la fuente financiera</p>
                   </div>
                   <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
                   <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
@@ -815,7 +815,7 @@ export function LaudusFinanceControlCard() {
                     ))}
                   </div>
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    Estado fuente Laudus. MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente.
+                    Estado informado por la fuente financiera. MOTIL no lo interpreta automáticamente como deuda, error bancario ni pago pendiente.
                   </p>
                 </div>
               </details>
@@ -863,7 +863,7 @@ export function LaudusFinanceControlCard() {
         </section>
 
         <p className="text-xs text-muted-foreground">
-          Solo lectura. Laudus sigue siendo fuente financiera; MOTIL organiza evidencia y decisiones sin escribir pagos, asientos ni documentos en el ERP.
+          Solo lectura. La fuente financiera conserva la autoridad contable; MOTIL organiza evidencia, prioriza decisiones y no escribe pagos, asientos ni documentos en el ERP.
         </p>
       </CardContent>
     </Card>
