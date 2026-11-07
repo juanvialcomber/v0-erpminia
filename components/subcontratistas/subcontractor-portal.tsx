@@ -68,6 +68,7 @@ type PortalSession = {
     status: string;
     submitted_at: string | null;
     created_at: string;
+    compliance_period: string | null;
     carpeta_documentos: PortalDoc[];
   } | null;
   docs: PortalDoc[];
@@ -87,6 +88,13 @@ const fetcher = async (url: string) => {
   }
   return payload as PortalSession;
 };
+
+function periodLabel(value?: string | null) {
+  if (!value) return 'Período no definido';
+  const date = new Date(`${value.slice(0, 10)}T12:00:00-03:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+}
 
 function statusBadge(status: string) {
   const normalized = String(status || '').toLowerCase();
@@ -366,6 +374,7 @@ function PortalContent({
             <p className="text-xs font-medium tracking-wide text-muted-foreground">MOTIL / Contratistas</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">{session.eecc?.name || 'Documentos'}</h1>
             <p className="mt-1 text-sm text-muted-foreground">RUT {session.session.rut_display}</p>
+            <p className="mt-1 text-xs font-medium text-primary">Cumplimiento · {periodLabel(session.carpeta?.compliance_period)}</p>
           </div>
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={handleLogout}>
             <LogOut className="h-4 w-4" /> Salir
@@ -498,6 +507,10 @@ function PortalContent({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Empresa</span>
                   <span className="font-medium">{session.eecc?.name || '-'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Período</span>
+                  <span className="font-medium">{periodLabel(session.carpeta?.compliance_period)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Carpeta</span>
