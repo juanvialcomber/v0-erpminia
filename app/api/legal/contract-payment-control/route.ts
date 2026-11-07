@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import {
+  LEGAL_CONTRACT_SOURCE_META,
   LEGAL_PROGRESS_MILESTONES,
   LEGAL_PROGRESS_SOURCE_FILE,
   LEGAL_PROGRESS_SOURCE_SHA256,
@@ -16,6 +17,23 @@ function normalizeTaxId(value: string | null | undefined) {
 function money(value: unknown) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function todayKey() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function daysBetween(dateValue: string | null | undefined, today: string) {
+  if (!dateValue) return null;
+  const target = new Date(`${dateValue}T12:00:00Z`).getTime();
+  const base = new Date(`${today}T12:00:00Z`).getTime();
+  if (!Number.isFinite(target) || !Number.isFinite(base)) return null;
+  return Math.round((target - base) / 86400000);
 }
 
 function classifyInvoicePayment(
@@ -64,7 +82,7 @@ export async function GET(request: NextRequest) {
   ];
   const { data: contracts, error: contractError } = await context.supabase
     .from('contracts')
-    .select('id,contract_number,title,contractor_name,contract_value,paid_amount,status,supplier_id')
+    .select('id,contract_number,title,contractor_name,contract_value,currency,paid_amount,status,supplier_id')
     .eq('organization_id', context.organizationId)
     .in('contract_number', contractNumbers);
 
@@ -200,14 +218,53 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const today = todayKey();
   const contractsSummary = contractNumbers.map((contractNumber) => {
     const contract = contractByNumber.get(contractNumber);
     const rows = milestones.filter((item) => item.contract_number === contractNumber);
+    const sourceMeta = LEGAL_CONTRACT_SOURCE_META[
+      contractNumber as keyof typeof LEGAL_CONTRACT_SOURCE_META
+    ];
+    const sourceTotal = rows.reduce((sum, item) => sum + money(item.total_amount), 0);
+    const sourceExecuted = rows.reduce((sum, item) => sum + money(item.executed_amount), 0);
+    const sourceInvoiced = rows.reduce((sum, item) => sum + money(item.invoiced_amount), 0);
+    const progressRatio = sourceTotal > 0 ? sourceExecuted / sourceTotal : null;
+    const contractValue = money(contract?.contract_value);
+    const contractCurrency = String(contract?.currency || 'CLP');
+    const comparableCurrency = rows.length > 0 && rows.every((item) => item.currency === contractCurrency);
+    const financialExposure = comparableCurrency
+      ? Math.max(sourceExecuted, sourceInvoiced, money(contract?.paid_amount))
+      : 0;
+    const overrunTolerance = Math.max(1, contractValue * 0.001);
+    const budgetOverrun = comparableCurrency && contractValue > 0 && financialExposure > contractValue + overrunTolerance;
+    const daysToEnd = daysBetween(sourceMeta?.endDate, today);
+    const completed = progressRatio !== null && progressRatio >= 0.999;
+    const attentionReasons: string[] = [];
+
+    if (budgetOverrun) {
+      attentionReasons.push('Monto ejecutado/facturado/pagado comparable supera el valor contractual por sobre la tolerancia.');
+    }
+    if (!completed && daysToEnd !== null && daysToEnd < 0) {
+      attentionReasons.push('La fecha de término informada en la planilla fuente ya pasó y el avance estructurado no está al 100%.');
+    } else if (!completed && daysToEnd !== null && daysToEnd >= 0 && daysToEnd <= 15) {
+      attentionReasons.push('La fecha de término informada en la planilla fuente vence dentro de 15 días.');
+    }
+
+    const attentionState =
+      budgetOverrun || (!completed && daysToEnd !== null && daysToEnd < 0)
+        ? 'red'
+        : !completed && daysToEnd !== null && daysToEnd >= 0 && daysToEnd <= 15
+          ? 'yellow'
+          : completed
+            ? 'green'
+            : 'neutral';
+
     return {
       contract_number: contractNumber,
       title: contract?.title || null,
       contractor_name: contract?.contractor_name || null,
-      contract_value: money(contract?.contract_value),
+      contract_value: contractValue,
+      contract_currency: contractCurrency,
       contract_paid_amount: money(contract?.paid_amount),
       milestones: rows.length,
       milestones_started: rows.filter((item) => item.progress_ratio > 0).length,
@@ -220,6 +277,14 @@ export async function GET(request: NextRequest) {
       invoice_matches: rows.reduce((sum, item) => sum + item.matched_invoice_count, 0),
       invoice_expected: rows.reduce((sum, item) => sum + item.invoice_count, 0),
       detail_available: detailContractNumbers.has(contractNumber),
+      source_start_date: sourceMeta?.startDate || null,
+      source_end_date: sourceMeta?.endDate || null,
+      source_schedule_note: sourceMeta?.note || null,
+      source_progress_ratio: progressRatio,
+      days_to_end: daysToEnd,
+      budget_overrun: budgetOverrun,
+      attention_state: attentionState,
+      attention_reasons: attentionReasons,
     };
   });
 
@@ -232,6 +297,9 @@ export async function GET(request: NextRequest) {
       invoices_expected: milestones.reduce((sum, item) => sum + item.invoice_count, 0),
       invoices_matched: milestones.reduce((sum, item) => sum + item.matched_invoice_count, 0),
       retained_milestones: milestones.filter((item) => item.payment_state === 'paid_with_retention').length,
+      contracts_red: contractsSummary.filter((item) => item.attention_state === 'red').length,
+      contracts_yellow: contractsSummary.filter((item) => item.attention_state === 'yellow').length,
+      contracts_green: contractsSummary.filter((item) => item.attention_state === 'green').length,
       source_file: LEGAL_PROGRESS_SOURCE_FILE,
       source_file_sha256: LEGAL_PROGRESS_SOURCE_SHA256,
     },
@@ -240,6 +308,7 @@ export async function GET(request: NextRequest) {
       payment_truth: 'El estado de pago proviene de Laudus sólo cuando proveedor + número de factura coinciden.',
       retention: 'Pago parcial se clasifica como pagado con retención sólo cuando el saldo Laudus coincide con la retención informada en la planilla.',
       no_inference: 'MOTIL no convierte facturado en pagado ni avance físico en autorización de pago.',
+      schedule: 'El semáforo usa fechas de término de la planilla fuente de Elías. Rojo/amarillo son señales de revisión, no declaraciones automáticas de incumplimiento.',
     },
   });
 }
