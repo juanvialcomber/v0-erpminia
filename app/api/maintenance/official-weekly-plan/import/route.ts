@@ -7,6 +7,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { loadXlsxModule, sheetToMatrix, type XlsxCellValue } from '@/lib/xlsx';
 import { POST as createWorkOrder } from '@/app/api/maintenance/work-orders/route';
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const BUCKET = 'maintenance-work-order-evidence';
@@ -110,7 +111,7 @@ function parseProgram(sheetName:string,rows:XlsxCellValue[][]){
    }
   }
  }
- return {mine,weekStart,weekEnd:addDays(weekStart,6),items,declaredCount};
+ return {sheetName,mine,weekStart,weekEnd:addDays(weekStart,6),items,declaredCount};
 }
 
 export async function POST(request:NextRequest){
@@ -134,7 +135,7 @@ export async function POST(request:NextRequest){
 
  const {data:existing}=await context.supabase.from('planning_weekly_work_sources')
   .select('id,mine,week_start,week_end,is_current').eq('organization_id',context.organizationId)
-  .eq('source_sha256',sha256).eq('source_sheet',workbook.SheetNames[0]).maybeSingle();
+  .eq('source_sha256',sha256).eq('source_sheet',program.sheetName).maybeSingle();
  if(existing)return NextResponse.json({ok:true,duplicate:true,source:existing,summary:{parsed:program.items.length,declared:program.declaredCount,mismatch:program.declaredCount!=null&&program.declaredCount!==program.items.length}});
 
  const storagePath=`${context.organizationId}/weekly-programs/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g,'_')}`;
@@ -144,7 +145,7 @@ export async function POST(request:NextRequest){
  try{
   const mismatch=program.declaredCount!=null&&program.declaredCount!==program.items.length;
   const {data:source,error:sourceError}=await context.supabase.from('planning_weekly_work_sources').insert({
-   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:workbook.SheetNames[0],
+   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:program.sheetName,
    source_url:`storage:${BUCKET}/${storagePath}`,mine:program.mine,week_start:program.weekStart,week_end:program.weekEnd,
    reported_at:new Date().toISOString(),source_owner:'Ariel López',status:mismatch?'review_required':'official_source',is_current:false,
   }).select('id,mine,week_start,week_end,status').single();
@@ -182,7 +183,7 @@ export async function POST(request:NextRequest){
   const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
   if(promoteError)throw promoteError;
 
-  const today=new Date().toISOString().slice(0,10);
+  const today=chileTodayDateKey();
   const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,errors:[] as string[]};
   for(const item of insertedItems){
    const status=normalize(item.source_status);
