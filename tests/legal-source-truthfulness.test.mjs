@@ -10,9 +10,10 @@ test('legal overview preserves source uncertainty and never fabricates operation
   const tracker = await readFile(trackerUrl, 'utf8');
 
   assert.match(page, /if \(!response\.ok\) throw new Error/);
-  assert.match(page, /coverageError \? '—'/);
+  assert.match(page, /coverageError \?/);
   assert.match(page, /inboxError/);
-  assert.match(page, /No se pudo actualizar la bandeja/);
+  assert.match(page, /No se pudo actualizar el trabajo pendiente/);
+  assert.match(page, /Revisión no disponible|Cumplimiento no disponible/);
   assert.doesNotMatch(page, /new Date\(\)\.toISOString\(\)/);
   assert.doesNotMatch(page, /Cumplimiento.*100%|Cumplimiento.*0%/);
 
