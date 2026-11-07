@@ -160,6 +160,15 @@ set entity_id=excluded.entity_id,
 
 -- Asignaciones de pago cuya factura referenciada aun no esta disponible en la capa Laudus local.
 -- No invalida el pago: conserva la relacion como evidencia hasta completar o reconciliar la factura.
+with limite_facturas as (
+  select organization_id,
+         min((external_id)::bigint) filter (where external_id ~ '^[0-9]+
+) as min_external_id_local,
+         max((external_id)::bigint) filter (where external_id ~ '^[0-9]+
+) as max_external_id_local
+  from integration.laudus_purchase_invoices
+  group by organization_id
+)
 insert into public.data_reconciliation_reviews
   (organization_id, issue_key, entity_type, entity_id, issue_type, field_name, status, evidence_reference, updated_at)
 select
@@ -168,7 +177,19 @@ select
     a.payment_external_id || ':' || coalesce(a.payment_item_id,'sin_item') || ':' || a.purchase_invoice_external_id,
   'payment',
   null,
-  'factura_referenciada_no_disponible',
+  case
+    when a.purchase_invoice_external_id ~ '^[0-9]+
+
+         and l.min_external_id_local is not null
+         and (a.purchase_invoice_external_id)::bigint < l.min_external_id_local
+      then 'factura_fuera_del_backfill_local'
+    when a.purchase_invoice_external_id ~ '^[0-9]+
+
+         and l.min_external_id_local is not null
+         and (a.purchase_invoice_external_id)::bigint between l.min_external_id_local and l.max_external_id_local
+      then 'factura_faltante_dentro_del_rango_cargado'
+    else 'factura_referenciada_no_disponible'
+  end,
   'factura',
   'open',
   concat('laudus_purchase_payment_allocations:',
@@ -179,14 +200,19 @@ select
          ' | proveedor=',coalesce(a.supplier_name,a.supplier_external_id,'sin_dato'),
          ' | monto_aplicado=',a.applied_amount::text,
          ' | moneda=',a.currency_code,
+         ' | minimo_id_factura_local=',coalesce(l.min_external_id_local::text,'sin_dato'),
+         ' | maximo_id_factura_local=',coalesce(l.max_external_id_local::text,'sin_dato'),
          ' | sincronizado=',coalesce(a.synced_at::text,'sin_dato')),
   now()
 from integration.laudus_purchase_payment_allocations a
 left join integration.laudus_purchase_invoices i
   on i.organization_id=a.organization_id
  and i.external_id=a.purchase_invoice_external_id
+left join limite_facturas l
+  on l.organization_id=a.organization_id
 where i.id is null
 on conflict (organization_id,issue_key) do update
-set evidence_reference=excluded.evidence_reference,
+set issue_type=excluded.issue_type,
+    evidence_reference=excluded.evidence_reference,
     updated_at=now(),
     status=case when data_reconciliation_reviews.status='ignored' then 'ignored' else 'open' end;
