@@ -3,7 +3,7 @@ import { buildEvidenceState, type SkillEvidenceFacts } from './source-state';
 import { buildSkillAvailability } from './availability';
 
 type CountResult = { count: number | null; error: { message: string } | null };
-export type SkillRuntimeDomain = 'maintenance' | 'inventory' | 'procurement' | 'finance' | 'data_health' | 'executive';
+export type SkillRuntimeDomain = 'maintenance' | 'inventory' | 'procurement' | 'finance' | 'legal' | 'data_health' | 'executive';
 
 const emptyCount = (): Promise<CountResult> => Promise.resolve({ count: 0, error: null });
 
@@ -24,8 +24,9 @@ export async function resolveMotilSkillAvailability(
   const canInventory = allowed.has('inventory') || allowed.has('executive');
   const canProcurement = allowed.has('procurement') || allowed.has('executive');
   const canFinance = allowed.has('finance') || allowed.has('executive');
+  const canLegal = allowed.has('legal') || allowed.has('executive');
   const canDataHealth = allowed.has('data_health') || allowed.has('executive');
-  const canExternal = canMaintenance || canInventory || canProcurement || canFinance || canDataHealth;
+  const canExternal = canMaintenance || canInventory || canProcurement || canFinance || canLegal || canDataHealth;
 
   const [
     products,
@@ -39,6 +40,8 @@ export async function resolveMotilSkillAvailability(
     maintenance,
     assets,
     procurementRequests,
+    legalContracts,
+    legalInvoiceEvidence,
   ] = await Promise.all([
     (canInventory || canProcurement || canMaintenance)
       ? exists(context.supabase.schema('canonical').from('products').select('id', { count: 'exact', head: true }).eq('organization_id', org))
@@ -72,6 +75,12 @@ export async function resolveMotilSkillAvailability(
       : emptyCount().then(() => false),
     (canProcurement || canMaintenance)
       ? exists(context.supabase.from('procurement_intake_requests').select('id', { count: 'exact', head: true }).eq('organization_id', org))
+      : emptyCount().then(() => false),
+    canLegal
+      ? exists(context.supabase.from('contracts').select('id', { count: 'exact', head: true }).eq('organization_id', org))
+      : emptyCount().then(() => false),
+    canLegal
+      ? exists(context.supabase.from('laudus_purchase_invoice_payment_status_service_v1').select('purchase_invoice_external_id', { count: 'exact', head: true }).eq('organization_id', org))
       : emptyCount().then(() => false),
   ]);
 
@@ -143,6 +152,8 @@ export async function resolveMotilSkillAvailability(
     maintenance,
     assets,
     procurementRequests,
+    legalContracts,
+    legalInvoiceEvidence,
     laudus,
     laudusFixedAssets,
   });

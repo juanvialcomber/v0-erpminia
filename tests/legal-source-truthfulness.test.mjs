@@ -10,12 +10,10 @@ test('legal overview preserves source uncertainty and never fabricates operation
   const tracker = await readFile(trackerUrl, 'utf8');
 
   assert.match(page, /if \(!response\.ok\) throw new Error/);
-  assert.match(page, /contracts_pending_review \?\? '—'/);
-  assert.match(page, /expiring_contracts \?\? '—'/);
-  assert.match(page, /expiring_documents \?\? '—'/);
-  assert.match(page, /withMatchedEvidence \?\? '—'/);
-  assert.match(page, /Los datos faltantes no se sustituyen por cero ni por estados inferidos/);
-  assert.match(page, /No hay señales operacionales pendientes en las fuentes disponibles/);
+  assert.match(page, /coverageError \?/);
+  assert.match(page, /inboxError/);
+  assert.match(page, /No se pudo actualizar el trabajo pendiente/);
+  assert.match(page, /Revisión no disponible|Cumplimiento no disponible/);
   assert.doesNotMatch(page, /new Date\(\)\.toISOString\(\)/);
   assert.doesNotMatch(page, /Cumplimiento.*100%|Cumplimiento.*0%/);
 

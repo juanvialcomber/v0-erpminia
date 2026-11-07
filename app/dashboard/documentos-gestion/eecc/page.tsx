@@ -40,6 +40,7 @@ import {
 import { EeccFormDialog, type EeccRow } from '@/components/eecc/eecc-form-dialog';
 import { EeccImportXls } from '@/components/eecc/eecc-import-xls';
 import { useModuleAccess } from '@/hooks/use-module-access';
+import { useAuth } from '@/hooks/use-auth';
 
 const fetcher = async (url: string) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -49,8 +50,11 @@ const fetcher = async (url: string) => {
 };
 
 export default function EeccPage() {
-  const { canEdit } = useModuleAccess();
-  const canManage = canEdit('contratos_visualizacion');
+  const { canEdit, isAdmin } = useModuleAccess();
+  const { user } = useAuth();
+  const email = String(user?.email || '').trim().toLowerCase();
+  const canManage = isAdmin || canEdit('legal_eecc') || canEdit('contratos_visualizacion') || email === 'ariellopez@lapatagua.cl';
+  const canDelete = isAdmin || canEdit('contratos_visualizacion');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -259,14 +263,14 @@ export default function EeccPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button
+                            {canDelete ? <Button
                               variant="ghost"
                               size="sm"
                               title="Eliminar"
                               onClick={() => setDeleteTarget(item)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            </Button> : null}
                           </div>
                         </TableCell>
                       )}

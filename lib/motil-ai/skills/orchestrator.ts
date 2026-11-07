@@ -2,6 +2,7 @@ import { getMotilSkill, type MotilSkill } from './catalog';
 import { routeOrDefault } from './router';
 
 const RELATED: Record<string, string[]> = {
+  'legal-contract-payment-control': ['laudus-source-reconciliation', 'accounts-payable-exposure'],
   'maintenance-cost-trace': ['purchase-price-variance', 'supplier-performance', 'asset-financial-360'],
   'inventory-stock-risk': ['purchase-need-context', 'supplier-performance', 'purchase-price-variance'],
   'procurement-three-way-match': ['dte-procurement-check', 'supplier-performance', 'accounts-payable-exposure'],

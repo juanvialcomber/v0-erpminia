@@ -107,7 +107,7 @@ function Row({ title, meta, value }: { title: string; meta: string; value: strin
 function LaudusFinancePanel({ financial }: { financial?: LaudusFinancial }) {
   if (!financial?.linked) {
     return <section className="rounded-lg border bg-card p-5">
-      <div className="flex items-start gap-3"><WalletCards className="mt-0.5 h-5 w-5 text-muted-foreground"/><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Laudus</p><h3 className="mt-1 font-semibold">Sin vínculo financiero confirmado</h3><p className="mt-1 text-sm text-muted-foreground">MOTIL no asociará facturas ni pagos por nombre aproximado. El proveedor debe estar conciliado con Laudus antes de mostrar exposición financiera.</p></div></div>
+      <div className="flex items-start gap-3"><WalletCards className="mt-0.5 h-5 w-5 text-muted-foreground"/><div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas</p><h3 className="mt-1 font-semibold">Sin vínculo financiero confirmado</h3><p className="mt-1 text-sm text-muted-foreground">MOTIL no asociará facturas ni pagos por nombre aproximado. El proveedor debe estar conciliado con la fuente financiera antes de mostrar exposición financiera.</p></div></div>
     </section>;
   }
 
@@ -121,8 +121,8 @@ function LaudusFinancePanel({ financial }: { financial?: LaudusFinancial }) {
 
   return <section className="rounded-lg border bg-card">
     <div className="flex flex-col gap-2 border-b p-5 sm:flex-row sm:items-end sm:justify-between">
-      <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas · Laudus</p><h3 className="mt-1 text-lg font-semibold">Exposición financiera</h3><p className="mt-1 text-sm text-muted-foreground">Lectura financiera reconciliada. Laudus conserva la autoridad contable y MOTIL no modifica sus registros.</p></div>
-      <p className="text-xs text-muted-foreground">Laudus · actualizado {sourceDate} · {sourceHealthy ? 'fuente saludable' : 'fuente requiere revisión'}</p>
+      <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Finanzas</p><h3 className="mt-1 text-lg font-semibold">Exposición financiera</h3><p className="mt-1 text-sm text-muted-foreground">Lectura financiera reconciliada. La fuente financiera conserva la autoridad contable y MOTIL no modifica sus registros.</p></div>
+      <p className="text-xs text-muted-foreground">Actualizado {sourceDate} · {sourceHealthy ? 'fuente saludable' : 'fuente requiere revisión'}</p>
     </div>
     {!complete ? <div className="m-5 flex gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-4 text-sm"><AlertTriangle className="h-4 w-4 shrink-0"/><p>Cobertura parcial: {financial.coverage.returnedRows} de {financial.coverage.totalRows} facturas. No se publican totales incompletos.</p></div>
     : summaries.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No hay historia financiera con moneda verificable para este proveedor.</p>

@@ -35,9 +35,17 @@ type ObservedPayables = { source:string; readOnly:boolean; openItems:number; ope
 type PaymentReviewRow = { purchase_invoice_external_id:string; doc_number?:string|null; supplier_name?:string|null; total_amount:number; currency:string; paid_amount:number; excess_amount:number; payment_count:number; last_payment_at?:string|null; review_reason:'exact_double_total'|'additional_partial_excess' };
 type PaymentReview = { source:string; readOnly:boolean; itemCount:number; excessAmountClp:number; exactDoubleCount:number; exactDoubleAmountClp:number; additionalPartialCount:number; additionalPartialAmountClp:number; rows:PaymentReviewRow[]; semantics:string };
 type DialogMode = 'due' | 'pay' | 'reconcile' | null;
+type PaymentRequest = {
+  id:string;payable_id:string;amount:number;currency:string;requested_payment_date?:string|null;status:string;required_signatures:number;request_note?:string|null;created_by:string;created_at:string;
+  approved_signatures:number;rejected_signatures:number;can_current_user_sign:boolean;
+  payable?:{invoice_number:string;supplier_name:string;approved_amount:number;due_date?:string|null;status:string;paid_amount:number;outstanding_amount:number}|null;
+};
+type PaymentRequestsPayload={data:PaymentRequest[];policy:{separation:string;execution:string}};
 
 export default function PayablesPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/finance/payables', fetcher);
+  const canEdit = data?.canEdit === true;
+  const { data: paymentRequestsData, mutate: mutatePaymentRequests } = useSWR<PaymentRequestsPayload>(canEdit ? '/api/finance/payment-requests' : null, fetcher);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
@@ -50,10 +58,11 @@ export default function PayablesPage() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [reconciliationReference, setReconciliationReference] = useState('');
   const [reconciliationNotes, setReconciliationNotes] = useState('');
+  const [signatureConfirm,setSignatureConfirm]=useState<{id:string;decision:'approved'|'rejected'}|null>(null);
+  const [signatureNote,setSignatureNote]=useState('');
 
   const payables: Payable[] = data?.payables || [];
   const payments: Payment[] = data?.payments || [];
-  const canEdit = data?.canEdit === true;
   const observedPayables: ObservedPayables | null = data?.observedPayables || null;
   const paymentReview: PaymentReview | null = data?.paymentReview || null;
 
@@ -89,6 +98,21 @@ export default function PayablesPage() {
   }, [overdue]);
 
   const overdueSupplierConcentration = overdueBySupplier.slice(0, 5).reduce((sum, item) => sum + item.sharePct, 0);
+
+  const signPaymentRequest=async()=>{
+    if(!signatureConfirm)return;
+    if(signatureConfirm.decision==='rejected'&&!signatureNote.trim())return setMessage('El rechazo requiere una observación.');
+    setBusy(true);setMessage(null);
+    try{
+      const response=await fetch('/api/finance/payment-requests',{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({requestId:signatureConfirm.id,decision:signatureConfirm.decision,note:signatureNote.trim()||null})});
+      const payload=await response.json().catch(()=>null);
+      if(!response.ok)throw new Error(payload?.error||'No se pudo registrar la firma');
+      setMessage(payload.status==='approved'?'Solicitud con firmas completas. Aún no se ejecutó el pago.':payload.status==='rejected'?'Solicitud rechazada.':'Firma registrada; faltan firmas.');
+      setSignatureConfirm(null);setSignatureNote('');
+      await mutatePaymentRequests();
+    }catch(error){setMessage(error instanceof Error?error.message:'No se pudo registrar la firma');}
+    finally{setBusy(false);}
+  };
 
   const post = async (body: unknown) => {
     setBusy(true); setMessage(null);
@@ -130,7 +154,7 @@ export default function PayablesPage() {
   };
 
   let nextTitle = 'Sin CxP MOTIL pendientes';
-  let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en Laudus se revisa en Resumen y Proveedores.';
+  let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en la fuente financiera se revisa en Resumen y Proveedores.';
   let nextControl: React.ReactNode = null;
   if (dueMissing.length) {
     nextTitle = 'Definir vencimiento';
@@ -155,6 +179,29 @@ export default function PayablesPage() {
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
+    {canEdit && paymentRequestsData?.data?.some((row)=>row.status==='pending_signatures') ? (
+      <Card className="shadow-none">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Aprobación humana</p><CardTitle className="mt-1">Solicitudes por firmar</CardTitle><CardDescription>Dos firmas distintas son obligatorias. Firmar no ejecuta la transferencia.</CardDescription></div>
+            <Badge variant="outline">{paymentRequestsData.data.filter((row)=>row.status==='pending_signatures').length} pendientes</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {paymentRequestsData.data.filter((row)=>row.status==='pending_signatures').slice(0,8).map((row)=>(
+            <div key={row.id} className="rounded-lg border p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div><p className="text-sm font-semibold">{row.payable?.supplier_name||'Proveedor'} · Factura {row.payable?.invoice_number||'s/n'}</p><p className="mt-1 text-xs text-muted-foreground">{money(row.amount,row.currency)} · {row.approved_signatures}/{row.required_signatures} firmas</p>{row.request_note?<p className="mt-2 text-xs text-muted-foreground">{row.request_note}</p>:null}</div>
+                {row.can_current_user_sign ? <div className="flex gap-2"><Button size="sm" variant="outline" onClick={()=>{setSignatureConfirm({id:row.id,decision:'rejected'});setSignatureNote('');}}>Rechazar</Button><Button size="sm" onClick={()=>{setSignatureConfirm({id:row.id,decision:'approved'});setSignatureNote('');}}>Aprobar</Button></div>:<Badge variant="secondary">Esperando otra firma</Badge>}
+              </div>
+              {signatureConfirm?.id===row.id ? <div className="mt-3 space-y-2 border-t pt-3"><p className="text-xs font-medium">{signatureConfirm.decision==='approved'?'Confirmar aprobación':'Motivo del rechazo'}</p>{signatureConfirm.decision==='rejected'?<Textarea value={signatureNote} onChange={(event)=>setSignatureNote(event.target.value)} placeholder="Observación obligatoria"/>:<p className="text-xs text-muted-foreground">Esta firma no ejecuta pago; sólo avanza la solicitud.</p>}<div className="flex justify-end gap-2"><Button size="sm" variant="outline" onClick={()=>{setSignatureConfirm(null);setSignatureNote('');}}>Cancelar</Button><Button size="sm" disabled={busy||signatureConfirm.decision==='rejected'&&!signatureNote.trim()} onClick={()=>void signPaymentRequest()}>{busy?'Guardando…':'Confirmar'}</Button></div></div>:null}
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">{paymentRequestsData.policy.separation} {paymentRequestsData.policy.execution}</p>
+        </CardContent>
+      </Card>
+    ) : null}
+
     <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card>
 
     {observedPayables && observedPayables.openItems > 0 ? (
@@ -163,10 +210,10 @@ export default function PayablesPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Exposición observada</p>
-              <CardTitle className="mt-1">CxP visible desde Laudus</CardTitle>
+              <CardTitle className="mt-1">Exposición financiera observada</CardTitle>
               <CardDescription>{observedPayables.semantics}</CardDescription>
             </div>
-            <Badge variant="outline">Laudus · sólo lectura</Badge>
+            <Badge variant="outline">Fuente financiera · sólo lectura</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -210,7 +257,7 @@ export default function PayablesPage() {
               <CardTitle className="mt-1">Aplicaciones de pago por revisar</CardTitle>
               <CardDescription>{paymentReview.semantics}</CardDescription>
             </div>
-            <Badge variant="outline">Laudus · sólo lectura</Badge>
+            <Badge variant="outline">Fuente financiera · sólo lectura</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -243,7 +290,7 @@ export default function PayablesPage() {
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">Revisar comprobantes, anticipos y notas de crédito antes de cualquier ajuste. MOTIL no modifica estos pagos.</p>
+          <p className="text-xs text-muted-foreground">Revisar comprobantes, anticipos y notas de crédito antes de cualquier ajuste. MOTIL no modifica los registros contables de origen.</p>
         </CardContent>
       </Card>
     ) : null}
@@ -292,7 +339,7 @@ export default function PayablesPage() {
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
-      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que Laudus no tenga exposición abierta.</p> : null}
+      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
 

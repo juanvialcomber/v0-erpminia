@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/guard';
+import { requireEeccProfileManager } from '@/lib/api/eecc-profile-access';
 import { createEecc, listEeccForOrganization } from '@/lib/api/eecc';
 
 export async function GET(request: NextRequest) {
@@ -23,9 +24,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized || !auth.organizationId || !auth.user) {
-    return auth.response || NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const manager = await requireEeccProfileManager(request);
+  if (!manager.authorized) return manager.response;
+  const auth = manager.auth;
+  if (!auth.organizationId || !auth.user) {
+    return NextResponse.json({ error: 'Contexto de organización no disponible' }, { status: 403 });
   }
 
   try {

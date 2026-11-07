@@ -38,7 +38,7 @@ test('finance payables API is finance-authorized and tenant scoped',()=>{
 test('finance navigation exposes the payments workspace with honest empty states',()=>{
   assert.match(layout,/\/dashboard\/finanzas\/pagos/);
   assert.match(page,/No hay cuentas por pagar aprobadas en MOTIL/);
-  assert.match(page,/Esto no significa que Laudus no tenga exposición abierta/);
+  assert.match(page,/Esto no significa que la fuente financiera no tenga exposición abierta/);
   assert.match(page,/CxP MOTIL pendientes/);
   assert.match(page,/No hay pagos registrados/);
 });
@@ -58,8 +58,8 @@ test('treasury exposes Laudus open exposure as read-only evidence without creati
   assert.match(route,/observedPayables/);
   assert.match(route,/readOnly: true/);
   assert.match(route,/No constituye una CxP aprobada en MOTIL ni habilita pagos/);
-  assert.match(page,/CxP visible desde Laudus/);
-  assert.match(page,/Laudus · sólo lectura/);
+  assert.match(page,/Exposición financiera observada/);
+  assert.match(page,/Fuente financiera · sólo lectura/);
   assert.match(page,/No se puede registrar pago desde estas partidas hasta que la obligación sea promovida y aprobada en MOTIL/);
 });
 
@@ -81,7 +81,7 @@ test('treasury surfaces Laudus payment overapplications as read-only review evid
   assert.match(page,/Aplicaciones de pago por revisar/);
   assert.match(page,/Duplicado exacto/);
   assert.match(page,/Pago adicional parcial/);
-  assert.match(page,/MOTIL no modifica estos pagos/);
+  assert.match(page,/MOTIL no modifica los registros contables de origen/);
 });
 
 

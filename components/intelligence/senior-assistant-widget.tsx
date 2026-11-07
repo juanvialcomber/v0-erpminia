@@ -138,6 +138,13 @@ const specialistConfig = {
     placeholder: 'Pregunta al Asistente de Documentos…',
     toolCopy: documentsToolCopy,
   },
+  legal: {
+    endpoint: '/api/legal/asistente',
+    loadingCopy: 'Cargando contratos, pagos, proveedores y evidencia legal…',
+    emptyCopy: 'Pregunta por contratos, estados de pago, proveedores, vencimientos, permisos o transferencias. El asistente separa avance, facturación y pago.',
+    placeholder: 'Pregunta al Asistente Legal MOTIL…',
+    toolCopy: documentsToolCopy,
+  },
   data_health: {
     endpoint: '/api/data-quality/assistant',
     loadingCopy: 'Cargando salud y cobertura de fuentes autorizadas…',
@@ -165,6 +172,7 @@ const controlledMemoryDomains = new Set<string>([
   'production',
   'finance',
   'documents',
+  'legal',
   'data_health',
 ]);
 

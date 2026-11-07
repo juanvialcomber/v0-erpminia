@@ -9,6 +9,7 @@ export type AssistantDomain =
   | 'production'
   | 'finance'
   | 'documents'
+  | 'legal'
   | 'data_health'
   | 'executive';
 
@@ -114,6 +115,19 @@ const CONTEXTS: Array<AssistantContext & { prefixes: string[] }> = [
     ],
   },
   {
+    domain: 'legal',
+    prefixes: ['/dashboard/legal'],
+    label: 'Legal',
+    title: 'Asistente Legal MOTIL',
+    scopeHint: 'Parte desde contratos, estados de pago, proveedores, cumplimiento, permisos y evidencia financiera visible para Legal.',
+    capabilities: ['documents', 'finance'],
+    suggestedPrompts: [
+      '¿Qué contratos requieren atención hoy?',
+      '¿Qué falta pagar y qué evidencia respalda ese estado?',
+      '¿Qué proveedores o permisos tienen vencimientos pendientes?',
+    ],
+  },
+  {
     domain: 'data_health',
     prefixes: ['/dashboard/calidad-datos', '/dashboard/auditoria-operacional'],
     label: 'Calidad de Datos',
@@ -177,5 +191,5 @@ export function resolveAssistantContext(pathname: string): AssistantContext {
 }
 
 export function isAssistantDomain(value: unknown): value is AssistantDomain {
-  return ['global', 'maintenance', 'geology', 'inventory', 'procurement', 'production', 'finance', 'documents', 'data_health', 'executive'].includes(String(value || ''));
+  return ['global', 'maintenance', 'geology', 'inventory', 'procurement', 'production', 'finance', 'documents', 'legal', 'data_health', 'executive'].includes(String(value || ''));
 }

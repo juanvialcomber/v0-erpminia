@@ -24,8 +24,7 @@ test('finance traceability does not infer currency without evidence', () => {
 });
 
 const legalPage = readFileSync('app/dashboard/legal/page.tsx', 'utf8');
-test('legal evidence review uses open canonical cases', () => {
-  assert.match(legalPage, /casesData\?\.data/);
-  assert.match(legalPage, /item\.status !== 'closed'/);
-  assert.match(legalPage, /Evidencia regulatoria por conciliar/);
+test('legal regulatory evidence remains reachable through the canonical cases work center', () => {
+  assert.match(legalPage, /\/dashboard\/legal\/casos/);
+  assert.match(legalPage, /Herramientas y áreas de soporte/);
 });

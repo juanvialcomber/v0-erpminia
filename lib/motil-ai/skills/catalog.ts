@@ -6,7 +6,8 @@ export type MotilSkillDomain =
   | 'supplier'
   | 'asset'
   | 'integration'
-  | 'data_quality';
+  | 'data_quality'
+  | 'legal';
 
 export type MotilSkillRisk = 'read_only' | 'review_required' | 'human_action_required';
 
@@ -23,6 +24,16 @@ export type MotilSkill = {
 };
 
 export const MOTIL_CONTEXTUAL_SKILLS: MotilSkill[] = [
+  {
+    key: 'legal-contract-payment-control',
+    name: 'Control contractual y pagos',
+    domain: 'legal',
+    summary: 'Une avance contractual, OC, factura, retención y pago Laudus para que Legal trabaje excepciones sin confundir facturado con pagado.',
+    evidence: ['contracts', 'laudus_purchase_invoice_payment_status_service_v1'],
+    outputs: ['contract progress', 'verified invoice', 'payment status', 'retention state', 'exception', 'next action'],
+    risk: 'review_required',
+    requiresSyncedData: ['laudus'],
+  },
   {
     key: 'laudus-source-reconciliation',
     name: 'Conciliar Laudus con MOTIL',

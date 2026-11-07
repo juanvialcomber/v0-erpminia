@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { listLaudus, listLaudusWithOrderFallback } from '@/lib/integrations/laudus/client';
 import { futureIssuedDateIncidents, reconcileFutureIssuedDateIncidents } from '@/lib/integrations/laudus/data-quality';
+import { syncLegalContractInvoiceTraces } from '@/lib/legal/contract-invoice-trace-sync';
 import {
   markLaudusSyncFailure,
   markLaudusSyncRunning,
@@ -236,6 +237,16 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
     });
     if (refresh.error) throw new Error('motil_refresh_laudus_financial_staging failed');
 
+    let legalTraceRecovery: Awaited<ReturnType<typeof syncLegalContractInvoiceTraces>> | null = null;
+    let legalTraceRecoveryError: string | null = null;
+    try {
+      legalTraceRecovery = await syncLegalContractInvoiceTraces(organizationId, db);
+      apiCalls += Number(legalTraceRecovery.apiCalls || 0);
+    } catch (error) {
+      legalTraceRecoveryError = error instanceof Error ? error.message : 'No se pudo recuperar trazabilidad Legal';
+      console.error('[laudus/procurement:legal-trace-recovery]', error);
+    }
+
     const partial = orders.partial || invoices.partial || payments.partial;
     const processed = ordersProcessed + invoicesProcessed + paymentsProcessed;
 
@@ -252,6 +263,8 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
         paymentAllocations: flattenedPayments.length,
         paymentCoverage: 'verified_v2_list',
         accountsPayableDerived: true,
+        legalTraceRecovery,
+        legalTraceRecoveryError,
         futureIssuedDateIncidents: futureDateIncidents.length,
         futureIssuedDateQuality: quality,
       },

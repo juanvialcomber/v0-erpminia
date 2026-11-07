@@ -1,6 +1,7 @@
 import type { SkillAvailability } from './availability';
 
 const PROMPTS: Record<string, string> = {
+  'legal-contract-payment-control': '¿Qué contratos, hitos o pagos requieren atención de Legal hoy?',
   'laudus-source-reconciliation': '¿Qué datos de Laudus requieren conciliación antes de usarlos?',
   'inventory-stock-risk': '¿Qué stock requiere atención ahora y por qué?',
   'procurement-three-way-match': '¿Qué compras tienen diferencias entre OC, recepción y factura?',
@@ -32,6 +33,11 @@ const PROMPTS: Record<string, string> = {
 };
 
 const DOMAIN_PRIORITY: Record<string, string[]> = {
+  legal: [
+    'legal-contract-payment-control',
+    'laudus-source-reconciliation',
+    'accounts-payable-exposure',
+  ],
   maintenance: [
     'work-order-readiness',
     'maintenance-procurement-urgency',

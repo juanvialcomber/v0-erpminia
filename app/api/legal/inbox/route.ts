@@ -40,6 +40,13 @@ function daysFromToday(value: string | null, today: string) {
   return Math.round((target - base) / 86_400_000);
 }
 
+function timingState(daysUntil: number | null) {
+  if (daysUntil === null) return 'no_due_date';
+  if (daysUntil < 0) return 'overdue';
+  if (daysUntil <= 7) return 'due_soon';
+  return 'on_track';
+}
+
 export async function GET(request: NextRequest) {
   const auth = await authorize(request);
   if (!auth.ok) return auth.response;
@@ -149,16 +156,19 @@ export async function GET(request: NextRequest) {
       due_date: dueDate,
       days_until: daysUntil,
       overdue: typeof daysUntil === 'number' && daysUntil < 0,
+      timing_state: timingState(daysUntil),
       status: row.status,
       priority: row.priority,
       owner: row.legal_owner || row.operational_owner,
       evidence_status: row.evidence_status,
+      management_ready: false,
       signatures_required: null,
       signatures_done: null,
       amount: null,
       currency: null,
       source_href: row.source_href || '/dashboard/legal/casos',
       updated_at: row.updated_at || row.created_at,
+      next_action: row.evidence_status === 'pending' ? 'Completar evidencia del caso' : 'Revisar y resolver caso',
     };
   });
 
@@ -173,6 +183,12 @@ export async function GET(request: NextRequest) {
       const signaturesRequired = paymentRequest?.required_signatures ?? 2;
       const signaturesDone = paymentRequest ? signaturesByRequest.get(paymentRequest.id) || 0 : 0;
       const paymentStatus = paymentRequest?.status || 'payment_not_requested';
+      const managementReady = Boolean(
+        paymentRequest &&
+        String(paymentStatus).toLowerCase() === 'approved' &&
+        signaturesDone >= signaturesRequired &&
+        !paymentRequest.executed_at,
+      );
 
       return {
         id: `payable:${row.id}`,
@@ -189,12 +205,22 @@ export async function GET(request: NextRequest) {
         evidence_status: paymentRequest?.executed_at
           ? (paymentRequest.evidence_document_id || paymentRequest.evidence_url ? 'complete' : 'pending')
           : 'pending',
+        management_ready: managementReady,
         signatures_required: signaturesRequired,
         signatures_done: signaturesDone,
         amount: paymentRequest?.amount ?? row.approved_amount ?? null,
         currency: paymentRequest?.currency ?? row.currency ?? null,
         source_href: '/dashboard/finanzas/pagos',
         updated_at: paymentRequest?.updated_at || paymentRequest?.created_at || null,
+        next_action: !paymentRequest
+          ? 'Preparar solicitud de pago'
+          : signaturesDone < signaturesRequired
+            ? 'Completar firmas requeridas'
+            : managementReady
+              ? 'Informar a Gerencia: pago listo'
+              : paymentRequest.executed_at && !(paymentRequest.evidence_document_id || paymentRequest.evidence_url)
+                ? 'Adjuntar evidencia de transferencia'
+                : 'Revisar estado de pago',
       };
     });
 
@@ -211,21 +237,35 @@ export async function GET(request: NextRequest) {
       due_date: null,
       days_until: null,
       overdue: false,
+      timing_state: 'no_due_date',
       status: 'submitted',
       priority: row.evidence_document_id ? 'medium' : 'high',
       owner: contract?.responsible_person || contract?.responsible_area || null,
       evidence_status: row.evidence_document_id ? 'complete' : 'pending',
+      management_ready: false,
       signatures_required: null,
       signatures_done: null,
       amount: null,
       currency: null,
       source_href: '/dashboard/legal/avances-contractistas',
       updated_at: row.updated_at || row.submitted_at,
+      next_action: row.evidence_document_id ? 'Revisar avance contractual' : 'Adjuntar evidencia de avance',
     };
   });
 
+  const priorityRank: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  const actionScore = (item: (typeof legalItems)[number] | (typeof financeItems)[number] | (typeof progressItems)[number]) => {
+    let score = priorityRank[String(item.priority || 'medium')] || 0;
+    if (item.overdue) score += 10;
+    if (item.management_ready) score += 8;
+    if (item.evidence_status === 'pending') score += 4;
+    if (typeof item.days_until === 'number' && item.days_until >= 0 && item.days_until <= 7) score += 3;
+    return score;
+  };
+
   const data = [...legalItems, ...financeItems, ...progressItems].sort((a, b) => {
-    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    const scoreDiff = actionScore(b) - actionScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
     if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
     if (a.due_date) return -1;
     if (b.due_date) return 1;
@@ -242,6 +282,7 @@ export async function GET(request: NextRequest) {
       due_next_7_days: data.filter((item) => typeof item.days_until === 'number' && item.days_until >= 0 && item.days_until <= 7).length,
       waiting_signatures: data.filter((item) => item.kind === 'payable' && (item.signatures_done || 0) < (item.signatures_required || 0)).length,
       evidence_pending: data.filter((item) => item.evidence_status === 'pending').length,
+      ready_for_management: data.filter((item) => item.kind === 'payable' && item.management_ready === true).length,
     },
   });
 }

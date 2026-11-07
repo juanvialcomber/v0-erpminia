@@ -311,3 +311,66 @@ Estos umbrales habilitan escala inicial, no E4.
 - Nivel actual: L2 visibilidad operacional + L3 priorización de conciliación; evidencia E1 de cobertura. No se declara L4 hasta medir decisiones humanas sobre esta cola.
 - Valor demostrado: reduce fragmentación de evidencia y hace visible la brecha de identidad dentro del flujo financiero ya existente. No se atribuyen horas ahorradas ni ahorro CLP.
 - Siguiente medición: decisiones de conciliación por período, tiempo medio por revisión, tasa de resolución y porcentaje de pendientes que llegan a Ficha 360 con evidencia suficiente.
+
+
+## 2026-11-06 — Legal: MOTIL reemplaza consulta diaria a Laudus
+
+- Problema previo: Elías debía combinar planillas, correo y consulta financiera en Laudus para entender contratos, facturas, pagos, proveedores, transportistas, permisos y vencimientos.
+- Capacidad: el workspace Legal concentra contratos/pagos, cumplimiento mensual de proveedores, Proveedor 360, liquidaciones de transportistas, propiedad minera, polvorines, evidencia entrante y notificaciones de pago.
+- Cambio de experiencia: la superficie visible `Legal ↔ Laudus` se retira; la navegación pasa a `Pagos y facturas`. Laudus queda como fuente ERP trazable en segundo plano.
+- Evidencia de cobertura actual: 604/605 nombres de proveedor verificados; 11.237 órdenes verificadas; 12.426 facturas con estado financiero disponible, de las cuales 10.977 figuran pagadas, 740 parcialmente pagadas y 507 impagas en la fuente observada.
+- Salud de fuente: procurement, productos, stock, proveedores, bancos y contabilidad reportan sync read-only saludable en la medición del 6 de noviembre de 2026.
+- Autoridad: MOTIL no ejecuta pagos ni contabilidad y no transforma facturación en pago. Laudus conserva autoridad contable/tributaria mientras MOTIL absorbe la experiencia operacional.
+- Nivel actual: L2 visibilidad operacional + L3 inteligencia de excepciones. El workspace habilita L4 en conciliación/decisión cuando exista revisión humana registrada.
+- Evidencia actual: E1 fuerte de cobertura. No existe todavía evidencia suficiente para declarar horas ahorradas o ROI.
+- Métrica siguiente: porcentaje de consultas financieras de Legal resueltas íntegramente en MOTIL, tiempo medio de resolución y cantidad de aperturas manuales de Laudus evitadas/observadas.
+- Hipótesis de valor: reducir búsqueda y doble navegación entre Excel/Gmail/Laudus. Debe medirse antes de monetizarse.
+
+
+## 2026-11-06 — Legal: preparación de estados de pago en MOTIL
+
+- Problema previo: Elías debía leer avance, pendiente de facturar, OC y evidencia en planillas antes de preparar un estado de pago.
+- Capacidad: MOTIL deriva candidatos de estado de pago desde hitos contractuales estructurados, monto ejecutado, facturado, pendiente de facturar, OC y provenance.
+- Regla determinística: monto candidato = pendiente de facturar informado por la evidencia contractual estructurada.
+- Autoridad: el candidato sólo prepara trabajo. No aprueba estado de pago, no emite factura, no solicita transferencia y no modifica la fuente financiera.
+- UX: los candidatos aparecen dentro de `Contratos y pagos`, priorizados por excepciones y con una siguiente acción humana.
+- Nivel actual: L4 habilitado como decisión/preparación asistida; evidencia E1 hasta medir revisiones humanas reales.
+- Métrica siguiente: candidatos revisados, tasa de aceptación/corrección, tiempo medio de preparación manual vs MOTIL y motivos de rechazo.
+- Impacto económico: no medido todavía; no se declara ahorro de tiempo hasta contar con baseline y uso real.
+
+
+## 2026-11-06 — Legal: gate de solicitud de pago en MOTIL
+
+- Problema previo: para saber si una factura podía avanzar a pago era necesario investigar manualmente contrato, proveedor, factura, saldo y vencimiento entre planillas y ERP.
+- Capacidad: MOTIL calcula un estado read-only por factura contractual: lista para solicitar pago, falta vencimiento, falta promoción a CxP MOTIL, conflicto, proveedor faltante o saldada.
+- Gate determinístico: proveedor contractual exacto + número de factura exacto + misma moneda + una única CxP MOTIL + saldo pendiente + vencimiento definido.
+- Autoridad: “lista para solicitar pago” no aprueba, firma ni ejecuta pago. El paso siguiente continúa bajo firmas y Finanzas.
+- Evidencia de brecha actual: producción tiene 2 CxP MOTIL y 0 abiertas, por lo que el cuello de botella verificable es la promoción/aprobación de obligaciones, no la falta de datos financieros externos.
+- Nivel actual: L4 de preparación/decisión asistida. No es L5.
+- Métrica siguiente: porcentaje de facturas contractuales que alcanzan readiness, motivo de bloqueo, tiempo desde factura observada a CxP aprobada y tiempo desde CxP a transferencia confirmada.
+- Impacto económico: no medido todavía; la hipótesis es reducir búsqueda manual y ciclos de coordinación, pendiente de baseline.
+
+
+## 2026-11-06 — Solicitud de pago y doble firma dentro de MOTIL
+
+- Problema previo: incluso con evidencia contractual y CxP preparada, el handoff a pago quedaba fuera del flujo Legal visible.
+- Capacidad: Legal puede crear una solicitud de pago sólo desde una CxP MOTIL exacta, con saldo y vencimiento; la solicitud nace `pending_signatures` con mínimo 2 firmas.
+- Separación de funciones: el creador no puede firmar; cada firmante decide una sola vez; rechazo requiere observación.
+- Gate de aprobación: dos aprobaciones distintas cambian la solicitud a `approved`.
+- Autoridad: ningún endpoint de este bloque ejecuta transferencia ni llama a `record_supplier_payment_v2`. Ejecución y conciliación siguen en Tesorería.
+- Evidencia actual de roles: Daniel Villarroel tiene edición Finanzas; Gerencia/Admin provee separación adicional de aprobación. Elías prepara desde Legal sólo cuando el payable exacto está listo.
+- Nivel actual: L4 decisión/preparación asistida. No es L5 porque no existe ejecución autónoma.
+- Métrica siguiente: tiempo desde readiness a solicitud, tiempo a 2 firmas, tasa de rechazo, motivos de rechazo y tiempo a transferencia real.
+- Impacto económico: hipótesis de menor coordinación manual; aún no medido.
+
+
+## 2026-11-06 — Recuperación automática de trazabilidad factura → OC para Legal
+
+- Problema previo: 1.183 facturas abiertas estaban visibles en la fuente financiera, pero 0 tenían trazabilidad persistida factura → OC en staging; esto impedía promover obligaciones a CxP MOTIL con evidencia suficiente.
+- Causa: el sync procurement sólo traía cabecera de factura y no recuperaba items/traceFrom desde el detalle nativo.
+- Capacidad: el sync procurement ahora recupera automáticamente trazas sólo para facturas de contratos Legal conocidas, exige match exacto por contrato/proveedor RUT/factura y persiste líneas + traceFrom.
+- Control de costo: máximo 8 facturas faltantes por corrida; facturas ya sincronizadas se omiten mediante estado persistido.
+- Autoridad: la recuperación escribe sólo staging/evidencia. No crea CxP, no aprueba factura, no modifica contratos y no escribe en Laudus.
+- Resiliencia: si la recuperación Legal falla, el sync procurement principal no cae; la brecha queda explícita en metadata.
+- Nivel actual: L2/L3 habilitador de trazabilidad. El valor L4 se activa sólo después de three-way match y aprobación humana.
+- Métrica siguiente: facturas Legal con traza exacta de OC / facturas Legal observadas; líneas recuperadas; trazas recuperadas; llamadas API consumidas por corrida.

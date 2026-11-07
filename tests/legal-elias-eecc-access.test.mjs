@@ -13,7 +13,7 @@ test('read and create are separately authorized',()=>{
  assert.match(route,/legalAccess !== 'ED' && hseAccess !== 'ED'/);
 });
 test('contractor paperwork is reachable from Legal',()=>{
- assert.match(layout,/label: 'Contratistas · Documentos'/);
+ assert.match(layout,/href: '\/dashboard\/legal\/contratistas-documentos'/);
 });
 
 test('rejected folders cannot bypass contractor correction and resubmission',()=>{

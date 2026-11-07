@@ -11,23 +11,25 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const [inventoryAccess, procurementAccess, financeAccess, maintenanceAccess] = await Promise.all([
+    const [inventoryAccess, procurementAccess, financeAccess, maintenanceAccess, legalAccess] = await Promise.all([
       requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO),
       requireModuleAccess(request, MODULE_KEYS.FIN_COMPRAS),
       requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS),
       requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES),
+      requireModuleAccess(request, MODULE_KEYS.LEGAL_MODULO),
     ]);
     const allowedDomains = [
       inventoryAccess.authorized ? 'inventory' : null,
       procurementAccess.authorized ? 'procurement' : null,
       financeAccess.authorized ? 'finance' : null,
       maintenanceAccess.authorized ? 'maintenance' : null,
+      legalAccess.authorized ? 'legal' : null,
       ['superadmin', 'admin'].includes(String(context.role || '').toLowerCase()) ? 'data_health' : null,
     ].filter(Boolean) as Array<'inventory' | 'procurement' | 'finance' | 'maintenance' | 'data_health'>;
 
     const runtime = await resolveMotilSkillAvailability(context, allowedDomains);
     const promptsByDomain = Object.fromEntries(
-      ['maintenance', 'inventory', 'procurement', 'finance', 'data_health', 'executive']
+      ['maintenance', 'inventory', 'procurement', 'finance', 'legal', 'data_health', 'executive']
         .map((domain) => [domain, suggestedPromptsForDomain(runtime.skills, domain)]),
     );
 
