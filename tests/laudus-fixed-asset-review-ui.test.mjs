@@ -75,6 +75,7 @@ test('Maintenance owns operational identity review without financial write acces
   assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES, true\)/);
   assert.match(route, /JEFE DEPARTAMENTO DE MANTENIMIENTO/);
+  assert.match(route, /JEFE DE PLANIFICACIÓN/);
   assert.match(route, /canDecideOperationalIdentity/);
   assert.match(route, /canDecide: false/);
   assert.match(route, /data_reconciliation_reviews/);
