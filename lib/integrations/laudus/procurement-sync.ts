@@ -157,6 +157,7 @@ function purchaseInvoiceDetailRows(detail: JsonRow): JsonRow[] {
     supplier_VATId: detail.supplier?.VATId ?? null,
     warehouse_warehouseId: detail.warehouse?.warehouseId ?? null,
     warehouse_name: detail.warehouse?.name ?? null,
+    totals_total: detail.totals?.total ?? detail.totals_total ?? detail.totalAmount ?? null,
   };
 
   const items = Array.isArray(detail.items) ? detail.items : [];
