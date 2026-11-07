@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 const routePath = new URL('../app/api/integrations/laudus/fixed-asset-review/route.ts', import.meta.url);
 const componentPath = new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url);
-const pagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
+const pagePath = new URL('../app/dashboard/finanzas/activos/conciliacion/page.tsx', import.meta.url);
+const legacyPagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
 const financeCardPath = new URL('../components/integrations/laudus-finance-control-card.tsx', import.meta.url);
 
 test('fixed asset review GET reuses canonical review queue and remains read-only', async () => {
@@ -41,7 +42,9 @@ test('Finance routes users to the MOTIL asset reconciliation review', async () =
   const financeCard = await readFile(financeCardPath, 'utf8');
 
   assert.match(page, /LaudusFixedAssetReview/);
-  assert.match(financeCard, /\/dashboard\/finanzas\/activos-laudus/);
+  const legacyPage = await readFile(legacyPagePath, 'utf8');
+  assert.match(legacyPage, /redirect\('\/dashboard\/finanzas\/activos\/conciliacion'\)/);
+  assert.match(financeCard, /\/dashboard\/finanzas\/activos\/conciliacion/);
   assert.match(financeCard, /Revisar activos/);
 });
 
