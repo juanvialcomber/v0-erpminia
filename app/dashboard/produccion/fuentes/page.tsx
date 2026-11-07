@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { Database, FileCheck2, FileClock, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -51,6 +52,8 @@ export default function ProductionSourcesPage() {
           Archivos aceptados que alimentan Producción. MOTIL distingue ejecución, respaldo y planificación; un plan nunca se presenta como dato real.
         </p>
       </header>
+
+      <SectionHandover section="production" />
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -99,6 +100,8 @@ export default function FinanceSourcesPage() {
           Muestra de dónde provienen las cifras, qué período cubren y si existe respaldo documental asociado.
         </p>
       </header>
+
+      <SectionHandover section="finance" />
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[

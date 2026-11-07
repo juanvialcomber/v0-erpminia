@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { ArrowRight, FileCheck2, Leaf, ShieldCheck, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
@@ -122,6 +123,7 @@ export default function SostenibilidadDashboard() {
 
   return (
     <div className="space-y-6">
+      <SectionHandover section="hse" />
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderEyebrow>HSE · Sostenibilidad</PageHeaderEyebrow>

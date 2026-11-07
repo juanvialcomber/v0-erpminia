@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { SectionHandover } from '@/components/intake/section-handover';
 import { AlertTriangle, Database, FileSpreadsheet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -44,6 +45,8 @@ export default function MaintenanceSourcesPage() {
           Archivos entregados al módulo y su estado de promoción. MOTIL conserva el original y sólo convierte coincidencias verificables en datos canónicos.
         </p>
       </header>
+
+      <SectionHandover section="maintenance" />
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
