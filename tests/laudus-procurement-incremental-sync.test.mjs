@@ -8,6 +8,8 @@ const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_pro
 const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
 const missingRecoveryMigration = fs.readFileSync('supabase/migrations/20261107170000_laudus_missing_invoice_recovery_candidates.sql','utf8');
 const evidenceMigration = fs.readFileSync('supabase/migrations/20261107152500_persist_laudus_90d_inconsistency_evidence.sql','utf8');
+const missingRecoveryRoute = fs.readFileSync('app/api/integrations/laudus/missing-invoices-recovery/route.ts','utf8');
+const missingRecoveryPage = fs.readFileSync('app/admin/laudus/missing-invoices-recovery/page.tsx','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
@@ -104,4 +106,21 @@ test('evidencia de asignaciones de pago usa un entity_type permitido por la band
   assert.match(evidenceMigration,/laudus:asignacion_pago_factura_no_resuelta:/);
   assert.match(evidenceMigration,/\n\s*'invoice',\n\s*null,\n\s*case/);
   assert.doesNotMatch(evidenceMigration,/\n\s*'payment',\n\s*null,\n\s*case/);
+});
+
+
+test('accion manual de recuperacion exige compras con escritura y conserva limites',()=>{
+  assert.match(missingRecoveryRoute,/MODULE_KEYS\.FIN_COMPRAS/);
+  assert.match(missingRecoveryRoute,/if \(!access\.canWrite\)/);
+  assert.match(missingRecoveryRoute,/recoverMissingPurchaseInvoices/);
+  assert.match(missingRecoveryRoute,/maxPerRun:\s*12/);
+  assert.match(missingRecoveryRoute,/minimumApiReserve:\s*200/);
+  assert.match(missingRecoveryRoute,/laudusWriteBack:\s*false/);
+  assert.match(missingRecoveryRoute,/canonicalMutationExecuted:\s*false/);
+});
+
+test('ejecutor interno usa POST same-origin y no incorpora secretos',()=>{
+  assert.match(missingRecoveryPage,/method:\s*'POST'/);
+  assert.match(missingRecoveryPage,/credentials:\s*'same-origin'/);
+  assert.doesNotMatch(missingRecoveryPage,/CRON_SECRET|LAUDUS_PASSWORD|Authorization:/);
 });
