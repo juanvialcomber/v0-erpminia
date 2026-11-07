@@ -80,3 +80,20 @@ test('weekly import preserves priority semantics and fails closed on unknown wor
  assert.match(importer,/clasificación de trabajo no reconocida/);
  assert.doesNotMatch(importer,/includes\('prevent'\)\?'preventive':'corrective'/);
 });
+
+
+test('duplicate weekly imports retry only missing linked OTs and preserve event idempotency',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/if\(item\.linked_work_order_id\)\{automation\.skippedLinked\+=1;continue;\}/);
+ assert.match(importer,/automation=await createEligibleOrders\(\{request,context,sourceId:existing\.id/);
+ assert.match(importer,/idempotentReplay===true/);
+ assert.match(importer,/eq\('event_type','official_weekly_program_imported'\)/);
+ assert.match(importer,/eq\('source_record_id',item\.id\)/);
+});
+
+test('weekly import refuses multiple recognized program sheets instead of silently dropping one',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/if\(parsed\.length>1\)/);
+ assert.match(importer,/más de una hoja de programa semanal/);
+ assert.match(importer,/sheets:parsed\.map\(program=>program\.sheetName\)/);
+});
