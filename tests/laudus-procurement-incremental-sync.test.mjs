@@ -6,6 +6,7 @@ const sync = fs.readFileSync('lib/integrations/laudus/procurement-sync.ts','utf8
 const policy = fs.readFileSync('lib/integrations/laudus/sync-policy.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261029212000_laudus_procurement_sync_domains.sql','utf8');
 const budgetMigration = fs.readFileSync('supabase/migrations/20261029224000_laudus_budget_headroom_v3.sql','utf8');
+const missingRecoveryMigration = fs.readFileSync('supabase/migrations/20261107170000_laudus_missing_invoice_recovery_candidates.sql','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 const procurementRoute = fs.readFileSync('app/api/cron/laudus-procurement-daily/route.ts','utf8');
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
@@ -77,4 +78,22 @@ test('supplier full scan avoids unsupported supplierId ordering while staying bo
   assert.doesNotMatch(block,/orderBy/);
   assert.match(block,/for \(let page = 0; page < 25; page \+= 1\)/);
   assert.match(block,/limit: 100/);
+});
+
+
+test('recuperacion de facturas faltantes es puntual y respeta presupuesto Laudus',()=>{
+  assert.match(sync,/MAX_MISSING_INVOICE_RECOVERY_PER_RUN = 12/);
+  assert.match(sync,/MIN_LAUDUS_API_BUDGET_RESERVE = 200/);
+  assert.match(sync,/laudus_api_budget_service_v1/);
+  assert.match(sync,/laudus_missing_purchase_invoice_recovery_candidates_v1/);
+  assert.match(sync,/getLaudusReadOnly\('\/purchases\/invoices\/' \+ externalId\)/);
+  assert.match(sync,/motil_ingest_laudus_invoice_rows/);
+  assert.doesNotMatch(sync,/MAX_MISSING_INVOICE_RECOVERY_PER_RUN = (?:[3-9][0-9]|[1-9][0-9]{2,})/);
+});
+
+test('cola de recuperacion prioriza huecos del rango cargado sin excluir historia anterior',()=>{
+  assert.match(missingRecoveryMigration,/faltante_dentro_rango/);
+  assert.match(missingRecoveryMigration,/historia_anterior_backfill/);
+  assert.match(missingRecoveryMigration,/recovery_priority/);
+  assert.match(missingRecoveryMigration,/left join integration\.laudus_purchase_invoices/);
 });
