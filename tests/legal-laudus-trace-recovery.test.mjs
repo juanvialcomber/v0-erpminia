@@ -39,3 +39,13 @@ test('procurement sync recovers Legal trace without making the core sync depend 
  assert.match(procurement,/console\.error\('\[laudus\/procurement:legal-trace-recovery\]'/);
  assert.match(procurement,/apiCalls \+= Number\(legalTraceRecovery\.apiCalls/);
 });
+
+
+test('Legal invoice trace readiness falls back to private trace ledger when RPC migration is missing',()=> {
+ assert.match(lib,/PGRST202/);
+ assert.match(lib,/createServiceClient/);
+ assert.match(lib,/schema\('integration'\)/);
+ assert.match(lib,/from\('laudus_purchase_invoice_trace_sync'\)/);
+ assert.match(lib,/select\('invoice_external_id,status,trace_count,synced_at'\)/);
+ assert.match(lib,/traceStatusError = null/);
+});
