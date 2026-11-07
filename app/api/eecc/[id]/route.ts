@@ -1,17 +1,16 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api/guard';
+import { requireEeccProfileManager } from '@/lib/api/eecc-profile-access';
 import { deleteEecc, updateEecc } from '@/lib/api/eecc';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized || !auth.organizationId) {
-    return auth.response || NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
+  const manager = await requireEeccProfileManager(request);
+  if (!manager.authorized || !manager.auth.organizationId) return manager.response;
+  const auth = manager.auth;
 
   try {
     const { id } = await params;
@@ -39,10 +38,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAuth(request);
-  if (!auth.authorized || !auth.organizationId) {
-    return auth.response || NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const manager = await requireEeccProfileManager(request);
+  if (!manager.authorized || !manager.auth.organizationId) return manager.response;
+  if (!manager.canDelete) {
+    return NextResponse.json({ error: 'Eliminar perfiles requiere permiso contractual de edición' }, { status: 403 });
   }
+  const auth = manager.auth;
 
   try {
     const { id } = await params;
