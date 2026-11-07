@@ -31,8 +31,50 @@ function label(state:string){
 }
 function variant(state:string):'default'|'secondary'|'destructive'|'outline'{
   if(state==='paid') return 'secondary';
-  if(state==='unpaid'||state==='partial') return 'destructive';
+  if(state==='unpaid'||state==='partial'||state==='needs_reconciliation') return 'destructive';
   return 'outline';
+}
+function decision(item:Milestone){
+  if(item.payment_state==='needs_reconciliation') return {
+    conclusion:'Hay facturas informadas que no están conciliadas exactamente con Laudus.',
+    next:'Revisar proveedor + número de factura antes de concluir pago.',
+    tone:'destructive' as const,
+  };
+  if(item.payment_state==='partial') return {
+    conclusion:'Existe pago parcial que no queda explicado completamente por retención.',
+    next:'Conciliar saldo pendiente y retención con Finanzas.',
+    tone:'destructive' as const,
+  };
+  if(item.payment_state==='unpaid') return {
+    conclusion:'La factura está identificada, pero el pago sigue pendiente.',
+    next:'Confirmar con Finanzas si existe transferencia ejecutada o programada.',
+    tone:'destructive' as const,
+  };
+  if(item.payment_state==='paid_with_retention') return {
+    conclusion:'El pago está conciliado y el saldo pendiente coincide con retención contractual.',
+    next:'Mantener la retención separada de deuda ordinaria y controlar su liberación.',
+    tone:'outline' as const,
+  };
+  if(item.payment_state==='paid') return {
+    conclusion:'Las facturas informadas para este hito aparecen pagadas en la evidencia financiera disponible.',
+    next:item.progress_ratio>=0.999?'Revisar cierre contractual del hito.':'Continuar seguimiento del avance físico.',
+    tone:'secondary' as const,
+  };
+  if(item.progress_ratio>0 && item.invoiced_amount<=0) return {
+    conclusion:'Existe avance físico sin facturación informada.',
+    next:'Revisar si corresponde preparar estado de pago o factura.',
+    tone:'destructive' as const,
+  };
+  if(item.payment_state==='not_invoiced') return {
+    conclusion:item.progress_ratio>0?'Hay avance físico y aún no existe factura informada.':'Hito sin avance ni facturación informada.',
+    next:item.progress_ratio>0?'Validar con el responsable si corresponde facturar el avance.':'Mantener seguimiento hasta que exista avance verificable.',
+    tone:'outline' as const,
+  };
+  return {
+    conclusion:'El estado requiere revisión antes de concluir.',
+    next:'Revisar evidencia contractual y financiera.',
+    tone:'outline' as const,
+  };
 }
 
 export default function ContractPaymentsPage(){
@@ -47,7 +89,8 @@ export default function ContractPaymentsPage(){
     <header className="border-b border-border/70 pb-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Avances y pagos</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Avance físico desde la evidencia contractual y estado financiero verificado. Facturado no se trata como pagado.</p>
+      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Primero muestra qué significa cada estado y qué debe hacer Legal. Avance físico, facturación, retención y pago se mantienen separados.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Cobertura detallada actual: IO-01 e IO-02. El resto de IO/EP se incorporará desde la misma planilla fuente sin inventar detalle.</p>
     </header>
     <section className="grid overflow-hidden rounded-md border sm:grid-cols-4">
       <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Contratos revisados</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts}</p></div>
@@ -65,12 +108,18 @@ export default function ContractPaymentsPage(){
       {data.contracts.map((contract)=><article key={'detail-'+contract.contract_number} className="overflow-hidden rounded-md border">
         <div className="border-b bg-muted/20 px-4 py-3"><p className="text-sm font-semibold">{contract.contract_number} · {contract.contractor_name}</p><p className="mt-1 text-xs text-muted-foreground">{contract.invoice_matches}/{contract.invoice_expected} facturas verificadas</p></div>
         <div className="divide-y">
-          {data.data.filter((item)=>item.contract_number===contract.contract_number).map((item)=><div key={item.contract_number+'-'+item.sequence} className="p-4">
+          {data.data.filter((item)=>item.contract_number===contract.contract_number).map((item)=>{
+            const guidance=decision(item);
+            return <div key={item.contract_number+'-'+item.sequence} className="p-4">
+            <div className="mb-3 grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-2">
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Conclusión</p><p className="mt-1 text-sm font-medium">{guidance.conclusion}</p></div>
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Siguiente acción</p><p className="mt-1 text-sm">{guidance.next}</p></div>
+            </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline">Hito {item.sequence}</Badge><Badge variant="outline">OC {item.purchase_order_number}</Badge><Badge variant={variant(item.payment_state)}>{label(item.payment_state)}</Badge></div><h3 className="mt-2 text-sm font-semibold">{item.title}</h3><p className="mt-1 text-xs text-muted-foreground">Avance {percent(item.progress_ratio)} · Ejecutado {money(item.executed_amount,item.currency)} · Facturado {money(item.invoiced_amount,item.currency)}</p></div><div className="text-xs lg:text-right"><p className="font-medium">{money(item.total_amount,item.currency)}</p><p className="mt-1 text-muted-foreground">Pendiente de facturar {money(item.pending_to_invoice,item.currency)}</p></div></div>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-foreground" style={{width:String(Math.max(0,Math.min(100,item.progress_ratio*100)))+'%'}}/></div>
             {item.invoices.length ? <div className="mt-3 grid gap-2">{item.invoices.map((invoice)=><div key={invoice.doc_number} className="grid gap-2 rounded-md border px-3 py-2 text-xs md:grid-cols-[90px_1fr_1fr_1fr]"><div className="font-medium">F-{invoice.doc_number}</div><div><span className="text-muted-foreground">Neto planilla</span><p>{money(invoice.source_net_amount,item.currency)}</p></div><div><span className="text-muted-foreground">Retención</span><p>{money(invoice.source_retention_amount,item.currency)}</p></div><div><span className="text-muted-foreground">Pago verificado</span><p className="flex items-center gap-1.5">{invoice.payment_state==='paid'?<CheckCircle2 className="h-3.5 w-3.5"/>:<Clock3 className="h-3.5 w-3.5"/>}{label(invoice.payment_state)}</p>{invoice.laudus?<p className="mt-1 text-muted-foreground">Saldo {money(invoice.laudus.outstanding_amount)}</p>:null}</div></div>)}</div> : <p className="mt-3 rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Todavía no hay factura informada para este hito.</p>}
             <p className="mt-3 text-[11px] text-muted-foreground">Fuente: {item.provenance.source_sheet} · fila {item.provenance.source_row}</p>
-          </div>)}
+          </div>})}
         </div>
       </article>)}
     </section>
