@@ -69,3 +69,14 @@ test('weekly import uses Chile date and the recognized program sheet for idempot
  assert.doesNotMatch(importer,/const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
  assert.doesNotMatch(importer,/workbook\.SheetNames\[0\]/);
 });
+
+
+test('weekly import preserves priority semantics and fails closed on unknown work type',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/priorityRaw\.includes\('crit'\)\?'critical'/);
+ assert.match(importer,/priorityRaw\.includes\('baja'\)\?'low'/);
+ assert.match(importer,/workTypeRaw\.includes\('predict'\)\?'predictive':null/);
+ assert.match(importer,/skippedClassification\+=1/);
+ assert.match(importer,/clasificación de trabajo no reconocida/);
+ assert.doesNotMatch(importer,/includes\('prevent'\)\?'preventive':'corrective'/);
+});
