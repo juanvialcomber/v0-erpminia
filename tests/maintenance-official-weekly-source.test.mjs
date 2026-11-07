@@ -58,3 +58,14 @@ test('weekly import creates only current/future, matched and assigned OTs with s
  assert.match(importer,/source_sha256:sha256/);
  assert.match(importer,/status\.includes\('terminado'\)/);
 });
+
+
+test('weekly import uses Chile date and the recognized program sheet for idempotency',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/chileTodayDateKey\(\)/);
+ assert.match(importer,/return \{sheetName,mine,weekStart,weekEnd/);
+ assert.match(importer,/\.eq\('source_sheet',program\.sheetName\)/);
+ assert.match(importer,/source_sheet:program\.sheetName/);
+ assert.doesNotMatch(importer,/const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
+ assert.doesNotMatch(importer,/workbook\.SheetNames\[0\]/);
+});
