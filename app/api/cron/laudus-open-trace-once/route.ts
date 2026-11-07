@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { requireAdmin } from '@/lib/api/guard';
 import { withLaudusApiUsageTracking } from '@/lib/integrations/laudus/api-usage';
 import { recoverOpenInvoiceTraces } from '@/lib/integrations/laudus/native-invoice-trace';
 
@@ -18,19 +19,27 @@ function authorized(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!authorized(request)) return NextResponse.json({error:'No autorizado'},{status:401});
+  const cronAuthorized=authorized(request);
+  const adminAuth=cronAuthorized ? null : await requireAdmin(request);
+  if (!cronAuthorized && (!adminAuth?.authorized || !adminAuth.organizationId)) {
+    return adminAuth?.response || NextResponse.json({error:'No autorizado'},{status:401});
+  }
+
   const db=getSupabaseServerClient();
 
   const {data: existing}=await db.from('data_reconciliation_reviews')
     .select('id,status,resolution_note').eq('issue_key',RUN_KEY).maybeSingle();
   if (existing) return NextResponse.json({ok:true,skipped:true,reason:'already_executed',status:existing.status});
 
-  const {data: orgRows,error: orgError}=await db.from('laudus_source_status_service_v1')
-    .select('organization_id').eq('enabled',true).limit(10);
-  if (orgError) return NextResponse.json({error:'No se pudo resolver organización Laudus.'},{status:503});
-  const orgs=[...new Set((orgRows||[]).map((r:any)=>String(r.organization_id||'')).filter(Boolean))];
-  if (orgs.length!==1) return NextResponse.json({error:'La corrida requiere una única organización Laudus habilitada.'},{status:409});
-  const organizationId=orgs[0];
+  let organizationId=adminAuth?.organizationId ? String(adminAuth.organizationId) : '';
+  if (!organizationId) {
+    const {data: orgRows,error: orgError}=await db.from('laudus_source_status_service_v1')
+      .select('organization_id').eq('enabled',true).limit(10);
+    if (orgError) return NextResponse.json({error:'No se pudo resolver organización Laudus.'},{status:503});
+    const orgs=[...new Set((orgRows||[]).map((r:any)=>String(r.organization_id||'')).filter(Boolean))];
+    if (orgs.length!==1) return NextResponse.json({error:'La corrida requiere una única organización Laudus habilitada.'},{status:409});
+    organizationId=orgs[0];
+  }
 
   const {error: markerError}=await db.from('data_reconciliation_reviews').insert({
     organization_id:organizationId,
