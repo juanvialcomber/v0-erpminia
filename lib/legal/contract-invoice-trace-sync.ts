@@ -63,7 +63,7 @@ function detailTraces(detail: PurchaseInvoiceDetail) {
   );
 }
 
-export async function syncLegalContractInvoiceTraces(organizationId: string, db: SupabaseClient) {
+export async function syncLegalContractInvoiceTraces(organizationId: string, db: SupabaseClient, options: { recover?: boolean } = {}) {
   const contractNumbers = [...new Set(LEGAL_PROGRESS_MILESTONES.map((row) => row.contractNumber))];
   const invoiceRefs = LEGAL_PROGRESS_MILESTONES.flatMap((milestone) =>
     milestone.invoices.map((invoice) => ({ contractNumber: milestone.contractNumber, docNumber: invoice.docNumber })),
@@ -134,7 +134,30 @@ export async function syncLegalContractInvoiceTraces(organizationId: string, db:
   if (traceStatusError) throw new Error('No se pudo verificar estado de trazas');
 
   const alreadySynced = new Set((traceStatus || []).filter((row: any) => row.status === 'complete').map((row: any) => String(row.invoice_external_id)));
-  const pending = deduped.filter((row) => !alreadySynced.has(row.invoiceExternalId)).slice(0, MAX_LEGAL_TRACE_RECOVERY);
+  const unsynced = deduped.filter((row) => !alreadySynced.has(row.invoiceExternalId));
+  const pending = unsynced.slice(0, MAX_LEGAL_TRACE_RECOVERY);
+
+  if (options.recover === false) {
+    return {
+      examined: invoiceRefs.length,
+      matched: deduped.length,
+      ambiguous,
+      missing,
+      alreadySynced: alreadySynced.size,
+      recoverable: unsynced.length,
+      nextBatch: pending.length,
+      recovered: 0,
+      recoveredLines: 0,
+      recoveredTraces: 0,
+      apiCalls: 0,
+      remaining: unsynced.length,
+      errors: [],
+      canonicalMutationExecuted: false,
+      laudusMutationExecuted: false,
+      stagingOnly: true,
+      dryRun: true,
+    };
+  }
 
   let recovered = 0;
   let apiCalls = 0;
