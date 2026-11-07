@@ -23,7 +23,33 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ needs: data || [] });
+    const rows = data || [];
+    const workOrderIds = rows.map((row: any) => row.work_order_id).filter(Boolean);
+    const { data: workOrders, error: workOrdersError } = workOrderIds.length
+      ? await context.supabase
+          .from('maintenance_work_orders')
+          .select('id,status,closed_at')
+          .eq('organization_id', context.organizationId)
+          .in('id', workOrderIds)
+      : { data: [], error: null };
+    if (workOrdersError) throw workOrdersError;
+
+    const statusById = new Map((workOrders || []).map((row: any) => [String(row.id), row]));
+    const inactiveStatuses = new Set(['completed', 'closed', 'cancelled']);
+    const needs = rows.filter((row: any) => {
+      const workOrder = statusById.get(String(row.work_order_id || ''));
+      return workOrder && !inactiveStatuses.has(String(workOrder.status || '').toLowerCase()) && !workOrder.closed_at;
+    });
+    const historicalDebt = rows.filter((row: any) => {
+      const workOrder = statusById.get(String(row.work_order_id || ''));
+      return !workOrder || inactiveStatuses.has(String(workOrder.status || '').toLowerCase()) || Boolean(workOrder.closed_at);
+    });
+
+    return NextResponse.json({
+      needs,
+      historicalDebt,
+      semantics: 'only active maintenance work orders can be converted into procurement intake; closed shortages remain historical data-quality debt',
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudieron cargar las necesidades de abastecimiento';
     return NextResponse.json({ needs: [], error: message }, { status: 500 });
