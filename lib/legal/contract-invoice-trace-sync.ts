@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getLaudusReadOnly, LaudusApiError } from '@/lib/integrations/laudus/client';
+import { createClient as createServiceClient } from '@/lib/supabase/server';
 import { LEGAL_PROGRESS_MILESTONES } from '@/lib/legal/contract-progress-source';
 
 const MAX_LEGAL_TRACE_RECOVERY = 8;
@@ -143,12 +144,39 @@ export async function syncLegalContractInvoiceTraces(organizationId: string, db:
   }
 
   const deduped = [...new Map(candidates.map((row) => [row.invoiceExternalId, row])).values()];
-  const { data: traceStatus, error: traceStatusError } = deduped.length
-    ? await db.rpc('motil_get_laudus_invoice_trace_status_v1', {
-        p_organization_id: organizationId,
-        p_invoice_external_ids: deduped.map((row) => row.invoiceExternalId),
-      })
-    : { data: [], error: null };
+  let traceStatus: any[] = [];
+  let traceStatusError: any = null;
+
+  if (deduped.length) {
+    const rpcResult = await db.rpc('motil_get_laudus_invoice_trace_status_v1', {
+      p_organization_id: organizationId,
+      p_invoice_external_ids: deduped.map((row) => row.invoiceExternalId),
+    });
+
+    traceStatus = rpcResult.data || [];
+    traceStatusError = rpcResult.error || null;
+
+    const missingRpc = Boolean(
+      traceStatusError &&
+      (String(traceStatusError.code || '') === 'PGRST202' ||
+        /motil_get_laudus_invoice_trace_status_v1/i.test(String(traceStatusError.message || ''))),
+    );
+
+    if (missingRpc) {
+      const serviceDb = await createServiceClient();
+      const { data: fallbackRows, error: fallbackError } = await serviceDb
+        .schema('integration')
+        .from('laudus_purchase_invoice_trace_sync')
+        .select('invoice_external_id,status,trace_count,synced_at')
+        .eq('organization_id', organizationId)
+        .in('invoice_external_id', deduped.map((row) => row.invoiceExternalId));
+
+      if (fallbackError) throw new Error('No se pudo verificar estado de trazas');
+      traceStatus = fallbackRows || [];
+      traceStatusError = null;
+    }
+  }
+
   if (traceStatusError) throw new Error('No se pudo verificar estado de trazas');
 
   const alreadySynced = new Set((traceStatus || []).filter((row: any) => row.status === 'complete').map((row: any) => String(row.invoice_external_id)));
