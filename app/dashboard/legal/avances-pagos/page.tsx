@@ -13,12 +13,20 @@ type ContractSummary = { contract_number:string; title:string|null; contractor_n
 type Payload = { data:Milestone[]; contracts:ContractSummary[]; summary:{contracts:number;milestones:number;invoices_expected:number;invoices_matched:number;retained_milestones:number;contracts_red:number;contracts_yellow:number;contracts_green:number}; policy:{retention:string;no_inference:string;schedule:string} };
 type EvidenceItem = { source:'email'|'whatsapp';source_id:string;occurred_at:string|null;sender:string|null;context:string|null;file_name:string|null;mime_type:string|null;sha256:string|null;ingest_state:string;download_state:string;source_cutoff_date:string|null;contracts:string[];purchase_orders:string[];needs_review:boolean };
 type EvidencePayload = { data:EvidenceItem[];summary:{total:number;email:number;whatsapp:number;with_contract_reference:number;with_purchase_order_reference:number};policy:{promotion:string;matching:string} };
+type PaymentDraft = { id:string;contract_number:string;contract_title:string|null;contractor_name:string|null;sequence:number;milestone_title:string;currency:string;progress_ratio:number;executed_amount:number;invoiced_amount:number;pending_to_invoice:number;purchase_orders:string[];review_state:'candidate'|'needs_review';review_reasons:string[];next_action:string;provenance:{source_file:string;source_sheet:string;source_row:number} };
+type PaymentDraftPayload = { data:PaymentDraft[];summary:{candidates:number;ready_for_review:number;needs_review:number};policy:{calculation:string;authority:string;no_inference:string} };
 
 const fetcher = async (url:string) => {
   const response = await fetch(url,{credentials:'include',cache:'no-store'});
   const payload = await response.json().catch(()=>null);
   if(!response.ok) throw new Error(payload?.error || 'No se pudo cargar avances y pagos');
   return payload as Payload;
+};
+const draftFetcher = async (url:string) => {
+  const response = await fetch(url,{credentials:'include',cache:'no-store'});
+  const payload = await response.json().catch(()=>null);
+  if(!response.ok) throw new Error(payload?.error || 'No se pudieron preparar estados de pago');
+  return payload as PaymentDraftPayload;
 };
 const evidenceFetcher = async (url:string) => {
   const response = await fetch(url,{credentials:'include',cache:'no-store'});
@@ -50,7 +58,7 @@ function variant(state:string):'default'|'secondary'|'destructive'|'outline'{
 }
 function decision(item:Milestone){
   if(item.payment_state==='needs_reconciliation') return {
-    conclusion:'Hay facturas informadas que no están conciliadas exactamente con Laudus.',
+    conclusion:'Hay facturas informadas que no están conciliadas exactamente con la fuente financiera.',
     next:'Revisar proveedor + número de factura antes de concluir pago.',
     tone:'destructive' as const,
   };
@@ -94,12 +102,13 @@ function decision(item:Milestone){
 export default function ContractPaymentsPage(){
   const {data,error,isLoading}=useSWR<Payload>('/api/legal/contract-payment-control',fetcher,{revalidateOnFocus:false});
   const {data:evidence,error:evidenceError}=useSWR<EvidencePayload>('/api/legal/contract-evidence-queue',evidenceFetcher,{revalidateOnFocus:false});
-  if(isLoading) return <StatePanel tone="loading" title="Conciliando avances y pagos" description="Leyendo avance contractual y evidencia financiera Laudus."/>;
+  const {data:drafts,error:draftsError}=useSWR<PaymentDraftPayload>('/api/legal/payment-certificate-drafts',draftFetcher,{revalidateOnFocus:false});
+  if(isLoading) return <StatePanel tone="loading" title="Conciliando avances y pagos" description="Leyendo avance contractual y evidencia financiera disponible."/>;
   if(error||!data) return <StatePanel tone="error" title="Avances no disponibles" description="MOTIL no muestra estados de pago si no puede verificar la evidencia."/>;
   return <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Button asChild size="sm" variant="ghost"><Link href="/dashboard/legal"><ArrowLeft className="mr-2 h-4 w-4"/>Legal</Link></Button>
-      <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/laudus">Evidencia financiera <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+      <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/pagos-facturas">Pagos y facturas <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
     </div>
     <header className="border-b border-border/70 pb-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Legal · Contratos</p>
@@ -113,6 +122,37 @@ export default function ContractPaymentsPage(){
       <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">≤15 días</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts_yellow}</p></div>
       <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">100% verificado</p><p className="mt-1 text-xl font-semibold">{data.summary.contracts_green}</p></div>
     </section>
+    <section className="overflow-hidden rounded-md border">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Trabajo preparado por MOTIL</p>
+          <h2 className="mt-1 text-base font-semibold">Estados de pago candidatos</h2>
+          <p className="mt-1 text-sm text-muted-foreground">MOTIL calcula qué avance queda pendiente de facturar y prepara la revisión. Legal conserva la decisión.</p>
+        </div>
+        {drafts ? <div className="text-right text-xs text-muted-foreground"><p>{drafts.summary.ready_for_review} listos para revisar</p><p>{drafts.summary.needs_review} con excepción</p></div> : null}
+      </div>
+      {draftsError ? <p className="px-4 py-3 text-sm text-destructive">No se pudieron preparar los estados de pago candidatos.</p> : null}
+      {drafts?.data?.length ? <div className="divide-y">{drafts.data.slice(0,8).map((item)=><article key={item.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_auto]">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">{item.contract_number}</Badge>
+            <Badge variant={item.review_state==='needs_review'?'destructive':'secondary'}>{item.review_state==='needs_review'?'Revisar excepción':'Listo para revisión'}</Badge>
+            {item.purchase_orders.slice(0,3).map((oc)=><Badge key={oc} variant="outline">OC {oc}</Badge>)}
+          </div>
+          <h3 className="mt-2 text-sm font-semibold">{item.milestone_title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Avance {percent(item.progress_ratio)} · Ejecutado {money(item.executed_amount,item.currency)} · Facturado {money(item.invoiced_amount,item.currency)}</p>
+          <p className="mt-2 text-sm"><span className="font-medium">Siguiente acción:</span> {item.next_action}</p>
+          {item.review_reasons.length ? <div className="mt-2 text-xs text-destructive">{item.review_reasons.map((reason)=><p key={reason}>{reason}</p>)}</div> : null}
+        </div>
+        <div className="text-sm md:text-right">
+          <p className="font-semibold">{money(item.pending_to_invoice,item.currency)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Pendiente de facturar</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{item.provenance.source_sheet} · fila {item.provenance.source_row}</p>
+        </div>
+      </article>)}</div> : !draftsError ? <p className="px-4 py-3 text-sm text-muted-foreground">No hay estados de pago candidatos con la evidencia estructurada actual.</p> : null}
+      {drafts ? <div className="border-t px-4 py-3 text-xs text-muted-foreground"><p>{drafts.policy.calculation}</p><p className="mt-1">{drafts.policy.authority}</p></div> : null}
+    </section>
+
     <section className="overflow-hidden rounded-md border">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
         <div>
