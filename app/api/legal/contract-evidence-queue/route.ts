@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       .limit(100),
     context.supabase
       .from('motil_whatsapp_groups')
-      .select('id,name,chat_id')
+      .select('id,display_name,chat_id')
       .eq('organization_id', context.organizationId)
       .eq('enabled', true)
       .limit(50),
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       source_id: `whatsapp:${row.provider_message_id}`,
       occurred_at: row.occurred_at || row.received_at,
       sender: row.sender_name,
-      context: group?.name || group?.chat_id || 'WhatsApp',
+      context: group?.display_name || group?.chat_id || 'WhatsApp',
       file_name: attachment?.original_file_name || row.file_name || null,
       mime_type: attachment?.mime_type || null,
       sha256: attachment?.sha256 || null,
