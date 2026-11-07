@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRight, CircleDollarSign, FolderCheck, Clock3, BellRing } from 'lucide-react';
+import { ArrowRight, CircleDollarSign, FolderCheck, Clock3, BellRing, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatePanel } from '@/components/ui/state-panel';
 
@@ -15,7 +15,7 @@ const fetcher = async (url: string) => {
 
 type ContractorFolder = { id:string; empresa_nombre:string; status:string; carpeta_documentos?:Array<{file_name:string|null}> };
 type ContractorPayload = { carpetas?: ContractorFolder[] };
-type EeccCoverage = { summary:{registered:number;with_folder:number;without_folder:number} };
+type EeccCoverage = { period:string; summary:{registered:number;with_folder:number;without_folder:number;in_review:number;approved:number} };
 type InboxPayload = { summary?:{total:number;overdue:number;due_next_7_days:number;waiting_signatures:number;evidence_pending:number;ready_for_management:number}; warnings?:string[] };
 type LegalNotification = { id:string;title:string;message:string;read_at:string|null;created_at:string };
 type LegalNotificationsPayload = { notifications:LegalNotification[];summary:{total:number;unread:number} };
@@ -43,7 +43,7 @@ export default function LegalPage() {
         </div>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Trabajo principal de Legal">
+      <section className="grid gap-3 md:grid-cols-4" aria-label="Trabajo principal de Legal">
         <Link href="/dashboard/legal/inbox" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
           <Clock3 className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Hoy</p>
@@ -58,6 +58,11 @@ export default function LegalPage() {
           <FolderCheck className="h-4 w-4 text-muted-foreground" />
           <p className="mt-3 text-sm font-semibold">Proveedores</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Cumplimiento mensual, documentos y subsanaciones.</p>
+        </Link>
+        <Link href="/dashboard/legal/transportistas" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
+          <Truck className="h-4 w-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-semibold">Transportistas</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Liquidaciones, anticipos, descuentos y líquido a pago.</p>
         </Link>
       </section>
 
@@ -121,7 +126,7 @@ export default function LegalPage() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Proveedores</p>
             <h2 id="providers-title" className="mt-1 text-base font-semibold">Cumplimiento mensual</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Revisar sólo proveedores que requieren acción de Legal.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Revisar sólo proveedores que requieren acción de Legal en el período actual.</p>
           </div>
           <Button asChild size="sm" variant="outline"><Link href="/dashboard/legal/contratistas-documentos">Abrir proveedores <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
         </div>
@@ -129,7 +134,7 @@ export default function LegalPage() {
           <div className="px-4 py-3"><p className="text-[11px] uppercase text-muted-foreground">Registrados</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.registered ?? '…'}</p></div>
           <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Con carpeta</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.with_folder ?? '…'}</p></div>
           <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Sin carpeta</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.without_folder ?? '…'}</p></div>
-          <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Primera revisión</p><p className="mt-1 text-xl font-semibold">{contractorError ? '—' : contractorData ? l1Queue.length : '…'}</p></div>
+          <div className="border-t px-4 py-3 sm:border-l sm:border-t-0"><p className="text-[11px] uppercase text-muted-foreground">Primera revisión</p><p className="mt-1 text-xl font-semibold">{coverageError ? '—' : coverage?.summary.in_review ?? '…'}</p></div>
         </div>
       </section>
 
