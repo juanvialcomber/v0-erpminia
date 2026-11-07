@@ -69,6 +69,7 @@ export interface PortalCarpetaRecord {
   submitted_at: string | null;
   created_at: string;
   updated_at?: string | null;
+  compliance_period: string | null;
   carpeta_documentos: PortalCarpetaDocument[];
 }
 
@@ -246,9 +247,21 @@ export async function findMatchingEeccRecords(
   }));
 }
 
+function currentCompliancePeriod() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  return `${year}-${month}-01`;
+}
+
 export async function loadPortalCarpetaByRut(
   supabase: SupabaseClient,
-  rutValue: string
+  rutValue: string,
+  compliancePeriod = currentCompliancePeriod()
 ): Promise<PortalCarpetaRecord | null> {
   const targetRut = normalizeRutDigits(rutValue);
   if (!targetRut) return null;
@@ -256,12 +269,13 @@ export async function loadPortalCarpetaByRut(
   const { data, error } = await supabase
     .from('carpetas_arranque')
     .select(`
-      id, empresa_nombre, empresa_rut, contacto_email, status, submitted_at, created_at, updated_at,
+      id, empresa_nombre, empresa_rut, contacto_email, status, submitted_at, created_at, updated_at, compliance_period,
       carpeta_documentos (
         id, slot_index, documento_nombre, file_name, file_path, file_size_bytes,
         uploaded_at, l1_status, l1_observaciones, l1_reviewed_at, l2_status, l2_observaciones, l2_reviewed_at
       )
     `)
+    .eq('compliance_period', compliancePeriod)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -280,6 +294,7 @@ export async function loadPortalCarpetaByRut(
     submitted_at: found.submitted_at || null,
     created_at: found.created_at,
     updated_at: found.updated_at || null,
+    compliance_period: found.compliance_period || null,
     carpeta_documentos: (found.carpeta_documentos || []).map((doc: any) => ({
       id: doc.id,
       slot_index: doc.slot_index,
@@ -316,8 +331,9 @@ async function createPortalCarpeta(
       contacto_email: contactEmail,
       created_by: eecc.created_by || null,
       status: 'pendiente',
+      compliance_period: currentCompliancePeriod(),
     })
-    .select('id, empresa_nombre, empresa_rut, contacto_email, status, submitted_at, created_at, updated_at')
+    .select('id, empresa_nombre, empresa_rut, contacto_email, status, submitted_at, created_at, updated_at, compliance_period')
     .single();
 
   if (error) {
@@ -335,6 +351,7 @@ async function createPortalCarpeta(
     submitted_at: carpeta.submitted_at || null,
     created_at: carpeta.created_at,
     updated_at: carpeta.updated_at || null,
+    compliance_period: carpeta.compliance_period || null,
   } satisfies Omit<PortalCarpetaRecord, 'carpeta_documentos'>;
 }
 
