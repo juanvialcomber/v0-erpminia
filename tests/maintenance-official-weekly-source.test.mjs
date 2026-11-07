@@ -58,3 +58,53 @@ test('weekly import creates only current/future, matched and assigned OTs with s
  assert.match(importer,/source_sha256:sha256/);
  assert.match(importer,/status\.includes\('terminado'\)/);
 });
+
+
+test('weekly import uses Chile date and the recognized program sheet for idempotency',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/chileTodayDateKey\(\)/);
+ assert.match(importer,/return \{sheetName,mine,weekStart,weekEnd/);
+ assert.match(importer,/\.eq\('source_sheet',program\.sheetName\)/);
+ assert.match(importer,/source_sheet:program\.sheetName/);
+ assert.doesNotMatch(importer,/const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
+ assert.doesNotMatch(importer,/workbook\.SheetNames\[0\]/);
+});
+
+
+test('weekly import preserves priority semantics and fails closed on unknown work type',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/priorityRaw\.includes\('crit'\)\?'critical'/);
+ assert.match(importer,/priorityRaw\.includes\('baja'\)\?'low'/);
+ assert.match(importer,/workTypeRaw\.includes\('predict'\)\?'predictive':null/);
+ assert.match(importer,/skippedClassification\+=1/);
+ assert.match(importer,/clasificación de trabajo no reconocida/);
+ assert.doesNotMatch(importer,/includes\('prevent'\)\?'preventive':'corrective'/);
+});
+
+
+test('duplicate weekly imports retry only missing linked OTs and preserve event idempotency',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/if\(item\.linked_work_order_id\)\{automation\.skippedLinked\+=1;continue;\}/);
+ assert.match(importer,/automation=await createEligibleOrders\(\{request,context,sourceId:existing\.id/);
+ assert.match(importer,/idempotentReplay===true/);
+ assert.match(importer,/eq\('event_type','official_weekly_program_imported'\)/);
+ assert.match(importer,/eq\('source_record_id',item\.id\)/);
+});
+
+test('weekly import refuses multiple recognized program sheets instead of silently dropping one',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/if\(parsed\.length>1\)/);
+ assert.match(importer,/más de una hoja de programa semanal/);
+ assert.match(importer,/sheets:parsed\.map\(program=>program\.sheetName\)/);
+});
+
+
+test('cross-user retry checks organization-wide creation keys before creating another OT',()=>{
+ const importer=read('app/api/maintenance/official-weekly-plan/import/route.ts');
+ assert.match(importer,/existingByRequest/);
+ assert.match(importer,/\.eq\('organization_id',context\.organizationId\)\.in\('creation_request_id',ids\)/);
+ assert.match(importer,/offset\+=50/);
+ assert.match(importer,/existingOrders\.length>1/);
+ assert.match(importer,/OT existente encontrada pero no se pudo reparar el vínculo/);
+ assert.match(importer,/repaired_link:true/);
+});

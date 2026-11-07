@@ -7,6 +7,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { loadXlsxModule, sheetToMatrix, type XlsxCellValue } from '@/lib/xlsx';
 import { POST as createWorkOrder } from '@/app/api/maintenance/work-orders/route';
+import { chileTodayDateKey } from '@/lib/maintenance/work-order-calendar-date.mjs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const BUCKET = 'maintenance-work-order-evidence';
@@ -110,7 +111,78 @@ function parseProgram(sheetName:string,rows:XlsxCellValue[][]){
    }
   }
  }
- return {mine,weekStart,weekEnd:addDays(weekStart,6),items,declaredCount};
+ return {sheetName,mine,weekStart,weekEnd:addDays(weekStart,6),items,declaredCount};
+}
+
+async function createEligibleOrders({
+ request,context,sourceId,mine,sourceFile,sha256,items,peopleByName,
+}:{
+ request:NextRequest;
+ context:Awaited<ReturnType<typeof getOrganizationContext>> & {ok:true};
+ sourceId:string;
+ mine:string;
+ sourceFile:string;
+ sha256:string;
+ items:any[];
+ peopleByName:Map<string,Array<any>>;
+}){
+ const today=chileTodayDateKey();
+ const automation={created:0,replayed:0,skippedLinked:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,skippedClassification:0,errors:[] as string[]};
+ const unlinkedIds=items.filter(item=>!item.linked_work_order_id).map(item=>String(item.id)).filter(Boolean);
+ const existingByRequest=new Map<string,Array<{id:string;creation_request_id:string|null}>>();
+ for(let offset=0;offset<unlinkedIds.length;offset+=50){
+  const ids=unlinkedIds.slice(offset,offset+50);
+  const {data:existingOrders,error:existingError}=await context.supabase.from('maintenance_work_orders')
+   .select('id,creation_request_id').eq('organization_id',context.organizationId).in('creation_request_id',ids);
+  if(existingError)throw existingError;
+  for(const order of existingOrders||[]){
+   const key=String(order.creation_request_id||'');if(!key)continue;
+   const list=existingByRequest.get(key)||[];list.push(order as {id:string;creation_request_id:string|null});existingByRequest.set(key,list);
+  }
+ }
+ for(const item of items){
+  if(item.linked_work_order_id){automation.skippedLinked+=1;continue;}
+  const status=normalize(item.source_status);
+  if(status.includes('terminado')||status.includes('completado')||status.includes('cerrado')){automation.skippedCompleted+=1;continue;}
+  if(!item.planned_date||item.planned_date<today){automation.skippedPast+=1;continue;}
+  const assignees=peopleByName.get(normalize(item.assigned_name))||[];
+  const assignee=assignees.length===1?assignees[0]:null;
+  if(!item.canonical_asset_id||item.reconciliation_status!=='matched'||!assignee){automation.skippedIdentity+=1;continue;}
+  const existingOrders=existingByRequest.get(String(item.id))||[];
+  if(existingOrders.length>1){automation.errors.push(`Fila ${item.source_row}: más de una OT existente comparte la clave de creación; requiere revisión`);continue;}
+  if(existingOrders.length===1){
+   const existingOrderId=existingOrders[0].id;
+   const {error:linkError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:existingOrderId,updated_at:new Date().toISOString()}).eq('organization_id',context.organizationId).eq('id',item.id);
+   if(linkError){automation.errors.push(`Fila ${item.source_row}: OT existente encontrada pero no se pudo reparar el vínculo`);continue;}
+   const {data:event}=await context.supabase.from('work_order_events').select('id').eq('organization_id',context.organizationId).eq('work_order_id',existingOrderId).eq('event_type','official_weekly_program_imported').eq('source_record_id',item.id).limit(1).maybeSingle();
+   if(!event)await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:existingOrderId,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'Vínculo de OT reparado desde programa semanal oficial de Ariel',payload:{source_id:sourceId,source_row:item.source_row,source_file:sourceFile,source_sha256:sha256,planned_date:item.planned_date,repaired_link:true}});
+   automation.replayed+=1;continue;
+  }
+  const priorityRaw=normalize(item.priority_raw);
+  const priority=priorityRaw.includes('crit')?'critical':priorityRaw.includes('alta')?'high':priorityRaw.includes('baja')?'low':'medium';
+  const workTypeRaw=normalize(item.work_type_raw);
+  const workType=workTypeRaw.includes('correct')?'corrective':workTypeRaw.includes('prevent')?'preventive':workTypeRaw.includes('predict')?'predictive':null;
+  if(!workType){automation.skippedClassification+=1;automation.errors.push(`Fila ${item.source_row}: clasificación de trabajo no reconocida`);continue;}
+  const headers=new Headers(request.headers);headers.set('content-type','application/json');headers.set('idempotency-key',item.id);
+  const internalRequest=new NextRequest(new URL('/api/maintenance/work-orders',request.url),{method:'POST',headers,body:JSON.stringify({
+   canonicalAssetId:item.canonical_asset_id,assignedPersonId:assignee.id,title:item.title,
+   description:`Programa semanal oficial de Ariel · ${mine} · fila ${item.source_row}`,
+   requestedMaterials:item.materials||null,workType,priority,scheduledDate:item.planned_date,
+   plannedDurationHours:Number(item.planned_hours||0),
+  })});
+  const created=await createWorkOrder(internalRequest);
+  const payload=await created.json().catch(()=>({}));
+  if(created.ok&&payload?.data?.id){
+   if(payload?.idempotentReplay===true)automation.replayed+=1;else automation.created+=1;
+   const {error:linkError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:payload.data.id,updated_at:new Date().toISOString()}).eq('organization_id',context.organizationId).eq('id',item.id);
+   if(linkError)automation.errors.push(`Fila ${item.source_row}: OT creada pero no vinculada`);
+   else{
+    const {data:event}=await context.supabase.from('work_order_events').select('id').eq('organization_id',context.organizationId).eq('work_order_id',payload.data.id).eq('event_type','official_weekly_program_imported').eq('source_record_id',item.id).limit(1).maybeSingle();
+    if(!event)await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:payload.data.id,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'OT creada automáticamente desde programa semanal oficial de Ariel',payload:{source_id:sourceId,source_row:item.source_row,source_file:sourceFile,source_sha256:sha256,planned_date:item.planned_date}});
+   }
+  }else automation.errors.push(`Fila ${item.source_row}: ${payload?.error||'no se pudo crear OT'}`);
+ }
+ return automation;
 }
 
 export async function POST(request:NextRequest){
@@ -130,12 +202,23 @@ export async function POST(request:NextRequest){
   return sheet?parseProgram(sheetName,sheetToMatrix(xlsx,sheet,true)):null;
  }).filter(Boolean) as Array<ReturnType<typeof parseProgram> extends infer T ? Exclude<T,null> : never>;
  if(!parsed.length)return NextResponse.json({error:'No se encontró una hoja de programa semanal reconocible'},{status:422});
+ if(parsed.length>1)return NextResponse.json({error:'El archivo contiene más de una hoja de programa semanal. Sepáralas para preservar trazabilidad por faena.',sheets:parsed.map(program=>program.sheetName)},{status:422});
  const program=parsed[0];
 
  const {data:existing}=await context.supabase.from('planning_weekly_work_sources')
   .select('id,mine,week_start,week_end,is_current').eq('organization_id',context.organizationId)
-  .eq('source_sha256',sha256).eq('source_sheet',workbook.SheetNames[0]).maybeSingle();
- if(existing)return NextResponse.json({ok:true,duplicate:true,source:existing,summary:{parsed:program.items.length,declared:program.declaredCount,mismatch:program.declaredCount!=null&&program.declaredCount!==program.items.length}});
+  .eq('source_sha256',sha256).eq('source_sheet',program.sheetName).maybeSingle();
+ if(existing){
+  const [{data:existingItems,error:itemError},{data:people,error:peopleError}]=await Promise.all([
+   context.supabase.from('planning_weekly_work_items').select('id,source_row,planned_date,assigned_name,canonical_asset_id,title,work_type_raw,priority_raw,planned_hours,source_status,materials,reconciliation_status,linked_work_order_id').eq('organization_id',context.organizationId).eq('source_id',existing.id).order('source_row'),
+   context.supabase.from('people').select('id,full_name,role_title,profile_id').eq('organization_id',context.organizationId).eq('employment_status','active').not('profile_id','is',null).limit(2000),
+  ]);
+  if(itemError||peopleError)return NextResponse.json({error:(itemError||peopleError)?.message||'No se pudo revalidar el programa existente'},{status:500});
+  const peopleByName=new Map<string,Array<any>>();
+  for(const person of people||[]){const key=normalize(person.full_name);const list=peopleByName.get(key)||[];list.push(person);peopleByName.set(key,list);}
+  const automation=await createEligibleOrders({request,context,sourceId:existing.id,mine:program.mine,sourceFile:file.name,sha256,items:existingItems||[],peopleByName});
+  return NextResponse.json({ok:true,duplicate:true,source:existing,summary:{parsed:program.items.length,declared:program.declaredCount,mismatch:program.declaredCount!=null&&program.declaredCount!==program.items.length},automation});
+ }
 
  const storagePath=`${context.organizationId}/weekly-programs/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]+/g,'_')}`;
  const upload=await context.supabase.storage.from(BUCKET).upload(storagePath,bytes,{contentType:file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',upsert:false});
@@ -144,7 +227,7 @@ export async function POST(request:NextRequest){
  try{
   const mismatch=program.declaredCount!=null&&program.declaredCount!==program.items.length;
   const {data:source,error:sourceError}=await context.supabase.from('planning_weekly_work_sources').insert({
-   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:workbook.SheetNames[0],
+   organization_id:context.organizationId,source_file:file.name,source_sha256:sha256,source_sheet:program.sheetName,
    source_url:`storage:${BUCKET}/${storagePath}`,mine:program.mine,week_start:program.weekStart,week_end:program.weekEnd,
    reported_at:new Date().toISOString(),source_owner:'Ariel López',status:mismatch?'review_required':'official_source',is_current:false,
   }).select('id,mine,week_start,week_end,status').single();
@@ -182,33 +265,7 @@ export async function POST(request:NextRequest){
   const {error:promoteError}=await context.supabase.from('planning_weekly_work_sources').update({is_current:true}).eq('organization_id',context.organizationId).eq('id',source.id);
   if(promoteError)throw promoteError;
 
-  const today=new Date().toISOString().slice(0,10);
-  const automation={created:0,skippedPast:0,skippedCompleted:0,skippedIdentity:0,errors:[] as string[]};
-  for(const item of insertedItems){
-   const status=normalize(item.source_status);
-   if(status.includes('terminado')||status.includes('completado')||status.includes('cerrado')){automation.skippedCompleted+=1;continue;}
-   if(!item.planned_date||item.planned_date<today){automation.skippedPast+=1;continue;}
-   const assignees=peopleByName.get(normalize(item.assigned_name))||[];
-   const assignee=assignees.length===1?assignees[0]:null;
-   if(!item.canonical_asset_id||item.reconciliation_status!=='matched'||!assignee){automation.skippedIdentity+=1;continue;}
-   const priority=normalize(item.priority_raw).includes('alta')?'high':normalize(item.priority_raw).includes('crit')?'critical':'medium';
-   const workType=normalize(item.work_type_raw).includes('correct')?'corrective':normalize(item.work_type_raw).includes('prevent')?'preventive':'corrective';
-   const headers=new Headers(request.headers);headers.set('content-type','application/json');headers.set('idempotency-key',item.id);
-   const internalRequest=new NextRequest(new URL('/api/maintenance/work-orders',request.url),{method:'POST',headers,body:JSON.stringify({
-    canonicalAssetId:item.canonical_asset_id,assignedPersonId:assignee.id,title:item.title,
-    description:`Programa semanal oficial de Ariel · ${program.mine} · fila ${item.source_row}`,
-    requestedMaterials:item.materials||null,workType,priority,scheduledDate:item.planned_date,
-    plannedDurationHours:Number(item.planned_hours||0),
-   })});
-   const created=await createWorkOrder(internalRequest);
-   const payload=await created.json().catch(()=>({}));
-   if(created.ok&&payload?.data?.id){
-    automation.created+=1;
-    const {error:linkError}=await context.supabase.from('planning_weekly_work_items').update({linked_work_order_id:payload.data.id,updated_at:new Date().toISOString()}).eq('organization_id',context.organizationId).eq('id',item.id);
-    if(linkError)automation.errors.push(`Fila ${item.source_row}: OT creada pero no vinculada`);
-    else await context.supabase.from('work_order_events').insert({organization_id:context.organizationId,work_order_id:payload.data.id,canonical_asset_id:item.canonical_asset_id,event_type:'official_weekly_program_imported',actor_id:context.authUserId,actor_name:context.userName||null,source_table:'planning_weekly_work_items',source_record_id:item.id,summary:'OT creada automáticamente desde programa semanal oficial de Ariel',payload:{source_id:source.id,source_row:item.source_row,source_file:file.name,source_sha256:sha256,planned_date:item.planned_date}});
-   }else automation.errors.push(`Fila ${item.source_row}: ${payload?.error||'no se pudo crear OT'}`);
-  }
+  const automation=await createEligibleOrders({request,context,sourceId:source.id,mine:program.mine,sourceFile:file.name,sha256,items:insertedItems,peopleByName});
 
   return NextResponse.json({ok:true,source,summary:{parsed:rows.length,declared:program.declaredCount,mismatch,matched:rows.filter(r=>r.reconciliation_status==='matched').length,review:rows.filter(r=>r.reconciliation_status!=='matched').length},automation,
    authority:mismatch?'Archivo preservado. Las filas válidas desde hoy generan OT automáticamente; la diferencia resumen/detalle queda marcada para revisión.':'Fuente semanal incorporada. Las filas válidas desde hoy generan OT automáticamente.'},{status:201});
