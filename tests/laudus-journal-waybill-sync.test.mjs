@@ -43,7 +43,7 @@ test('journal staging normalizes blank or non-numeric debit and credit values be
   assert.match(sync,/normalizeNumberish/);
   assert.match(sync,/debit:\s*normalizeNumberish\(line\?\.debit\)/);
   assert.match(sync,/credit:\s*normalizeNumberish\(line\?\.credit\)/);
-  assert.match(sync,/dedupeJournalRows\(listed\.rows\)/);
+  assert.match(sync,/normalizeJournalRows\(listed\.rows\)/);
 });
 
 
