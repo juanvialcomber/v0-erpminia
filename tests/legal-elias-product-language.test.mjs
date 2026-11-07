@@ -9,11 +9,13 @@ const finance = await readFile(new URL('../app/dashboard/legal/pagos-facturas/pa
 const legacyFinance = await readFile(new URL('../app/dashboard/legal/laudus/page.tsx', import.meta.url), 'utf8');
 
 test('Elias primary UI uses domain language instead of infrastructure terms', () => {
-  assert.match(payments, /Evidencia financiera/);
+  assert.match(payments, /Pagos y facturas/);
   assert.match(payments, /Pago verificado/);
   assert.match(payments, /Avance físico, facturación, retención y pago se mantienen separados/);
+  assert.match(payments, /Trabajo preparado por MOTIL/);
   assert.doesNotMatch(payments, /Legal ↔ Laudus/);
   assert.match(finance, /Pagos y facturas/);
+  assert.match(finance, /La procedencia ERP queda en segundo plano/);
   assert.doesNotMatch(finance, /Legal ↔ Laudus|Puede salir de Laudus|Sigue siendo autoridad Laudus/);
   assert.match(legacyFinance, /redirect\('\/dashboard\/legal\/pagos-facturas'\)/);
   assert.match(redirectPage,/redirect\('\/dashboard\/legal'\)/);
