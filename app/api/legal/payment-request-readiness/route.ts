@@ -51,6 +51,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No se pudieron consultar cuentas por pagar MOTIL' }, { status: 503 });
   }
 
+  const payableIds=(payables||[]).map((row)=>row.id).filter(Boolean);
+  const { data: activeRequests, error: requestError } = payableIds.length
+    ? await context.supabase
+        .from('finance_payment_requests')
+        .select('id,payable_id,status,required_signatures,requested_payment_date,created_at')
+        .eq('organization_id',context.organizationId)
+        .in('payable_id',payableIds)
+        .in('status',['pending_signatures','approved'])
+        .limit(1000)
+    : {data:[],error:null};
+
+  if(requestError){
+    return NextResponse.json({error:'No se pudo verificar solicitudes de pago activas'},{status:503});
+  }
+  const activeRequestByPayable=new Map((activeRequests||[]).map((row)=>[row.payable_id,row]));
+
   const candidates = LEGAL_PROGRESS_MILESTONES.flatMap((milestone) => {
     const contract = contractByNumber.get(milestone.contractNumber);
     return (milestone.invoices || []).map((invoice) => {
@@ -66,6 +82,7 @@ export async function GET(request: NextRequest) {
         | 'needs_due_date'
         | 'needs_payable_promotion'
         | 'settled'
+        | 'request_active'
         | 'conflict'
         | 'missing_supplier' = 'needs_payable_promotion';
       let reason = 'La factura existe en la evidencia contractual, pero todavía no existe una CxP MOTIL exacta y aprobada.';
@@ -79,9 +96,13 @@ export async function GET(request: NextRequest) {
         reason = 'Existe más de una CxP MOTIL con el mismo proveedor, factura y moneda; requiere conciliación.';
       } else if (payable) {
         const outstanding = number(payable.outstanding_amount);
+        const activeRequest = activeRequestByPayable.get(payable.id);
         if (outstanding <= 0 || ['paid','reconciled','cancelled'].includes(String(payable.status || '').toLowerCase())) {
           readiness = 'settled';
           reason = 'La CxP MOTIL no mantiene saldo pendiente.';
+        } else if (activeRequest) {
+          readiness = 'request_active';
+          reason = 'Ya existe una solicitud activa para esta CxP; debe completar firmas o resolución antes de crear otra.';
         } else if (!payable.due_date) {
           readiness = 'needs_due_date';
           reason = 'La CxP MOTIL existe con saldo, pero falta fecha de vencimiento antes de registrar o solicitar pago.';
@@ -116,8 +137,10 @@ export async function GET(request: NextRequest) {
           status: payable.status,
           days_to_due: payable.days_to_due,
         } : null,
+        active_request: payable ? (activeRequestByPayable.get(payable.id) || null) : null,
         next_action:
           readiness === 'ready_for_request' ? 'Preparar solicitud de pago para firmas.'
+          : readiness === 'request_active' ? 'Completar firmas o resolver la solicitud activa.'
           : readiness === 'needs_due_date' ? 'Definir vencimiento en Tesorería.'
           : readiness === 'needs_payable_promotion' ? 'Revisar three-way match y promover la factura a CxP MOTIL.'
           : readiness === 'conflict' ? 'Resolver duplicidad antes de solicitar pago.'
@@ -140,6 +163,7 @@ export async function GET(request: NextRequest) {
       ready_for_request: candidates.filter((item) => item.readiness === 'ready_for_request').length,
       needs_due_date: candidates.filter((item) => item.readiness === 'needs_due_date').length,
       needs_payable_promotion: candidates.filter((item) => item.readiness === 'needs_payable_promotion').length,
+      request_active: candidates.filter((item) => item.readiness === 'request_active').length,
       conflicts: candidates.filter((item) => item.readiness === 'conflict' || item.readiness === 'missing_supplier').length,
       settled: candidates.filter((item) => item.readiness === 'settled').length,
     },
