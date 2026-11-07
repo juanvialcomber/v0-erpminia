@@ -20,6 +20,18 @@ type CanonicalInventoryRow = {
   warehouse_code: string | null;
 };
 
+type OperationalInventoryRow = {
+  canonical_product_id: string | null;
+  laudus_product_external_id: string | null;
+  sku: string | null;
+  description: string | null;
+  unit_of_measure: string | null;
+  operational_category: string | null;
+  operational_quantity: number | string | null;
+  operational_resolution: string | null;
+  laudus_synced_at: string | null;
+};
+
 type InventoryRow = {
   id: string;
   sku?: string | null;
@@ -81,6 +93,135 @@ export async function GET(request: NextRequest) {
   const offset = validPage * validPageSize;
 
   if (orgHasCanonicalData(orgId)) {
+    const { data: authority } = await supabase
+      .from('bodega_stock_source_authority_service_v1')
+      .select('authority_state,authority_reason,latest_laudus_stock_sync')
+      .eq('organization_id', orgId)
+      .limit(1)
+      .maybeSingle();
+
+    if (authority?.authority_state === 'laudus_primary') {
+      if (searchParams.get('categories') === 'true') {
+        const categories = new Set<string>();
+        let from = 0;
+        const chunk = 1000;
+
+        while (true) {
+          const { data: categoryRows, error: categoryError } = await supabase
+            .from('bodega_inventory_operational_service_v1')
+            .select('operational_category')
+            .eq('organization_id', orgId)
+            .neq('reconciliation_state', 'laudus_only_zero')
+            .order('operational_category')
+            .range(from, from + chunk - 1);
+
+          if (categoryError) break;
+          const batch = Array.isArray(categoryRows) ? categoryRows : [];
+          for (const row of batch as Array<{ operational_category?: string | null }>) {
+            const label = String(row.operational_category || '').trim();
+            if (label) categories.add(canonicalCategory(label) || label);
+          }
+          if (batch.length < chunk) break;
+          from += chunk;
+        }
+
+        if (categories.size > 0) {
+          return NextResponse.json({
+            categories: Array.from(categories).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })),
+            dataSource: 'laudus_operational',
+            sourceAuthority: authority,
+          });
+        }
+      }
+
+      let operationalQuery = supabase
+        .from('bodega_inventory_operational_service_v1')
+        .select(
+          'canonical_product_id,laudus_product_external_id,sku,description,unit_of_measure,operational_category,operational_quantity,operational_resolution,laudus_synced_at',
+          { count: 'exact' },
+        )
+        .eq('organization_id', orgId)
+        .neq('reconciliation_state', 'laudus_only_zero');
+
+      if (search) {
+        operationalQuery = operationalQuery.or(
+          `sku.ilike.%${search}%,description.ilike.%${search}%,operational_category.ilike.%${search}%`,
+        );
+      }
+      if (category) operationalQuery = operationalQuery.ilike('operational_category', `%${category}%`);
+
+      const operationalResult = await operationalQuery
+        .order('sku')
+        .range(offset, offset + validPageSize - 1);
+
+      if (!operationalResult.error && operationalResult.data) {
+        const rows = operationalResult.data as OperationalInventoryRow[];
+        const canonicalIds = rows
+          .map((row) => row.canonical_product_id)
+          .filter((value): value is string => Boolean(value));
+        const canonicalById = new Map<string, CanonicalInventoryRow>();
+
+        for (let i = 0; i < canonicalIds.length; i += 50) {
+          const batchIds = canonicalIds.slice(i, i + 50);
+          const { data: canonicalData, error: canonicalError } = await supabase
+            .from('canonical_inventory_current')
+            .select('id,sku,name,category,description,quantity,min_stock,max_stock,unit_cost,warehouse_code')
+            .eq('organization_id', orgId)
+            .in('id', batchIds);
+
+          if (canonicalError) {
+            console.error('[bodega/inventory:canonical-enrichment]', canonicalError);
+            break;
+          }
+
+          for (const row of (canonicalData || []) as CanonicalInventoryRow[]) canonicalById.set(row.id, row);
+        }
+
+        const inventory = rows.map((row) => {
+          const canonical = row.canonical_product_id ? canonicalById.get(row.canonical_product_id) : undefined;
+          const quantity = toNumber(row.operational_quantity);
+          const unitCost = toNumber(canonical?.unit_cost);
+          const sourceOnly = !row.canonical_product_id;
+
+          return {
+            id: canonical?.id || `laudus:${row.laudus_product_external_id || row.sku || 'unknown'}`,
+            sku: String(row.sku || canonical?.sku || ''),
+            name: String(canonical?.name || row.description || row.sku || ''),
+            category: String(canonical?.category || row.operational_category || 'Otros'),
+            quantity,
+            quantity_available: quantity,
+            quantity_reserved: 0,
+            min_stock: toNumber(canonical?.min_stock),
+            max_stock: toNumber(canonical?.max_stock),
+            unit_cost: unitCost,
+            total_value: quantity * unitCost,
+            description: String(canonical?.description || row.description || row.unit_of_measure || ''),
+            sourceOnly,
+            readOnly: sourceOnly,
+            source: 'laudus',
+            operationalResolution: row.operational_resolution,
+            sourceSyncedAt: row.laudus_synced_at,
+          };
+        });
+
+        return NextResponse.json({
+          inventory,
+          pagination: {
+            page: validPage,
+            pageSize: validPageSize,
+            total: operationalResult.count || 0,
+            totalPages: Math.ceil((operationalResult.count || 0) / validPageSize),
+          },
+          dataSource: 'laudus_operational',
+          sourceAuthority: authority,
+        });
+      }
+
+      if (operationalResult.error) {
+        console.error('[bodega/inventory:laudus-operational]', operationalResult.error);
+      }
+    }
+
     if (searchParams.get('categories') === 'true') {
       const categorySet = new Set<string>();
       let from = 0;
@@ -155,6 +296,8 @@ export async function GET(request: NextRequest) {
           total: count || 0,
           totalPages: Math.ceil((count || 0) / validPageSize),
         },
+        dataSource: 'canonical_fallback',
+        sourceAuthority: authority || null,
       });
     }
   }
