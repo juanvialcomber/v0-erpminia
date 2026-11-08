@@ -22,6 +22,7 @@ select
     ' · ',
     count(*) filter (where d.issue_type='asset_candidate_missing_unit_identifier')::text || ' unidad(es) sin identificador',
     count(*) filter (where d.issue_type='asset_family_requires_unit_disaggregation')::text || ' familia(s) múltiples por desagregar',
+    count(*) filter (where d.issue_type='existing_asset_family_requires_unit_disambiguation')::text || ' familia(s) canónicas ambiguas',
     'capturar serie/placa/etiqueta y ubicación exacta'
   ) as evidence_summary,
   'pending'::text as status,
@@ -34,7 +35,7 @@ from public.data_reconciliation_reviews d
 join public.cargos c on upper(c.name)='JEFE BODEGA'
 where d.status='open'
   and d.entity_type='asset'
-  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation')
+  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation','existing_asset_family_requires_unit_disambiguation')
 group by d.organization_id,c.id,c.name
 
 union all
@@ -50,7 +51,8 @@ select
   'Apoyar identificación física de activos'::text as title,
   concat_ws(' · ',
     count(*) filter (where d.issue_type='asset_candidate_missing_unit_identifier')::text || ' unidad(es) sin identificador',
-    count(*) filter (where d.issue_type='asset_family_requires_unit_disaggregation')::text || ' familia(s) múltiples'
+    count(*) filter (where d.issue_type='asset_family_requires_unit_disaggregation')::text || ' familia(s) múltiples',
+    count(*) filter (where d.issue_type='existing_asset_family_requires_unit_disambiguation')::text || ' familia(s) ambiguas'
   ) as evidence_summary,
   'pending'::text as status,
   false as material_related,
@@ -62,8 +64,31 @@ from public.data_reconciliation_reviews d
 join public.cargos c on upper(c.name)='JEFE DEPARTAMENTO DE MANTENIMIENTO'
 where d.status='open'
   and d.entity_type='asset'
-  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation')
-group by d.organization_id,c.id,c.name;
+  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation','existing_asset_family_requires_unit_disambiguation')
+group by d.organization_id,c.id,c.name
+
+union all
+
+select
+  d.organization_id,
+  c.id as cargo_id,
+  c.name as cargo_name,
+  'facility-identity:javito'::text as task_key,
+  'operations'::text as domain,
+  'info'::text as severity,
+  55 as priority_score,
+  'Confirmar identidad operacional de Tranque Relave Javito'::text as title,
+  d.evidence_reference as evidence_summary,
+  'pending'::text as status,
+  false as material_related,
+  coalesce(d.updated_at,d.created_at) as occurred_at,
+  'confirm_javito_operational_identity'::text as recommended_action,
+  'owner'::text as responsibility,
+  'Confirmar que Javito será la única entidad operacional para el tranque, definir límites/responsable y luego autorizar alta canónica. No crear ni fusionar automáticamente.'::text as role_action
+from public.data_reconciliation_reviews d
+join public.cargos c on upper(c.name)='GERENTE DE OPERACIONES'
+where d.status='open'
+  and d.issue_key='finance_facility_candidate:javito';
 
 revoke all on public.operational_tasks_by_cargo_v10 from public, anon;
 grant select on public.operational_tasks_by_cargo_v10 to authenticated, service_role;
