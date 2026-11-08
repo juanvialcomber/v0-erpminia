@@ -9,6 +9,7 @@ test('routes one aggregated physical asset identity campaign without mutating ca
   assert.match(sql,/asset-identification-campaign:bodega/);
   assert.match(sql,/JEFE BODEGA/);
   assert.match(sql,/asset_candidate_missing_unit_identifier/);
+  assert.match(sql,/asset_family_requires_unit_disaggregation/);
   assert.match(sql,/capture_asset_identity_in_bodega/);
   assert.match(sql,/No modificar stock ni crear Fichas 360 automáticamente/);
   assert.doesNotMatch(sql,/update\s+canonical\./i);
