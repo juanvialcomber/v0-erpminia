@@ -137,8 +137,7 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
     return (data?.rows || []).filter((row) => {
       if (family !== 'all' && assetFamily(row.laudus.name) !== family) return false;
       if (!query) return true;
-      return
-      [
+      return [
         row.laudus.name,
         row.laudus.manufacturer,
         row.laudus.model,
