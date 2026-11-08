@@ -26,6 +26,24 @@ type ReviewRow = {
     total_laudus_stock: number;
     synced_at: string | null;
   }>;
+  motilSnapshot: null | {
+    quantity: number | null;
+    warehouseCode: string | null;
+    snapshotDate: string | null;
+    validationStatus: string | null;
+  };
+  procurement: null | {
+    purchaseOrderCount: number | null;
+    purchaseLineCount: number | null;
+    supplierCount: number | null;
+    totalQuantityPurchased: number | null;
+    totalSpend: number | null;
+    weightedAverageUnitCost: number | null;
+    firstPurchaseDate: string | null;
+    lastPurchaseDate: string | null;
+    daysSinceLastPurchase: number | null;
+    status: string | null;
+  };
 };
 
 type Payload = {
@@ -145,6 +163,29 @@ export function LaudusInventoryReconciliationQueue() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="grid gap-px border-t bg-border md:grid-cols-2">
+        <div className="bg-card p-4">
+          <p className="text-xs font-medium">Último snapshot MOTIL</p>
+          {row.motilSnapshot ? (
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p>Saldo: <span className="font-medium text-foreground">{fmt(row.motilSnapshot.quantity)} {row.unit || ''}</span></p>
+              <p>Bodega: {row.motilSnapshot.warehouseCode || 'Sin bodega'}</p>
+              <p>Fecha: {row.motilSnapshot.snapshotDate || 'Sin fecha'} · {row.motilSnapshot.validationStatus || 'sin validación'}</p>
+            </div>
+          ) : <p className="mt-2 text-xs text-muted-foreground">Sin snapshot MOTIL disponible para este producto.</p>}
+        </div>
+        <div className="bg-card p-4">
+          <p className="text-xs font-medium">Historial de compras</p>
+          {row.procurement ? (
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p>{fmt(row.procurement.purchaseOrderCount)} OC · {fmt(row.procurement.supplierCount)} proveedor(es)</p>
+              <p>Cantidad histórica: {fmt(row.procurement.totalQuantityPurchased)} {row.unit || ''}</p>
+              <p>Última compra: {row.procurement.lastPurchaseDate || 'Sin fecha'} · costo medio {fmt(row.procurement.weightedAverageUnitCost)}</p>
+            </div>
+          ) : <p className="mt-2 text-xs text-muted-foreground">Sin historial de compras canónico para este producto.</p>}
         </div>
       </div>
 
