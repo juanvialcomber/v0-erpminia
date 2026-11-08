@@ -15,11 +15,14 @@ function normalize(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-async function canDecideBodega(userId: string, role?: string | null) {
-  if (isAdminRole(role)) return true;
+async function bodegaDecisionAuthority(userId: string, role?: string | null) {
+  if (isAdminRole(role)) return { allowed: true, projectLead: false };
   const access = await getUserModuleAccess(userId);
   const cargo = normalize(access.cargoName);
-  return cargo === 'jefe bodega' || cargo === 'jefe de planificación';
+  return {
+    allowed: cargo === 'jefe bodega' || cargo === 'jefe de planificación',
+    projectLead: cargo === 'jefe de planificación',
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -135,7 +138,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const canDecide = access.canWrite && await canDecideBodega(context.userId, context.role);
+    const authority = await bodegaDecisionAuthority(context.userId, context.role);
+    const canDecide = authority.allowed && (access.canWrite || authority.projectLead);
 
     return NextResponse.json({
       rows,
@@ -165,7 +169,8 @@ export async function POST(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  if (!(await canDecideBodega(context.userId, context.role))) {
+  const authority = await bodegaDecisionAuthority(context.userId, context.role);
+  if (!authority.allowed || (!access.canWrite && !authority.projectLead)) {
     return NextResponse.json(
       { error: 'Sólo el Jefe de Bodega, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
