@@ -56,7 +56,7 @@ export default function FinanzasDocumentosImportarPage() {
             <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
               <p className="font-medium">Evidencia bancaria requerida</p>
               <p className="mt-1 text-muted-foreground">
-                Sube la cartola o respaldo bancario más reciente. El archivo se conserva como evidencia financiera; cargarlo no marca pagos como conciliados ni modifica Laudus automáticamente.
+                Sube la cartola o respaldo bancario más reciente y selecciona el tipo “Cartola bancaria”. El archivo se conserva como evidencia financiera; cargarlo no marca pagos como conciliados ni modifica Laudus automáticamente.
               </p>
             </div>
           ) : null}
