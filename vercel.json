@@ -56,6 +56,10 @@
     {
       "path": "/api/cron/laudus-recovery",
       "schedule": "50 * * * *"
+    },
+    {
+      "path": "/api/cron/document-intake-triage",
+      "schedule": "14,34,54 * * * *"
     }
   ]
 }
