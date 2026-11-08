@@ -44,7 +44,7 @@ test('finance manager can read and persist only personal action state through th
   const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8');
   const api = await readFile(apiUrl, 'utf8');
 
-  assert.match(proxy, /path === '\\/api\\/actions\\/state'\) return true/);
+  assert.ok(proxy.includes("if (path === '/api/actions/state') return true;"));
   assert.match(api, /\.eq\('user_id', context\.userId\)/);
   assert.match(api, /\.eq\('cargo_id', profile\.cargo_id\)/);
   assert.match(api, /\.eq\('task_key', sourceKey\)/);
