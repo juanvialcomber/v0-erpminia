@@ -88,7 +88,30 @@ select
 from public.data_reconciliation_reviews d
 join public.cargos c on upper(c.name)='GERENTE DE OPERACIONES'
 where d.status='open'
-  and d.issue_key='finance_facility_candidate:javito';
+  and d.issue_key='finance_facility_candidate:javito'
+
+union all
+
+select
+  d.organization_id,
+  c.id as cargo_id,
+  c.name as cargo_name,
+  'asset-canonical-approval:60332526'::text as task_key,
+  'maintenance'::text as domain,
+  'warning'::text as severity,
+  78 as priority_score,
+  'Aprobar alta canónica de Motor Cummins 60332526'::text as title,
+  d.evidence_reference as evidence_summary,
+  'pending'::text as status,
+  false as material_related,
+  coalesce(d.updated_at,d.created_at) as occurred_at,
+  'approve_canonical_asset_candidate'::text as recommended_action,
+  'owner'::text as responsibility,
+  'Validar físicamente la serie 60332526 y aprobar o rechazar el alta. La evidencia incluye Depreciación y 14 líneas de OC con la serie exacta; no crear automáticamente.'::text as role_action
+from public.data_reconciliation_reviews d
+join public.cargos c on upper(c.name)='JEFE DEPARTAMENTO DE MANTENIMIENTO'
+where d.status='open'
+  and d.issue_key='depreciation_asset_candidate:serial:60332526';
 
 revoke all on public.operational_tasks_by_cargo_v10 from public, anon;
 grant select on public.operational_tasks_by_cargo_v10 to authenticated, service_role;
