@@ -162,7 +162,7 @@ export function LaudusFinanceReconciliationQueue() {
         </div>
 
         {!data?.canDecide ? (
-          <p className="mt-2 text-right text-xs text-muted-foreground">Sólo el responsable de Administración y Finanzas o administración puede resolver estos casos.</p>
+          <p className="mt-2 text-right text-xs text-muted-foreground">Sólo Administración y Finanzas, el Jefe de Planificación como líder del proyecto Laudus o administración puede resolver estos casos.</p>
         ) : null}
       </div>
     </section>
