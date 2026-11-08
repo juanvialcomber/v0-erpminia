@@ -15,7 +15,7 @@ test('Laudus finance project-lead access uses maintenance ED without granting ge
   assert.match(route, /!projectLead\.authorized \|\| !projectLead\.canWrite/);
   assert.match(route, /normalize\(access\.cargoName\) !== 'jefe de planificación'/);
   assert.match(route, /Sólo conciliaciones Laudus; no amplía acceso general a Finanzas/);
-  assert.match(route, /!access\.canWrite \|\| !\(await canDecideFinance/);
+  assert.match(route, /!access\.canWrite \|\| !authority\.allowed/);
 });
 
 test('Laudus Bodega project-lead override preserves normal area write gate', async () => {
