@@ -20,7 +20,8 @@ select
   'Identificar activos físicos en Bodega'::text as title,
   concat_ws(
     ' · ',
-    count(*)::text || ' unidad(es) físicas vigentes sin identificador unitario',
+    count(*) filter (where d.issue_type='asset_candidate_missing_unit_identifier')::text || ' unidad(es) sin identificador',
+    count(*) filter (where d.issue_type='asset_family_requires_unit_disaggregation')::text || ' familia(s) múltiples por desagregar',
     'capturar serie/placa/etiqueta y ubicación exacta'
   ) as evidence_summary,
   'pending'::text as status,
@@ -33,7 +34,7 @@ from public.data_reconciliation_reviews d
 join public.cargos c on upper(c.name)='JEFE BODEGA'
 where d.status='open'
   and d.entity_type='asset'
-  and d.issue_type='asset_candidate_missing_unit_identifier'
+  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation')
 group by d.organization_id,c.id,c.name
 
 union all
@@ -47,7 +48,10 @@ select
   'info'::text as severity,
   50 as priority_score,
   'Apoyar identificación física de activos'::text as title,
-  count(*)::text || ' unidad(es) requieren identidad física antes de Ficha 360' as evidence_summary,
+  concat_ws(' · ',
+    count(*) filter (where d.issue_type='asset_candidate_missing_unit_identifier')::text || ' unidad(es) sin identificador',
+    count(*) filter (where d.issue_type='asset_family_requires_unit_disaggregation')::text || ' familia(s) múltiples'
+  ) as evidence_summary,
   'pending'::text as status,
   false as material_related,
   max(coalesce(d.updated_at,d.created_at)) as occurred_at,
@@ -58,7 +62,7 @@ from public.data_reconciliation_reviews d
 join public.cargos c on upper(c.name)='JEFE DEPARTAMENTO DE MANTENIMIENTO'
 where d.status='open'
   and d.entity_type='asset'
-  and d.issue_type='asset_candidate_missing_unit_identifier'
+  and d.issue_type in ('asset_candidate_missing_unit_identifier','asset_family_requires_unit_disaggregation')
 group by d.organization_id,c.id,c.name;
 
 revoke all on public.operational_tasks_by_cargo_v10 from public, anon;
