@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     const productIds = [...new Set((reviews || []).map((row) => row.entity_id).filter(Boolean))] as string[];
 
-    const [mismatches, negatives] = await Promise.all([
+    const [mismatches, negatives, inventoryContext, procurementContext] = await Promise.all([
       productIds.length
         ? context.supabase
             .from('laudus_inventory_reconciliation_service_v1')
@@ -57,12 +57,30 @@ export async function GET(request: NextRequest) {
             .eq('organization_id', context.organizationId)
             .in('canonical_product_id', productIds)
         : Promise.resolve({ data: [], error: null }),
+      productIds.length
+        ? context.supabase
+            .from('canonical_inventory_current')
+            .select('id,sku,quantity,warehouse_code,snapshot_date,validation_status')
+            .eq('organization_id', context.organizationId)
+            .in('id', productIds)
+        : Promise.resolve({ data: [], error: null }),
+      productIds.length
+        ? context.supabase
+            .from('product_procurement_status')
+            .select('product_id,purchase_order_count,purchase_line_count,supplier_count,total_quantity_purchased,total_spend,weighted_average_unit_cost,first_purchase_date,last_purchase_date,days_since_last_purchase,procurement_status')
+            .eq('organization_id', context.organizationId)
+            .in('product_id', productIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
     if (mismatches.error) throw mismatches.error;
     if (negatives.error) throw negatives.error;
+    if (inventoryContext.error) throw inventoryContext.error;
+    if (procurementContext.error) throw procurementContext.error;
 
     const mismatchByProduct = new Map((mismatches.data || []).map((row) => [row.canonical_product_id, row]));
+    const inventoryByProduct = new Map((inventoryContext.data || []).map((row) => [row.id, row]));
+    const procurementByProduct = new Map((procurementContext.data || []).map((row) => [row.product_id, row]));
     const negativeByProduct = new Map<string, any[]>();
     for (const row of negatives.data || []) {
       const current = negativeByProduct.get(row.canonical_product_id) || [];
@@ -75,6 +93,8 @@ export async function GET(request: NextRequest) {
       const negativePositions = review.entity_id ? (negativeByProduct.get(review.entity_id) || []) : [];
       const kind = review.issue_key.startsWith('laudus:negative_stock:') ? 'negative_stock' : 'inventory_mismatch';
       const firstNegative = negativePositions[0] || null;
+      const inventory = review.entity_id ? inventoryByProduct.get(review.entity_id) : null;
+      const procurement = review.entity_id ? procurementByProduct.get(review.entity_id) : null;
       return {
         id: review.id,
         kind,
@@ -91,6 +111,24 @@ export async function GET(request: NextRequest) {
         motilUpdatedAt: mismatch?.motil_updated_at || null,
         reconciliationState: mismatch?.reconciliation_state || null,
         negativePositions,
+        motilSnapshot: inventory ? {
+          quantity: inventory.quantity,
+          warehouseCode: inventory.warehouse_code,
+          snapshotDate: inventory.snapshot_date,
+          validationStatus: inventory.validation_status,
+        } : null,
+        procurement: procurement ? {
+          purchaseOrderCount: procurement.purchase_order_count,
+          purchaseLineCount: procurement.purchase_line_count,
+          supplierCount: procurement.supplier_count,
+          totalQuantityPurchased: procurement.total_quantity_purchased,
+          totalSpend: procurement.total_spend,
+          weightedAverageUnitCost: procurement.weighted_average_unit_cost,
+          firstPurchaseDate: procurement.first_purchase_date,
+          lastPurchaseDate: procurement.last_purchase_date,
+          daysSinceLastPurchase: procurement.days_since_last_purchase,
+          status: procurement.procurement_status,
+        } : null,
         evidenceReference: review.evidence_reference,
         updatedAt: review.updated_at,
       };
