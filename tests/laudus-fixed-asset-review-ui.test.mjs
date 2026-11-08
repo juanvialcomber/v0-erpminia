@@ -20,7 +20,7 @@ test('fixed asset review GET reuses canonical review queue and remains read-only
   assert.match(route, /noCanonicalMutation: true/);
   assert.match(route, /noLaudusMutation: true/);
   assert.match(route, /filter\(\(row\) => !row\.decision\)/);
-  assert.match(route, /slice\(0, 50\)/);
+  assert.match(route, /slice\(0, 500\)/);
   const getBlock = route.slice(route.indexOf('export async function GET'), route.indexOf('type ReviewDecision'));
   assert.doesNotMatch(getBlock, /\.insert\(/);
   assert.doesNotMatch(getBlock, /\.update\(/);
@@ -37,6 +37,8 @@ test('fixed asset review UI exposes evidence and human authority', async () => {
   assert.match(component, /Serie exacta/);
   assert.match(component, /no se modifica el activo canónico ni Laudus/i);
   assert.match(component, /\/api\/integrations\/laudus\/fixed-asset-review/);
+  assert.match(component, /Bombas, motores y generadores/);
+  assert.match(component, /Todas \{data\?\.rows\.length \|\| 0\}/);
 });
 
 test('Finance routes users to the dedicated Laudus fixed asset review', async () => {
