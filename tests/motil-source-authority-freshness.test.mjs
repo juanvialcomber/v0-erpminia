@@ -36,3 +36,14 @@ test('freshness service separates observed time from source event time and expos
   assert.match(sql, /make_interval\(mins => c\.freshness_sla_minutes\)/);
   assert.match(sql, /'bank_reconciliation','PREPARE','laudus'[\s\S]*?'business_event'/);
 });
+
+
+test('channel health exposes operational backlog instead of treating transport success as health', async () => {
+  const sql = await readFile(migrationUrl, 'utf8');
+  assert.match(sql, /motil_channel_health_service_v1/);
+  assert.match(sql, /motil_whatsapp_intake_exceptions_v1/);
+  assert.match(sql, /download_state='pending'/);
+  assert.match(sql, /pending_classification/);
+  assert.match(sql, /when coalesce\(s\.pending_count,0\) > 0 then 'degraded'/);
+  assert.match(sql, /source_key='motil_native' then 'healthy'/);
+});
