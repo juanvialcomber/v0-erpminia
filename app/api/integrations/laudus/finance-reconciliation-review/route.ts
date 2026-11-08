@@ -18,11 +18,25 @@ function normalize(value: unknown) {
 async function canDecideFinance(userId: string, role?: string | null) {
   if (isAdminRole(role)) return true;
   const access = await getUserModuleAccess(userId);
-  return normalize(access.cargoName) === 'gerente de finanzas';
+  const cargo = normalize(access.cargoName);
+  return cargo === 'gerente de finanzas' || cargo === 'jefe de planificación';
+}
+
+async function requireFinanceReconciliationAccess(request: NextRequest) {
+  const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (finance.authorized) return finance;
+
+  const projectLead = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (!projectLead.authorized || !projectLead.canWrite) return finance;
+
+  const access = await getUserModuleAccess(projectLead.user.id);
+  if (normalize(access.cargoName) !== 'jefe de planificación') return finance;
+
+  return projectLead;
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const access = await requireFinanceReconciliationAccess(request);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -64,6 +78,11 @@ export async function GET(request: NextRequest) {
         cargo: 'Gerente de Finanzas',
         area: 'Administración y Finanzas',
       },
+      projectLead: {
+        cargo: 'Jefe de Planificación',
+        canDecide,
+        scope: 'Sólo conciliaciones Laudus; no amplía acceso general a Finanzas.',
+      },
       summary: {
         pending: (rows || []).length,
         accountsPayable: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:cxp_inconsistente:')).length,
@@ -84,7 +103,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
+  const access = await requireFinanceReconciliationAccess(request);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -92,7 +111,7 @@ export async function POST(request: NextRequest) {
 
   if (!(await canDecideFinance(context.userId, context.role))) {
     return NextResponse.json(
-      { error: 'Sólo el responsable de Administración y Finanzas o un administrador puede resolver esta conciliación.' },
+      { error: 'Sólo Administración y Finanzas, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
     );
   }
