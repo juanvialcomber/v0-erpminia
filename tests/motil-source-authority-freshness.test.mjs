@@ -27,7 +27,12 @@ test('freshness service separates observed time from source event time and expos
   const sql = await readFile(migrationUrl, 'utf8');
   assert.match(sql, /observed_at/);
   assert.match(sql, /source_event_at/);
+  assert.match(sql, /freshness_kind/);
+  assert.match(sql, /business_event/);
+  assert.match(sql, /native_activity/);
+  assert.match(sql, /effective_freshness_at/);
   assert.match(sql, /freshness_status/);
   assert.match(sql, /requires_review/);
   assert.match(sql, /make_interval\(mins => c\.freshness_sla_minutes\)/);
+  assert.match(sql, /'bank_reconciliation','PREPARE','laudus'[\s\S]*?'business_event'/);
 });
