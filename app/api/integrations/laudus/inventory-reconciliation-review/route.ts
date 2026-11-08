@@ -18,7 +18,8 @@ function normalize(value: unknown) {
 async function canDecideBodega(userId: string, role?: string | null) {
   if (isAdminRole(role)) return true;
   const access = await getUserModuleAccess(userId);
-  return normalize(access.cargoName) === 'jefe bodega';
+  const cargo = normalize(access.cargoName);
+  return cargo === 'jefe bodega' || cargo === 'jefe de planificación';
 }
 
 export async function GET(request: NextRequest) {
@@ -158,7 +159,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, true);
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
 
   if (!(await canDecideBodega(context.userId, context.role))) {
     return NextResponse.json(
-      { error: 'Sólo el Jefe de Bodega o un administrador puede resolver esta conciliación.' },
+      { error: 'Sólo el Jefe de Bodega, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
     );
   }
