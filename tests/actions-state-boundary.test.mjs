@@ -38,3 +38,15 @@ test('actions dashboard distinguishes unavailable summary and failed state write
   assert.doesNotMatch(page, /summary\?\.owners \?\? 0/);
   assert.doesNotMatch(page, /summary\?\.critical \?\? 0/);
 });
+
+
+test('finance manager can read and persist only personal action state through the shared actions endpoint', async () => {
+  const proxy = await readFile(new URL('../proxy.ts', import.meta.url), 'utf8');
+  const api = await readFile(apiUrl, 'utf8');
+
+  assert.match(proxy, /path === '\\/api\\/actions\\/state'\) return true/);
+  assert.match(api, /\.eq\('user_id', context\.userId\)/);
+  assert.match(api, /\.eq\('cargo_id', profile\.cargo_id\)/);
+  assert.match(api, /\.eq\('task_key', sourceKey\)/);
+  assert.match(api, /Una acción crítica no puede posponerse/);
+});
