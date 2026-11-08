@@ -35,10 +35,10 @@ export async function syncNegativeLaudusKardex(organizationId: string, supabase:
   }
 
   const { data: negatives, error: negativeError } = await supabase
-    .from('laudus_negative_stock_positions_service_v1')
-    .select('product_external_id,sku,total_laudus_stock,synced_at')
+    .from('laudus_kardex_recovery_candidates_service_v1')
+    .select('product_external_id,sku,priority_score,synced_at')
     .eq('organization_id', organizationId)
-    .order('total_laudus_stock', { ascending: true })
+    .order('priority_score', { ascending: false })
     .limit(MAX_PRODUCTS);
 
   if (negativeError) {
