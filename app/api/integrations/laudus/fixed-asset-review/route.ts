@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         || n(b.best_name_similarity) - n(a.best_name_similarity)
         || String(a.laudus_external_id || '').localeCompare(String(b.laudus_external_id || ''), 'es-CL')
       )
-      .slice(0, 50)
+      .slice(0, 500)
       .map((row) => ({
         externalId: String(row.laudus_external_id || ''),
         laudus: {
