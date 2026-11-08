@@ -170,12 +170,12 @@ with probes as (
 
   union all
 
-  select f.organization_id,'legal_documents',
-         max(d.updated_at),max(d.uploaded_at),count(*)::bigint,
-         count(*) filter (where d.l1_status is null or d.l1_status not in ('approved','aprobado'))::bigint
-  from public.carpetas f
-  join public.carpeta_documentos d on d.carpeta_id=f.id
-  group by f.organization_id
+  select organization_id,'legal_documents',
+         max(coalesce(linked_at,classified_at,created_at)),max(created_at),count(*)::bigint,
+         count(*) filter (where status='pending_classification')::bigint
+  from public.document_intake_items
+  where lower(coalesce(area,'')) in ('legal','juridico','jurídico')
+  group by organization_id
 )
 select
   c.organization_id,
