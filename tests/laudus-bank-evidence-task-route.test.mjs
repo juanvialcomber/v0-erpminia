@@ -17,4 +17,11 @@ test('finance document intake explains bank evidence semantics without auto reco
   assert.match(page, /Evidencia bancaria requerida/);
   assert.match(page, /no marca pagos como conciliados ni modifica Laudus automáticamente/);
   assert.match(page, /DocumentUpload module="finanzas" category="documentos"/);
+  assert.match(page, /Cartola bancaria/);
+});
+
+
+test('finance document catalog includes bank statements as an explicit type', async () => {
+  const upload = await readFile(new URL('../components/documents/document-upload.tsx', import.meta.url), 'utf8');
+  assert.match(upload, /finanzas:\s*\[[\s\S]*'Cartola bancaria'/);
 });
