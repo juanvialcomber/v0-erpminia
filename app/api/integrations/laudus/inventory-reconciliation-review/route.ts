@@ -209,6 +209,7 @@ export async function POST(request: NextRequest) {
     const resolutionNote = [
       `decision=${decision}`,
       'area=bodega',
+      `authority=${authority.projectLead ? 'project_lead' : 'area_owner'}`,
       `actor=${actor}`,
       `reason=${reason}`,
       'auto_write=false',
