@@ -21,8 +21,8 @@ test('Ariel project-lead override is scoped to Laudus reconciliation APIs', asyn
   assert.match(inventory, /authority\.allowed && \(access\.canWrite \|\| authority\.projectLead\)/);
   assert.match(inventory, /!authority\.allowed \|\| \(!access\.canWrite && !authority\.projectLead\)/);
 
-  assert.match(finance, /authority=\\\$\\\{authority\\.projectLead \\? 'project_lead' : 'area_owner'\\\}/);
-  assert.match(inventory, /authority=\\\$\\\{authority\\.projectLead \\? 'project_lead' : 'area_owner'\\\}/);
+  assert.match(finance, /authority=\$\{authority\.projectLead \? 'project_lead' : 'area_owner'\}/);
+  assert.match(inventory, /authority=\$\{authority\.projectLead \? 'project_lead' : 'area_owner'\}/);
 });
 
 test('project lead has a dedicated maintenance Laudus view without opening Finance navigation', async () => {
