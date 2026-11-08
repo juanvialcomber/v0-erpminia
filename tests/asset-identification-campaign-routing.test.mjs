@@ -10,6 +10,7 @@ test('routes one aggregated physical asset identity campaign without mutating ca
   assert.match(sql,/JEFE BODEGA/);
   assert.match(sql,/asset_candidate_missing_unit_identifier/);
   assert.match(sql,/asset_family_requires_unit_disaggregation/);
+  assert.match(sql,/existing_asset_family_requires_unit_disambiguation/);
   assert.match(sql,/capture_asset_identity_in_bodega/);
   assert.match(sql,/No modificar stock ni crear Fichas 360 automáticamente/);
   assert.doesNotMatch(sql,/update\s+canonical\./i);
@@ -20,4 +21,14 @@ test('keeps maintenance as support instead of duplicate owner', () => {
   assert.match(sql,/asset-identification-campaign:maintenance-support/);
   assert.match(sql,/JEFE DEPARTAMENTO DE MANTENIMIENTO/);
   assert.match(sql,/'support'::text as responsibility/);
+});
+
+
+test('routes Javito and high-confidence Cummins candidate to accountable human owners', () => {
+  assert.match(sql,/facility-identity:javito/);
+  assert.match(sql,/GERENTE DE OPERACIONES/);
+  assert.match(sql,/asset-canonical-approval:60332526/);
+  assert.match(sql,/approve_canonical_asset_candidate/);
+  assert.match(sql,/14 líneas de OC/);
+  assert.doesNotMatch(sql,/insert\s+into\s+canonical\./i);
 });
