@@ -109,11 +109,35 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
   const [index, setIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [rationale, setRationale] = useState('');
+  const [family, setFamily] = useState('all');
+
+  const assetFamily = (name: string | null) => {
+    const value = (name || '').toUpperCase();
+    if (/(BOMBA|MOTOR|COMPRESOR|GENERADOR|GRUPO ELECTROGENO)/.test(value)) return 'Bombas, motores y generadores';
+    if (/(CAMION|CAMIÓN|DUMPER|CAMIONETA|VEHIC|TRACTO|BUS|MINIBUS)/.test(value)) return 'Vehículos';
+    if (/(PERFOR|SONDA|JUMBO|BOLTER|SCOOP|CARGADOR|EXCAVAD|RETRO)/.test(value)) return 'Equipos mina';
+    if (/(CHANCADOR|MOLINO|HIDROCICLON|FILTRO|CELDA|ESPESADOR)/.test(value)) return 'Planta proceso';
+    if (/(MAQUINA|MÁQUINA|TORNO|SOLDAD|CORTAD|PRENSA|HIDROLAV)/.test(value)) return 'Taller y herramientas';
+    if (/(NIVEL|TOPOGRAF|LEICA|ESTACION TOTAL|GPS)/.test(value)) return 'Topografía';
+    if (/(CONTENEDOR|GALPON|CASA|OFICINA|BODEGA|TALLER)/.test(value)) return 'Infraestructura';
+    return 'Otros';
+  };
+
+  const families = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of data?.rows || []) {
+      const key = assetFamily(row.laudus.name);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [data?.rows]);
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return data?.rows || [];
-    return (data?.rows || []).filter((row) =>
+    return (data?.rows || []).filter((row) => {
+      if (family !== 'all' && assetFamily(row.laudus.name) !== family) return false;
+      if (!query) return true;
+      return
       [
         row.laudus.name,
         row.laudus.manufacturer,
@@ -127,9 +151,9 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(query),
-    );
-  }, [data?.rows, search]);
+        .includes(query);
+    });
+  }, [data?.rows, search, family]);
 
   const safeIndex = rows.length ? Math.min(index, rows.length - 1) : 0;
   const current = rows[safeIndex] || null;
@@ -215,6 +239,19 @@ export function LaudusFixedAssetReview({ area = 'finance' }: { area?: 'finance' 
             <span>{rows.length.toLocaleString('es-CL')} sin decisión visibles en esta cola</span>
           </div>
         </section>
+      ) : null}
+
+      {isMaintenance && families.length ? (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant={family === 'all' ? 'secondary' : 'outline'} onClick={() => { setFamily('all'); setIndex(0); }}>
+            Todas {data?.rows.length || 0}
+          </Button>
+          {families.map(([name, count]) => (
+            <Button key={name} size="sm" variant={family === name ? 'secondary' : 'outline'} onClick={() => { setFamily(name); setIndex(0); }}>
+              {name} {count}
+            </Button>
+          ))}
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
