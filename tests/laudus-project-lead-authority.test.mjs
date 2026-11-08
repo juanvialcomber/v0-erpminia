@@ -15,11 +15,14 @@ test('Ariel project-lead override is scoped to Laudus reconciliation APIs', asyn
   assert.match(finance, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES\)/);
   assert.match(finance, /normalize\(access\.cargoName\) !== 'jefe de planificación'/);
   assert.match(finance, /scope: 'Sólo conciliaciones Laudus; no amplía acceso general a Finanzas\.'/);
-  assert.match(finance, /!access\.canWrite \|\| !\(await canDecideFinance/);
+  assert.match(finance, /!access\.canWrite \|\| !authority\.allowed/);
 
   assert.match(inventory, /cargo === 'jefe bodega' \|\| cargo === 'jefe de planificación'/);
   assert.match(inventory, /authority\.allowed && \(access\.canWrite \|\| authority\.projectLead\)/);
   assert.match(inventory, /!authority\.allowed \|\| \(!access\.canWrite && !authority\.projectLead\)/);
+
+  assert.match(finance, /authority=\\\$\\\{authority\\.projectLead \\? 'project_lead' : 'area_owner'\\\}/);
+  assert.match(inventory, /authority=\\\$\\\{authority\\.projectLead \\? 'project_lead' : 'area_owner'\\\}/);
 });
 
 test('project lead has a dedicated maintenance Laudus view without opening Finance navigation', async () => {
