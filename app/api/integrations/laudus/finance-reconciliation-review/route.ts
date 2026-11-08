@@ -15,11 +15,14 @@ function normalize(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-async function canDecideFinance(userId: string, role?: string | null) {
-  if (isAdminRole(role)) return true;
+async function financeDecisionAuthority(userId: string, role?: string | null) {
+  if (isAdminRole(role)) return { allowed: true, projectLead: false };
   const access = await getUserModuleAccess(userId);
   const cargo = normalize(access.cargoName);
-  return cargo === 'gerente de finanzas' || cargo === 'jefe de planificación';
+  return {
+    allowed: cargo === 'gerente de finanzas' || cargo === 'jefe de planificación',
+    projectLead: cargo === 'jefe de planificación',
+  };
 }
 
 async function requireFinanceReconciliationAccess(request: NextRequest) {
@@ -54,7 +57,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const canDecide = access.canWrite && await canDecideFinance(context.userId, context.role);
+    const authority = await financeDecisionAuthority(context.userId, context.role);
+    const canDecide = access.canWrite && authority.allowed;
 
     return NextResponse.json({
       rows: (rows || []).map((row) => ({
@@ -80,7 +84,8 @@ export async function GET(request: NextRequest) {
       },
       projectLead: {
         cargo: 'Jefe de Planificación',
-        canDecide,
+        currentUser: authority.projectLead,
+        canDecide: authority.projectLead && canDecide,
         scope: 'Sólo conciliaciones Laudus; no amplía acceso general a Finanzas.',
       },
       summary: {
@@ -109,7 +114,8 @@ export async function POST(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  if (!access.canWrite || !(await canDecideFinance(context.userId, context.role))) {
+  const authority = await financeDecisionAuthority(context.userId, context.role);
+  if (!access.canWrite || !authority.allowed) {
     return NextResponse.json(
       { error: 'Sólo Administración y Finanzas, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
@@ -153,6 +159,7 @@ export async function POST(request: NextRequest) {
     const resolutionNote = [
       `decision=${decision}`,
       'area=administracion_finanzas',
+      `authority=${authority.projectLead ? 'project_lead' : 'area_owner'}`,
       `actor=${actor}`,
       `reason=${reason}`,
       'canonical_mutation=false',
