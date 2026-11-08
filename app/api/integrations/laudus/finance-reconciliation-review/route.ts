@@ -15,14 +15,31 @@ function normalize(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-async function canDecideFinance(userId: string, role?: string | null) {
-  if (isAdminRole(role)) return true;
+async function financeDecisionAuthority(userId: string, role?: string | null) {
+  if (isAdminRole(role)) return { allowed: true, projectLead: false };
   const access = await getUserModuleAccess(userId);
-  return normalize(access.cargoName) === 'gerente de finanzas';
+  const cargo = normalize(access.cargoName);
+  return {
+    allowed: cargo === 'gerente de finanzas' || cargo === 'jefe de planificación',
+    projectLead: cargo === 'jefe de planificación',
+  };
+}
+
+async function requireFinanceReconciliationAccess(request: NextRequest) {
+  const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  if (finance.authorized) return finance;
+
+  const projectLead = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (!projectLead.authorized || !projectLead.canWrite) return finance;
+
+  const access = await getUserModuleAccess(projectLead.user.id);
+  if (normalize(access.cargoName) !== 'jefe de planificación') return finance;
+
+  return projectLead;
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const access = await requireFinanceReconciliationAccess(request);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -40,7 +57,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const canDecide = access.canWrite && await canDecideFinance(context.userId, context.role);
+    const authority = await financeDecisionAuthority(context.userId, context.role);
+    const canDecide = access.canWrite && authority.allowed;
 
     return NextResponse.json({
       rows: (rows || []).map((row) => ({
@@ -64,6 +82,12 @@ export async function GET(request: NextRequest) {
         cargo: 'Gerente de Finanzas',
         area: 'Administración y Finanzas',
       },
+      projectLead: {
+        cargo: 'Jefe de Planificación',
+        currentUser: authority.projectLead,
+        canDecide: authority.projectLead && canDecide,
+        scope: 'Sólo conciliaciones Laudus; no amplía acceso general a Finanzas.',
+      },
       summary: {
         pending: (rows || []).length,
         accountsPayable: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:cxp_inconsistente:')).length,
@@ -84,15 +108,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS, true);
+  const access = await requireFinanceReconciliationAccess(request);
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  if (!(await canDecideFinance(context.userId, context.role))) {
+  const authority = await financeDecisionAuthority(context.userId, context.role);
+  if (!access.canWrite || !authority.allowed) {
     return NextResponse.json(
-      { error: 'Sólo el responsable de Administración y Finanzas o un administrador puede resolver esta conciliación.' },
+      { error: 'Sólo Administración y Finanzas, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
     );
   }
@@ -134,6 +159,7 @@ export async function POST(request: NextRequest) {
     const resolutionNote = [
       `decision=${decision}`,
       'area=administracion_finanzas',
+      `authority=${authority.projectLead ? 'project_lead' : 'area_owner'}`,
       `actor=${actor}`,
       `reason=${reason}`,
       'canonical_mutation=false',

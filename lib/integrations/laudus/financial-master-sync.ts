@@ -80,6 +80,12 @@ export async function syncLaudusFinancialMasters(
   );
   if (reconciliationError) throw new Error('Laudus financial master reconciliation failed');
 
+  const { data: dormantCostCenters, error: dormantCostCenterError } = await supabase.rpc(
+    'motil_classify_dormant_laudus_cost_centers',
+    { p_organization_id: organizationId },
+  );
+  if (dormantCostCenterError) throw new Error('Laudus dormant cost-center classification failed');
+
     const apiListCalls = costCenters.calls + fixedAssets.calls;
     await markLaudusSyncSuccess(supabase, organizationId, 'financial_masters', {
       processed: costCenters.rows.length + fixedAssets.rows.length,
@@ -97,6 +103,7 @@ export async function syncLaudusFinancialMasters(
     fixedAssetsRead: fixedAssets.rows.length,
     ingest,
     reconciliation,
+    dormantCostCenters,
     laudusMutated: false,
     canonicalMutated: false,
     };

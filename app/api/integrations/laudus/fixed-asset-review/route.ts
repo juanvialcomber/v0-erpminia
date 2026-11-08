@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { MODULE_KEYS, getUserModuleAccess, isAdminRole, requireModuleAccess } from '@/lib/api/module-access';
 
 type ReviewRow = {
   decision?: string | null;
@@ -38,8 +38,31 @@ function n(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+async function canDecideOperationalIdentity(userId: string, role: string | null) {
+  if (isAdminRole(role)) return true;
+  const access = await getUserModuleAccess(userId);
+  const cargo = access.cargoName?.trim().toUpperCase();
+  const authorizedCargo =
+    cargo === 'JEFE DEPARTAMENTO DE MANTENIMIENTO'
+    || cargo === 'JEFE DE PLANIFICACIÓN';
+  return authorizedCargo && access.access[MODULE_KEYS.MANT_OPERACIONES] === 'ED';
+}
+
+async function requireReviewReadAccess(request: NextRequest) {
+  const maintenance = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES);
+  if (maintenance.authorized) {
+    return {
+      access: maintenance,
+      canDecide: await canDecideOperationalIdentity(maintenance.user.id, maintenance.role),
+    };
+  }
+  const finance = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  return { access: finance, canDecide: false };
+}
+
 export async function GET(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const resolved = await requireReviewReadAccess(request);
+  const access = resolved.access;
   if (!access.authorized) return access.response;
 
   const context = await getOrganizationContext(request);
@@ -86,7 +109,7 @@ export async function GET(request: NextRequest) {
         || n(b.best_name_similarity) - n(a.best_name_similarity)
         || String(a.laudus_external_id || '').localeCompare(String(b.laudus_external_id || ''), 'es-CL')
       )
-      .slice(0, 50)
+      .slice(0, 500)
       .map((row) => ({
         externalId: String(row.laudus_external_id || ''),
         laudus: {
@@ -147,6 +170,7 @@ export async function GET(request: NextRequest) {
         rejectedTotal,
       },
       rows: actionable,
+      canDecide: resolved.canDecide,
       policy: {
         noAutomaticLink: true,
         noCanonicalMutation: true,
@@ -167,9 +191,11 @@ export async function GET(request: NextRequest) {
 type ReviewDecision = 'confirm_candidate' | 'reject_candidate' | 'defer';
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.FIN_FINANZAS);
+  const access = await requireModuleAccess(request, MODULE_KEYS.MANT_OPERACIONES, true);
   if (!access.authorized) return access.response;
-  if (!access.canWrite) return NextResponse.json({ error: 'No tienes permiso para registrar esta revisión.' }, { status: 403 });
+  if (!(await canDecideOperationalIdentity(access.user.id, access.role))) {
+    return NextResponse.json({ error: 'La identidad operacional la resuelve Mantenimiento o el Jefe de Planificación como líder del proyecto.' }, { status: 403 });
+  }
 
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -257,6 +283,36 @@ export async function POST(request: NextRequest) {
       }, { onConflict: 'organization_id,laudus_external_id' });
 
     if (decisionError) throw decisionError;
+
+    const reconciliationStatus =
+      decision === 'confirm_candidate'
+        ? 'accepted'
+        : decision === 'reject_candidate'
+          ? 'ignored'
+          : 'resolved';
+    const resolutionNote = [
+      `decision=${decision}`,
+      `candidate_asset_id=${currentCandidateId || 'none'}`,
+      `reviewer=${context.userName || context.userEmail || context.userId}`,
+      `rationale=${rationale || 'sin observación'}`,
+      'canonical_mutation=false',
+      'laudus_mutation=false',
+    ].join(' | ');
+
+    const { error: reconciliationError } = await context.supabase
+      .from('data_reconciliation_reviews')
+      .update({
+        status: reconciliationStatus,
+        resolution_note: resolutionNote,
+        reviewed_by: context.userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('organization_id', context.organizationId)
+      .eq('issue_key', `laudus:fixed_asset_identity:${externalId}`)
+      .eq('status', 'open');
+
+    if (reconciliationError) throw reconciliationError;
 
     return NextResponse.json({
       ok: true,

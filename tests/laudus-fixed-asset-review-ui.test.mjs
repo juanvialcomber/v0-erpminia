@@ -6,18 +6,21 @@ const routePath = new URL('../app/api/integrations/laudus/fixed-asset-review/rou
 const componentPath = new URL('../components/integrations/laudus-fixed-asset-review.tsx', import.meta.url);
 const pagePath = new URL('../app/dashboard/finanzas/activos-laudus/page.tsx', import.meta.url);
 const financeCardPath = new URL('../components/integrations/laudus-finance-control-card.tsx', import.meta.url);
+const maintenancePagePath = new URL('../app/dashboard/mantenimiento/activos-laudus/page.tsx', import.meta.url);
+const inboxRoutePath = new URL('../app/api/actions/inbox/route.ts', import.meta.url);
 
 test('fixed asset review GET reuses canonical review queue and remains read-only', async () => {
   const route = await readFile(routePath, 'utf8');
 
   assert.match(route, /motil_laudus_fixed_asset_review_queue/);
   assert.match(route, /MODULE_KEYS\.FIN_FINANZAS/);
+  assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(route, /humanDecisionRequired: true/);
   assert.match(route, /noAutomaticLink: true/);
   assert.match(route, /noCanonicalMutation: true/);
   assert.match(route, /noLaudusMutation: true/);
   assert.match(route, /filter\(\(row\) => !row\.decision\)/);
-  assert.match(route, /slice\(0, 50\)/);
+  assert.match(route, /slice\(0, 500\)/);
   const getBlock = route.slice(route.indexOf('export async function GET'), route.indexOf('type ReviewDecision'));
   assert.doesNotMatch(getBlock, /\.insert\(/);
   assert.doesNotMatch(getBlock, /\.update\(/);
@@ -34,6 +37,8 @@ test('fixed asset review UI exposes evidence and human authority', async () => {
   assert.match(component, /Serie exacta/);
   assert.match(component, /no se modifica el activo canónico ni Laudus/i);
   assert.match(component, /\/api\/integrations\/laudus\/fixed-asset-review/);
+  assert.match(component, /Bombas, motores y generadores/);
+  assert.match(component, /Todas \{data\?\.rows\.length \|\| 0\}/);
 });
 
 test('Finance routes users to the dedicated Laudus fixed asset review', async () => {
@@ -57,5 +62,35 @@ test('fixed asset review records human decisions without canonical mutation', as
   assert.match(ui, /Confirmar candidato/);
   assert.match(ui, /Rechazar/);
   assert.match(ui, /Diferir/);
+  assert.match(ui, /La identidad operacional la resuelve Mantenimiento/);
   assert.match(ui, /Confirmar no modifica automáticamente el activo canónico/);
+});
+
+
+test('Maintenance owns operational identity review without financial write access', async () => {
+  const page = await readFile(maintenancePagePath, 'utf8');
+  const route = await readFile(routePath, 'utf8');
+  const inbox = await readFile(inboxRoutePath, 'utf8');
+
+  assert.match(page, /LaudusFixedAssetReview area="maintenance"/);
+  assert.match(route, /requireReviewReadAccess/);
+  assert.match(route, /MODULE_KEYS\.MANT_OPERACIONES/);
+  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.MANT_OPERACIONES, true\)/);
+  assert.match(route, /JEFE DEPARTAMENTO DE MANTENIMIENTO/);
+  assert.match(route, /JEFE DE PLANIFICACIÓN/);
+  assert.match(route, /canDecideOperationalIdentity/);
+  assert.match(route, /canDecide: false/);
+  assert.match(route, /data_reconciliation_reviews/);
+  assert.match(route, /laudus:fixed_asset_identity:/);
+  assert.match(inbox, /kind === 'laudus-fixed-asset'/);
+  assert.match(inbox, /\/dashboard\/mantenimiento\/activos-laudus/);
+});
+
+
+test('Planning project lead receives support visibility for open asset identity reviews', async () => {
+  const sql = await readFile(new URL('../supabase/migrations/20261107194100_surface_laudus_asset_support_to_planning.sql', import.meta.url), 'utf8');
+  assert.match(sql, /JEFE DE PLANIFICACIÓN/);
+  assert.match(sql, /support_laudus_fixed_asset_identity/);
+  assert.match(sql, /'support'::text as responsibility/);
+  assert.match(sql, /laudus:fixed_asset_identity:%/);
 });

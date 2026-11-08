@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const sync = fs.readFileSync('lib/integrations/laudus/journal-waybill-sync.ts','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261029221000_laudus_journal_waybill_sync_domains.sql','utf8');
+const provenanceMigration = fs.readFileSync('supabase/migrations/20261108144500_separate_laudus_waybill_header_line_provenance.sql','utf8');
 const coreRoute = fs.readFileSync('app/api/cron/laudus-core-daily/route.ts','utf8');
 const vercel = JSON.parse(fs.readFileSync('vercel.json','utf8'));
 
@@ -60,4 +61,14 @@ test('journal staging groups repeated journalEntryId values without dropping dis
 test('journal sync observability separates grouped line rows from real duplicates',()=>{
   assert.match(sync,/flattenedLineRowsGrouped/);
   assert.match(sync,/duplicatesRemoved: 0/);
+});
+
+
+test('waybill header provenance excludes line-level item evidence',()=>{
+  assert.match(provenanceMigration,/v_header_payload := v_row - array\[/);
+  assert.match(provenanceMigration,/'items_product_sku'/);
+  assert.match(provenanceMigration,/'items_quantity'/);
+  assert.match(provenanceMigration,/source_payload=excluded\.source_payload/);
+  assert.match(provenanceMigration,/update integration\.laudus_waybills/);
+  assert.doesNotMatch(provenanceMigration,/update integration\.laudus_waybill_lines\s+set\s+quantity/i);
 });

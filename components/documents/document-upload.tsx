@@ -138,6 +138,7 @@ const DOCUMENT_TYPES_BY_MODULE: Record<string, string[]> = {
     'Registro de Trabajos',
   ].sort(),
   finanzas: [
+    'Cartola bancaria',
     'Instructivo de Compras',
     'Política de Gastos',
     'Política Financiera',

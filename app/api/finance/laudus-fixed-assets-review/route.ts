@@ -102,10 +102,28 @@ export async function GET(request: NextRequest) {
 
   const canonicalById = new Map(canonicalRows.map((row) => [String(row.id), row]));
 
+  const { data: triageRows, error: triageError } = await context.supabase
+    .from('laudus_fixed_asset_triage_v1')
+    .select('external_id,triage_bucket,responsible_cargo_name,human_action_now,next_action')
+    .eq('organization_id', context.organizationId);
+
+  if (triageError) {
+    console.error('[finance/laudus-fixed-assets-review:triage]', triageError);
+    return NextResponse.json({ error: 'No se pudo cargar la clasificación de activos Laudus' }, { status: 500 });
+  }
+
+  const triageByExternalId = new Map(
+    (triageRows || []).map((row: any) => [String(row.external_id || ''), row]),
+  );
+
   const pendingRows = rows.filter((row) => row.reconciliation_status === 'pending');
   const activePendingRows = pendingRows
     .filter((row) => !row.retirement_date)
-    .map((row) => ({ ...row, reviewTier: reviewTier(row) }))
+    .map((row) => ({
+      ...row,
+      reviewTier: reviewTier(row),
+      triage: triageByExternalId.get(String(row.external_id || '')) || null,
+    }))
     .sort((a, b) =>
       b.reviewTier.rank - a.reviewTier.rank ||
       String(b.acquisition_date || '').localeCompare(String(a.acquisition_date || '')) ||
@@ -120,6 +138,10 @@ export async function GET(request: NextRequest) {
     }))
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es'));
 
+  const humanActionRows = activePendingRows.filter((row) => Boolean(row.triage?.human_action_now));
+  const classifiedBacklogRows = activePendingRows.filter((row) => row.triage && !row.triage.human_action_now);
+  const unownedRows = activePendingRows.filter((row) => !row.triage?.responsible_cargo_name);
+
   const summary = {
     totalRows: rows.length,
     matched: rows.filter((row) => row.reconciliation_status === 'matched').length,
@@ -127,6 +149,9 @@ export async function GET(request: NextRequest) {
     conflict: rows.filter((row) => row.reconciliation_status === 'conflict').length,
     ignored: rows.filter((row) => row.reconciliation_status === 'ignored').length,
     activePending: activePendingRows.length,
+    humanActionsNow: humanActionRows.length,
+    classifiedBacklog: classifiedBacklogRows.length,
+    unowned: unownedRows.length,
     activePendingWithSerial: activePendingRows.filter((row) => hasText(row.serial_number)).length,
     activePendingWithModel: activePendingRows.filter((row) => hasText(row.model) || hasText(row.manufacturer)).length,
     retiredPending: pendingRows.filter((row) => Boolean(row.retirement_date)).length,
@@ -145,10 +170,13 @@ export async function GET(request: NextRequest) {
       }, null),
     },
     summary,
-    reviewRows: activePendingRows.slice(0, 30),
+    reviewRows: humanActionRows.slice(0, 30),
+    classifiedRows: classifiedBacklogRows.slice(0, 30),
     matchedRows: matchedRows.slice(0, 20),
     semantics: {
-      pending: 'Registro de activo fijo Laudus sin contraparte canónica verificada en MOTIL.',
+      pending: 'Estado técnico de fuente: registro Laudus sin contraparte canónica verificada. No implica por sí solo una acción humana.',
+      classified_backlog: 'Registro fuente clasificado por área y próxima acción; permanece como backlog de enriquecimiento, no como excepción individual.',
+      human_action: 'Sólo estos casos requieren decisión humana inmediata de identidad.',
       physical_identifier: 'La fuente trae número de serie. Es mejor evidencia para revisión, pero no autoriza un match automático.',
       model_identifier: 'La fuente trae marca o modelo. Sirve para acotar candidatos, no para identificar una unidad por sí sola.',
       source_reference_only: 'La fila sólo conserva referencia contable/documental. Requiere evidencia operacional adicional.',

@@ -99,6 +99,10 @@ function resolveTaskRoute(task: RoleTask, reviewRoutes: Map<string, ReviewRouteR
     }
   }
 
+  if (kind === 'laudus-fixed-asset' && rawId) {
+    return '/dashboard/mantenimiento/activos-laudus';
+  }
+
   if (kind === 'work_order' && rawId && rest.length === 0 && UUID_PATTERN.test(rawId)) {
     return `/dashboard/mantenimiento/ordenes-trabajo/${rawId}`;
   }
@@ -154,6 +158,10 @@ function resolveTaskRoute(task: RoleTask, reviewRoutes: Map<string, ReviewRouteR
 
   if (kind === 'finance' && (rawId === 'zero_amount_lines' || rawId === 'validation') && rest.length === 0) {
     return `/dashboard/finanzas/importar?issue=${encodeURIComponent(rawId)}`;
+  }
+
+  if (task.task_key === 'laudus-bank-evidence-gap') {
+    return '/dashboard/finanzas/documentos/importar?source=bank-evidence';
   }
 
   return task.module_route || defaultModuleRoute(task);

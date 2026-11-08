@@ -22,3 +22,15 @@ test('Bodega reuses the existing admin-only Kardex endpoint one SKU at a time', 
   assert.match(card, /Requiere permiso de administración/);
   assert.match(card, /disabled=\{!row\.productId \|\| Boolean\(kardexLoading\)\}/);
 });
+
+
+test('Bodega shows the latest persisted Kardex movement for each negative SKU', async () => {
+  const readiness = await readFile(readinessPath, 'utf8');
+  const card = await readFile(cardPath, 'utf8');
+
+  assert.match(readiness, /laudus_product_kardex/);
+  assert.match(readiness, /movement_date,movement_type,description,quantity,resulting_stock,synced_at/);
+  assert.match(readiness, /latestKardexByProduct/);
+  assert.match(card, /Último movimiento:/);
+  assert.match(card, /Kardex aún no recuperado/);
+});

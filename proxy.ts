@@ -196,6 +196,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
   if (path.startsWith('/api/auth/') || path === '/api/me' || path.startsWith('/api/me/')) return true;
   if (path === '/api/actions/inbox' || path === '/api/data-sources/status') return readOnly;
+  if (path === '/api/actions/state') return true;
   if (path.startsWith('/api/procurement/')) return readOnly;
   if (path === '/api/pipeline/operational') return readOnly;
 
