@@ -160,6 +160,10 @@ function resolveTaskRoute(task: RoleTask, reviewRoutes: Map<string, ReviewRouteR
     return `/dashboard/finanzas/importar?issue=${encodeURIComponent(rawId)}`;
   }
 
+  if (task.task_key === 'laudus-bank-evidence-gap') {
+    return '/dashboard/finanzas/documentos/importar?source=bank-evidence';
+  }
+
   return task.module_route || defaultModuleRoute(task);
 }
 
