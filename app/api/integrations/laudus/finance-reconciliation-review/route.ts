@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
-  if (!(await canDecideFinance(context.userId, context.role))) {
+  if (!access.canWrite || !(await canDecideFinance(context.userId, context.role))) {
     return NextResponse.json(
       { error: 'Sólo Administración y Finanzas, el Jefe de Planificación como líder del proyecto o un administrador puede resolver esta conciliación.' },
       { status: 403 },
