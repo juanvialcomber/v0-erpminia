@@ -31,6 +31,8 @@ create table if not exists integration.source_authority_contracts (
   primary_source_key text not null,
   secondary_source_keys text[] not null default '{}',
   freshness_sla_minutes integer not null check (freshness_sla_minutes > 0),
+  freshness_kind text not null default 'source_observation'
+    check (freshness_kind in ('source_observation','business_event','native_activity')),
   owner_cargo text,
   auto_promote boolean not null default false,
   conflict_policy text not null,
@@ -47,43 +49,43 @@ grant select, insert, update on integration.source_authority_contracts to servic
 
 insert into integration.source_authority_contracts (
   organization_id,domain,authority_mode,primary_source_key,secondary_source_keys,
-  freshness_sla_minutes,owner_cargo,auto_promote,conflict_policy,notes,updated_at
+  freshness_sla_minutes,freshness_kind,owner_cargo,auto_promote,conflict_policy,notes,updated_at
 )
 values
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','maintenance','MOTIL_CANONICAL','motil_native',
-   array['whatsapp_greenapi','gmail_lapatagua','document_intake'],1440,'JEFE DEPARTAMENTO DE MANTENIMIENTO',true,
+   array['whatsapp_greenapi','gmail_lapatagua','document_intake'],1440,'native_activity','JEFE DEPARTAMENTO DE MANTENIMIENTO',true,
    'Preservar evidencia; conflicto material requiere revisión humana.',
    'OT, ejecución, pausas, evidencias y cierre operacional pertenecen a MOTIL.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','weekly_planning','MOTIL_CANONICAL','gmail_lapatagua',
-   array['production_files','motil_native'],10080,'JEFE PLANIFICACIÓN',false,
+   array['production_files','motil_native'],10080,'business_event','JEFE PLANIFICACIÓN',false,
    'La fuente oficial más reciente validada prevalece; no inferir aprobación por silencio.',
    'Planificación semanal se origina en evidencia de Ariel y se promueve a MOTIL con trazabilidad.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','production','MOTIL_CANONICAL','production_files',
-   array['whatsapp_greenapi','gmail_lapatagua','motil_native'],1440,'GERENTE DE OPERACIONES',false,
+   array['whatsapp_greenapi','gmail_lapatagua','motil_native'],1440,'business_event','GERENTE DE OPERACIONES',false,
    'No reemplazar dato reportado por inferencia; reconciliar versiones y cortes.',
    'Producción operacional debe quedar gobernada por fuentes y registros MOTIL.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','inventory','MOTIL_CANONICAL','motil_native',
-   array['laudus','gmail_lapatagua','document_intake'],2880,'JEFE BODEGA',false,
+   array['laudus','gmail_lapatagua','document_intake'],2880,'business_event','JEFE BODEGA',false,
    'Stock físico/canónico MOTIL no se sobrescribe por discrepancia Laudus; crear revisión.',
    'Laudus pasa a contraste de stock y movimientos, no autoridad operacional única.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','procurement','PREPARE','motil_native',
-   array['laudus','gmail_lapatagua','document_intake'],1440,'JEFE BODEGA',false,
+   array['laudus','gmail_lapatagua','document_intake'],1440,'native_activity','JEFE BODEGA',false,
    'MOTIL prepara y reconcilia; recepciones, facturas y compromisos no se colapsan en un solo estado.',
    'Transición progresiva hacia compras operacionales en MOTIL.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','product_master','MOTIL_CANONICAL','motil_native',
-   array['laudus','gmail_lapatagua'],10080,'JEFE BODEGA',false,
+   array['laudus','gmail_lapatagua'],43200,'native_activity','JEFE BODEGA',false,
    'Alias o identidad dudosa queda en revisión; nunca fuzzy auto-match.',
    'MOTIL mantiene el maestro operacional enriquecido; Laudus es fuente secundaria.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','finance_accounting','LAUDUS_CANONICAL','laudus',
-   array['gmail_lapatagua','document_intake'],1440,'GERENTE DE FINANZAS',false,
+   array['gmail_lapatagua','document_intake'],1440,'source_observation','GERENTE DE FINANZAS',false,
    'Contabilidad, DTE y pago se mantienen separados y bajo autoridad financiera.',
    'MOTIL consume y explica; no sustituye aún la autoridad contable/tributaria de Laudus.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','bank_reconciliation','PREPARE','laudus',
-   array['gmail_lapatagua','document_intake'],1440,'GERENTE DE FINANZAS',false,
+   array['gmail_lapatagua','document_intake'],1440,'business_event','GERENTE DE FINANZAS',false,
    'Deposited no equivale a conciliado bancariamente; exigir cartola/evidencia bancaria.',
    'MOTIL prepara conciliación; cierre humano y evidencia bancaria siguen siendo obligatorios.',now()),
   ('2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee','legal_documents','MOTIL_CANONICAL','document_intake',
-   array['gmail_lapatagua'],10080,'LEGAL',false,
+   array['gmail_lapatagua'],10080,'source_observation','LEGAL',false,
    'Preservar versión, aprobación y evidencia; no inferir vigencia contractual.',
    'Expediente y control documental operacional pertenecen a MOTIL.',now())
 on conflict (organization_id,domain) do update
@@ -91,6 +93,7 @@ set authority_mode=excluded.authority_mode,
     primary_source_key=excluded.primary_source_key,
     secondary_source_keys=excluded.secondary_source_keys,
     freshness_sla_minutes=excluded.freshness_sla_minutes,
+    freshness_kind=excluded.freshness_kind,
     owner_cargo=excluded.owner_cargo,
     auto_promote=excluded.auto_promote,
     conflict_policy=excluded.conflict_policy,
@@ -184,6 +187,7 @@ select
   c.primary_source_key,
   c.secondary_source_keys,
   c.freshness_sla_minutes,
+  c.freshness_kind,
   c.owner_cargo,
   c.auto_promote,
   c.conflict_policy,
@@ -193,9 +197,18 @@ select
   coalesce(p.record_count,0) record_count,
   coalesce(p.pending_count,0) pending_count,
   case
-    when p.observed_at is null then 'unknown'
-    when p.observed_at < now() - make_interval(mins => c.freshness_sla_minutes) then 'stale'
+    when c.freshness_kind='business_event' then p.source_event_at
+    else p.observed_at
+  end as effective_freshness_at,
+  case
+    when p.observed_at is null and p.source_event_at is null then 'unknown'
     when coalesce(p.pending_count,0) > 0 then 'requires_review'
+    when c.freshness_kind='native_activity' then 'current'
+    when coalesce(
+      case when c.freshness_kind='business_event' then p.source_event_at else p.observed_at end,
+      p.observed_at,
+      p.source_event_at
+    ) < now() - make_interval(mins => c.freshness_sla_minutes) then 'stale'
     else 'fresh'
   end as freshness_status,
   now() as evaluated_at
