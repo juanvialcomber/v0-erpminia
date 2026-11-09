@@ -82,11 +82,10 @@ test('critical suggestion never silently pauses work; changing active OT require
   assert.match(detail, /runningElsewhere/);
   assert.match(detail, /switchComment\.trim\(\)/);
   assert.match(detail, /comment\.length < 5/);
-  assert.match(detail, /action: 'pause'/);
+  assert.match(detail, /\/api\/maintenance\/work-orders\/\$\{workOrderId\}\/switch/);
+  assert.match(detail, /fromWorkOrderId: runningElsewhere\.id/);
   assert.match(detail, /Promise\.all\(\[refreshAssignedWork\(\), onWorkOrderChange\(\), mutate\(\)\]\)/);
   assert.match(detail, /Pausar OT actual e iniciar esta/);
-  assert.match(detail, /timerStatus === 'paused'/);
-  assert.match(detail, /timerStatus === 'idle'/);
   assert.match(detail, /'Entró una OT más crítica'/);
   assert.match(detail, /toast.warning/);
   assert.match(timer, /findOtherRunningWorkOrder\(context, workOrderId\)/);
