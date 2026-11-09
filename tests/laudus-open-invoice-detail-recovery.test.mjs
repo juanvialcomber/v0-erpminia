@@ -38,3 +38,12 @@ test('recovery route requires writable Compras access and server-side tracking',
   assert.match(route, /maxPerRun: 12/);
   assert.match(route, /minimumApiReserve: 200/);
 });
+
+
+test('recovery prioritizes invoices that have plausible Laudus PO context', () => {
+  assert.match(lib, /laudus_purchase_orders/);
+  assert.match(lib, /180 \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(lib, /hasCandidatePurchaseOrder/);
+  assert.match(lib, /prioritized\.slice\(0, limit\)/);
+  assert.match(lib, /elegiblesConOcCandidata/);
+});
