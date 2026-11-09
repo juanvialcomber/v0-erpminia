@@ -42,6 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           ok: false,
           error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
           concurrentWorkOrderId: other.id,
+          concurrentTimerStartedAt: other.timer_start_time,
         }, { status: 409 });
       }
     } catch (cause) {
