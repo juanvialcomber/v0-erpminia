@@ -27,18 +27,17 @@ export async function GET(request: NextRequest) {
       if (identityLink?.profile_id) profileIds.add(identityLink.profile_id);
     }
 
-    const { data: profiles, error: profileError } = await context.supabase
+    const canonicalProfileId = Array.from(profileIds).find((id) => id !== access.user.id) || access.user.id;
+    const { data: profile, error: profileError } = await context.supabase
       .from('profiles')
       .select('id,cargo_id')
       .eq('organization_id', context.organizationId)
-      .in('id', Array.from(profileIds))
-      .limit(2);
+      .eq('id', canonicalProfileId)
+      .maybeSingle();
     if (profileError) throw profileError;
-    const uniqueProfiles = new Map((profiles || []).map((profile) => [profile.id, profile]));
-    if (uniqueProfiles.size !== 1) {
-      return NextResponse.json({ error: 'No se pudo resolver un perfil operativo único para tu sesión.' }, { status: 403 });
+    if (!profile) {
+      return NextResponse.json({ error: 'No se pudo resolver el perfil operativo de tu sesión.' }, { status: 403 });
     }
-    const profile = profiles?.[0];
 
     let cargoName: string | null = null;
     if (profile?.cargo_id) {
