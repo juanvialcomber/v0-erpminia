@@ -73,18 +73,11 @@ export async function getWorkOrderReleaseReadiness(
   const blockers: WorkOrderReleaseReadiness['blockers'] = [];
   if (!checks.asset) blockers.push({ code: 'asset', label: 'Vincular activo canónico' });
   if (!checks.assignee) blockers.push({ code: 'assignee', label: 'Asignar responsable' });
+  if (!emergencyBypass && !checks.schedule) blockers.push({ code: 'schedule', label: 'Programar fecha de ejecución' });
 
-  if (!emergencyBypass) {
-    if (!checks.schedule) blockers.push({ code: 'schedule', label: 'Programar fecha de ejecución' });
-    const operational = [
-      ['procurement', 'Cerrar compras abiertas', Number(typedReadiness.open_procurement_orders || 0)],
-      ['materials', 'Resolver faltantes de materiales', Number(typedReadiness.unmet_material_requirements || 0)],
-      ['external_services', 'Resolver servicios externos pendientes', Number(typedReadiness.pending_external_services || 0)],
-    ] as const;
-    for (const [code, label, count] of operational) {
-      if (count > 0) blockers.push({ code, label, count });
-    }
-  }
-
+  // Start-readiness is intentionally narrower than close-readiness.
+  // Procurement, material shortages and external services remain visible in
+  // checks/close-readiness, but they must not prevent an assigned technician
+  // from starting diagnosis, preparation, cleaning or other executable work.
   return { ready: blockers.length === 0, emergencyBypass, blockers, checks };
 }
