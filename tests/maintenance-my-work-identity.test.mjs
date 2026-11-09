@@ -14,7 +14,7 @@ test('my-work resolves auth UUID through canonical profile identity bridge',()=>
 test('my-work identity resolution remains tenant scoped and fail closed',()=>{
   assert.match(route,/organization_id', context\.organizationId/);
   assert.match(route,/employment_status', 'active'/);
-  assert.match(route,/uniqueProfiles\.size !== 1/);
+  assert.match(route,/canonicalProfileId/);
   assert.match(route,/uniquePeople\.size > 1/);
   assert.match(route,/más de una persona operativa activa/);
 });
