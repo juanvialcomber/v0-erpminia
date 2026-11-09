@@ -14,19 +14,15 @@ function languages(path: string) {
 }
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
-
   return [
     {
       url: baseUrl,
-      lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
       alternates: { languages: languages('/') },
     },
     {
       url: `${baseUrl}/mineria-chile`,
-      lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.9,
       alternates: { languages: languages('/mineria-chile') },
@@ -39,7 +35,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     ...moduleSlugs.map((slug) => ({
       url: `${baseUrl}/modulos/${slug}`,
-      lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: slug === 'produccion' || slug === 'mantenimiento' ? 0.85 : 0.75,
       alternates: { languages: languages(`/modulos/${slug}`) },
