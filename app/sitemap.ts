@@ -31,6 +31,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
       alternates: { languages: languages('/mineria-chile') },
     },
+    {
+      url: `${baseUrl}/evidencia`,
+      lastModified: new Date('2026-11-09'),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
     ...moduleSlugs.map((slug) => ({
       url: `${baseUrl}/modulos/${slug}`,
       lastModified: now,
