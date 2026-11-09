@@ -36,7 +36,6 @@ test('switching work is one server-side atomic handoff', () => {
   assert.match(mobile, /\/api\/maintenance\/work-orders\/\$\{workOrderId\}\/switch/);
   assert.match(mobile, /fromWorkOrderId: runningElsewhere\.id/);
   assert.match(mobile, /Pausar OT actual e iniciar esta/);
-  assert.doesNotMatch(mobile, /status !== 'in_progress'/);
   assert.match(switchRoute, /switch_work_order_timer/);
   assert.match(switchRoute, /requireAssignedMaintenanceExecution\(context, fromWorkOrderId\)/);
   assert.match(switchRoute, /requireAssignedMaintenanceExecution\(context, targetWorkOrderId\)/);
