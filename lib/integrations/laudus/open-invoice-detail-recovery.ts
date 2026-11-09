@@ -8,6 +8,7 @@ type OpenInvoice = {
   purchase_invoice_external_id: string;
   laudus_purchase_invoice_id: number | string | null;
   doc_number: string | null;
+  supplier_external_id: string | null;
   issued_date: string | null;
   outstanding_amount: number | string | null;
   payment_status: string | null;
@@ -148,7 +149,7 @@ export async function recoverOpenInvoiceDetails(
 
   const supplierIds = [...new Set(
     missingLineRows
-      .map((row) => String((row as OpenInvoice & { supplier_external_id?: string | null }).supplier_external_id || '').trim())
+      .map((row) => String(row.supplier_external_id || '').trim())
       .filter(Boolean),
   )];
 
@@ -176,7 +177,7 @@ export async function recoverOpenInvoiceDetails(
     }
   }
 
-  const hasCandidatePurchaseOrder = (row: OpenInvoice & { supplier_external_id?: string | null }) => {
+  const hasCandidatePurchaseOrder = (row: OpenInvoice) => {
     const supplierId = String(row.supplier_external_id || '').trim();
     const invoiceAt = Date.parse(String(row.issued_date || ''));
     if (!supplierId || !Number.isFinite(invoiceAt)) return false;
@@ -186,7 +187,7 @@ export async function recoverOpenInvoiceDetails(
   };
 
   const prioritized = missingLineRows
-    .filter((row) => hasCandidatePurchaseOrder(row as OpenInvoice & { supplier_external_id?: string | null }));
+    .filter((row) => hasCandidatePurchaseOrder(row));
 
   const candidates = prioritized.slice(0, limit);
 
