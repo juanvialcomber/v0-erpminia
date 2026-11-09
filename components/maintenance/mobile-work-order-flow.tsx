@@ -42,6 +42,7 @@ type AssignedWorkAction = {
   href: string;
   isCritical: boolean;
   isRunning: boolean;
+  timerStartedAt?: string | null;
 };
 type AssignedWorkResponse = { actions?: AssignedWorkAction[] };
 
@@ -114,6 +115,10 @@ export function MobileWorkOrderFlow({
   );
   const assignedActions = assignedWork?.actions || [];
   const runningElsewhere = assignedActions.find((order) => order.isRunning && order.id !== workOrderId) || null;
+  const runningElsewhereAgeSeconds = runningElsewhere?.timerStartedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(runningElsewhere.timerStartedAt).getTime()) / 1000))
+    : null;
+  const runningElsewherePossiblyStale = runningElsewhereAgeSeconds !== null && runningElsewhereAgeSeconds >= 12 * 60 * 60;
   const isThisCritical = assignedActions.some((order) => order.id === workOrderId && order.isCritical);
   const higherPriority = !isThisCritical
     ? assignedActions.find((order) => order.isCritical && order.id !== workOrderId) || null
@@ -329,16 +334,16 @@ export function MobileWorkOrderFlow({
     setMessage(null);
     try {
       const reason = isThisCritical ? 'Entró una OT más crítica' : 'Cambio de prioridad operacional';
-      await request('/api/maintenance/work-orders/' + encodeURIComponent(runningElsewhere.id) + '/timer', {
+      await request(`/api/maintenance/work-orders/${workOrderId}/switch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'pause',
+          fromWorkOrderId: runningElsewhere.id,
           notes: reason + ' · Para atender ' + (workOrderNumber || 'otra OT') + ' — ' + comment,
         }),
       });
       setSwitchComment('');
-      await refreshAssignedWork();
+      await Promise.all([refreshAssignedWork(), onWorkOrderChange(), mutate()]);
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : 'No se pudo registrar la pausa de la OT anterior.');
     } finally {
@@ -392,8 +397,13 @@ export function MobileWorkOrderFlow({
         <div className="space-y-3 rounded-lg border p-4" aria-label="Cambio de orden de trabajo">
           <p className="font-semibold">Primero pausa la OT actual</p>
           <p className="text-sm text-muted-foreground">
-            {runningElsewhere.title} sigue registrando tiempo. Para elegir esta OT, deja un comentario de interrupción; no se cambiará la prioridad automáticamente.
+            {runningElsewhere.title} sigue registrando tiempo. Para pasar a esta OT, deja un comentario: MOTIL pausará la anterior y arrancará esta orden.
           </p>
+          {runningElsewherePossiblyStale ? (
+            <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+              Este cronómetro lleva más de 12 horas activo. Puede haber quedado abierto de una sesión anterior. Confirma el estado real antes de cambiar de OT; MOTIL no corregirá horas automáticamente.
+            </div>
+          ) : null}
           <div className="space-y-2">
             <label htmlFor="ot-switch-comment" className="text-sm font-medium">Comentario obligatorio de la pausa</label>
             <textarea id="ot-switch-comment" value={switchComment} onChange={(event) => setSwitchComment(event.target.value)}
@@ -402,7 +412,7 @@ export function MobileWorkOrderFlow({
           </div>
           <Button className="h-12 w-full" disabled={switchBusy || switchComment.trim().length < 5 || Boolean(assignedWorkError)}
             onClick={() => void pauseOtherBeforeSwitch()}>
-            <CirclePause className="mr-2 h-4 w-4" />{switchBusy ? 'Guardando pausa...' : 'Registrar pausa y continuar'}
+            <CirclePause className="mr-2 h-4 w-4" />{switchBusy ? 'Cambiando de OT...' : 'Pausar OT actual e iniciar esta'}
           </Button>
           <Button variant="outline" asChild className="h-11 w-full">
             <Link href={runningElsewhere.href}>Volver a la OT en ejecución</Link>

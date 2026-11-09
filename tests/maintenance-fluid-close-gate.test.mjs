@@ -61,7 +61,7 @@ test('oil quantity is requested only when mechanic confirms fluid use', () => {
 
 
 test('assigned mechanic fluid routes bypass only the coarse maintenance role gate', () => {
-  assert.match(organizationContext, /timer\|close\|evidence\|standard-plan\|offline-notes\|fluids/);
+  assert.match(organizationContext, /timer\|switch\|close\|evidence\|standard-plan\|offline-notes\|fluids/);
   assert.match(organizationContext, /fluids\\\/closure/);
   assert.match(closureRoute, /requireAssignedMaintenanceExecution/);
   assert.match(closureRoute, /if \(!assigned\.ok\) return assigned\.response/);

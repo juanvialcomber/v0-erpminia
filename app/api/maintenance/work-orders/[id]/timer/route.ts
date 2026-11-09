@@ -11,6 +11,7 @@ function timerErrorResponse(error: { code?: string; message?: string } | null | 
   if (error?.code === 'P0002') return NextResponse.json({ ok: false, error: 'WO not found' }, { status: 404 });
   if (error?.code === '22023') return NextResponse.json({ ok: false, error: error.message || 'Invalid action' }, { status: 400 });
   if (error?.code === '55000') return NextResponse.json({ ok: false, error: error.message || 'Invalid timer transition' }, { status: 409 });
+  if (error?.code === '23505') return NextResponse.json({ ok: false, error: 'Ya existe otra OT registrando tiempo para esta persona. Pausa la OT actual antes de continuar.' }, { status: 409 });
   return NextResponse.json({ ok: false, error: error?.message || 'Internal server error' }, { status: 500 });
 }
 
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           ok: false,
           error: 'Primero pausa ' + (other.work_order_number || 'la otra OT') + ' e indica el motivo antes de iniciar esta orden.',
           concurrentWorkOrderId: other.id,
+          concurrentTimerStartedAt: other.timer_start_time,
         }, { status: 409 });
       }
     } catch (cause) {

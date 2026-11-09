@@ -5,7 +5,7 @@ import type { OrganizationSuccessContext } from '@/lib/api/organization-context'
 export async function findOtherRunningWorkOrder(
   context: OrganizationSuccessContext,
   workOrderId: string,
-): Promise<{ id: string; work_order_number: string | null } | null> {
+): Promise<{ id: string; work_order_number: string | null; timer_start_time: string | null } | null> {
   const { data: target, error: targetError } = await context.supabase
     .from('maintenance_work_orders')
     .select('assigned_person_id')
@@ -17,7 +17,7 @@ export async function findOtherRunningWorkOrder(
 
   const { data: concurrent, error } = await context.supabase
     .from('maintenance_work_orders')
-    .select('id,work_order_number')
+    .select('id,work_order_number,timer_start_time')
     .eq('organization_id', context.organizationId)
     .eq('assigned_person_id', target.assigned_person_id)
     .eq('timer_status', 'running')
