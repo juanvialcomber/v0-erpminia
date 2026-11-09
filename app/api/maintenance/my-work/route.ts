@@ -15,13 +15,29 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
+    const profileIds = new Set<string>([access.user.id]);
+    for (const authUserId of [context.authUserId, access.user.id]) {
+      if (!authUserId) continue;
+      const { data: identityLink, error: identityError } = await context.supabase
+        .from('auth_profile_identity_links')
+        .select('profile_id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+      if (identityError) throw identityError;
+      if (identityLink?.profile_id) profileIds.add(identityLink.profile_id);
+    }
+
+    const canonicalProfileId = Array.from(profileIds).find((id) => id !== access.user.id) || access.user.id;
     const { data: profile, error: profileError } = await context.supabase
       .from('profiles')
-      .select('cargo_id')
-      .eq('id', access.user.id)
+      .select('id,cargo_id')
       .eq('organization_id', context.organizationId)
+      .eq('id', canonicalProfileId)
       .maybeSingle();
     if (profileError) throw profileError;
+    if (!profile) {
+      return NextResponse.json({ error: 'No se pudo resolver el perfil operativo de tu sesión.' }, { status: 403 });
+    }
 
     let cargoName: string | null = null;
     if (profile?.cargo_id) {
@@ -42,11 +58,17 @@ export async function GET(request: NextRequest) {
       .from('people')
       .select('id')
       .eq('organization_id', context.organizationId)
-      .eq('profile_id', access.user.id)
-      .maybeSingle();
+      .in('profile_id', Array.from(profileIds))
+      .eq('employment_status', 'active')
+      .limit(2);
     if (personError) throw personError;
+    const uniquePeople = new Map((person || []).map((row) => [row.id, row]));
+    if (uniquePeople.size > 1) {
+      return NextResponse.json({ error: 'La sesión está vinculada a más de una persona operativa activa.' }, { status: 403 });
+    }
+    const resolvedPerson = person?.[0];
 
-    if (!person?.id) {
+    if (!resolvedPerson?.id) {
       return NextResponse.json({
         identityLinked: false,
         actions: [],
@@ -59,7 +81,7 @@ export async function GET(request: NextRequest) {
       .from('maintenance_work_orders')
       .select('id,work_order_number,title,status,priority,scheduled_date,start_date,created_at,timer_status,total_timer_minutes,canonical_asset_id')
       .eq('organization_id', context.organizationId)
-      .eq('assigned_person_id', person.id)
+      .eq('assigned_person_id', resolvedPerson.id)
       .not('created_by', 'is', null)
       .in('status', ['open', 'assigned', 'pending', 'planned', 'in_progress'])
       .order('scheduled_date', { ascending: true, nullsFirst: false })
