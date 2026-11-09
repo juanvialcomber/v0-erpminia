@@ -20,3 +20,13 @@ test('requested open work orders cannot bypass the close-queue execution filter'
   assert.ok(statusFilterIndex >= 0);
   assert.ok(requestedFilterIndex > statusFilterIndex);
 });
+
+
+test('close queue fluid readiness matches backend declaration freshness', () => {
+  assert.match(route, /latestFluidDeclarationByWorkOrder/);
+  assert.match(route, /maintenance_fluid_usage_records/);
+  assert.match(route, /declared_by_assigned_executor === true/);
+  assert.match(route, /declaredFluidUsageCount === currentFluidUsageCount/);
+  assert.match(route, /hasValidFluidClosureDeclaration/);
+  assert.match(route, /ready_to_close: Boolean\(row\.ready_to_close\) && hasValidFluidClosureDeclaration/);
+});
