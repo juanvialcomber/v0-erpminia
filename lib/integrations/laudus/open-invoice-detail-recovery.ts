@@ -113,7 +113,7 @@ export async function recoverOpenInvoiceDetails(
 
   const openResult = await db
     .from('laudus_purchase_invoice_payment_status_service_v1')
-    .select('purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,issued_date,outstanding_amount,payment_status')
+    .select('purchase_invoice_external_id,laudus_purchase_invoice_id,doc_number,supplier_external_id,issued_date,outstanding_amount,payment_status')
     .eq('organization_id', organizationId)
     .in('payment_status', ['unpaid', 'partially_paid'])
     .order('outstanding_amount', { ascending: false })
@@ -143,9 +143,52 @@ export async function recoverOpenInvoiceDetails(
     }
   }
 
-  const candidates = openRows
-    .filter((row) => !existingLineInvoiceIds.has(String(row.purchase_invoice_external_id)))
-    .slice(0, limit);
+  const missingLineRows = openRows
+    .filter((row) => !existingLineInvoiceIds.has(String(row.purchase_invoice_external_id)));
+
+  const supplierIds = [...new Set(
+    missingLineRows
+      .map((row) => String((row as OpenInvoice & { supplier_external_id?: string | null }).supplier_external_id || '').trim())
+      .filter(Boolean),
+  )];
+
+  const candidateOrderDatesBySupplier = new Map<string, number[]>();
+  for (let offset = 0; offset < supplierIds.length; offset += 50) {
+    const suppliers = supplierIds.slice(offset, offset + 50);
+    const orderResult = await db
+      .schema('integration')
+      .from('laudus_purchase_orders')
+      .select('supplier_external_id,issued_date')
+      .eq('organization_id', organizationId)
+      .in('supplier_external_id', suppliers)
+      .order('issued_date', { ascending: false })
+      .limit(1000);
+
+    if (orderResult.error) throw new Error('No se pudo verificar contexto de OC Laudus.');
+
+    for (const row of orderResult.data || []) {
+      const supplierId = String(row.supplier_external_id || '').trim();
+      const issuedAt = Date.parse(String(row.issued_date || ''));
+      if (!supplierId || !Number.isFinite(issuedAt)) continue;
+      const dates = candidateOrderDatesBySupplier.get(supplierId) || [];
+      dates.push(issuedAt);
+      candidateOrderDatesBySupplier.set(supplierId, dates);
+    }
+  }
+
+  const hasCandidatePurchaseOrder = (row: OpenInvoice & { supplier_external_id?: string | null }) => {
+    const supplierId = String(row.supplier_external_id || '').trim();
+    const invoiceAt = Date.parse(String(row.issued_date || ''));
+    if (!supplierId || !Number.isFinite(invoiceAt)) return false;
+    const minAt = invoiceAt - 180 * 24 * 60 * 60 * 1000;
+    return (candidateOrderDatesBySupplier.get(supplierId) || [])
+      .some((issuedAt) => issuedAt >= minAt && issuedAt <= invoiceAt);
+  };
+
+  const prioritized = missingLineRows
+    .filter((row) => hasCandidatePurchaseOrder(row as OpenInvoice & { supplier_external_id?: string | null }));
+
+  const candidates = prioritized.slice(0, limit);
 
   let recovered = 0;
   let withLines = 0;
