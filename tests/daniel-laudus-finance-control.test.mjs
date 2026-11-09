@@ -218,3 +218,14 @@ test('Daniel finance runtime never queries the private integration schema direct
   assert.match(loader, /laudus_fixed_assets_service_v1/);
   assert.match(loader, /laudus_suppliers_service_v1/);
 });
+
+
+test('Daniel finance exposure excludes invalid Laudus CxP from executive totals', () => {
+  assert.match(loader, /laudus_accounts_payable_quality_v1/);
+  assert.match(loader, /quality_status', 'verificado'/);
+  assert.match(loader, /excludedOpenItems/);
+  assert.match(loader, /excludedOpenAmountClp/);
+  assert.match(loader, /invalid or incomplete Laudus payables are excluded from executive exposure until reviewed/);
+  assert.match(card, /CxP verificadas en Laudus/);
+  assert.match(card, /están excluidos del total ejecutivo por calidad pendiente/);
+});
