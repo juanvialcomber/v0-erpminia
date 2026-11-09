@@ -7,7 +7,7 @@ const read = (path) => readFileSync(path, 'utf8');
 test('the coarse maintenance role guard delegates offline note POSTs to scoped execution authorization', () => {
   const org = read('lib/api/organization-context.ts');
   const route = read('app/api/maintenance/work-orders/[id]/offline-notes/route.ts');
-  assert.match(org, /timer\|close\|evidence\|standard-plan\|offline-notes/);
+  assert.match(org, /timer\|switch\|close\|evidence\|standard-plan\|offline-notes/);
   assert.match(route, /requireAssignedMaintenanceExecution/);
   assert.match(route, /requireOperationalMaintenanceWorkOrder/);
   assert.match(route, /getModuleAccessLevel/);
