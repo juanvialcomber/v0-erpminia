@@ -2,7 +2,7 @@
 -- 1) DB invariant: one canonical assignee may have at most one OT recording time.
 -- 2) Atomic handoff: pause the current OT and start/resume the selected OT in one transaction.
 
-do $
+do $guard$
 begin
   if exists (
     select 1
@@ -14,7 +14,7 @@ begin
   ) then
     raise exception 'Cannot install timer invariant: duplicate running timers exist by organization/person.';
   end if;
-end $;
+end $guard$;
 
 create unique index if not exists maintenance_work_orders_one_running_timer_per_person_uidx
   on public.maintenance_work_orders (organization_id, assigned_person_id)
