@@ -4,6 +4,7 @@ import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
 import { getWorkOrderReleaseReadiness } from '@/lib/maintenance/work-order-release-readiness';
+import { resolveWorkshopHeadScope, workshopHeadCanAccessOrder } from '@/lib/maintenance/workshop-site-scope';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const context = await getOrganizationContext(request);
@@ -33,6 +34,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (!targetScope.ok) {
     return NextResponse.json({ ok: false, error: targetScope.error, record_scope: targetScope.scope }, { status: targetScope.status });
+  }
+
+  const workshop = await resolveWorkshopHeadScope(context);
+  if (workshop.isWorkshopHead) {
+    const { data: sourceOrder, error: sourceOrderError } = await context.supabase
+      .from('maintenance_work_orders')
+      .select('workshop_site,assigned_person_id')
+      .eq('organization_id', context.organizationId)
+      .eq('id', fromWorkOrderId)
+      .maybeSingle();
+    if (sourceOrderError) {
+      return NextResponse.json({ ok: false, error: sourceOrderError.message || 'No se pudo verificar la faena de la OT actual.' }, { status: 500 });
+    }
+    if (!sourceOrder || !workshopHeadCanAccessOrder(workshop, sourceOrder)) {
+      return NextResponse.json({ ok: false, error: 'OT actual fuera de tu faena' }, { status: 403 });
+    }
   }
 
   const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
