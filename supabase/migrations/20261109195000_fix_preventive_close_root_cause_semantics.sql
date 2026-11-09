@@ -41,6 +41,10 @@ declare
   v_has_runtime_evidence boolean := false;
   v_pending_plan_steps integer;
   v_authorized boolean := false;
+  v_photo_count integer := 0;
+  v_fluid_declaration record;
+  v_current_fluid_usage_count integer := 0;
+  v_declared_fluid_usage_count integer := 0;
 begin
   select * into v_wo
   from public.maintenance_work_orders
@@ -113,6 +117,62 @@ begin
   end if;
   if coalesce(v_wo.actual_duration_hours, 0) <= 0 then
     raise exception 'Registra las horas reales antes de cerrar';
+  end if;
+  if lower(coalesce(v_wo.timer_status, 'idle')) in ('running','paused') then
+    raise exception 'Detén el cronómetro antes de cerrar la OT';
+  end if;
+
+  select count(*) into v_photo_count
+  from public.work_order_evidence_files
+  where organization_id = v_wo.organization_id
+    and work_order_id = p_work_order_id
+    and evidence_type = 'photo';
+
+  if v_photo_count < 1 then
+    raise exception 'Agrega al menos una foto como evidencia antes de cerrar la OT';
+  end if;
+
+  select e.actor_id, e.payload, e.event_at
+  into v_fluid_declaration
+  from public.work_order_events e
+  where e.organization_id = v_wo.organization_id
+    and e.work_order_id = p_work_order_id
+    and e.event_type = 'fluid_closure_declared'
+  order by e.event_at desc
+  limit 1;
+
+  if not found then
+    raise exception 'Antes de cerrar, el mecánico asignado debe confirmar los aceites/fluidos utilizados y el estado del residuo';
+  end if;
+
+  if v_fluid_declaration.actor_id is distinct from v_actor then
+    raise exception 'La declaración de aceites/fluidos debe ser realizada por el mecánico asignado que está cerrando la OT';
+  end if;
+
+  if coalesce((v_fluid_declaration.payload ->> 'declared_by_assigned_executor')::boolean, false) is not true
+     or jsonb_typeof(v_fluid_declaration.payload -> 'fluids_used') <> 'boolean' then
+    raise exception 'La declaración de aceites/fluidos no es válida para cierre';
+  end if;
+
+  select count(*) into v_current_fluid_usage_count
+  from public.maintenance_fluid_usage_records
+  where organization_id = v_wo.organization_id
+    and work_order_id = p_work_order_id;
+
+  v_declared_fluid_usage_count := coalesce((v_fluid_declaration.payload ->> 'fluid_usage_count')::integer, 0);
+
+  if v_current_fluid_usage_count <> v_declared_fluid_usage_count then
+    raise exception 'Los datos de aceites/fluidos cambiaron después de la confirmación';
+  end if;
+
+  if coalesce((v_fluid_declaration.payload ->> 'fluids_used')::boolean, false)
+     and v_current_fluid_usage_count < 1 then
+    raise exception 'La declaración indica uso de fluidos, pero no hay fluidos registrados';
+  end if;
+
+  if not coalesce((v_fluid_declaration.payload ->> 'fluids_used')::boolean, false)
+     and v_current_fluid_usage_count > 0 then
+    raise exception 'La declaración indica que no hubo fluidos, pero existen registros de uso';
   end if;
 
   select count(*) into v_pending_plan_steps
