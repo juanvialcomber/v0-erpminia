@@ -45,7 +45,7 @@ test('operational and executor inbox expose scheduled work regardless of future 
   assert.doesNotMatch(orders, /\.lte\('scheduled_date'/);
   assert.doesNotMatch(mine, /\.lte\('scheduled_date'/);
   assert.match(orders, /query = query\.eq\('assigned_person_id', executionScope\.personId\)/);
-  assert.match(mine, /\.eq\('assigned_person_id', person\.id\)/);
+  assert.match(mine, /\.eq\('assigned_person_id', resolvedPerson\.id\)/);
   assert.match(mine, /'planned', 'in_progress'/);
 });
 
