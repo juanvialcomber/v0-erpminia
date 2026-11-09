@@ -63,7 +63,7 @@ test('the API scopes to authenticated assignee and returns all active dates with
   const api = read('app/api/maintenance/my-work/route.ts');
   assert.match(api, /requireModuleAccess\(request, MODULE_KEYS.MANT_OPERACIONES\)/);
   assert.match(api, /\.eq\('organization_id', context.organizationId\)/);
-  assert.match(api, /\.eq\('assigned_person_id', person.id\)/);
+  assert.match(api, /\.eq\('assigned_person_id', resolvedPerson.id\)/);
   assert.match(api, /\.in\('status', \['open', 'assigned', 'pending', 'planned', 'in_progress'\]\)/);
   assert.match(api, /\.limit\(200\)/);
   assert.doesNotMatch(api, /\.lte\('scheduled_date'/);
