@@ -34,17 +34,20 @@ export async function GET(request: NextRequest) {
 
     const productIds = [...new Set((inventoryRows || []).map((row) => row.canonical_product_id).filter(Boolean))] as string[];
 
-    const { data: procurementRows, error: procurementError } = productIds.length
-      ? await context.supabase
-          .from('product_procurement_status')
-          .select('product_id,purchase_order_count,last_purchase_date,days_since_last_purchase,total_spend')
-          .eq('organization_id', context.organizationId)
-          .in('product_id', productIds.slice(0, 50))
-      : { data: [], error: null };
+    const procurementRows: any[] = [];
+    for (let offset = 0; offset < productIds.length; offset += 50) {
+      const batch = productIds.slice(offset, offset + 50);
+      const result = await context.supabase
+        .from('product_procurement_status')
+        .select('product_id,purchase_order_count,last_purchase_date,days_since_last_purchase,total_spend')
+        .eq('organization_id', context.organizationId)
+        .in('product_id', batch);
 
-    if (procurementError) throw procurementError;
+      if (result.error) throw result.error;
+      procurementRows.push(...(result.data || []));
+    }
 
-    const procurementByProduct = new Map((procurementRows || []).map((row) => [row.product_id, row]));
+    const procurementByProduct = new Map(procurementRows.map((row) => [row.product_id, row]));
 
     const rows = (inventoryRows || [])
       .map((row) => {
