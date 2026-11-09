@@ -28,7 +28,10 @@ test('preventive actions remain mandatory for non-general technical work', () =>
 test('readiness view changes root-cause semantics without weakening other gates', () => {
   assert.match(migration, /work_order_close_readiness_v2/);
   assert.match(migration, /correctivo''::text, ''corrective''::text/);
-  assert.match(migration, /record_preventive_actions/);
+  assert.match(
+    migration,
+    /lower\(coalesce\(v_wo\.work_type, ''\)\) <> 'general'[\s\S]*coalesce\(trim\(v_wo\.preventive_actions\), ''\) = ''/,
+  );
   assert.match(migration, /pending_external_services/);
   assert.match(migration, /open_labor_entries/);
   assert.match(migration, /external_cost_conflict/);
