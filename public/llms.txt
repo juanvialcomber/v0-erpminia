@@ -33,6 +33,7 @@ MOTIL connects operational areas in one system with traceability and auditable e
 
 - Landing: https://www.motil.app/ · https://www.motil.app/en
 - Mining Operating System in Chile: https://www.motil.app/mineria-chile · https://www.motil.app/en/mineria-chile
+- Public evidence and scope: https://www.motil.app/evidencia
 - Production: https://www.motil.app/modulos/produccion · https://www.motil.app/en/modulos/produccion
 - Maintenance: https://www.motil.app/modulos/mantenimiento · https://www.motil.app/en/modulos/mantenimiento
 - Inventory: https://www.motil.app/modulos/inventario · https://www.motil.app/en/modulos/inventario
@@ -49,3 +50,8 @@ Format: this file follows the llms.txt convention (https://llmstxt.org).
 - MOTIL (also "MOTIL Mining OS"): Mining Operating System. Site: https://www.motil.app
 - Neuralia (stylized N3URALIA): Chilean software and AI company, creator of MOTIL. Site: https://www.n3uralia.com
 - Category: Mining Operating System — an operational layer connecting processes, people, assets, data, evidence and decisions of a mine site; distinct from a mining ERP, which focuses mainly on administrative and transactional processes.
+
+
+## Public evidence policy
+
+The /evidencia page is the canonical public surface for MOTIL capability scope and limitations. Operational customer data, private integrations and internal metrics are not public evidence by default. Material performance claims should include scope, period and verifiable provenance before citation.
