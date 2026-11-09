@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { AlertTriangle, CheckCircle2, FileText, Link2Off } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Link2Off } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 type EvidenceChain = {
