@@ -55,3 +55,14 @@ test('close RPC rejects unstarted work orders even if invoked outside the close 
     /lower\(coalesce\(v_wo\.status, ''\)\) <> 'in_progress'[\s\S]*La orden debe estar en ejecución antes de cerrar/,
   );
 });
+
+
+test('close RPC enforces timer stop, photo evidence and fresh fluid declaration', () => {
+  assert.match(migration, /Detén el cronómetro antes de cerrar la OT/);
+  assert.match(migration, /work_order_evidence_files/);
+  assert.match(migration, /Agrega al menos una foto como evidencia antes de cerrar la OT/);
+  assert.match(migration, /event_type = 'fluid_closure_declared'/);
+  assert.match(migration, /declared_by_assigned_executor/);
+  assert.match(migration, /maintenance_fluid_usage_records/);
+  assert.match(migration, /Los datos de aceites\/fluidos cambiaron después de la confirmación/);
+});
