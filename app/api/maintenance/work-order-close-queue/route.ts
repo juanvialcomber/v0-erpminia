@@ -145,7 +145,8 @@ export async function GET(request: NextRequest) {
     let readinessQuery = context.supabase
       .from('work_order_close_readiness_v2')
       .select('*')
-      .eq('organization_id', context.organizationId);
+      .eq('organization_id', context.organizationId)
+      .eq('status', 'in_progress');
     if (allowedWorkOrderIds) readinessQuery = readinessQuery.in('work_order_id', allowedWorkOrderIds);
     if (requestedWorkOrderId) readinessQuery = readinessQuery.eq('work_order_id', requestedWorkOrderId);
 
