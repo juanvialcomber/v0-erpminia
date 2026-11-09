@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
     const { data: rows, error: workOrdersError } = await context.supabase
       .from('maintenance_work_orders')
-      .select('id,work_order_number,title,status,priority,scheduled_date,start_date,created_at,timer_status,total_timer_minutes,canonical_asset_id')
+      .select('id,work_order_number,title,status,priority,scheduled_date,start_date,created_at,timer_status,timer_start_time,total_timer_minutes,canonical_asset_id')
       .eq('organization_id', context.organizationId)
       .eq('assigned_person_id', resolvedPerson.id)
       .not('created_by', 'is', null)
