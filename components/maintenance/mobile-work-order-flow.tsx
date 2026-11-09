@@ -334,34 +334,14 @@ export function MobileWorkOrderFlow({
     setMessage(null);
     try {
       const reason = isThisCritical ? 'Entró una OT más crítica' : 'Cambio de prioridad operacional';
-      await request('/api/maintenance/work-orders/' + encodeURIComponent(runningElsewhere.id) + '/timer', {
+      await request(`/api/maintenance/work-orders/${workOrderId}/switch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'pause',
+          fromWorkOrderId: runningElsewhere.id,
           notes: reason + ' · Para atender ' + (workOrderNumber || 'otra OT') + ' — ' + comment,
         }),
       });
-      if (status !== 'in_progress') {
-        await request(`/api/maintenance/work-orders/${workOrderId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'in_progress' }),
-        });
-      }
-      if (timerStatus === 'paused') {
-        await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'resume' }),
-        });
-      } else if (timerStatus === 'idle') {
-        await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'play' }),
-        });
-      }
       setSwitchComment('');
       await Promise.all([refreshAssignedWork(), onWorkOrderChange(), mutate()]);
     } catch (cause) {
