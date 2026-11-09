@@ -2,6 +2,20 @@
 -- 1) DB invariant: one canonical assignee may have at most one OT recording time.
 -- 2) Atomic handoff: pause the current OT and start/resume the selected OT in one transaction.
 
+do $
+begin
+  if exists (
+    select 1
+    from public.maintenance_work_orders
+    where timer_status = 'running'
+      and assigned_person_id is not null
+    group by organization_id, assigned_person_id
+    having count(*) > 1
+  ) then
+    raise exception 'Cannot install timer invariant: duplicate running timers exist by organization/person.';
+  end if;
+end $;
+
 create unique index if not exists maintenance_work_orders_one_running_timer_per_person_uidx
   on public.maintenance_work_orders (organization_id, assigned_person_id)
   where timer_status = 'running'
@@ -68,6 +82,19 @@ begin
   if lower(coalesce(v_to.status, '')) in ('completed','closed','cancelled','canceled') then
     raise exception 'No se puede iniciar una OT finalizada o cancelada.' using errcode = '55000';
   end if;
+
+  -- Re-evaluate start-readiness from the locked target row so the decision and
+  -- timer transition share the same transaction snapshot.
+  if lower(coalesce(v_to.work_type, '')) <> 'general' and v_to.canonical_asset_id is null then
+    raise exception 'La OT destino no está preparada: falta activo canónico.' using errcode = '55000';
+  end if;
+  if v_to.assigned_person_id is null then
+    raise exception 'La OT destino no está preparada: falta responsable.' using errcode = '55000';
+  end if;
+  if lower(coalesce(v_to.work_type, '')) <> 'emergency' and v_to.scheduled_date is null then
+    raise exception 'La OT destino no está preparada: falta fecha programada.' using errcode = '55000';
+  end if;
+
   if coalesce(v_to.timer_status, 'idle') not in ('idle','paused') then
     raise exception 'La OT destino no está disponible para iniciar o reanudar.' using errcode = '55000';
   end if;
