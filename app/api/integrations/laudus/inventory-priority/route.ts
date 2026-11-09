@@ -11,7 +11,7 @@ function priorityFor(row: { operational_category?: string | null; laudus_stock?:
   if (stock < 0) return 100;
   if (category === 'process_consumable' && (stock > 10 || delta > 10)) return 90;
   if (category === 'maintenance_supply' && (stock > 10 || delta > 5)) return 80;
-  if (['safety_supply', 'general_supply'].includes(category) && (stock > 10 || delta > 5)) return 70;
+  if (category === 'safety_supply' && (stock > 10 || delta > 5)) return 70;
   return 10;
 }
 
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         negative: rows.filter((row) => Number(row.laudusStock || 0) < 0).length,
         process: rows.filter((row) => row.operationalCategory === 'process_consumable').length,
         maintenance: rows.filter((row) => row.operationalCategory === 'maintenance_supply').length,
-        other: rows.filter((row) => ['safety_supply', 'general_supply'].includes(String(row.operationalCategory || ''))).length,
+        safety: rows.filter((row) => row.operationalCategory === 'safety_supply').length,
       },
       policy: {
         source: 'Laudus',
