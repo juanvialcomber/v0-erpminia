@@ -51,7 +51,7 @@ test('finance summary stays neutral and does not overclaim urgency', () => {
 
 
 test('Laudus payables control is bounded and keeps source-state semantics', () => {
-  assert.match(loader, /laudus_accounts_payable_service_v1/);
+  assert.match(loader, /laudus_accounts_payable_quality_v1/);
   assert.match(loader, /oldestOpenItems/);
   assert.match(loader, /not reconciled cash commitment or final accounting liability/);
   assert.match(card, /CxP más antiguas/);
