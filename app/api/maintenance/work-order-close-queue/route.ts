@@ -156,16 +156,40 @@ export async function GET(request: NextRequest) {
     const rows = (data || []) as CloseQueueRow[];
 
     const rowIds = rows.map((row) => row.work_order_id);
-    const fluidDeclarationIds = new Set<string>();
+    const latestFluidDeclarationByWorkOrder = new Map<string, { payload: Record<string, unknown> | null; event_at: string | null }>();
+    const fluidUsageCountByWorkOrder = new Map<string, number>();
     if (rowIds.length > 0) {
-      const { data: fluidDeclarations, error: fluidDeclarationError } = await context.supabase
-        .from('work_order_events')
-        .select('work_order_id')
-        .eq('organization_id', context.organizationId)
-        .eq('event_type', 'fluid_closure_declared')
-        .in('work_order_id', rowIds.slice(0, 250));
+      const boundedIds = rowIds.slice(0, 250);
+      const [{ data: fluidDeclarations, error: fluidDeclarationError }, { data: fluidUsages, error: fluidUsageError }] = await Promise.all([
+        context.supabase
+          .from('work_order_events')
+          .select('work_order_id,payload,event_at')
+          .eq('organization_id', context.organizationId)
+          .eq('event_type', 'fluid_closure_declared')
+          .in('work_order_id', boundedIds)
+          .order('event_at', { ascending: false }),
+        context.supabase
+          .from('maintenance_fluid_usage_records')
+          .select('work_order_id')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', boundedIds),
+      ]);
       if (fluidDeclarationError) throw fluidDeclarationError;
-      for (const event of fluidDeclarations || []) fluidDeclarationIds.add(String(event.work_order_id));
+      if (fluidUsageError) throw fluidUsageError;
+
+      for (const event of fluidDeclarations || []) {
+        const workOrderId = String(event.work_order_id || '');
+        if (!workOrderId || latestFluidDeclarationByWorkOrder.has(workOrderId)) continue;
+        latestFluidDeclarationByWorkOrder.set(workOrderId, {
+          payload: (event.payload || null) as Record<string, unknown> | null,
+          event_at: event.event_at || null,
+        });
+      }
+      for (const usage of fluidUsages || []) {
+        const workOrderId = String(usage.work_order_id || '');
+        if (!workOrderId) continue;
+        fluidUsageCountByWorkOrder.set(workOrderId, (fluidUsageCountByWorkOrder.get(workOrderId) || 0) + 1);
+      }
     }
     const assetIds = [...new Set(rows.map((row) => row.canonical_asset_id).filter((id): id is string => Boolean(id)))];
     const assetMap = new Map<string, AssetRow>();
@@ -181,15 +205,28 @@ export async function GET(request: NextRequest) {
 
     const queue = rows
       .map((row) => {
-        const hasFluidClosureDeclaration = fluidDeclarationIds.has(row.work_order_id);
-        const nextAction = row.next_action === 'close_work_order' && !hasFluidClosureDeclaration
+        const fluidDeclaration = latestFluidDeclarationByWorkOrder.get(row.work_order_id) || null;
+        const fluidPayload = fluidDeclaration?.payload || null;
+        const currentFluidUsageCount = fluidUsageCountByWorkOrder.get(row.work_order_id) || 0;
+        const declaredFluidUsageCount = Number(fluidPayload?.fluid_usage_count ?? Number.NaN);
+        const fluidsUsed = fluidPayload?.fluids_used;
+        const hasValidFluidClosureDeclaration = Boolean(
+          fluidDeclaration
+          && fluidPayload?.declared_by_assigned_executor === true
+          && typeof fluidsUsed === 'boolean'
+          && Number.isInteger(declaredFluidUsageCount)
+          && declaredFluidUsageCount >= 0
+          && declaredFluidUsageCount === currentFluidUsageCount
+          && ((fluidsUsed === true && currentFluidUsageCount > 0) || (fluidsUsed === false && currentFluidUsageCount === 0))
+        );
+        const nextAction = row.next_action === 'close_work_order' && !hasValidFluidClosureDeclaration
           ? 'record_fluid_closure'
           : row.next_action;
         return {
           ...row,
           next_action: nextAction,
-          ready_to_close: Boolean(row.ready_to_close) && hasFluidClosureDeclaration,
-          fluid_closure_declared: hasFluidClosureDeclaration,
+          ready_to_close: Boolean(row.ready_to_close) && hasValidFluidClosureDeclaration,
+          fluid_closure_declared: hasValidFluidClosureDeclaration,
           asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
         };
       })
