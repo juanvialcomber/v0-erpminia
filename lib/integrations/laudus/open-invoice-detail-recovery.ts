@@ -231,6 +231,7 @@ export async function recoverOpenInvoiceDetails(
   return {
     estado: errors > 0 ? 'parcial' : 'completado',
     candidatos: candidates.length,
+    elegiblesConOcCandidata: prioritized.length,
     recuperadas: recovered,
     conLineas: withLines,
     sinLineas: withoutLines,
