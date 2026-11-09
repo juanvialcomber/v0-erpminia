@@ -47,3 +47,11 @@ test('close RPC keeps backend-only execution grants', () => {
     /grant execute on function public\.close_work_order_safely\(uuid\) to postgres, service_role/,
   );
 });
+
+
+test('close RPC rejects unstarted work orders even if invoked outside the close queue', () => {
+  assert.match(
+    migration,
+    /lower\(coalesce\(v_wo\.status, ''\)\) <> 'in_progress'[\s\S]*La orden debe estar en ejecución antes de cerrar/,
+  );
+});
