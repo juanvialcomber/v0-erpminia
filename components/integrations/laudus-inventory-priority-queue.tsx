@@ -24,7 +24,7 @@ type Row = {
 
 type Payload = {
   rows: Row[];
-  summary: { prioritized: number; negative: number; process: number; maintenance: number; other: number };
+  summary: { prioritized: number; negative: number; process: number; maintenance: number; safety: number };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
