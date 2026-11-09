@@ -12,7 +12,8 @@ type JsonRow = Record<string, any>;
 
 const SUPPLIER_FIELDS = ['supplierId','name','legalName','VATId','email','phone','city'] as const;
 const PURCHASE_ORDER_FIELDS = [
-  'purchaseOrderId','issuedDate','dueDate','status',
+  'purchaseOrderId','orderNumber','issuedDate','dueDate','status','notes','currency',
+  'totals.net','totals.tax','totals.total',
   'supplier.supplierId','supplier.name','supplier.legalName','supplier.VATId',
   'warehouse.warehouseId','warehouse.name',
   'items.itemId','items.product.productId','items.product.sku','items.product.description',
@@ -66,6 +67,71 @@ function supplierRow(row: JsonRow) {
     email: row.email ?? null,
     term,
   };
+}
+
+function purchaseOrderRows(rows: JsonRow[]): JsonRow[] {
+  const grouped = new Map<string, JsonRow>();
+
+  for (const row of rows) {
+    const externalId = String(row.purchaseOrderId ?? row.orderId ?? '').trim();
+    if (!externalId) continue;
+
+    const existing = grouped.get(externalId);
+    const base: JsonRow = existing ?? {
+      ...row,
+      purchaseOrderId: row.purchaseOrderId ?? row.orderId ?? null,
+      orderNumber: row.orderNumber ?? row.order_number ?? row.number ?? row.docNumber ?? null,
+      supplier: {
+        supplierId: row.supplier?.supplierId ?? row.supplier_supplierId ?? row.supplierId ?? null,
+        name: row.supplier?.name ?? row.supplier_name ?? row.supplierName ?? null,
+        legalName: row.supplier?.legalName ?? row.supplier_legalName ?? row.supplierLegalName ?? null,
+        VATId: row.supplier?.VATId ?? row.supplier_VATId ?? row.supplierVATId ?? row.VATId ?? null,
+      },
+      warehouse: {
+        warehouseId: row.warehouse?.warehouseId ?? row.warehouse_warehouseId ?? row.warehouseId ?? null,
+        name: row.warehouse?.name ?? row.warehouse_name ?? row.warehouseName ?? null,
+      },
+      totals: {
+        net: row.totals?.net ?? row.totals_net ?? row.netAmount ?? null,
+        tax: row.totals?.tax ?? row.totals_tax ?? row.taxAmount ?? null,
+        total: row.totals?.total ?? row.totals_total ?? row.totalAmount ?? null,
+      },
+      currency: row.currency ?? row.currency_code ?? row.currencyCode ?? null,
+      notes: row.notes ?? null,
+      items: [],
+    };
+
+    const itemId = row.items?.itemId ?? row.items_itemId ?? null;
+    const productId = row.items?.product?.productId ?? row.items_product_productId ?? null;
+    const sku = row.items?.product?.sku ?? row.items?.product?.SKU ?? row.items_product_sku ?? row.items_product_SKU ?? null;
+    const description = row.items?.product?.description ?? row.items_product_description ?? null;
+    const unitOfMeasure = row.items?.product?.unitOfMeasure ?? row.items_product_unitOfMeasure ?? null;
+    const quantity = row.items?.quantity ?? row.items_quantity ?? null;
+    const unitCost = row.items?.unitCost ?? row.items_unitCost ?? null;
+    const costCenterId = row.items?.costCenter?.costCenterId ?? row.items_costCenter_costCenterId ?? null;
+
+    if (itemId != null || productId != null || sku != null || quantity != null || unitCost != null) {
+      const items = Array.isArray(base.items) ? base.items : [];
+      const itemKey = String(itemId ?? [productId, sku, quantity, unitCost].join('|'));
+      const alreadyPresent = items.some((item: JsonRow) => (
+        String(item.itemId ?? [item.product?.productId, item.product?.sku ?? item.product?.SKU, item.quantity, item.unitCost].join('|')) === itemKey
+      ));
+      if (!alreadyPresent) {
+        items.push({
+          itemId,
+          product: { productId, sku, description, unitOfMeasure },
+          quantity,
+          unitCost,
+          costCenter: { costCenterId },
+        });
+      }
+      base.items = items;
+    }
+
+    grouped.set(externalId, base);
+  }
+
+  return [...grouped.values()];
 }
 
 function paymentRows(row: JsonRow): JsonRow[] {
@@ -385,7 +451,7 @@ export async function syncLaudusProcurement(organizationId: string, db: Supabase
 
     apiCalls += orders.calls + invoices.calls + payments.calls;
 
-    const orderRows = orders.rows;
+    const orderRows = purchaseOrderRows(orders.rows);
     const futureDateIncidents = futureIssuedDateIncidents(orderRows, 'purchase_order');
     const quality = await reconcileFutureIssuedDateIncidents(
       db,
