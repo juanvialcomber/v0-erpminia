@@ -119,9 +119,10 @@ function purchaseOrderRows(rows: JsonRow[]): JsonRow[] {
       if (!alreadyPresent) {
         items.push({
           itemId,
-          product: { productId, sku, description, unitOfMeasure },
+          product: { productId, sku, SKU: sku, description, unitOfMeasure },
           quantity,
           unitCost,
+          unitPrice: unitCost,
           costCenter: { costCenterId },
         });
       }
