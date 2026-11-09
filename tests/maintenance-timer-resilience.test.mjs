@@ -9,6 +9,7 @@ const priority = fs.readFileSync('lib/maintenance/my-work-priority.mjs','utf8');
 const mobile = fs.readFileSync('components/maintenance/mobile-work-order-flow.tsx','utf8');
 const migration = fs.readFileSync('supabase/migrations/20261109173000_unique_running_timer_per_person.sql','utf8');
 const switchRoute = fs.readFileSync('app/api/maintenance/work-orders/[id]/switch/route.ts','utf8');
+const organizationContext = fs.readFileSync('lib/api/organization-context.ts','utf8');
 
 test('database enforces one running timer per canonical assignee', () => {
   assert.match(migration, /create unique index if not exists maintenance_work_orders_one_running_timer_per_person_uidx/);
@@ -45,4 +46,30 @@ test('switching work is one server-side atomic handoff', () => {
   assert.match(migration, /'timer_pause'/);
   assert.match(migration, /v_to_event := case when/);
   assert.match(migration, /grant execute on function public\.switch_work_order_timer/);
+});
+
+
+test('technicians can reach the narrow assigned switch endpoint without gaining broad maintenance write access', () => {
+  assert.match(organizationContext, /timer\|switch\|close\|evidence\|standard-plan\|offline-notes\|fluids/);
+  assert.match(organizationContext, /maintenanceWriteRoles/);
+});
+
+test('switch route scopes the body-supplied source OT for workshop heads', () => {
+  assert.match(switchRoute, /resolveWorkshopHeadScope\(context\)/);
+  assert.match(switchRoute, /workshopHeadCanAccessOrder\(workshop, sourceOrder\)/);
+  assert.match(switchRoute, /OT actual fuera de tu faena/);
+});
+
+test('atomic handoff rechecks start readiness while target row is locked', () => {
+  assert.match(migration, /for update/);
+  assert.match(migration, /v_to\.work_type/);
+  assert.match(migration, /v_to\.canonical_asset_id is null/);
+  assert.match(migration, /v_to\.scheduled_date is null/);
+  assert.match(migration, /falta activo canónico/);
+  assert.match(migration, /falta fecha programada/);
+});
+
+test('migration fails explicitly if duplicate running timers already exist', () => {
+  assert.match(migration, /having count\(\*\) > 1/);
+  assert.match(migration, /Cannot install timer invariant: duplicate running timers exist/);
 });
