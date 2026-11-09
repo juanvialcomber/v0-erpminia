@@ -97,6 +97,9 @@ begin
   if v_wo.status = 'completed' then
     raise exception 'La orden ya está cerrada';
   end if;
+  if lower(coalesce(v_wo.status, '')) <> 'in_progress' then
+    raise exception 'La orden debe estar en ejecución antes de cerrar';
+  end if;
   if v_wo.canonical_asset_id is null and lower(coalesce(v_wo.work_type, '')) <> 'general' then
     raise exception 'La orden no puede cerrarse sin equipo asociado';
   end if;
