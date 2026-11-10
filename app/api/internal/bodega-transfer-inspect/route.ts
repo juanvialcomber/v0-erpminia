@@ -8,9 +8,22 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const DEFAULT_SKUS = ["CORREA0113", "FERRETERÍA0111", "FERRETERIA0111"]
+const TARGET_DESCRIPTIONS = new Map([
+  ["CORREA0113", ["CORREA ALTERNADOR 8PK-2170", "8PK-2170"]],
+  ["FERRETERÍA0111", ["SILICONA SPRAY TABLERO 400ML", "SILICONA SPRAY TABLERO"]],
+  ["FERRETERIA0111", ["SILICONA SPRAY TABLERO 400ML", "SILICONA SPRAY TABLERO"]],
+])
 
 function normalizeSku(value: unknown) {
   return String(value ?? "").trim().toUpperCase()
+}
+
+function normalizeSearch(value: unknown) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
 }
 
 export async function GET(request: NextRequest) {
@@ -26,6 +39,8 @@ export async function GET(request: NextRequest) {
 
   const requestedLimit = Number(request.nextUrl.searchParams.get("limit") || 10)
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 25) : 10
+  const requestedOffset = Number(request.nextUrl.searchParams.get("offset") || 0)
+  const offset = Number.isInteger(requestedOffset) ? Math.min(Math.max(requestedOffset, 0), 500) : 0
   const skus = (request.nextUrl.searchParams.getAll("sku").length
     ? request.nextUrl.searchParams.getAll("sku")
     : DEFAULT_SKUS
@@ -41,7 +56,7 @@ export async function GET(request: NextRequest) {
     .eq("status", "pending_classification")
     .ilike("source_path", "%Traslados de Stgo%")
     .order("original_name", { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
 
   if (intakeError) {
     return NextResponse.json({ error: "intake_query_failed", detail: intakeError.message }, { status: 500 })
@@ -69,7 +84,12 @@ export async function GET(request: NextRequest) {
       const candidates = workbook.SheetNames.flatMap((sheetName) =>
         mapSheet(sheetName, workbook.Sheets[sheetName], item.original_name).rows,
       )
-      const matches = candidates.filter((row) => skus.includes(normalizeSku(row.sku)))
+      const descriptions = skus.flatMap((sku) => TARGET_DESCRIPTIONS.get(sku) ?? []).map(normalizeSearch)
+      const matches = candidates.filter((row) => {
+        const sku = normalizeSku(row.sku)
+        const description = normalizeSearch(row.description)
+        return skus.includes(sku) || descriptions.some((target) => target && description.includes(target))
+      })
 
       files.push({
         id: item.id,
@@ -105,6 +125,7 @@ export async function GET(request: NextRequest) {
     mode: "dry-run",
     readOnly: true,
     scannedFiles: items?.length ?? 0,
+    offset,
     requestedSkus: skus,
     files,
   })
