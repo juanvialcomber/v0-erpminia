@@ -23,7 +23,7 @@ function normalizeNumber(value) {
   return Number.isFinite(number) ? number : null
 }
 
-function normalizeHeader(value) {
+export function normalizeHeader(value) {
   return String(value ?? "")
     .trim()
     .toLowerCase()
@@ -54,7 +54,7 @@ function findColumn(headers, aliases) {
   return -1
 }
 
-function detectHeaderRow(matrix) {
+export function detectHeaderRow(matrix) {
   const maxScan = Math.min(matrix.length, 30)
   let best = null
   for (let rowIndex = 0; rowIndex < maxScan; rowIndex += 1) {
@@ -68,7 +68,7 @@ function detectHeaderRow(matrix) {
   return best && best.score >= 2 ? best : null
 }
 
-function inferDestinationFromFilename(fileName) {
+export function inferDestinationFromFilename(fileName) {
   const text = normalizeHeader(fileName)
   const candidates = [
     ["jdm", "Mina Don Jaime"],
@@ -84,7 +84,7 @@ function inferDestinationFromFilename(fileName) {
   return null
 }
 
-function mapSheet(sheetName, worksheet, fileName) {
+export function mapSheet(sheetName, worksheet, fileName) {
   const matrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null, raw: true })
   const header = detectHeaderRow(matrix)
   if (!header) return { sheetName, rows: [], warnings: ["header_not_detected"] }
@@ -151,7 +151,10 @@ async function main() {
   }, null, 2))
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exitCode = 1
-})
+const invokedPath = process.argv[1] ? new URL(`file://${process.argv[1].replace(/\\\\/g, "/")}`).href : null
+if (import.meta.url === invokedPath) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exitCode = 1
+  })
+}
