@@ -363,6 +363,13 @@ async function proxyRequest(request: NextRequest) {
     return withSecurityHeaders(response);
   }
 
+  if (
+    process.env.VERCEL_ENV === 'preview' &&
+    pathname === '/api/internal/bodega-transfer-inspect'
+  ) {
+    return withSecurityHeaders(response);
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
