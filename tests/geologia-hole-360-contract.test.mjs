@@ -49,3 +49,8 @@ test('hole 360 endpoint is off by default before authenticated QA',()=>{
   assert.match(dashboard,/NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true'/);
   assert.match(tasks,/NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true'/);
 });
+
+test('existing hole selection works even when the new 360 feature is disabled',()=>{
+  assert.match(dashboard,/const selectedHole=useMemo\(\(\)=>selectedHoleId \? data\?\.holes\.find/);
+  assert.match(dashboard,/setSelectedHoleId\(holeId\);/);
+});
