@@ -9,8 +9,9 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { useModuleAccess } from '@/hooks/use-module-access';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import { ProductionSourceSnapshot } from '@/components/production/production-source-snapshot';
+import { sourceAgeDays, sourceFreshnessStatus } from '@/lib/production/source-age.mjs';
 
-type SourceCutoff={stats:{cutoff:string|null;source:string|null;totalExtractedTons:number|null;plannedToDateTons:number|null;plannedMonthTons:number|null;forecastEndMonthTons:number|null;fineExtractedTons:number|null};stock:{cutoff:string|null;source:string|null;plantStockTons:number|null;transportedWeekTons:number|null}};
+type SourceCutoff={asOfChileDate:string;stats:{cutoff:string|null;source:string|null;totalExtractedTons:number|null;plannedToDateTons:number|null;plannedMonthTons:number|null;forecastEndMonthTons:number|null;fineExtractedTons:number|null};stock:{cutoff:string|null;source:string|null;plantStockTons:number|null;transportedWeekTons:number|null}};
 
 type Overview = {
   counts: { materialMovements:number; plantShifts:number; metallurgyResults:number; concentrateShipments:number; drillingReports:number; drillingHoles:number };
@@ -67,7 +68,15 @@ export function ProduccionDashboard(){
   const sourceDelta=sourceForecast!==null&&sourceMonthPlan!==null?sourceForecast-sourceMonthPlan:null;
   const attentionSignal=data.intelligence.find(signal=>signal.level!=='info')||data.intelligence[0]||null;
   const reviewQueue=data.coverage.queue;
-  const reviewTotal=reviewQueue.importExceptions+reviewQueue.movementNormalization+reviewQueue.movementValidation+reviewQueue.entityReconciliation+reviewQueue.plantShifts+reviewQueue.metallurgy+reviewQueue.drillLocations+data.quality.hold;
+  const reviewAreas=[
+    reviewQueue.importExceptions, reviewQueue.movementNormalization, reviewQueue.movementValidation,
+    reviewQueue.entityReconciliation, reviewQueue.plantShifts, reviewQueue.metallurgy,
+    reviewQueue.drillLocations, data.quality.hold,
+  ].filter((count)=>count>0).length;
+  const hasPendingReview=reviewAreas>0;
+  const cutoffAge=sourceAgeDays(sourceCutoff?.stats.cutoff??null,sourceCutoff?.asOfChileDate??null);
+  const cutoffStatus=sourceFreshnessStatus(cutoffAge);
+  const outdatedCutoff=cutoffStatus==='outdated'||cutoffStatus==='future';
 
   return <div className="space-y-6">
     <PageHeader>
@@ -87,13 +96,13 @@ export function ProduccionDashboard(){
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué requiere atención</p>
-        <p className="mt-2 text-sm font-medium">{sourceDelta!==null?(sourceDelta>=0?'Proyección sobre plan mensual':'Proyección bajo plan mensual'):(attentionSignal?.title||'Sin señal actual calculable')}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{sourceDelta!==null?((sourceDelta>=0?'+':'')+n(sourceDelta,1)+' t de proyección al cierre versus el plan mensual oficial. Dato fuente; no equivale a tratamiento ni recuperación.'):(attentionSignal?.detail||'No hay una comparación actual sustentada por la fuente disponible.')}</p>
+        <p className="mt-2 text-sm font-medium">{outdatedCutoff?'Fuentes por actualizar':sourceDelta!==null?(sourceDelta>=0?'Proyección sobre plan mensual':'Proyección bajo plan mensual'):(attentionSignal?.title||'Sin señal actual calculable')}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{outdatedCutoff?('Estadística con '+(cutoffAge===null?'fecha no comprobada':n(cutoffAge)+' días de antigüedad')+'. Las proyecciones corresponden al corte histórico, no a la operación actual.') : sourceDelta!==null?((sourceDelta>=0?'+':'')+n(sourceDelta,1)+' t de proyección al cierre versus el plan mensual oficial. Dato fuente; no equivale a tratamiento ni recuperación.'):(attentionSignal?.detail||'No hay una comparación actual sustentada por la fuente disponible.')}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Qué validar</p>
-        <p className="mt-2 text-sm font-medium">{reviewTotal>0?(n(reviewTotal)+' controles requieren revisión'):'Sin controles pendientes en la cola actual'}</p>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">Importación, transporte, identidades, planta, metalurgia, ubicación de pozos y controles de calidad. La validación sigue siendo humana.</p>
+        <p className="mt-2 text-sm font-medium">{hasPendingReview?(n(reviewAreas)+' áreas con registros por revisar'):'Sin pendientes identificados en las colas consultadas'}</p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">Las colas pueden contener registros repetidos entre áreas; no se suman como casos únicos. La validación sigue siendo humana.</p>
         <Link href="/dashboard/produccion/fuentes" className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">Revisar fuentes <ArrowRight className="h-3 w-3"/></Link>
       </div>
     </section>
@@ -175,7 +184,7 @@ function CoverageOverview({data}:{data:Overview}){
         const StatusIcon=meta.icon;
         return <Link key={domain.key} href={domain.href} aria-label={`Abrir ${domain.title}: ${meta.label}`} className="group grid gap-3 px-4 py-3 outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(170px,.8fr)_minmax(180px,1fr)_auto] sm:items-center">
           <div className="flex items-center gap-3"><Icon className="size-4 shrink-0 text-muted-foreground"/><div><p className="text-sm font-medium">{domain.title}</p><p className="text-xs text-muted-foreground">{n(coverage.evidenceCount)} {domain.unit}{coverage.dataThrough?` · corte ${date(coverage.dataThrough)}`:''}</p></div></div>
-          <p className="text-xs leading-5 text-muted-foreground line-clamp-2">{coverage.note}</p>
+          <p className="text-xs leading-5 text-muted-foreground line-clamp-2">{coverage.note}{coverage.dataThrough?` Última evidencia: ${date(coverage.dataThrough)}.`:''}</p>
           <div className="flex items-center gap-3 sm:justify-end"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${meta.className}`}><StatusIcon className="size-3"/>{meta.label}</span><span className="text-xs text-muted-foreground">{coverage.reviewCount>0?`${n(coverage.reviewCount)} revisión`:'Sin pendientes'}</span><ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"/></div>
         </Link>;
       })}
@@ -189,8 +198,8 @@ function CoverageOverview({data}:{data:Overview}){
 }
 
 function coverageStatus(status:'operational'|'partial'|'awaiting_source'){
-  if(status==='operational') return {label:'Completo',icon:CheckCircle2,className:'border-secondary/35 bg-secondary/10 text-secondary'};
-  if(status==='partial') return {label:'Incompleto',icon:AlertTriangle,className:'border-primary/35 bg-primary/10 text-primary'};
+  if(status==='operational') return {label:'Con datos',icon:CheckCircle2,className:'border-secondary/35 bg-secondary/10 text-secondary'};
+  if(status==='partial') return {label:'Por revisar',icon:AlertTriangle,className:'border-primary/35 bg-primary/10 text-primary'};
   return {label:'Sin datos',icon:CircleDashed,className:'border-border bg-muted/40 text-muted-foreground'};
 }
 
