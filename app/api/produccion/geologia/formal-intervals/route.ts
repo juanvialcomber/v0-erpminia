@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         .order('created_at',{ascending:false}).limit(60)
     : {data:[],error:null};
   if (events.error) return unavailable(events.error);
-  return NextResponse.json({ available:true, canWrite:access.canWrite, hole:hole.data, rows:records.data || [], events:events.data || [],
+  return NextResponse.json({ available:true, canWrite:access.canWrite, viewerId:context.userId, hole:hole.data, rows:records.data || [], events:events.data || [],
     notes:'El registro geológico formal es distinto de los intervalos operacionales y de los ensayes de laboratorio.' },
     {headers:{'Cache-Control':'private, no-store'}});
 }
