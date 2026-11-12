@@ -43,3 +43,9 @@ test('Immediate tasks open the matching canonical drill hole', () => {
   assert.match(dashboard, /<GeologiaHole360 holeId=\{selectedHole\.id\}\/>/);
   assert.match(dashboard, /url\.searchParams\.set\('hole',holeId\)/);
 });
+
+test('hole 360 endpoint is off by default before authenticated QA',()=>{
+  assert.match(api,/MOTIL_GEOLOGIA_360_ENABLED !== 'true'/);
+  assert.match(dashboard,/NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true'/);
+  assert.match(tasks,/NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true'/);
+});
