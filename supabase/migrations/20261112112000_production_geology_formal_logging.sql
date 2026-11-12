@@ -76,8 +76,29 @@ begin
   end if;
 
   if tg_op = 'UPDATE' then
-    if old.status = 'validated' then
-      raise exception 'Un registro validado es inmutable; crear una nueva revisión documentada' using errcode = '23514';
+    if old.status in ('validated','rejected') then
+      raise exception 'El registro revisado es inmutable; crea uno nuevo con otra referencia documental' using errcode = '23514';
+    end if;
+    if old.status = 'submitted' and new.status not in ('draft','validated','rejected') then
+      raise exception 'El registro enviado sólo admite devolución o revisión final' using errcode = '23514';
+    end if;
+    if old.status = 'draft' and new.status not in ('draft','submitted') then
+      raise exception 'El borrador debe enviarse a revisión antes de validarse' using errcode = '23514';
+    end if;
+    if old.status = 'submitted' and (
+      new.from_m is distinct from old.from_m
+      or new.to_m is distinct from old.to_m
+      or new.observed_on is distinct from old.observed_on
+      or new.source_reference is distinct from old.source_reference
+      or new.lithology is distinct from old.lithology
+      or new.alteration is distinct from old.alteration
+      or new.mineralization is distinct from old.mineralization
+      or new.structures is distinct from old.structures
+      or new.recovery_pct is distinct from old.recovery_pct
+      or new.rqd_pct is distinct from old.rqd_pct
+      or new.field_notes is distinct from old.field_notes
+    ) then
+      raise exception 'La evidencia enviada a revisión no se puede editar' using errcode = '23514';
     end if;
     if new.id is distinct from old.id
        or new.organization_id is distinct from old.organization_id
@@ -150,7 +171,9 @@ alter table public.production_geology_formal_interval_events enable row level se
 revoke all on public.production_geology_formal_intervals from public, anon, authenticated;
 revoke all on public.production_geology_formal_interval_events from public, anon, authenticated;
 grant select, insert, update on public.production_geology_formal_intervals to service_role;
+revoke delete, truncate on public.production_geology_formal_intervals from service_role;
 grant select, insert on public.production_geology_formal_interval_events to service_role;
+revoke update, delete, truncate on public.production_geology_formal_interval_events from service_role;
 grant usage, select on sequence public.production_geology_formal_interval_events_id_seq to service_role;
 revoke execute on function public.guard_production_geology_formal_interval() from public, anon, authenticated;
 revoke execute on function public.audit_production_geology_formal_interval() from public, anon, authenticated;
