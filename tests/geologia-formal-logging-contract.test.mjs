@@ -38,7 +38,7 @@ test('independent reviewer and immutable approvals are enforced in route and DB'
   assert.match(api,/submitted: \['draft','validated','rejected'\]/);
   assert.match(api,/validated: \[\]/);
   assert.match(api,/rejected: \[\]/);
-  assert.match(migration,/old\.status = 'validated'/);
+  assert.match(migration,/old\.status in \('validated','rejected'\)/);
   assert.match(migration,/reviewed_by <> created_by/);
   assert.match(migration,/production_geology_formal_interval_events/);
   assert.match(migration,/after insert or update on public\.production_geology_formal_intervals/);
