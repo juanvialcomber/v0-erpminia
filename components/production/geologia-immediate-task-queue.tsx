@@ -71,6 +71,7 @@ export function GeologiaImmediateTaskQueue(){
           <div className="flex flex-wrap items-center gap-2"><p className="font-medium">{task.hole_code}</p><span className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{priorityLabel[task.task_priority]||'Revisión'}</span></div>
           <p className="mt-1 text-xs text-muted-foreground">{categoryLabel[task.task_category]||task.task_title}</p>
           <p className="mt-2 text-xs text-muted-foreground">{task.evidence_summary}</p>
+          <a className="mt-2 inline-block text-xs font-medium underline underline-offset-2" href={'/dashboard/produccion/geologia?tab=holes&hole='+encodeURIComponent(task.drill_hole_id)}>Abrir Ficha 360</a>
         </div>
         <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pregunta a resolver</p><p className="mt-1 text-sm font-medium">{task.clarifying_question}</p><p className="mt-2 text-xs text-muted-foreground">{task.human_checkpoint}</p></div>
         <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-sm">{task.recommended_action}</p><p className="mt-2 text-xs text-muted-foreground">El resultado sólo se materializa después de recuperar evidencia primaria y validarla humanamente.</p></div>
