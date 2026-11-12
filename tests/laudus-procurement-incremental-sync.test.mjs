@@ -175,3 +175,31 @@ test('refresh reciente de facturas preserva lineas y solo actualiza cabecera',()
   assert.doesNotMatch(invoiceMetadataMigration,/delete from integration\.laudus_purchase_invoice_lines/i);
   assert.doesNotMatch(invoiceMetadataMigration,/canonical\./);
 });
+
+
+test('purchase order list requests identity and financial header fields',()=>{
+  assert.match(sync,/['"]orderNumber['"]/);
+  assert.match(sync,/['"]totals\.net['"]/);
+  assert.match(sync,/['"]totals\.tax['"]/);
+  assert.match(sync,/['"]totals\.total['"]/);
+  assert.match(sync,/['"]notes['"]/);
+  assert.match(sync,/['"]currency['"]/);
+});
+
+test('purchase order rows rebuild flattened Laudus list output before staging',()=>{
+  assert.match(sync,/function purchaseOrderRows\(rows: JsonRow\[\]\)/);
+  assert.match(sync,/new Map<string, JsonRow>\(\)/);
+  assert.match(sync,/row\.supplier_supplierId/);
+  assert.match(sync,/row\.supplier_VATId/);
+  assert.match(sync,/row\.warehouse_warehouseId/);
+  assert.match(sync,/row\.totals_total/);
+  assert.match(sync,/row\.items_itemId/);
+  assert.match(sync,/row\.items_product_productId/);
+  assert.match(sync,/row\.items_product_sku/);
+  assert.match(sync,/unitPrice: unitCost/);
+  assert.match(sync,/const orderRows = purchaseOrderRows\(orders\.rows\)/);
+});
+
+test('reconstructed PO lines preserve lowercase and legacy SKU contract',()=>{
+  assert.match(sync,/product: \{ productId, sku, SKU: sku, description, unitOfMeasure \}/);
+});
