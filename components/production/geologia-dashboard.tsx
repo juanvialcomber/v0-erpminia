@@ -63,6 +63,8 @@ const fetcher=async(url:string):Promise<GeologyData>=>{
 function pct(value:number){return `${value.toLocaleString('es-CL',{maximumFractionDigits:1})}%`;}
 function meters(value:number){return `${value.toLocaleString('es-CL',{maximumFractionDigits:0})} m`;}
 
+const GEOLOGIA_360_ENABLED = process.env.NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true';
+
 const tabs=[
   ['today','Hoy'],
   ['holes','Mapa y sondajes'],
@@ -85,11 +87,14 @@ export function GeologiaDashboard(){
   const [tab,setTab]=useState<TabKey>('today');
   const [selectedHoleId,setSelectedHoleId]=useState('');
   useEffect(()=>{
+
+    if (!GEOLOGIA_360_ENABLED) return;
     const holeId=new URLSearchParams(window.location.search).get('hole');
     if(holeId)setSelectedHoleId(holeId);
   },[]);
   const selectHole=(holeId:string)=>{
     setSelectedHoleId(holeId);
+    if (!GEOLOGIA_360_ENABLED) return;
     const url=new URL(window.location.href);
     url.searchParams.set('hole',holeId);
     url.searchParams.set('tab','holes');
@@ -104,7 +109,7 @@ export function GeologiaDashboard(){
     const query=holeSearch.trim().toLowerCase();
     return (data?.holes||[]).filter((hole)=>!query||[hole.hole_code,hole.drilling_domain,hole.status,hole.geological_purpose,hole.operational_purpose].some((v)=>String(v||'').toLowerCase().includes(query)));
   },[data?.holes,holeSearch]);
-  const selectedHole=useMemo(()=>selectedHoleId ? data?.holes.find((hole)=>hole.id===selectedHoleId)||null : filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
+  const selectedHole=useMemo(()=>GEOLOGIA_360_ENABLED && selectedHoleId ? data?.holes.find((hole)=>hole.id===selectedHoleId)||null : filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
   const selectedIntervals=useMemo(()=>selectedHole?(data?.intervals||[]).filter((row)=>row.drill_hole_id===selectedHole.id):[],[data?.intervals,selectedHole]);
   const selectedOperationalIntervals=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='operational_source_interval'),[selectedIntervals]);
   const selectedFormalLogging=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='explicit_formal_logging'),[selectedIntervals]);
@@ -165,7 +170,7 @@ export function GeologiaDashboard(){
       <aside className="space-y-5">{selectedHole?<><section className="rounded-lg border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs text-muted-foreground">Ficha del sondaje</p><h2 className="mt-1 text-xl font-semibold">{selectedHole.hole_code}</h2></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs">{selectedHole.status||'Sin estado'}</span></div><div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 text-sm"><Metric label="Profundidad" value={selectedHole.drilled_depth_m!=null?meters(Number(selectedHole.drilled_depth_m)):'—'} detail={selectedHole.planned_depth_m!=null?`Plan ${meters(Number(selectedHole.planned_depth_m))}`:'Sin plan'}/><Metric label="Orientación" value={selectedHole.azimuth_deg!=null?`${selectedHole.azimuth_deg}°`:'—'} detail={selectedHole.dip_deg!=null?`Dip ${selectedHole.dip_deg}°`:'Sin inclinación'}/><Metric label="Collar" value={selectedHole.collar_elevation!=null?`${selectedHole.collar_elevation} m`:'—'} detail={selectedHole.coordinate_reference||'CRS no informado'}/><Metric label="Diámetro" value={selectedHole.diameter_mm!=null?`${selectedHole.diameter_mm} mm`:'—'} detail={selectedHole.drilling_domain||'Sin dominio'}/></div><div className="mt-5 border-t pt-4"><p className="text-xs text-muted-foreground">Propósito geológico</p><p className="mt-1 text-sm">{selectedHole.geological_purpose||'No documentado'}</p></div></section>
 
         <GeologiaHoleEvidenceReadiness hole={selectedHole} intervalCount={selectedOperationalIntervals.length} sampleCount={selectedSamples.length}/>
-        <GeologiaHole360 holeId={selectedHole.id}/>
+        {GEOLOGIA_360_ENABLED ? <GeologiaHole360 holeId={selectedHole.id}/> : null}
 
         <section className="rounded-lg border bg-card p-5"><div className="flex items-center justify-between"><div><p className="font-medium">Intervalos operacionales por profundidad</p><p className="mt-1 text-sm text-muted-foreground">Evidencia estructurada desde reportes fuente. No equivale a logging geológico formal.</p></div><Layers3 className="h-4 w-4 text-muted-foreground"/></div>{selectedOperationalIntervals.length?<div className="mt-4 space-y-2">{selectedOperationalIntervals.map((row)=><div key={row.id} className="rounded-md border px-3 py-3 text-sm"><div className="flex items-center justify-between gap-3"><p className="font-medium">{row.from_m}–{row.to_m} m</p><span className="text-xs text-muted-foreground">Operacional</span></div>{row.lithology?<><p className="mt-2 text-xs text-muted-foreground">Litología reportada</p><p>{row.lithology}</p></>:null}<div className="mt-2 grid gap-3 text-xs sm:grid-cols-2"><div><span className="text-muted-foreground">Mineralización visual · </span>{row.mineralization||'—'}</div><div><span className="text-muted-foreground">Resultado operacional · </span>{row.operational_result||'—'}</div></div><p className="mt-2 text-xs text-muted-foreground">RQD/recuperación/alteración no se asumen desde este intervalo.</p></div>)}</div>:<div className="mt-4"><Empty title="Sin intervalos operacionales estructurados" description="No hay tramos fuente estructurados para este sondaje. El logging geológico formal se mantiene como una fuente separada y no se inventa."/></div>}{selectedFormalLogging.length?<div className="mt-4 rounded-md border bg-muted/20 px-3 py-3 text-sm"><strong>{selectedFormalLogging.length}</strong> intervalo(s) identificados explícitamente como logging geológico formal.</div>:null}</section>
 
