@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Beaker, Drill, Layers3, MapPinned, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { GeologiaTodayDecisionBoard } from '@/components/production/geologia-tod
 import { GeologiaResultsDecisionBoard } from '@/components/production/geologia-results-decision-board';
 import { GeologiaPendingDecisionQueue } from '@/components/production/geologia-pending-decision-queue';
 import { GeologiaHoleEvidenceReadiness } from '@/components/production/geologia-hole-evidence-readiness';
+import { GeologiaHole360 } from '@/components/production/geologia-hole-360';
 import { GeologiaMineEvidenceOverview } from '@/components/production/geologia-mine-evidence-overview';
 
 type Hole = {
@@ -62,6 +63,8 @@ const fetcher=async(url:string):Promise<GeologyData>=>{
 function pct(value:number){return `${value.toLocaleString('es-CL',{maximumFractionDigits:1})}%`;}
 function meters(value:number){return `${value.toLocaleString('es-CL',{maximumFractionDigits:0})} m`;}
 
+const GEOLOGIA_360_ENABLED = process.env.NEXT_PUBLIC_MOTIL_GEOLOGIA_360_ENABLED === 'true';
+
 const tabs=[
   ['today','Hoy'],
   ['holes','Mapa y sondajes'],
@@ -83,6 +86,20 @@ export function GeologiaDashboard(){
   const {data,error,isLoading,mutate}=useSWR(periodUrl('/api/produccion/geologia',month),fetcher);
   const [tab,setTab]=useState<TabKey>('today');
   const [selectedHoleId,setSelectedHoleId]=useState('');
+  useEffect(()=>{
+
+    if (!GEOLOGIA_360_ENABLED) return;
+    const holeId=new URLSearchParams(window.location.search).get('hole');
+    if(holeId)setSelectedHoleId(holeId);
+  },[]);
+  const selectHole=(holeId:string)=>{
+    setSelectedHoleId(holeId);
+    if (!GEOLOGIA_360_ENABLED) return;
+    const url=new URL(window.location.href);
+    url.searchParams.set('hole',holeId);
+    url.searchParams.set('tab','holes');
+    window.history.replaceState({},'',url.pathname+url.search+url.hash);
+  };
   const [holeSearch,setHoleSearch]=useState('');
   const [selectedMines,setSelectedMines]=useState<Record<string,string>>({});
   const [savingId,setSavingId]=useState<string|null>(null);
@@ -92,7 +109,7 @@ export function GeologiaDashboard(){
     const query=holeSearch.trim().toLowerCase();
     return (data?.holes||[]).filter((hole)=>!query||[hole.hole_code,hole.drilling_domain,hole.status,hole.geological_purpose,hole.operational_purpose].some((v)=>String(v||'').toLowerCase().includes(query)));
   },[data?.holes,holeSearch]);
-  const selectedHole=useMemo(()=>data?.holes.find((hole)=>hole.id===selectedHoleId)||filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
+  const selectedHole=useMemo(()=>selectedHoleId ? data?.holes.find((hole)=>hole.id===selectedHoleId)||null : filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
   const selectedIntervals=useMemo(()=>selectedHole?(data?.intervals||[]).filter((row)=>row.drill_hole_id===selectedHole.id):[],[data?.intervals,selectedHole]);
   const selectedOperationalIntervals=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='operational_source_interval'),[selectedIntervals]);
   const selectedFormalLogging=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='explicit_formal_logging'),[selectedIntervals]);
@@ -145,7 +162,7 @@ export function GeologiaDashboard(){
 
     {data&&tab==='holes'?<div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,.85fr)]">
       <div className="space-y-5">
-        <section className="overflow-hidden rounded-lg border bg-card"><div className="border-b px-4 py-3"><p className="font-medium">Mapa de sondajes</p><p className="mt-1 text-sm text-muted-foreground">Vista relativa de collares canónicos. No reemplaza cartografía oficial.</p></div>{bounds?<div className="relative h-[360px] bg-muted/20">{locatedHoles.slice(0,400).map((hole)=>{const width=Math.max(bounds.maxX-bounds.minX,1);const height=Math.max(bounds.maxY-bounds.minY,1);const left=((Number(hole.collar_easting)-bounds.minX)/width)*92+4;const top=(1-(Number(hole.collar_northing)-bounds.minY)/height)*88+6;return <button key={hole.id} title={hole.hole_code} onClick={()=>setSelectedHoleId(hole.id)} className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background ${selectedHole?.id===hole.id?'bg-primary ring-4 ring-primary/20':'bg-foreground/55'}`} style={{left:`${left}%`,top:`${top}%`}}/>})}<div className="absolute bottom-3 left-3 rounded-md border bg-background/90 px-3 py-2 text-xs text-muted-foreground">{locatedHoles.length} collares visibles</div></div>:<Empty title="Sin collares georreferenciados" description="Cuando existan coordenadas canónicas, los sondajes aparecerán aquí."/>}</section>
+        <section className="overflow-hidden rounded-lg border bg-card"><div className="border-b px-4 py-3"><p className="font-medium">Mapa de sondajes</p><p className="mt-1 text-sm text-muted-foreground">Vista relativa de collares canónicos. No reemplaza cartografía oficial.</p></div>{bounds?<div className="relative h-[360px] bg-muted/20">{locatedHoles.slice(0,400).map((hole)=>{const width=Math.max(bounds.maxX-bounds.minX,1);const height=Math.max(bounds.maxY-bounds.minY,1);const left=((Number(hole.collar_easting)-bounds.minX)/width)*92+4;const top=(1-(Number(hole.collar_northing)-bounds.minY)/height)*88+6;return <button key={hole.id} title={hole.hole_code} onClick={()=>selectHole(hole.id)} className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background ${selectedHole?.id===hole.id?'bg-primary ring-4 ring-primary/20':'bg-foreground/55'}`} style={{left:`${left}%`,top:`${top}%`}}/>})}<div className="absolute bottom-3 left-3 rounded-md border bg-background/90 px-3 py-2 text-xs text-muted-foreground">{locatedHoles.length} collares visibles</div></div>:<Empty title="Sin collares georreferenciados" description="Cuando existan coordenadas canónicas, los sondajes aparecerán aquí."/>}</section>
 
         <section className="overflow-hidden rounded-lg border bg-card"><div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">Sondajes</p><p className="mt-1 text-sm text-muted-foreground">Selecciona un pozo para revisar su ficha, intervalos operacionales y evidencia explícitamente vinculada.</p></div><div className="relative w-full sm:w-72"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/><input value={holeSearch} onChange={(event)=>setHoleSearch(event.target.value)} placeholder="Buscar sondaje" className="h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"/></div></div><div className="max-h-[420px] overflow-auto"><table className="w-full text-sm"><thead className="sticky top-0 bg-muted/60 text-left text-xs text-muted-foreground backdrop-blur"><tr><th className="px-4 py-3">Pozo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3 text-right">Profundidad</th><th className="px-4 py-3">Ubicación</th></tr></thead><tbody className="divide-y">{filteredHoles.map((hole)=><tr key={hole.id} onClick={()=>setSelectedHoleId(hole.id)} className={`cursor-pointer hover:bg-muted/20 ${selectedHole?.id===hole.id?'bg-muted/30':''}`}><td className="px-4 py-3 font-medium">{hole.hole_code}</td><td className="px-4 py-3">{hole.status||'—'}</td><td className="px-4 py-3 text-right tabular-nums">{hole.drilled_depth_m!=null?meters(Number(hole.drilled_depth_m)):'—'}</td><td className="px-4 py-3 text-xs text-muted-foreground">{hole.collar_easting!=null&&hole.collar_northing!=null?'Ubicado':'Pendiente'}</td></tr>)}</tbody></table></div></section>
       </div>
@@ -153,6 +170,7 @@ export function GeologiaDashboard(){
       <aside className="space-y-5">{selectedHole?<><section className="rounded-lg border bg-card p-5"><div className="flex items-start justify-between gap-4"><div><p className="text-xs text-muted-foreground">Ficha del sondaje</p><h2 className="mt-1 text-xl font-semibold">{selectedHole.hole_code}</h2></div><span className="rounded-full bg-muted px-2.5 py-1 text-xs">{selectedHole.status||'Sin estado'}</span></div><div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 text-sm"><Metric label="Profundidad" value={selectedHole.drilled_depth_m!=null?meters(Number(selectedHole.drilled_depth_m)):'—'} detail={selectedHole.planned_depth_m!=null?`Plan ${meters(Number(selectedHole.planned_depth_m))}`:'Sin plan'}/><Metric label="Orientación" value={selectedHole.azimuth_deg!=null?`${selectedHole.azimuth_deg}°`:'—'} detail={selectedHole.dip_deg!=null?`Dip ${selectedHole.dip_deg}°`:'Sin inclinación'}/><Metric label="Collar" value={selectedHole.collar_elevation!=null?`${selectedHole.collar_elevation} m`:'—'} detail={selectedHole.coordinate_reference||'CRS no informado'}/><Metric label="Diámetro" value={selectedHole.diameter_mm!=null?`${selectedHole.diameter_mm} mm`:'—'} detail={selectedHole.drilling_domain||'Sin dominio'}/></div><div className="mt-5 border-t pt-4"><p className="text-xs text-muted-foreground">Propósito geológico</p><p className="mt-1 text-sm">{selectedHole.geological_purpose||'No documentado'}</p></div></section>
 
         <GeologiaHoleEvidenceReadiness hole={selectedHole} intervalCount={selectedOperationalIntervals.length} sampleCount={selectedSamples.length}/>
+        {GEOLOGIA_360_ENABLED ? <GeologiaHole360 holeId={selectedHole.id}/> : null}
 
         <section className="rounded-lg border bg-card p-5"><div className="flex items-center justify-between"><div><p className="font-medium">Intervalos operacionales por profundidad</p><p className="mt-1 text-sm text-muted-foreground">Evidencia estructurada desde reportes fuente. No equivale a logging geológico formal.</p></div><Layers3 className="h-4 w-4 text-muted-foreground"/></div>{selectedOperationalIntervals.length?<div className="mt-4 space-y-2">{selectedOperationalIntervals.map((row)=><div key={row.id} className="rounded-md border px-3 py-3 text-sm"><div className="flex items-center justify-between gap-3"><p className="font-medium">{row.from_m}–{row.to_m} m</p><span className="text-xs text-muted-foreground">Operacional</span></div>{row.lithology?<><p className="mt-2 text-xs text-muted-foreground">Litología reportada</p><p>{row.lithology}</p></>:null}<div className="mt-2 grid gap-3 text-xs sm:grid-cols-2"><div><span className="text-muted-foreground">Mineralización visual · </span>{row.mineralization||'—'}</div><div><span className="text-muted-foreground">Resultado operacional · </span>{row.operational_result||'—'}</div></div><p className="mt-2 text-xs text-muted-foreground">RQD/recuperación/alteración no se asumen desde este intervalo.</p></div>)}</div>:<div className="mt-4"><Empty title="Sin intervalos operacionales estructurados" description="No hay tramos fuente estructurados para este sondaje. El logging geológico formal se mantiene como una fuente separada y no se inventa."/></div>}{selectedFormalLogging.length?<div className="mt-4 rounded-md border bg-muted/20 px-3 py-3 text-sm"><strong>{selectedFormalLogging.length}</strong> intervalo(s) identificados explícitamente como logging geológico formal.</div>:null}</section>
 
