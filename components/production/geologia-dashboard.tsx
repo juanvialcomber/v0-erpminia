@@ -109,7 +109,7 @@ export function GeologiaDashboard(){
     const query=holeSearch.trim().toLowerCase();
     return (data?.holes||[]).filter((hole)=>!query||[hole.hole_code,hole.drilling_domain,hole.status,hole.geological_purpose,hole.operational_purpose].some((v)=>String(v||'').toLowerCase().includes(query)));
   },[data?.holes,holeSearch]);
-  const selectedHole=useMemo(()=>GEOLOGIA_360_ENABLED && selectedHoleId ? data?.holes.find((hole)=>hole.id===selectedHoleId)||null : filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
+  const selectedHole=useMemo(()=>selectedHoleId ? data?.holes.find((hole)=>hole.id===selectedHoleId)||null : filteredHoles[0]||null,[data?.holes,filteredHoles,selectedHoleId]);
   const selectedIntervals=useMemo(()=>selectedHole?(data?.intervals||[]).filter((row)=>row.drill_hole_id===selectedHole.id):[],[data?.intervals,selectedHole]);
   const selectedOperationalIntervals=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='operational_source_interval'),[selectedIntervals]);
   const selectedFormalLogging=useMemo(()=>selectedIntervals.filter((row)=>row.evidence_class==='explicit_formal_logging'),[selectedIntervals]);
