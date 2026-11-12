@@ -51,7 +51,7 @@ test('input ranges and read pagination remain bounded',()=>{
   assert.match(api,/\.limit\(100\)/);
   assert.match(api,/\.limit\(60\)/);
   assert.match(ui,/GeologiaFormalLogging/);
-  assert.match(hole,/<GeologiaFormalLogging holeId=\{holeId\}\/>/);
+  assert.match(hole,/<GeologiaFormalLogging key=\{holeId\} holeId=\{holeId\}\/>/);
 });
 
 test('tables are not exposed to public authenticated clients',()=>{
