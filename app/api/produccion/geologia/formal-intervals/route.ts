@@ -37,6 +37,7 @@ function unavailable(error: any) {
     : NextResponse.json({ error:error?.message || 'No fue posible consultar el registro geológico' }, { status:500 });
 }
 async function scopedContext(request: NextRequest, requireWrite = false) {
+  if (process.env.MOTIL_GEOLOGIA_360_ENABLED !== 'true') return { ok:false as const, response:NextResponse.json({ error:'Registro geológico formal en validación', available:false }, { status:404 }) };
   const access = await requireModuleAccess(request, MODULE_KEYS.PROD_GEOLOGIA, requireWrite);
   if (!access.authorized) return { ok:false as const, response:access.response };
   const context = await getOrganizationContext(request);
