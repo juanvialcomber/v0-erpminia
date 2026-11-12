@@ -103,6 +103,6 @@ export function GeologiaHole360({holeId}:{holeId:string}){
         {linkedAssays.filter(a=>a.sample_id===sample.id).map((assay,i)=><p key={i} className="mt-1 text-xs">{assay.analyte_code}: {assay.result_value??'Sin valor'} {assay.result_unit||''} · {assay.validation_status||'Sin validar'} · {assay.laboratory||'Laboratorio no informado'}</p>)}
       </div>)}</div>:<p className="mt-4 text-sm text-muted-foreground">Sin muestras químicas vinculadas explícitamente a este sondaje. Los resultados históricos de proceso permanecen separados.</p>}
     </div>
-    <GeologiaFormalLogging holeId={holeId}/>
+    <GeologiaFormalLogging key={holeId} holeId={holeId}/>
   </section>;
 }
