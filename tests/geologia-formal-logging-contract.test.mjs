@@ -31,6 +31,8 @@ test('all formal intervals endpoints are module-guarded and organization-scoped'
 
 test('independent reviewer and immutable approvals are enforced in route and DB',()=>{
   assert.match(api,/context\.userId === row\.created_by/);
+  assert.match(ui,/row\.created_by!==data\.viewerId/);
+  assert.match(api,/viewerId:context\.userId/);
   assert.match(api,/comment\.length < 10/);
   assert.match(api,/draft: \['submitted'\]/);
   assert.match(api,/submitted: \['draft','validated','rejected'\]/);
