@@ -38,6 +38,7 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
   const {data,error,isLoading,mutate}=useSWR<Response>(url,fetcher,{revalidateOnFocus:false});
   const [form,setForm]=useState(initial);
   const [saving,setSaving]=useState(false);
+  const [editingId,setEditingId]=useState<string|null>(null);
   const [busyId,setBusyId]=useState<string|null>(null);
   const [reviewComments,setReviewComments]=useState<Record<string,string>>({});
   const set=(key:keyof typeof initial,value:string)=>setForm(old=>({...old,[key]:value}));
@@ -48,18 +49,31 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
     if(!response.ok)throw new Error(payload?.error||'No fue posible registrar el cambio');
     await mutate();
   }
+  function startEdit(row:Interval) {
+    setEditingId(row.id);
+    setForm({
+      fromM:String(row.from_m),toM:String(row.to_m),observedOn:row.observed_on,sourceReference:row.source_reference,
+      lithology:row.lithology||'',alteration:row.alteration||'',mineralization:row.mineralization||'',
+      structures:row.structures||'',recoveryPct:row.recovery_pct==null?'':String(row.recovery_pct),
+      rqdPct:row.rqd_pct==null?'':String(row.rqd_pct),field_notes:row.field_notes||'',
+    });
+  }
   async function createDraft() {
     if(!holeId)return;
     setSaving(true);
     try {
-      await mutateInterval({
-        ...form,holeId,
-        field_notes:form.field_notes,
-        fromM:form.fromM,toM:form.toM,
-        recoveryPct:form.recoveryPct,rqdPct:form.rqdPct,
-      },'POST');
+      if (editingId) {
+        await mutateInterval({intervalId:editingId,holeId,status:'draft',
+          lithology:form.lithology,alteration:form.alteration,mineralization:form.mineralization,
+          structures:form.structures,field_notes:form.field_notes,
+          recoveryPct:form.recoveryPct,rqdPct:form.rqdPct},'PATCH');
+        toast.success('Observaciones del borrador actualizadas.');
+      } else {
+        await mutateInterval({...form,holeId},'POST');
+        toast.success('Borrador geológico guardado; pendiente de revisión profesional.');
+      }
       setForm(initial);
-      toast.success('Borrador geológico guardado; pendiente de revisión profesional.');
+      setEditingId(null);
     } catch(reason) {toast.error(reason instanceof Error?reason.message:'No fue posible guardar');}
     finally {setSaving(false);}
   }
@@ -94,7 +108,7 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
             {row.rqd_pct!=null?<p>RQD: {row.rqd_pct}%</p>:null}
           </div>
           {row.reviewer_comment?<p className="mt-3 text-xs text-muted-foreground">Revisión: {row.reviewer_comment}</p>:null}
-          {data.canWrite&&row.status==='draft'?<div className="mt-3"><Button size="sm" disabled={busyId===row.id} onClick={()=>void transition(row.id,'submitted')}>Enviar a revisión</Button></div>:null}
+          {data.canWrite&&row.status==='draft'?<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busyId===row.id} onClick={()=>startEdit(row)}>Editar observaciones</Button><Button size="sm" disabled={busyId===row.id} onClick={()=>void transition(row.id,'submitted')}>Enviar a revisión</Button></div>:null}
           {data.canWrite&&row.status==='submitted'?<div className="mt-3 space-y-2">
             <label className="block text-xs text-muted-foreground" htmlFor={'review-'+row.id}>Comentario del revisor (obligatorio)</label>
             <textarea id={'review-'+row.id} value={reviewComments[row.id]||''} onChange={event=>setReviewComments(old=>({...old,[row.id]:event.target.value}))}
@@ -112,20 +126,21 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
       </div>
 
       {data.canWrite?<form className="rounded-lg border bg-card p-5" onSubmit={event=>{event.preventDefault();void createDraft();}}>
-        <h4 className="font-medium">Nuevo intervalo · borrador</h4>
+        <h4 className="font-medium">{editingId?'Corregir observaciones · borrador':'Nuevo intervalo · borrador'}</h4>
+        {editingId?<p className="mt-2 text-xs text-muted-foreground">Metraje, fecha y fuente quedan fijos. Para corregir el origen se necesita un nuevo registro documentado.</p>:null}
         <p className="mt-1 text-xs text-muted-foreground">Completa sólo observaciones verificadas directamente, sin inferir ley ni continuidad geológica.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted-foreground">Desde (m)
-            <input required inputMode="decimal" type="number" min="0" step="0.001" value={form.fromM} onChange={e=>set('fromM',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
+            <input required disabled={!!editingId} inputMode="decimal" type="number" min="0" step="0.001" value={form.fromM} onChange={e=>set('fromM',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
           </label>
           <label className="text-xs text-muted-foreground">Hasta (m)
-            <input required inputMode="decimal" type="number" min="0" step="0.001" value={form.toM} onChange={e=>set('toM',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
+            <input required disabled={!!editingId} inputMode="decimal" type="number" min="0" step="0.001" value={form.toM} onChange={e=>set('toM',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
           </label>
           <label className="text-xs text-muted-foreground">Fecha de observación
-            <input required type="date" value={form.observedOn} onChange={e=>set('observedOn',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
+            <input required disabled={!!editingId} type="date" value={form.observedOn} onChange={e=>set('observedOn',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
           </label>
           <label className="text-xs text-muted-foreground">Referencia documental
-            <input required minLength={3} maxLength={500} value={form.sourceReference} onChange={e=>set('sourceReference',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm" placeholder="Registro terreno, libro, hoja o documento"/>
+            <input required disabled={!!editingId} minLength={3} maxLength={500} value={form.sourceReference} onChange={e=>set('sourceReference',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm" placeholder="Registro terreno, libro, hoja o documento"/>
           </label>
           {formFields.map(([key,label])=><label key={key} className="text-xs text-muted-foreground">{label}
             <input maxLength={2000} value={form[key]} onChange={e=>set(key,e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm" placeholder="No informado"/>
@@ -137,7 +152,7 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
             <input type="number" min="0" max="100" step="0.001" value={form.rqdPct} onChange={e=>set('rqdPct',e.target.value)} className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"/>
           </label>
         </div>
-        <Button type="submit" size="sm" className="mt-4" disabled={saving}>{saving?'Guardando…':'Guardar borrador'}</Button>
+        <div className="mt-4 flex flex-wrap gap-2"><Button type="submit" size="sm" disabled={saving}>{saving?'Guardando…':editingId?'Guardar correcciones':'Guardar borrador'}</Button>{editingId?<Button type="button" size="sm" variant="outline" onClick={()=>{setEditingId(null);setForm(initial);}}>Cancelar edición</Button>:null}</div>
         <p className="mt-2 text-xs text-muted-foreground">Las muestras y resultados de laboratorio no se enlazan automáticamente a este intervalo.</p>
       </form>:<p className="text-xs text-muted-foreground">Acceso de consulta: sólo los cargos con permiso de edición pueden registrar o revisar intervalos.</p>}
     </div>:null}
