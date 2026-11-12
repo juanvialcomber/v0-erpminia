@@ -59,3 +59,8 @@ test('tables are not exposed to public authenticated clients',()=>{
   assert.match(migration,/revoke all on public\.production_geology_formal_intervals from public, anon, authenticated/);
   assert.match(migration,/revoke all on public\.production_geology_formal_interval_events from public, anon, authenticated/);
 });
+
+test('formal write endpoints remain disabled until verified release flag',()=>{
+  assert.match(api,/MOTIL_GEOLOGIA_360_ENABLED !== 'true'/);
+  assert.match(ui,/Registro geológico formal/);
+});
