@@ -89,7 +89,7 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
   return <section className="space-y-4" aria-label="Registro geológico formal">
     <div className="rounded-lg border bg-card p-5">
       <h3 className="font-semibold">Registro geológico formal</h3>
-      <p className="mt-1 text-sm text-muted-foreground">Registra intervalos observados en terreno. Cada registro conserva su referencia documental y pasa por revisión de otro profesional antes de validarse. No altera los reportes de perforación.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Registra intervalos observados en terreno. Cada registro conserva su referencia documental y requiere revisión de otro profesional autorizado antes de validarse. La decisión queda registrada. No altera los reportes de perforación.</p>
     </div>
     {error?<StatePanel tone="error" title="Registro formal no disponible" description={error instanceof Error?error.message:'No se pudo leer la base de registros. Los reportes de perforación siguen intactos.'} className="min-h-0 py-5"/>:null}
     {isLoading?<StatePanel title="Leyendo registros geológicos" description="Consultando borradores y observaciones validadas del sondaje." className="min-h-0 py-5"/>:null}
