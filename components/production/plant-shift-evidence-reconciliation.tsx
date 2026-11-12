@@ -4,11 +4,13 @@ import useSWR from 'swr';
 
 type Case={key:string;operationDate:string|null;shift:string|null;status:string;treatedTmsRaw:string|null;
   headGradeRaw:string|null;sourceCount:number;duplicateCount:number;independentSources:number;
-  magnitudeAnomaly:boolean;conflictingFields:string[];
+  magnitudeAnomaly:boolean;conflictingFields:string[];ocrDisagreementFields:string[];
+  hasFormulaError:boolean;
   sourceRefs:Array<{messageId:string;attachmentId:string;rowIndex:number;tableIndex:number;
-    treatedTmsRaw:string|null;headGradeRaw:string|null;humidityRaw:string|null;dateResolution:string}>;};
+    treatedTmsRaw:string|null;headGradeRaw:string|null;humidityRaw:string|null;recoveryRaw:string|null;dateResolution:string}>;};
 type Data={summary:{sourceRows:number;reviewCases:number;duplicateCopies:number;conflictingSources:number;
   missingMeasurements:number;missingIdentity:number;magnitudeAnomalies:number;
+    ocrDisagreements:number;formulaErrors:number;
     latestMeasuredDate:string|null;latestCompleteCandidateDate:string|null;latestTemplateDate:string|null};
   items:Case[];canonicalThrough:string|null;note:string};
 const fetcher=async(url:string):Promise<Data>=>{
@@ -20,9 +22,16 @@ const fetcher=async(url:string):Promise<Data>=>{
 const status=(s:string)=>({
   needs_review:'Revisar fuente',missing_identity:'Fecha/turno sin resolver',
   conflicting_sources:'Fuentes contradictorias',missing_measurements:'Faltan mediciones',
-  magnitude_anomaly:'Magnitud inusual',
+  magnitude_anomaly:'Magnitud inusual',ocr_disagreement:'Lectura OCR por comprobar',
+  source_formula_error:'Fórmula origen con error',
   already_canonical:'Ya registrado',
 }[s]||'Por revisar');
+const fieldLabels:Record<string,string>={
+  treatedTms:'Tratado TMS',headGrade:'Ley de cabeza',concentrateGrade:'Ley concentrado',
+  tailGrade:'Ley relave',recoveryTheory:'Recuperación teórica',concentrateWet:'Concentrado húmedo',
+  humidity:'Humedad',
+};
+const fieldNames=(fields:string[])=>fields.map(f=>fieldLabels[f]||f).join(', ');
 export function PlantShiftEvidenceReconciliation(){
   const {data,error,isLoading}=useSWR<Data>('/api/produccion/planta-metalurgia/turnos-por-revisar',fetcher,{revalidateOnFocus:false});
   return <section className="rounded-lg border bg-card" aria-label="Turnos pendientes de conciliación">
@@ -36,7 +45,8 @@ export function PlantShiftEvidenceReconciliation(){
         {[
           ['Casos',data.summary.reviewCases],
           ['Duplicados',data.summary.duplicateCopies],
-          ['Conflictos',data.summary.conflictingSources],
+          ['Conflictos entre fuentes',data.summary.conflictingSources],
+          ['Lecturas OCR divergentes',data.summary.ocrDisagreements],
           ['Incompletos',data.summary.missingMeasurements+data.summary.missingIdentity],
           ['Magnitudes inusuales',data.summary.magnitudeAnomalies],
         ].map(([name,value])=><div key={name} className="bg-card px-4 py-3">
@@ -65,6 +75,9 @@ export function PlantShiftEvidenceReconciliation(){
               {r.duplicateCount>0?' ('+r.duplicateCount+' copias)':''}</td>
             <td className="px-4 py-2">
               <span>{status(r.status)}</span>
+              {r.hasFormulaError?<p className="mt-1 text-amber-700 dark:text-amber-400">
+                La planilla contiene errores de fórmula; revisar la fuente sin convertirlos a cero.
+              </p>:null}
               {r.magnitudeAnomaly?<p className="mt-1 text-amber-700 dark:text-amber-400">
                 Variación superior a tres veces la mediana de las TMS reconocidas. Verificar imagen.
               </p>:null}
@@ -74,13 +87,14 @@ export function PlantShiftEvidenceReconciliation(){
                   {r.sourceRefs.map((e,i)=><div key={e.attachmentId+'-'+e.rowIndex+'-'+i}
                     className="rounded border p-2">
                     <p>Mensaje #{e.messageId} · Fila {e.rowIndex+1}</p>
-                    <p>TMS: {e.treatedTmsRaw||'Sin dato'} · Ley: {e.headGradeRaw||'Sin dato'}</p>
+                    <p>TMS: {e.treatedTmsRaw||'Sin dato'} · Ley: {e.headGradeRaw||'Sin dato'} · Recup.: {e.recoveryRaw||'Sin dato'}</p>
                     <a href={'/api/produccion/whatsapp-evidence/'+encodeURIComponent(e.attachmentId)+'?mode=overview'}
                       target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                       Ver imagen original
                     </a>
                   </div>)}
-                  {r.conflictingFields.length>0?<p>Campos con diferencias: {r.conflictingFields.join(', ')}.</p>:null}
+                  {r.conflictingFields.length>0?<p>Fuentes distintas: {fieldNames(r.conflictingFields)}.</p>:null}
+                  {r.ocrDisagreementFields.length>0?<p>La misma foto tuvo OCR divergente: {fieldNames(r.ocrDisagreementFields)}.</p>:null}
                 </div>
               </details>
             </td>

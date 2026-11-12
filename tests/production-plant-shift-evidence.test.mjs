@@ -92,3 +92,30 @@ test('endpoint remains tenant-scoped and read-only; UI offers existing protected
   assert.match(ui,/mode=overview/);
   assert.match(ui,/noopener noreferrer/);
 });
+
+test('OCR from the same image is not treated as independent contradictory evidence',()=>{
+  const original=row('2026-10-08','B','223,476','1,42',{id:'doc1',sha:'one-photo'});
+  const repeated={...original,message_id:21,attachment_id:'doc2',source_cells:[...original.source_cells]};
+  repeated.source_cells[8]='83,84';
+  const result=reconcilePlantShiftEvidence([original,repeated]);
+  assert.equal(result.summary.conflictingSources,0);
+  assert.equal(result.summary.ocrDisagreements,1);
+  assert.equal(result.items[0].status,'ocr_disagreement');
+  assert.equal(result.items[0].approvedForCanonicalImport,false);
+});
+test('source Excel formula error stays visible and not converted to a valid percentage',()=>{
+  const source=row('2026-10-15','B','3113,237','1,66');
+  source.source_cells[8]='#DIV/0!';
+  const result=reconcilePlantShiftEvidence([source]);
+  assert.equal(result.summary.formulaErrors,1);
+  assert.equal(result.items[0].sourceRefs[0].recoveryRaw,'#DIV/0!');
+  assert.equal(result.items[0].approvedForCanonicalImport,false);
+});
+test('different independent photographs reporting same values corroborate but are not duplicate copies',()=>{
+  const first=row('2026-10-25','A','220,756','1,67',{sha:'photo1'});
+  const second=row('2026-10-25','A','220,756','1,67',{sha:'photo2',id:'other'});
+  const result=reconcilePlantShiftEvidence([first,second]);
+  assert.equal(result.summary.conflictingSources,0);
+  assert.equal(result.items[0].independentSources,2);
+  assert.equal(result.summary.duplicateCopies,0);
+});
