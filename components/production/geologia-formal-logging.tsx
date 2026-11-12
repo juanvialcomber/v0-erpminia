@@ -13,7 +13,7 @@ type Interval = {
   created_by:string;reviewer_comment:string|null;reviewed_at:string|null;
 };
 type Response={
-  available:boolean;canWrite:boolean;hole:{id:string;hole_code:string;drilled_depth_m:number|null};
+  available:boolean;canWrite:boolean;viewerId:string;hole:{id:string;hole_code:string;drilled_depth_m:number|null};
   rows:Interval[];events:Array<{event_type:string;created_at:string;actor_id:string}>;
 };
 const fetcher=async(url:string):Promise<Response>=>{
@@ -109,7 +109,8 @@ export function GeologiaFormalLogging({holeId}:{holeId:string}) {
           </div>
           {row.reviewer_comment?<p className="mt-3 text-xs text-muted-foreground">Revisión: {row.reviewer_comment}</p>:null}
           {data.canWrite&&row.status==='draft'?<div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busyId===row.id} onClick={()=>startEdit(row)}>Editar observaciones</Button><Button size="sm" disabled={busyId===row.id} onClick={()=>void transition(row.id,'submitted')}>Enviar a revisión</Button></div>:null}
-          {data.canWrite&&row.status==='submitted'?<div className="mt-3 space-y-2">
+          {data.canWrite&&row.status==='submitted'&&row.created_by===data.viewerId?<p className="mt-3 text-xs text-muted-foreground">Enviado a revisión: este registro debe ser evaluado por otro profesional autorizado.</p>:null}
+          {data.canWrite&&row.status==='submitted'&&row.created_by!==data.viewerId?<div className="mt-3 space-y-2">
             <label className="block text-xs text-muted-foreground" htmlFor={'review-'+row.id}>Comentario del revisor (obligatorio)</label>
             <textarea id={'review-'+row.id} value={reviewComments[row.id]||''} onChange={event=>setReviewComments(old=>({...old,[row.id]:event.target.value}))}
               className="min-h-20 w-full rounded-md border bg-background p-2 text-sm" maxLength={2000} placeholder="Describe la evidencia y el motivo de la decisión."/>
