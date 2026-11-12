@@ -68,6 +68,12 @@ type FinanceControl = {
     severeAgingSharePct?: number;
     topSupplierSharePct?: number;
     historicalTrendAvailable?: boolean;
+    qualityGate?: {
+      includedStatus?: string;
+      excludedOpenItems?: number;
+      excludedOpenAmountClp?: number;
+      semantics?: string;
+    };
     latestSync?: string | null;
     oldestOpenItems?: Array<{
       externalId?: string;
@@ -237,6 +243,8 @@ export function LaudusFinanceControlCard() {
   const overduePayables = Number(data?.accountsPayable?.overdueItems || 0);
   const dueSoonPayables = Number(data?.accountsPayable?.dueWithin7Days || 0);
   const openPayableAmount = Number(data?.accountsPayable?.openAmountClp || 0);
+  const excludedPayableItems = Number(data?.accountsPayable?.qualityGate?.excludedOpenItems || 0);
+  const excludedPayableAmount = Number(data?.accountsPayable?.qualityGate?.excludedOpenAmountClp || 0);
   const overduePayableAmount = Number(data?.accountsPayable?.overdueAmountClp || 0);
   const dueSoonPayableAmount = Number(data?.accountsPayable?.dueSoonAmountClp || 0);
   const agingData = data?.accountsPayable?.aging || [];
@@ -428,8 +436,13 @@ export function LaudusFinanceControlCard() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Exposición abierta</p>
             <p className="mt-3 text-4xl font-semibold tracking-tight">{isLoading ? '—' : compactMoney(openPayableAmount)}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {number(openPayables)} partidas abiertas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
+              {number(openPayables)} CxP verificadas en Laudus. {number(overdueSharePct)}% del saldo está vencido.
             </p>
+            {excludedPayableItems > 0 ? (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                {number(excludedPayableItems)} registros por {compactMoney(excludedPayableAmount)} están excluidos del total ejecutivo por calidad pendiente.
+              </p>
+            ) : null}
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs">
               <span><strong className="font-semibold text-destructive">{compactMoney(overduePayableAmount)}</strong> <span className="text-muted-foreground">vencido</span></span>
               <span><strong className="font-semibold text-foreground">{compactMoney(dueSoonPayableAmount)}</strong> <span className="text-muted-foreground">vence en 7 días</span></span>
