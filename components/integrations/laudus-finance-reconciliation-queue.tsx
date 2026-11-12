@@ -11,14 +11,17 @@ type Row = {
   id: string;
   kind: 'accounts_payable_inconsistency' | 'invoice_trace' | 'purchase_order_reconciliation' | 'cost_center_reconciliation';
   issueType: string;
+  fieldName?: string | null;
   evidenceReference: string | null;
+  resolutionNote?: string | null;
+  priority?: 'high_confidence' | 'conflict' | 'review';
 };
 
 type Payload = {
   rows: Row[];
   canDecide: boolean;
   owner: { cargo: string; area: string };
-  summary: { pending: number; accountsPayable: number; purchaseOrders: number; costCenters: number; trace: number };
+  summary: { pending: number; accountsPayable: number; purchaseOrders: number; costCenters: number; trace: number; highConfidence?: number; conflicts?: number };
 };
 
 const fetcher = async (url: string): Promise<Payload> => {
@@ -27,6 +30,18 @@ const fetcher = async (url: string): Promise<Payload> => {
   if (!response.ok) throw new Error(payload?.error || 'No fue posible cargar la conciliación financiera.');
   return payload;
 };
+
+function priorityLabel(row: Row) {
+  if (row.priority === 'high_confidence') return 'Alta confianza';
+  if (row.priority === 'conflict') return 'Conflicto';
+  return 'Revisión';
+}
+
+function priorityClass(row: Row) {
+  if (row.priority === 'high_confidence') return 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300';
+  if (row.priority === 'conflict') return 'border-destructive/30 bg-destructive/5 text-destructive';
+  return 'border-border bg-muted/20 text-muted-foreground';
+}
 
 function label(row: Row) {
   if (row.kind === 'accounts_payable_inconsistency') return 'CxP inconsistente';
@@ -106,27 +121,39 @@ export function LaudusFinanceReconciliationQueue() {
               <LaudusSourceMark state="review" />
             </div>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-              MOTIL no pudo resolver este caso de forma determinística. La decisión queda registrada y no modifica pagos, facturas, asientos ni Laudus automáticamente.
+              MOTIL prioriza primero los casos con candidato fuerte y separa los conflictos. La decisión queda registrada y no modifica pagos, facturas, asientos ni Laudus automáticamente.
             </p>
           </div>
           <div className="text-right text-xs text-muted-foreground">
             <p>Responsable: {data?.owner?.cargo || 'Gerente de Finanzas'}</p>
-            <p>{data?.summary.pending ?? 0} pendientes · {data?.summary.accountsPayable ?? 0} CxP · {data?.summary.purchaseOrders ?? 0} OC · {data?.summary.costCenters ?? 0} centros · {data?.summary.trace ?? 0} trazabilidad</p>
+            <p>{data?.summary.pending ?? 0} pendientes · {data?.summary.highConfidence ?? 0} alta confianza · {data?.summary.conflicts ?? 0} conflictos</p>
+            <p>{data?.summary.accountsPayable ?? 0} CxP · {data?.summary.purchaseOrders ?? 0} OC · {data?.summary.costCenters ?? 0} centros · {data?.summary.trace ?? 0} trazabilidad</p>
           </div>
         </div>
       </div>
 
       <div className="px-4 py-4">
         <div className="rounded-md border bg-muted/20 p-3">
-          <p className="text-xs text-muted-foreground">{label(row)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{label(row)}</p>
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${priorityClass(row)}`}>
+              {priorityLabel(row)}
+            </span>
+          </div>
           <p className="mt-1 text-sm font-medium">{row.issueType}</p>
+          {row.fieldName ? <p className="mt-1 text-xs text-muted-foreground">Campo: {row.fieldName}</p> : null}
+          {row.resolutionNote ? (
+            <p className="mt-2 rounded border bg-background/60 px-2.5 py-2 text-xs leading-5 text-foreground">
+              {row.resolutionNote}
+            </p>
+          ) : null}
           <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">{row.evidenceReference || 'Sin evidencia adicional.'}</p>
         </div>
 
         <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/20 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <p className="text-xs leading-5 text-muted-foreground">
-            Aprobar acepta esta evidencia para la conciliación. Rechazar conserva el caso como evidencia no adoptada. En ambos casos el motivo queda disponible para programar reglas futuras.
+            Aprobar acepta la revisión humana sobre esta evidencia; no asigna proveedor ni cambia el documento automáticamente. Rechazar conserva el caso como evidencia no adoptada. El motivo queda disponible para mejorar reglas futuras.
           </p>
         </div>
 
