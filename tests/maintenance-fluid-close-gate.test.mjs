@@ -24,7 +24,7 @@ test('fluid declaration is mandatory before close and becomes stale if fluid rec
   assert.match(closeRoute, /mecánico asignado debe confirmar los aceites\/fluidos/);
   assert.match(closeRoute, /currentUsageCount !== declaredUsageCount/);
   assert.match(closeQueue, /record_fluid_closure/);
-  assert.match(closeQueue, /ready_to_close: Boolean\(row\.ready_to_close\) && hasFluidClosureDeclaration/);
+  assert.match(closeQueue, /ready_to_close: Boolean\(row\.ready_to_close\) && hasValidFluidClosureDeclaration/);
 });
 
 test('mechanic must explicitly declare fluid and residue state', () => {
