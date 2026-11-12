@@ -11,6 +11,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
  * Source reports are observations, not validated geological logging.
  */
 export async function GET(request: NextRequest) {
+  if (process.env.MOTIL_GEOLOGIA_360_ENABLED !== 'true') return NextResponse.json({ error: 'Funcionalidad en validación' }, { status: 404 });
   const access = await requireModuleAccess(request, MODULE_KEYS.PROD_GEOLOGIA);
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
