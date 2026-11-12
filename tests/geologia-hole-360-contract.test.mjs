@@ -39,7 +39,7 @@ test('Interpretation boundaries and missing evidence are explicit', () => {
 
 test('Immediate tasks open the matching canonical drill hole', () => {
   assert.match(tasks, /encodeURIComponent\(task\.drill_hole_id\)/);
-  assert.match(dashboard, /searchParams\.get\('hole'\)/);
+  assert.match(dashboard, /new URLSearchParams\(window\.location\.search\)\.get\('hole'\)/);
   assert.match(dashboard, /<GeologiaHole360 holeId=\{selectedHole\.id\}\/>/);
   assert.match(dashboard, /url\.searchParams\.set\('hole',holeId\)/);
 });
