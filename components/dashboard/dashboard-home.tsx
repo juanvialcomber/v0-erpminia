@@ -214,10 +214,11 @@ function configFor(
     modeCfg.shortcuts.map((item) => ({ label: item.label, href: SHORTCUT_HREFS[item.key] ?? '/dashboard', detail: item.detail }));
 
   if (mode === 'engineering') {
+    const isProjectsRole = normalize(inbox?.profile?.cargoName) === 'jefe ingenieria y proyectos';
     return {
-      eyebrow: 'INGENIERÍA Y PLANIFICACIÓN',
-      title: 'Planificación minera',
-      description: 'Revisa el avance, las restricciones y las decisiones pendientes. Los datos sin verificar no se presentan como cumplimiento.',
+      eyebrow: isProjectsRole ? 'INGENIERÍA Y PROYECTOS' : 'INGENIERÍA Y PLANIFICACIÓN',
+      title: isProjectsRole ? 'Ingeniería y Proyectos' : 'Planificación minera',
+      description: isProjectsRole ? 'Consulta proyectos, solicitudes y dependencias entre departamentos. El inventario y las aprobaciones todavía requieren validación.' : 'Revisa el avance, las restricciones y las decisiones pendientes. Los datos sin verificar no se presentan como cumplimiento.',
       metrics: [],
       shortcuts: [
         { label: 'Ingeniería y Proyectos', href: '/dashboard/ingenieria/proyectos', detail: 'Consulta la cartera y el circuito de solicitudes pendiente de validación.' },
