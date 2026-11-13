@@ -68,7 +68,8 @@ export async function getUserModuleAccess(userId: string): Promise<UserModuleAcc
     return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
   }
 
-  const cargo = profile.cargos;
+  const cargo = Array.isArray(profile.cargos) ? profile.cargos[0] : profile.cargos;
+  if (!cargo) return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
   const map: ModuleAccessMap = {};
   for (const row of cargo.role_matrix ?? []) {
     if (row.access_level === 'ED' || row.access_level === 'LEC' || row.access_level === 'SR') {
