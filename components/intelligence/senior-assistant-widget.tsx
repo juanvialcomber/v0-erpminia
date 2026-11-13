@@ -197,13 +197,14 @@ export function SeniorAssistantWidget() {
   const { user } = useAuth();
   const skillAvailability = useMotilSkillAvailability();
   // The cookie only controls visibility; the endpoint verifies cargo and permissions on the server.
-  const engineeringCargo = String(user?.cargo || '').trim().toUpperCase() === 'JEFE ING. PLA MINA';
-  const isEngineeringContext = pathname === '/dashboard' || pathname.startsWith('/dashboard/produccion/topografia');
+  const engineeringCargo = ['JEFE ING. PLA MINA', 'JEFE INGENIERIA Y PROYECTOS'].includes(String(user?.cargo || '').trim().toUpperCase());
+  const isProjectEngineer = String(user?.cargo || '').trim().toUpperCase() === 'JEFE INGENIERIA Y PROYECTOS';
+  const isEngineeringContext = pathname === '/dashboard' || pathname.startsWith('/dashboard/produccion/topografia') || pathname.startsWith('/dashboard/ingenieria/proyectos');
   const engineeringAssistant = engineeringCargo && isEngineeringContext ? {
     endpoint: '/api/intelligence/engineering-assistant',
     loadingCopy: 'Verificando el plan, tus tareas y las brechas de fuente…',
     emptyCopy: 'Las respuestas usan evidencia vigente del cargo. No se modifican datos ni se guarda historial.',
-    placeholder: 'Consulta sobre planificación minera…',
+    placeholder: isProjectEngineer ? 'Consulta evidencia de Ingeniería…' : 'Consulta sobre planificación minera…',
     toolCopy: {},
   } : null;
   const engineeringPrompts = [
@@ -256,8 +257,8 @@ export function SeniorAssistantWidget() {
     ? specialistConfig[context.domain as SpecialistDomain]
     : null;
   const specialist = mineAssistant || engineeringAssistant || regularSpecialist;
-  const displayTitle = roleProfile?.title || (engineeringAssistant ? 'Asistente de Ingeniería Minera' : context.title);
-  const displayContext = roleProfile?.context || (engineeringAssistant ? 'Ingeniería / Topografía' : context.label);
+  const displayTitle = roleProfile?.title || (engineeringAssistant ? (isProjectEngineer ? 'Asistente de Ingeniería y Proyectos' : 'Asistente de Ingeniería Minera') : context.title);
+  const displayContext = roleProfile?.context || (engineeringAssistant ? (isProjectEngineer ? 'Ingeniería / Proyectos y fuentes mineras' : 'Ingeniería / Topografía') : context.label);
   const showsControlledMemory = !mineAssistant && !engineeringAssistant && controlledMemoryDomains.has(context.domain);
   const contextualStarters = roleProfile?.starters
     ? [...roleProfile.starters]
