@@ -95,7 +95,7 @@ function normalize(value: string | null | undefined) {
 
 function resolveMode(cargoName: string | null | undefined): HomeMode {
   const cargo = normalize(cargoName);
-  if (/jefe ing.*pla mina|jefe.*ingenier.*planific/.test(cargo)) return 'engineering';
+  if (/jefe ing.*pla mina|jefe.*ingenier.*planific|jefe ingenieria y proyectos/.test(cargo)) return 'engineering';
   if (cargo === 'jefe de planificacion') return 'maintenance';
   if (/jefe mina peumo|jefe mina don jaime/.test(cargo)) return 'mine';
   if (/todos los cargos|gerenc|director|administrador|admin|jefatura general/.test(cargo)) return 'management';
@@ -220,6 +220,7 @@ function configFor(
       description: 'Revisa el avance, las restricciones y las decisiones pendientes. Los datos sin verificar no se presentan como cumplimiento.',
       metrics: [],
       shortcuts: [
+        { label: 'Ingeniería y Proyectos', href: '/dashboard/ingenieria/proyectos', detail: 'Consulta la cartera y el circuito de solicitudes pendiente de validación.' },
         { label: 'Topografía y plan', href: '/dashboard/produccion/topografia', detail: 'Revisa vigencia del plan, objetivos y evidencia disponible.' },
         { label: 'Tareas del cargo', href: '/dashboard/acciones', detail: 'Revisa responsabilidades y escalaciones registradas.' },
       ],
