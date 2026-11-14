@@ -56,18 +56,27 @@ export interface UserModuleAccess { hasCargo: boolean; cargoId: string | null; c
 
 export async function getUserModuleAccess(userId: string): Promise<UserModuleAccess> {
   const supabase = getSupabaseServerClient();
-  const { data: profile } = await supabase.from('profiles').select('cargo_id').eq('id', userId).maybeSingle();
-  const cargoId = profile && profile.cargo_id ? profile.cargo_id : null;
-  if (!cargoId) return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
+  // One database request follows the two verified foreign keys instead of
+  // querying profiles, cargos and role_matrix separately on every module check.
+  // No cross-request cache: role revocations remain effective immediately.
+  const { data: profile, error } = await supabase.from('profiles')
+    .select('cargo_id,cargos!profiles_cargo_id_fkey(name,role_matrix!role_matrix_cargo_id_fkey(module_key,access_level))')
+    .eq('id', userId).maybeSingle();
 
-  const [{ data: rows }, { data: cargo }] = await Promise.all([
-    supabase.from('role_matrix').select('module_key, access_level').eq('cargo_id', cargoId),
-    supabase.from('cargos').select('name').eq('id', cargoId).maybeSingle(),
-  ]);
+  // Fail closed on SQL/relationship errors, never infer access from a stale cache.
+  if (error || !profile?.cargo_id || !profile.cargos) {
+    return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
+  }
 
+  const cargo = Array.isArray(profile.cargos) ? profile.cargos[0] : profile.cargos;
+  if (!cargo) return { hasCargo: false, cargoId: null, cargoName: null, access: {} };
   const map: ModuleAccessMap = {};
-  for (const row of rows ?? []) map[row.module_key as string] = row.access_level as AccessLevel;
-  return { hasCargo: true, cargoId, cargoName: cargo?.name || null, access: map };
+  for (const row of cargo.role_matrix ?? []) {
+    if (row.access_level === 'ED' || row.access_level === 'LEC' || row.access_level === 'SR') {
+      map[row.module_key as string] = row.access_level;
+    }
+  }
+  return { hasCargo: true, cargoId: profile.cargo_id, cargoName: cargo.name || null, access: map };
 }
 
 export async function getModuleAccessLevel(userId: string, role: string | null | undefined, moduleKey: ModuleKey): Promise<AccessLevel> {

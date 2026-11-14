@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { loadModuleAccess, responseClient } from './helpers/module-access.mjs';
 
 const pageUrl = new URL('../app/dashboard/admin/permissions/page.tsx', import.meta.url);
 const routeUrl = new URL('../app/api/admin/permissions/route.ts', import.meta.url);
@@ -38,7 +39,13 @@ test('role matrix source errors never render as an empty matrix', async () => {
 
 test('effective module access remains cargo role-matrix based', async () => {
   const access = await readFile(accessUrl, 'utf8');
-  assert.match(access, /from\('role_matrix'\)/);
+  const { client, calls } = responseClient({ data: { cargo_id: 'cargo-a', cargos: {
+    name: 'Reader', role_matrix: [{ module_key: 'fin_compras', access_level: 'LEC' }],
+  } }, error: null });
+  const kernel = loadModuleAccess(client);
+  assert.equal(await kernel.getModuleAccessLevel('user-a', 'worker', 'fin_compras'), 'LEC');
+  assert.equal(await kernel.getModuleAccessLevel('user-a', 'worker', 'fin_finanzas'), 'SR');
+  assert.ok(calls.every(call => call.table === 'profiles'));
   assert.match(access, /profile\.cargo_id/);
   assert.doesNotMatch(access, /from\('user_permissions'\)/);
 });
