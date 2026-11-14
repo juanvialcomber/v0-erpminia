@@ -17,8 +17,13 @@ Validation:
 
 ## Runtime gate and release restriction
 
-Fixture equivalence does not establish the real PostgREST response or production data equivalence. A read-only production comparison was blocked by automatic approval review because it involved a decrypted production service-role credential and private production tables. No database changes or deployment were performed. Do not use another route to bypass that rejection.
+After the initial automatic-review rejection, the user explicitly approved the read-only production comparison. The original audit script completed successfully against real Supabase/PostgREST data: 26 profiles, 26 assigned profiles, 23 distinct cargos, and zero differences in complete resolver results (cargo identity, name and effective grant map). This used the actual optimized resolver and independent profile/cargo/matrix reads. No data or permissions were modified. Output contained aggregate counts only.
 
-`scripts/verify-module-access-equivalence.mjs` is prepared for a separately approved read-only audit. It executes the optimized production resolver and compares its complete result against independent profile/cargo/matrix reads for every profile, requires coverage of at least two cargos, aborts on read errors or differences, and logs aggregate counts only. It performs SELECTs only, but uses privileged server credentials and therefore must be explicitly approved. The environment flag is an execution guard, not a substitute for user approval.
+GitHub Production release gate run 43586835320 also completed successfully for implementation commit `045d404abf8cbf0d81cc3c0a16d9cd3bf7896b6c`: secret checks, migrations, tests and build all passed.
 
-The optimization remains a draft candidate, not an approved production change. Retain it for release only if the runtime comparison succeeds. Otherwise restore the previous resolver or fix the discrepancy and repeat verification. Obtain the user's separate approval before merging or deploying, after presenting the actual runtime/build results and target commit SHA.
+The runtime result demonstrates equivalence for the currently observed production profiles and cargos. Denials, malformed/absent data, partial errors, transport errors, revocation and trusted admin bypasses are additionally covered by local behavior tests; production failures were not injected. This is not a browser-session QA claim.
+
+`scripts/verify-module-access-equivalence.mjs` remains an explicit read-only gate for future audits. It aborts on read errors or differences and requires at least two cargos. Its environment flag is an execution guard, not a substitute for approval to access privileged production data.
+
+The optimization can be retained on the evidence above. The PR remains in draft and has not been merged or deployed. Obtain the user's separate approval before merging or deploying, presenting the target commit and proposed operations. This documentation update changes no application code.
+
