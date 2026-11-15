@@ -4,6 +4,12 @@ CREATE OR REPLACE VIEW public.motil_whatsapp_caption_operational_reconciliation_
 WITH (security_invoker = true) AS
 SELECT c.organization_id,c.message_id,c.group_id,c.occurred_at,
        c.source_text,c.candidate_destination,c.proposed_status,
+       (c.occurred_at AT TIME ZONE 'America/Santiago')::date AS source_local_date,
+       EXISTS (SELECT 1 FROM public.motil_whatsapp_daily_reports r
+         WHERE r.organization_id=c.organization_id
+           AND r.report_date=(c.occurred_at AT TIME ZONE 'America/Santiago')::date
+       ) AS has_same_day_report,
+       'same_day_report_is_not_fact_match'::text AS report_match_limit,
        EXISTS (
          SELECT 1 FROM public.motil_whatsapp_operational_activities a
          WHERE a.organization_id=c.organization_id AND a.message_id=c.message_id
