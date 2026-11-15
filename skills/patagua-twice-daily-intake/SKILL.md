@@ -36,3 +36,12 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - La tarea `patagua-reconcile` solo verifica frescura y recupera WhatsApp: NO importa Gmail. No promoverla como solución completa.
 - Prioridad de implementación: worker autenticado de Gmail, paginación, lectura de cada mensaje, adjuntos con hash, staging y reconciliación por `gmail_message_id + attachment_index`.
 - `vercel.json` usa 11:00 y 23:00 UTC; son 08:00 y 20:00 solo durante horario de verano chileno. Corregir horario de invierno antes de habilitar SLA local permanente.
+
+## Identidad de activos: regla de matching (verificado 2026-11-15)
+- Comparar staging con `maintenance_canonical_assets_v1` (213 activos), no solamente `maintenance_assets` (7).
+- Para cada fila, usar primero patente normalizada única o nombre normalizado único; crear `candidate_asset_id` sin cambiar `review_status=needs_review` ni `official_meter_written=false`.
+- Las patentes/nombres únicos son candidatos, no autorización para actualizar lecturas oficiales.
+- No unir por nombre cuando hay dos activos homónimos: `Generador Toyama 6,5 Kva` aparece al menos dos veces en el catálogo. Los generadores QAS 500 tienen variantes numeradas, no inferir por mina.
+- Estado de reconciliación: 363 lecturas, 268 con candidato, 95 sin candidato (Raíz del Cobre 30, San Pedro 23, Don Jaime 21, Peumo 21).
+- Los 95 pendientes representan 36 etiquetas de equipo distintas, priorizar identidad por placa/serie, código centro de costo y faena; evitar fuzzy matching automático de activos de seguridad crítica.
+- La cobertura de correo no es completa hasta que los adjuntos estén almacenados y las filas importadas a staging. No declarar producción actualizada por cambios en esta skill.
