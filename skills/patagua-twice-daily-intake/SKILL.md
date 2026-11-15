@@ -42,7 +42,7 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - Para cada fila, usar primero patente normalizada única o nombre normalizado único; crear `candidate_asset_id` sin cambiar `review_status=needs_review` ni `official_meter_written=false`.
 - Las patentes/nombres únicos son candidatos, no autorización para actualizar lecturas oficiales.
 - No unir por nombre cuando hay dos activos homónimos: `Generador Toyama 6,5 Kva` aparece al menos dos veces en el catálogo. Los generadores QAS 500 tienen variantes numeradas, no inferir por mina.
-- Estado de reconciliación: 363 lecturas, 268 con candidato, 95 sin candidato (Raíz del Cobre 30, San Pedro 23, Don Jaime 21, Peumo 21).
+- Estado histórico inicial: 363 lecturas, 268 con candidato, 95 sin candidato. Estado verificado posterior: 339 con candidato y 24 sin candidato; consultar siempre conteos actuales en Supabase.
 - Los 95 pendientes representan 36 etiquetas de equipo distintas, priorizar identidad por placa/serie, código centro de costo y faena; evitar fuzzy matching automático de activos de seguridad crítica.
 - La cobertura de correo no es completa hasta que los adjuntos estén almacenados y las filas importadas a staging. No declarar producción actualizada por cambios en esta skill.
 
@@ -52,3 +52,13 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - Match candidate only after checking the exact canonical identity, same mine, unique match and source provenance. Retain `needs_review`; do not change official meter or maintenance state.
 - Recheck the same hidden identity mapping on subsequent reports. An equipment label alone is insufficient if identity conflicts across versions.
 - If hidden column is absent or conflicts, mark `identity_blocked` and request source confirmation, rather than auto-promoting.
+
+## Control de ambigüedad y protección de lecturas (2026-11-15)
+- Revisar las hojas `Reporte Diario`, `Base Equipos` e `Historial Lecturas`, comparando nombres, fechas, estado y columnas ocultas. La presencia de una línea base no valida automáticamente el horómetro actual.
+- San Pedro `Boomer S1D N°2`: horómetro defectuoso, lectura regresiva 1.944 h rechazada según nota de fuente. No asociar al Boomer S1D de Don Jaime ni al Epiroc 2019 sin serie o código inequívoco.
+- Peumo `Generador Atlas Copco QAS 500`: el archivo protege explícitamente la última MP oficial 27.780 h. No sobreescribir por el valor reportado; tampoco inferir la unidad VD (1/2/3) desde la faena.
+- Peumo `Compresor Atlas Copco G132 (1)`: línea base protegida; no modificar sin instrucción de Planificación.
+- Don Jaime `Compresor XAMS 396 E`: falta evidencia que confirme correspondencia exacta con `Compresor Portátil Atlas Copco XAMS` del catálogo; no asociar por familia.
+- En el reporte Don Jaime existe `Compresor Doosan XP825` con ubicación Don Jaime confirmada; un registro de San Pedro con el mismo modelo no debe heredarlo sin validar traslado o identidad.
+- Las etiquetas ambiguas se registran con razón específica en `review_reason`; no se crean activos duplicados ni se promueven lecturas oficiales.
+- La skill actualiza procedimiento en branch, NO ejecuta sincronización Gmail ni significa despliegue de cron. Requiere QA, release y comprobación del worker.
