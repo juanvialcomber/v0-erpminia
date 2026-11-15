@@ -21,6 +21,8 @@ WITH finding_refs AS (
 SELECT c.organization_id,c.message_id,c.candidate_destination,c.occurred_at,
        c.source_text,fr.report_date,fr.report_domain,fr.report_detail,
        fr.report_review_status,
+       CASE WHEN fr.source_message_id IS NOT NULL THEN 'already_cited_in_daily_report_pending_review'
+            ELSE 'needs_source_reconciliation' END AS next_action_state,
        CASE WHEN fr.source_message_id IS NOT NULL
             THEN 'exact_daily_finding_source_link'
             ELSE 'no_exact_daily_finding_source_link' END AS evidence_link_status,
