@@ -28,10 +28,17 @@ CREATE OR REPLACE VIEW public.motil_whatsapp_media_recovery_queue_v1
 WITH (security_invoker = true) AS
 SELECT e.organization_id,e.message_id,e.group_id,e.group_name,e.occurred_at,
        e.attachment_count,e.problematic_attachment_count,e.registry_state,
-       m.message_type,m.file_name,m.provider_message_id
+       m.message_type,m.file_name,m.provider_message_id,
+       a.download_status,a.scan_status,a.download_error_code,a.scan_error_code,
+       CASE WHEN a.download_status='stored' AND a.scan_status='manual' THEN 'manual_scan_review'
+            WHEN a.download_status='unavailable' THEN 'source_download_unavailable'
+            WHEN a.download_status='unsupported' THEN 'unsupported_source'
+            ELSE 'inspect_attachment_state' END AS recovery_route
 FROM public.motil_whatsapp_intake_exceptions_v1 e
 JOIN public.motil_whatsapp_messages m
  ON m.id=e.message_id AND m.organization_id=e.organization_id
+LEFT JOIN public.motil_whatsapp_attachments a
+ ON a.message_id=e.message_id AND a.organization_id=e.organization_id
 WHERE e.disposition='media_processing_issue';
 COMMENT ON VIEW public.motil_whatsapp_media_recovery_queue_v1 IS
 'Recovery candidates only; never mark media recovered without provider/storage verification.';
