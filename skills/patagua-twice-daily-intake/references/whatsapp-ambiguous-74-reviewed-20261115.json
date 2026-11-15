@@ -1,0 +1,748 @@
+{
+  "source": "MOTIL Supabase + WhatsApp group metadata",
+  "source_snapshot": "whatsapp-backlog-186-20261115.json",
+  "count": 74,
+  "warning": "Candidate classifications from excerpts and group. Conversation/attachment validation and canonical reconciliation pending.",
+  "records": [
+    {
+      "message_id": 173640,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 00:07:24+00",
+      "source_excerpt": "17:00 se deja en servicio bando de celdas Denver se cambio motor nuevo a celda Denver 5",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 184575,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 12:46:01+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193190,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:09+00",
+      "source_excerpt": "Las vigas del harnero",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193184,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:10+00",
+      "source_excerpt": "Nivel de aceite",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193185,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:10+00",
+      "source_excerpt": "Iman",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193188,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:10+00",
+      "source_excerpt": "Iman",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193181,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:11+00",
+      "source_excerpt": "Perno contra eje",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193183,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:11+00",
+      "source_excerpt": "Polea",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193176,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:12+00",
+      "source_excerpt": "Malla superior",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193179,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:09:12+00",
+      "source_excerpt": "Malla inferior",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 193630,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-30 22:44:24+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 202944,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-10-31 08:40:15+00",
+      "source_excerpt": "https://www.facebook.com/share/r/1F5CHZfS1U/",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 204374,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-10-31 10:28:40+00",
+      "source_excerpt": "22:15 f/s tolva llena",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 217305,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-11-01 00:10:37+00",
+      "source_excerpt": "👏🏽👏🏽👏🏽",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222807,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:50+00",
+      "source_excerpt": "se revisan imanes",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222809,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:50+00",
+      "source_excerpt": "21:05 e/s",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222810,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:50+00",
+      "source_excerpt": "01:35 f/s tolva llena",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222811,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:50+00",
+      "source_excerpt": "se revisan pernos contraeje",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222802,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:51+00",
+      "source_excerpt": "se revisan pernos contraeje",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 222805,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-01 06:10:51+00",
+      "source_excerpt": "se limpia chute harnero",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 238480,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-11-01 22:31:53+00",
+      "source_excerpt": "Que buen número 👏👏👏👏",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 239728,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-02 00:00:25+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 249642,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-02 10:07:29+00",
+      "source_excerpt": "Desde las 21:00 hasta las 02:00 se rellena tolva fina con material de stock saymon",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 260144,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-02 21:06:46+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 274111,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-03 11:17:47+00",
+      "source_excerpt": "23:50 se empieza a tirar material a cancha stock",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 274110,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-03 11:21:35+00",
+      "source_excerpt": "02:00 E/S M-8x48 \n- Se cambió buje inferior de descanso 6 , se tuvo que levantar piñón de ataque , soltar descanso 5 para retiro de buje dañado \n- Se repara protección de , para evitar derrame de lubricación hacia el molino",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 284529,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-03 21:38:05+00",
+      "source_excerpt": "- Bomba warman 6”x4” mol.8’x48”\n-cambio voluta de acero\n-cambio plato prensa\n-cambio plato succión \n-cambio impulsor acero \n-cambio juego de sello de goma\n-cambio sello expeller\n-cambio correas transmisión C-75(4)",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 298178,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 11:30:57+00",
+      "source_excerpt": "se revisan pernos contraeje ok",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 298180,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 11:30:57+00",
+      "source_excerpt": "nivel aceite ok",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 298174,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 11:30:58+00",
+      "source_excerpt": "02:00 se empieza a tirar material a cancha stock",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 298176,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 11:30:58+00",
+      "source_excerpt": "04:00 cono completo",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 307844,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 21:21:07+00",
+      "source_excerpt": "10:00 horas fuera de servicio molino 8x48 por temperaturas altas en descanso n*6",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 307845,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 21:21:07+00",
+      "source_excerpt": "11:30 horas en servicio molino 8x48",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 307843,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 21:21:08+00",
+      "source_excerpt": "Molino 8’x48”\n- reparar descanso n*6 contra eje molino , se instala laina a buje superior descanso\n- ⁠revisar aceite caja reductora ( nivel alto) , dientes lado izquierdo buen estado \n- ⁠revisar engrane piñón/corona recto 9,5mm \n- ⁠revisar engrane piñón/corona doble helicoidal 7mm",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 308580,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-04 21:54:30+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 310664,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 00:21:52+00",
+      "source_excerpt": "Trabajos realizados 04/11/2026\n- recuperativa \n- Alimentador primario \n-reparar contra eje , cambio de soportes, reparar bases de soporte, engrane corona / piñón \n- Bomba 2”x2 1/2” pozo n*1\n-desarme de bomba , retiro de cuerpo , revestimientos \n-cambio de rodamientos a cuerpo , camisa prensa estopa \n- Molino 8’x48”\n-reparar descanso n*6 , instalar laina de 1 mm a buje superior \n-revisión de nivel de aceite y inspección visual a engrane \n-revisión",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 314385,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 03:55:17+00",
+      "source_excerpt": "00:00 f/s tolva llena",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 314387,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 03:55:18+00",
+      "source_excerpt": "pernos contraeje ok",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 314389,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 03:55:18+00",
+      "source_excerpt": "se saca un polín de carga en c-5",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 322086,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 11:57:45+00",
+      "source_excerpt": "02:50 f/s M:8x48 \nFalla descanso n6.",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 323327,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-05 13:07:32+00",
+      "source_excerpt": "Buen día.Informa",
+      "classification": "ambiguous",
+      "review_status": "needs_full_source",
+      "destination": "undetermined",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 325815,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-11-05 15:45:51+00",
+      "source_excerpt": "Gracias don Iván",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 325816,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-11-05 15:47:58+00",
+      "source_excerpt": "👍🏻",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 328340,
+      "group": "Programación Despacho Concentrado CMLP",
+      "occurred_at": "2026-11-05 18:14:00+00",
+      "source_excerpt": "Ok, gracias",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 330888,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 20:38:18+00",
+      "source_excerpt": "Trabajos realizados molino 8’x48”\n- se detiene por temperatura \n- ⁠se retiran bujes de descanso N*6 superior e inferior \n- ⁠se instala juego de buje nuevo superior e inferior \n- ⁠se instala laina a tapa de descanso N*6\n- ⁠se cambia buje superior de descanso N*4 por estar deformado ( no asienta buen )\n- prueba de funcionamiento , toma temperatura nuevamente \n- ⁠se corrige alineamiento de caja descanso n*6\n- ⁠se instala laina a tapa descanso n*6\n- ",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 333192,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-05 23:04:53+00",
+      "source_excerpt": "- Reparación bomba 2”x21/2” pozo N*1\n- ⁠cambio de revestimientos de goma ( lado prensa - succión -impulsor)\n- ⁠cambio de rodamientos a cuerpo ( 3309-3310)\n- ⁠cambio de motor a bomba ( 5,5 kw -380v-1460 rpm) \n- ⁠cambio de camisa prensa estopa y empaquetadura",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 334482,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-06 00:18:06+00",
+      "source_excerpt": "Trabajos realizados 05-11-2026\n- Recuperativa \n-Molino 8’x48”\n- se detiene molino por temperatura en descanso N*6 \n- ⁠cambio de bujes superior e inferior ( nuevos) \n- ⁠alineamiento de caja descanso n*6\n- ⁠instalar laina a tapa de descanso n*6\n- ⁠cambio de buje superior a descanso n*4 por deformación \n- ⁠se prueba molino , se sube temperatura nuevamente, se instala laina a tapa \n- ⁠se rectifica buje inferior por temperatura lado piñón de ataque , ",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 346032,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-06 11:35:35+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 346803,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-06 12:09:47+00",
+      "source_excerpt": "Estimados muy buenos días, ingreso turno A con dotación completa y sin novedades",
+      "classification": "turnos",
+      "review_status": "contextual_candidate",
+      "destination": "planta/turnos",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 394818,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-08 11:01:35+00",
+      "source_excerpt": "Entrega turno B",
+      "classification": "turnos",
+      "review_status": "contextual_candidate",
+      "destination": "planta/turnos",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 401491,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-08 17:30:08+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408945,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:43:55+00",
+      "source_excerpt": "Sabemos la causa?",
+      "classification": "energia",
+      "review_status": "contextual_candidate",
+      "destination": "planta/energia",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408946,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:44:07+00",
+      "source_excerpt": "Problema nuestro o chilquinta?",
+      "classification": "energia",
+      "review_status": "contextual_candidate",
+      "destination": "planta/energia",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408947,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:45:41+00",
+      "source_excerpt": "no se sabe la causa aun",
+      "classification": "energia",
+      "review_status": "contextual_candidate",
+      "destination": "planta/energia",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408948,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:45:47+00",
+      "source_excerpt": "Causa desconocida aun",
+      "classification": "energia",
+      "review_status": "contextual_candidate",
+      "destination": "planta/energia",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408949,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:45:49+00",
+      "source_excerpt": "y el problema es proveniente desde chilquinta",
+      "classification": "energia",
+      "review_status": "contextual_candidate",
+      "destination": "planta/energia",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 408950,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-09 00:45:55+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 458521,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-11 00:25:49+00",
+      "source_excerpt": "Hola como estan",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 458783,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-11 00:40:38+00",
+      "source_excerpt": "Hola don rola, le paso algo ?",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 458784,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-11 00:45:53+00",
+      "source_excerpt": "Disculpe me equivoque de numero",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 458785,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-11 00:49:14+00",
+      "source_excerpt": "Ok",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 485207,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-12 02:04:47+00",
+      "source_excerpt": "Cuanto duro el poste del terciario?",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 485469,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-12 02:13:18+00",
+      "source_excerpt": "segun registro el poste principal n2 fue instalado el dia 21.10.2026",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 485470,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-12 02:13:28+00",
+      "source_excerpt": "daria unos 21-22 dias de duracion app",
+      "classification": "planta_mantenimiento",
+      "review_status": "contextual_candidate",
+      "destination": "mantenimiento/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 505604,
+      "group": "Grupo 2",
+      "occurred_at": "2026-11-12 21:35:27+00",
+      "source_excerpt": "Recuerden dejar las llaves del polvorín en la oficina del Fernando",
+      "classification": "seguridad",
+      "review_status": "contextual_candidate",
+      "destination": "mina/seguridad",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 518671,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 09:56:14+00",
+      "source_excerpt": "Ok 😘",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 522621,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 13:38:21+00",
+      "source_excerpt": "se revisan pernos contraeje ok",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 522623,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 13:38:21+00",
+      "source_excerpt": "se revisan y limpian imanes",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 522624,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 13:38:22+00",
+      "source_excerpt": "08:55 e/s",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 530749,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 21:27:50+00",
+      "source_excerpt": "09:10 se empieza a tirar material a cancha stock",
+      "classification": "planta_operacion",
+      "review_status": "contextual_candidate",
+      "destination": "produccion/planta",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 532587,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-13 23:20:52+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 533900,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-14 00:31:18+00",
+      "source_excerpt": "Estregas de turnos A",
+      "classification": "turnos",
+      "review_status": "contextual_candidate",
+      "destination": "planta/turnos",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 539150,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-14 05:30:21+00",
+      "source_excerpt": "👌",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    },
+    {
+      "message_id": 542805,
+      "group": "Planta Patagua",
+      "occurred_at": "2026-11-14 08:55:30+00",
+      "source_excerpt": "https://www.facebook.com/share/r/1FsDa5E1ZX/",
+      "classification": "social",
+      "review_status": "non_operational_context",
+      "destination": "no_operational_record",
+      "canonical_promotion": false
+    }
+  ]
+}
