@@ -30,3 +30,9 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - Verificar CRON_SECRET, scopes y logs sin revelar secretos.
 - Ejecutar backfill acotado hasta fecha actual; revisar y reintentar fallas.
 - Validar con QA y exact SHA antes de promover a producción.
+
+## Hallazgo de cobertura Gmail 2026-11-15
+- Consulta `from:(@lapatagua.cl) after:2026/11/06`: 38 mensajes, sin siguiente página; incluye respuestas y archivos de Don Jaime, Peumo, San Pedro, Raíz del Cobre y planificación.
+- La tarea `patagua-reconcile` solo verifica frescura y recupera WhatsApp: NO importa Gmail. No promoverla como solución completa.
+- Prioridad de implementación: worker autenticado de Gmail, paginación, lectura de cada mensaje, adjuntos con hash, staging y reconciliación por `gmail_message_id + attachment_index`.
+- `vercel.json` usa 11:00 y 23:00 UTC; son 08:00 y 20:00 solo durante horario de verano chileno. Corregir horario de invierno antes de habilitar SLA local permanente.
