@@ -45,3 +45,10 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - Estado de reconciliación: 363 lecturas, 268 con candidato, 95 sin candidato (Raíz del Cobre 30, San Pedro 23, Don Jaime 21, Peumo 21).
 - Los 95 pendientes representan 36 etiquetas de equipo distintas, priorizar identidad por placa/serie, código centro de costo y faena; evitar fuzzy matching automático de activos de seguridad crítica.
 - La cobertura de correo no es completa hasta que los adjuntos estén almacenados y las filas importadas a staging. No declarar producción actualizada por cambios en esta skill.
+
+## Hidden identity columns in operational Excel (2026-11-15 evidence)
+- Scan ALL workbook sheets and ALL columns, including columns beyond the visible operational summary (e.g. column T in `Reporte Diario`). Do not restrict extraction to the visible equipment label in column B.
+- Verified in `Reporte_Diario_Mina_Don_Jaime_Automatico  14-11-2026.xlsx`: row 7 column T `135GENERADORATLASCOPCOQAS500VD2` resolves the Don Jaime QAS 500 to canonical QAS 500 VD (2); row 38 column T `9-9 Camión Mercedes Benz Aljibe- TYYC-15` resolves Mercedes Atego to the unique canonical plate TYYC-15.
+- Match candidate only after checking the exact canonical identity, same mine, unique match and source provenance. Retain `needs_review`; do not change official meter or maintenance state.
+- Recheck the same hidden identity mapping on subsequent reports. An equipment label alone is insufficient if identity conflicts across versions.
+- If hidden column is absent or conflicts, mark `identity_blocked` and request source confirmation, rather than auto-promoting.
