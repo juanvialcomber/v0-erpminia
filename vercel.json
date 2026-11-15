@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/whatsapp-daily",
-      "schedule": "30 9 * * *"
+      "schedule": "30 9,21 * * *"
     },
     {
       "path": "/api/cron/messages-push",
