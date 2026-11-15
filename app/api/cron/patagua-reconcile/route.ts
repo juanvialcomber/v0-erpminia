@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   const latestEmail = email.data?.[0]?.email_sent_at || null;
   const latestWhatsapp = whatsapp.data?.[0]?.occurred_at || null;
   const now = Date.now();
-  const ageHours = (date: string | null) => date ? Math.round((now - Date.parse(date)) / 360000) / 10 : null;
+  const ageHours = (date: string | null) => date ? Math.round((now - Date.parse(date)) / 3600000 * 10) / 10 : null;
   const emailLagHours = ageHours(latestEmail);
   const whatsappLagHours = ageHours(latestWhatsapp);
   const staleEmail = emailLagHours === null || emailLagHours > 36;
