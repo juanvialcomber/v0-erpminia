@@ -12,6 +12,16 @@ export async function GET(request: NextRequest) {
   if (!secret || secret.length < 24 || request.headers.get('authorization') !== 'Bearer ' + secret)
     return NextResponse.json({ error: 'No autorizado' }, { status: 401, headers: GREEN_NO_STORE });
 
+  // Four UTC candidates cover Chilean winter/summer time without extra recovery runs.
+  // A 00:00 UTC candidate is the previous Chilean calendar day at 20:00.
+  const chileHour = Number(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Santiago', hour: '2-digit', hourCycle: 'h23',
+  }).format(new Date()));
+  if (chileHour !== 8 && chileHour !== 20) {
+    return NextResponse.json({ ok: true, skipped: true, reason: 'outside_chile_window' },
+      { headers: GREEN_NO_STORE });
+  }
+
   const db = greenDb();
   const [email, whatsapp, attachments] = await Promise.all([
     db.from('motil_email_source_manifest').select('email_sent_at,ingest_state,download_state')
