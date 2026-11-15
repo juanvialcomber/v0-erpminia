@@ -1,21 +1,16 @@
--- Read-only review queue; no model invocation or production-state writes.
--- Preserve source identity and media hashes for deterministic deduplication.
+-- Evidence-only attachment view. Do not OCR, transcribe or scan photos/videos.
+-- Preserve message text/caption as the primary operational interpretation.
 CREATE OR REPLACE VIEW public.motil_whatsapp_media_review_priorities_v1
 WITH (security_invoker = true) AS
 SELECT a.organization_id,a.id AS attachment_id,a.message_id,a.group_id,
        a.provider_message_id,a.mime_type,a.sha256,a.storage_path,
        a.scan_status,a.scan_error_code,a.downloaded_at,m.occurred_at,
-       CASE
-         WHEN a.mime_type='image/jpeg' THEN 'photo_document_review'
-         WHEN a.mime_type='video/mp4' THEN 'video_context_only'
-         ELSE 'unsupported_or_other'
-       END AS review_route,
-       CASE
-         WHEN a.mime_type='image/jpeg' THEN 1
-         WHEN a.mime_type='video/mp4' THEN 2
-         ELSE 3
-       END AS review_priority,
-       'pending_human_or_vision_review'::text AS review_state,
+       m.body AS associated_message_text,m.quoted_message_id,
+       CASE WHEN NULLIF(BTRIM(m.body),'') IS NOT NULL
+            THEN 'text_with_media_evidence'
+            ELSE 'media_evidence_only' END AS review_route,
+       2 AS review_priority,
+       'evidence_archived'::text AS review_state,
        false AS canonical_promotion
 FROM public.motil_whatsapp_attachments a
 JOIN public.motil_whatsapp_messages m
@@ -28,4 +23,4 @@ WHERE a.download_status='stored'
       AND e.disposition='media_processing_issue'
   );
 COMMENT ON VIEW public.motil_whatsapp_media_review_priorities_v1 IS
-'Prioritized evidence-only review; no automatic OCR, OT creation or canonical promotion.';
+'Stored photos/videos are evidence, not OCR tasks; keep original associated WhatsApp text and source identity.';
