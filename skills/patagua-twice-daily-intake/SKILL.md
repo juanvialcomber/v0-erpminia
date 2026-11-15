@@ -62,3 +62,13 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - En el reporte Don Jaime existe `Compresor Doosan XP825` con ubicación Don Jaime confirmada; un registro de San Pedro con el mismo modelo no debe heredarlo sin validar traslado o identidad.
 - Las etiquetas ambiguas se registran con razón específica en `review_reason`; no se crean activos duplicados ni se promueven lecturas oficiales.
 - La skill actualiza procedimiento en branch, NO ejecuta sincronización Gmail ni significa despliegue de cron. Requiere QA, release y comprobación del worker.
+
+## Gate de conciliación WhatsApp → avisos de OT (2026-11-15)
+- Auditar cobertura por **identidad de mensaje**, no por filas de actualización: ver `motil_whatsapp_ingestion_reconciliation_v1` (migración propuesta `20261115230000`). Cada mensaje tiene un solo estado principal; conservar `has_exception` independiente, pues hay registros simultáneamente operacionales y con excepción.
+- Línea base verificada en producción: 1.907 mensajes, 103 mensajes representados en 155 actualizaciones, 231 excepciones; 218 de tipo `media_processing_issue`; 6 registros de excepción se superponen con mensajes representados. Estas cifras son una fotografía, **no** cobertura completa ni diagnóstico de pérdida.
+- La cola `motil_whatsapp_media_recovery_queue_v1` es de recuperación candidata. Reintentar sólo tras verificar IDs del proveedor, almacenamiento y hash; no marcar recuperación por la sola presencia de un registro.
+- Usar `motil_whatsapp_maintenance_notice_candidates_v1` para avisos **no canónicos**, sin crear OT ni cambiar KPIs. Los tres casos iniciales son molino 8x48 (04/11 y 05/11) y corte eléctrico de Planta (08/11). No deducir que molino 8x48 equivale a `MOL-001 Molino SAG 01`.
+- Antes de proponer OT, buscar por texto, activo canónico, ventana temporal, eventos, evidencias y OT abiertas/cerradas. En lectura verificada: 73 OT, 1.154 eventos OT y 250 archivos de evidencia, **cero** coincidencias textuales para molino/descanso/Chilquinta/corte eléctrico. No significa que no existan trabajos, sólo que no hay vínculo verificable.
+- Conservar la distinción `aviso → decisión del planificador → OT vinculada o registro sin OT`. No asignar responsables, prioridad, duración, causa raíz ni aprobación desde WhatsApp.
+- Verificar migraciones propuestas con SQL, RLS de tenant, permisos, pruebas de idempotencia y QA preview exact-SHA antes de desplegar. La existencia de una vista en GitHub no demuestra que funcione en producción.
+- Reconciliar clasificaciones 72/74 de mensajes ambiguos: las 74 entradas provienen de extractos de 450 caracteres, mientras la consulta SQL usó texto completo. Leer cuerpo íntegro, conversación y adjuntos antes de promoción.
