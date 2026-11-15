@@ -72,3 +72,11 @@ description: Conciliar y recuperar automáticamente dos veces al día la evidenc
 - Conservar la distinción `aviso → decisión del planificador → OT vinculada o registro sin OT`. No asignar responsables, prioridad, duración, causa raíz ni aprobación desde WhatsApp.
 - Verificar migraciones propuestas con SQL, RLS de tenant, permisos, pruebas de idempotencia y QA preview exact-SHA antes de desplegar. La existencia de una vista en GitHub no demuestra que funcione en producción.
 - Reconciliar clasificaciones 72/74 de mensajes ambiguos: las 74 entradas provienen de extractos de 450 caracteres, mientras la consulta SQL usó texto completo. Leer cuerpo íntegro, conversación y adjuntos antes de promoción.
+
+## Política de multimedia como evidencia (instrucción operativa 2026-11-15)
+- NO procesar ni aplicar OCR/visión a fotografías WhatsApp por defecto. Guardarlas como evidencia original (hash, storage path, fecha, grupo, remitente y message ID).
+- Interpretar primero el `body` del **mismo mensaje**; preservar texto/caption y `quoted_message_id` si existe. No tratar una fotografía con texto asociado como mensaje sin información.
+- Cuando no haya texto, dejar `media_evidence_only`, sin inventar contenido, sin generar tareas de escaneo y sin bloquear el resto de la ingesta.
+- Videos también son evidencia por defecto. Procesarlos sólo con solicitud y justificación específica.
+- La vista propuesta `motil_whatsapp_media_review_priorities_v1` debe reflejar `text_with_media_evidence` o `media_evidence_only`; nunca forzar OCR.
+- Evidencia de lectura: entre 112 JPEG almacenados con `scan_status=manual`, 37 tienen `body` no vacío; este universo no equivale necesariamente a los 102 JPEG de la cola de excepciones.
