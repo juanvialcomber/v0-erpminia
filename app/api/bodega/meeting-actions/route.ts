@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, true);
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
   if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
 
   if (!definition || !isActionKey(actionKey)) return NextResponse.json({ error: 'Acción de Bodega inválida.' }, { status: 400 });
   if (!['pending','in_progress','ready_for_validation','completed','blocked'].includes(status)) return NextResponse.json({ error: 'Estado inválido.' }, { status: 400 });
+  if (status === 'completed' && !access.canWrite) return NextResponse.json({ error: 'Puedes guardar avances y enviarlos a validación; el cierre final requiere permiso de edición de Bodega.' }, { status: 403 });
   if (!payload || typeof payload !== 'object' || Array.isArray(payload) || JSON.stringify(payload).length > 50000) {
     return NextResponse.json({ error: 'Completa los datos de la acción antes de guardar.' }, { status: 400 });
   }
