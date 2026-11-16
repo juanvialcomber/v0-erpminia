@@ -35,9 +35,10 @@ type Payload = {
     comparedProducts: number;
     alignedProducts: number;
     quantityMismatches: number;
-    freshMismatches1d: number;
-    staleMismatches7d: number;
-    staleMismatches30d: number;
+    freshnessAvailable: boolean;
+    freshMismatches1d: number | null;
+    staleMismatches7d: number | null;
+    staleMismatches30d: number | null;
     missingInMotilNonzero: number;
     laudusOnlyZero: number;
     negativeProducts: number;
@@ -53,12 +54,14 @@ type Payload = {
       relativeDeltaPct: number | null;
       domain: string;
     }>;
+    negativePositionsCount: number | null;
+    negativePositionsPartial: boolean;
     negativePositions: Array<{
       productId: string;
       sku: string;
       description: string;
       unit: string;
-      totalStock: number;
+      totalStock: number | null;
       warehouseCode: string;
       warehouseName: string;
       warehouseStock: number;
@@ -108,6 +111,7 @@ const fetcher = async (url: string): Promise<Payload> => {
 
 const pct = (value: number) => `${value.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%`;
 const count = (value: number) => value.toLocaleString('es-CL');
+const knownCount = (value: number | null) => value == null ? 'N/D' : count(value);
 const dateTime = (value: string | null) => value
   ? new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Santiago' }).format(new Date(value))
   : 'Sin sincronización';
@@ -232,7 +236,7 @@ export function LaudusInventoryReadinessCard() {
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : count(data.laudus.quantityMismatches)}</p>
           <p className="mt-1 text-xs text-muted-foreground">Saldos distintos entre MOTIL y Laudus</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.freshMismatches1d)} frescas · ${count(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua · ${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL`}
+            {isLoading || !data ? '—' : `${knownCount(data.laudus.freshMismatches1d)} frescas · ${knownCount(data.laudus.staleMismatches30d)} con evidencia MOTIL >30 días más antigua · ${count(data.laudus.missingInMotilNonzero)} SKU con saldo Laudus sin existencia MOTIL`}
           </p>
         </div>
         <div className="bg-card p-4">
@@ -259,7 +263,7 @@ export function LaudusInventoryReadinessCard() {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <div>
               <p className="text-sm font-medium">
-                {count(data.laudus.negativeProducts)} SKU Laudus con saldo negativo en {count(data.laudus.negativeWarehouses)} bodega{data.laudus.negativeWarehouses === 1 ? '' : 's'}
+                {count(data.laudus.negativePositionsCount ?? data.laudus.negativePositions.length)} posiciones negativas en {count(data.laudus.negativeWarehouses)} bodega{data.laudus.negativeWarehouses === 1 ? '' : 's'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 La excepción se localiza por bodega. MOTIL no corrige el saldo: primero se revisan movimientos, recepciones, consumos o conteos en Laudus.
@@ -284,7 +288,7 @@ export function LaudusInventoryReadinessCard() {
                   )}
                   {kardexMessage[row.sku] ? <span className="mt-0.5 block text-[11px] text-muted-foreground">{kardexMessage[row.sku]}</span> : null}
                 </div>
-                <span className="text-muted-foreground">{row.warehouseName}</span>
+                <span className="text-muted-foreground">{row.warehouseName} ({row.warehouseCode})</span>
                 <span className="font-semibold tabular-nums text-amber-700 dark:text-amber-400">
                   {count(row.warehouseStock)} {row.unit}
                 </span>
@@ -361,7 +365,7 @@ export function LaudusInventoryReadinessCard() {
             <p className="mt-1 text-xs text-muted-foreground">
               {isLoading || !data
                 ? 'Verificando conciliación.'
-                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${count(data.laudus.freshMismatches1d)} diferencias frescas · ${count(data.laudus.staleMismatches30d)} diferencias con evidencia MOTIL >30 días más antigua.`}
+                : `${count(data.laudus.alignedProducts)} SKU coinciden · ${knownCount(data.laudus.freshMismatches1d)} diferencias frescas · ${knownCount(data.laudus.staleMismatches30d)} diferencias con evidencia MOTIL >30 días más antigua.`}
             </p>
           </div>
         </div>
@@ -369,6 +373,49 @@ export function LaudusInventoryReadinessCard() {
           {data?.authority.laudusIsPrimary ? 'Laudus primario · validación cruzada activa' : 'Conciliación activa · sin overwrite automático'}
         </p>
       </div>
+    </section>
+  );
+}
+
+
+/** Only warehouse-local Laudus balances, never a substitute for a physical count. */
+export function LaudusNegativeStockQueue() {
+  const { data, error, isLoading } = useSWR<Payload>(
+    '/api/integrations/laudus/inventory-readiness',
+    fetcher,
+    { revalidateOnFocus: false, refreshInterval: 900000 },
+  );
+  const positions = data?.laudus.negativePositions || [];
+  return (
+    <section aria-label="Saldos negativos Laudus por bodega" className="overflow-hidden rounded-lg border bg-card">
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground" /><h2 className="text-sm font-semibold">Negativos por bodega · Laudus</h2></div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">Los negativos locales se muestran aunque el total del producto sea positivo en otras bodegas. Se excluyen servicios que no representan inventario físico.</p>
+      </div>
+      {isLoading ? <p className="p-4 text-sm text-muted-foreground">Consultando Laudus…</p> : null}
+      {error ? <p role="alert" className="p-4 text-sm text-destructive">No se pudo verificar el saldo local Laudus. No se sustituye con stock histórico.</p> : null}
+      {!isLoading && !error && data ? (
+        <>
+          <p className="border-b px-4 py-2 text-xs text-muted-foreground">{count(data.laudus.negativePositionsCount ?? positions.length)} posiciones · {count(data.laudus.negativeWarehouses)} bodegas</p>
+          {positions.length === 0 ? <p className="p-4 text-sm text-muted-foreground">Sin posiciones negativas verificadas en esta consulta.</p> : null}
+          <div className="divide-y">
+            {positions.map((row) => (
+              <div key={row.productId + ':' + row.warehouseCode} className="grid gap-2 px-4 py-3 text-sm sm:grid-cols-[120px_1fr_155px_140px]">
+                <p className="font-mono text-xs">{row.sku || row.productId}</p>
+                <div>
+                  <p className="font-medium">{row.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{row.warehouseName} · código {row.warehouseCode}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Corte: {dateTime(row.sourceDate)} · sincronizado: {dateTime(row.syncedAt)}</p>
+                </div>
+                <div><p className="text-xs text-muted-foreground">Saldo bodega</p><p className="font-semibold tabular-nums text-destructive">{count(row.warehouseStock)} {row.unit}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total producto</p><p className="tabular-nums">{row.totalStock == null ? 'N/D' : count(row.totalStock) + ' ' + row.unit}</p></div>
+              </div>
+            ))}
+          </div>
+          {data.laudus.negativePositionsPartial ? <p className="border-t px-4 py-2 text-xs text-amber-700 dark:text-amber-400">Listado parcial: faltan posiciones por revisar.</p> : null}
+          <p className="border-t px-4 py-3 text-xs text-muted-foreground">Estos saldos son evidencia para revisión. MOTIL no corrige cantidades automáticamente.</p>
+        </>
+      ) : null}
     </section>
   );
 }
