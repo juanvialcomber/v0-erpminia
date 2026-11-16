@@ -34,8 +34,8 @@ const blankReport = () => ({ name: '', content: '', frequency: '', recipients: '
 const blankTask = () => ({ person: '', task: '', frequency: '' });
 const blankStockItem = () => ({ product_code: '', product_name: '', unit: '', proposed_minimum: '', confirmed_by_esteban: false, confirmed_by_ariel: false });
 
-function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusChange, onSave, saving, canEdit, children }: {
-  record: ActionRecord; status: ActionStatus; evidenceValue: string; onEvidenceChange: (value: string) => void; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; children: ReactNode;
+function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusChange, onSave, saving, canEdit, canComplete, children }: {
+  record: ActionRecord; status: ActionStatus; evidenceValue: string; onEvidenceChange: (value: string) => void; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; canComplete: boolean; children: ReactNode;
 }) {
   return (
     <section id={record.action_key} className="scroll-mt-24 rounded-lg border bg-card" aria-labelledby={record.action_key + '-title'}>
@@ -43,7 +43,7 @@ function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusC
         <div><div className="flex flex-wrap items-center gap-2"><h2 id={record.action_key + '-title'} className="font-semibold">{record.title}</h2><Badge variant={variants[status]}>{labels[status]}</Badge></div><p className="mt-1 text-xs text-muted-foreground">Responsable: {record.owner}</p></div>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">Estado
           <select value={status} disabled={!canEdit || saving} onChange={(event) => onStatusChange(event.target.value as ActionStatus)} className="h-9 rounded-md border bg-background px-2 text-foreground">
-            {statusOptions.map((option) => <option key={option} value={option}>{labels[option]}</option>)}
+            {statusOptions.map((option) => <option key={option} value={option} disabled={option === 'completed' && !canComplete}>{labels[option]}</option>)}
           </select>
         </label>
       </div>
@@ -58,8 +58,9 @@ function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusC
 }
 
 export default function BodegaAcuerdosPage() {
-  const { canEdit, ready } = useModuleAccess();
-  const editable = ready && canEdit('bodega_inventario');
+  const { canEdit, canView, ready } = useModuleAccess();
+  const editable = ready && canView('bodega_inventario');
+  const canClose = ready && canEdit('bodega_inventario');
   const { data, error, isLoading, mutate } = useSWR('/api/bodega/meeting-actions', fetcher, { revalidateOnFocus: false });
   const [drafts, setDrafts] = useState<Record<string, any>>({});
   const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
@@ -149,7 +150,7 @@ export default function BodegaAcuerdosPage() {
 
       {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : null}
 
-      {records.get('reports') ? <ActionCard record={records.get('reports')!} status={statuses.reports || 'pending'} evidenceValue={evidence.reports || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, reports: value }))} onStatusChange={(value) => setStatus('reports', value)} onSave={() => void saveAction('reports')} saving={saving === 'reports'} canEdit={editable}>
+      {records.get('reports') ? <ActionCard record={records.get('reports')!} status={statuses.reports || 'pending'} evidenceValue={evidence.reports || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, reports: value }))} onStatusChange={(value) => setStatus('reports', value)} onSave={() => void saveAction('reports')} saving={saving === 'reports'} canEdit={editable} canComplete={canClose}>
         <div className="space-y-3">
           <p className="text-sm font-medium">¿Qué reporte necesita Bodega? Agrega uno por fila.</p>
           {(reportDraft.reports || []).map((row, index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
@@ -162,7 +163,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('information_flow') ? <ActionCard record={records.get('information_flow')!} status={statuses.information_flow || 'pending'} evidenceValue={evidence.information_flow || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, information_flow: value }))} onStatusChange={(value) => setStatus('information_flow', value)} onSave={() => void saveAction('information_flow')} saving={saving === 'information_flow'} canEdit={editable}>
+      {records.get('information_flow') ? <ActionCard record={records.get('information_flow')!} status={statuses.information_flow || 'pending'} evidenceValue={evidence.information_flow || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, information_flow: value }))} onStatusChange={(value) => setStatus('information_flow', value)} onSave={() => void saveAction('information_flow')} saving={saving === 'information_flow'} canEdit={editable} canComplete={canClose}>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1"><Label>Origen de la información</Label><Input value={flowDraft.source || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{source:e.target.value})} placeholder="Correo, Laudus, vale, WhatsApp…" /></div>
           <div className="space-y-1"><Label>Quién la recibe</Label><Input value={flowDraft.receiver || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{receiver:e.target.value})} placeholder="Persona o área" /></div>
@@ -172,7 +173,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('worker_tasks') ? <ActionCard record={records.get('worker_tasks')!} status={statuses.worker_tasks || 'pending'} evidenceValue={evidence.worker_tasks || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, worker_tasks: value }))} onStatusChange={(value) => setStatus('worker_tasks', value)} onSave={() => void saveAction('worker_tasks')} saving={saving === 'worker_tasks'} canEdit={editable}>
+      {records.get('worker_tasks') ? <ActionCard record={records.get('worker_tasks')!} status={statuses.worker_tasks || 'pending'} evidenceValue={evidence.worker_tasks || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, worker_tasks: value }))} onStatusChange={(value) => setStatus('worker_tasks', value)} onSave={() => void saveAction('worker_tasks')} saving={saving === 'worker_tasks'} canEdit={editable} canComplete={canClose}>
         <div className="space-y-3">
           <p className="text-sm font-medium">Una fila por persona y tarea habitual.</p>
           {(taskDraft.tasks || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_2fr_1fr_auto]">
@@ -185,7 +186,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} evidenceValue={evidence.critical_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, critical_stock: value }))} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable}>
+      {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} evidenceValue={evidence.critical_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, critical_stock: value }))} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable} canComplete={canClose}>
         <div className="space-y-3">
           <div><p className="text-sm font-medium">Registra el mínimo acordado para cada código y unidad.</p><p className="mt-1 text-xs text-muted-foreground">Los valores quedan como propuesta hasta que Esteban y Ariel confirmen. No alimentan alertas ni órdenes de compra todavía.</p></div>
           {(stockDraft.items || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_2fr_120px_130px_150px_150px_auto]">
@@ -201,7 +202,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('central_stock') ? <ActionCard record={records.get('central_stock')!} status={statuses.central_stock || 'pending'} evidenceValue={evidence.central_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, central_stock: value }))} onStatusChange={(value) => setStatus('central_stock', value)} onSave={() => void saveAction('central_stock')} saving={saving === 'central_stock'} canEdit={editable}>
+      {records.get('central_stock') ? <ActionCard record={records.get('central_stock')!} status={statuses.central_stock || 'pending'} evidenceValue={evidence.central_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, central_stock: value }))} onStatusChange={(value) => setStatus('central_stock', value)} onSave={() => void saveAction('central_stock')} saving={saving === 'central_stock'} canEdit={editable} canComplete={canClose}>
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Primero concilia el corte central completo</p><p className="mt-1 text-xs text-muted-foreground">La cola Laudus muestra cobertura, diferencias y casos que necesitan decisión de jefatura.</p></div><Button asChild variant="outline" size="sm"><Link href="/dashboard/bodega">Abrir conciliación <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -215,7 +216,8 @@ export default function BodegaAcuerdosPage() {
       </ActionCard> : null}
 
       {!isLoading && !data?.actions?.length ? <div className="rounded-lg border p-6 text-sm text-muted-foreground">No se cargaron acciones de Bodega.</div> : null}
-      {!editable ? <p className="text-xs text-muted-foreground">Tu perfil puede consultar estas acciones; edición requiere permiso de inventario de Bodega.</p> : null}
+      {!editable ? <p className="text-xs text-muted-foreground">Tu perfil puede consultar estas acciones; para guardar avances se requiere acceso de lectura a Bodega.</p> : null}
+      {editable && !canClose ? <p className="text-xs text-muted-foreground">Puedes registrar avances y enviarlos a validación. El cierre final requiere permiso de edición de Bodega.</p> : null}
     </div>
   );
 }
