@@ -15,7 +15,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
-import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
+import { LaudusInventoryReadinessCard, LaudusNegativeStockQueue } from '@/components/integrations/laudus-inventory-readiness-card';
 import { LaudusInventoryReconciliationQueue } from '@/components/integrations/laudus-inventory-reconciliation-queue';
 import { ProcurementReceiptInbox } from '@/components/procurement/procurement-receipt-inbox';
 
@@ -107,7 +107,7 @@ export default function BodegaPage() {
       ]}
     /> : null}
 
-    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
+    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : <LaudusNegativeStockQueue />}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
 
@@ -151,7 +151,7 @@ export default function BodegaPage() {
     </section> : null}
 
     <section className="space-y-4">
-      <div className="flex flex-col gap-1"><h2 className="text-lg font-semibold">Existencias</h2><p className="text-sm text-muted-foreground">Busca por producto o código y abre la posición para revisar su evidencia.</p></div>
+      <div className="flex flex-col gap-1"><h2 className="text-lg font-semibold">{negativeStockMode ? "Totales por producto" : "Existencias"}</h2><p className="text-sm text-muted-foreground">{negativeStockMode ? "Referencia global: el total por producto no reemplaza el saldo local por bodega indicado arriba." : "Busca por producto o código y abre la posición para revisar su evidencia."}</p></div>
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center"><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar código o producto" /></div><Select value={status} onValueChange={setStatus}><SelectTrigger className="w-full lg:w-52"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Todos los estados</SelectItem><SelectItem value="healthy">Disponible</SelectItem><SelectItem value="reorder">Reponer</SelectItem><SelectItem value="out_of_stock">Sin stock</SelectItem><SelectItem value="negative">Revisar saldo</SelectItem><SelectItem value="expired">Vencido</SelectItem><SelectItem value="expiring">Próximo a vencer</SelectItem></SelectContent></Select></div>
 
       {isLoading ? <StatePanel tone="loading" title="Cargando inventario" description="Consultando las existencias registradas." /> : !error && positions.length === 0 ? <StatePanel tone="neutral" title={negativeStockMode ? 'No quedan saldos negativos' : 'No hay productos para mostrar'} description={negativeStockMode ? 'La cola Data Health está vacía para este filtro.' : 'Prueba con otros filtros o revisa si las existencias ya fueron importadas.'} /> : null}

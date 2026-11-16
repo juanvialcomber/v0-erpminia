@@ -149,9 +149,10 @@ export async function loadLaudusInventoryReadiness(
       .maybeSingle(),
     db
       .from('laudus_negative_stock_positions_service_v1')
-      .select('product_external_id,sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at')
+      .select('product_external_id,sku,description,unit_of_measure,total_laudus_stock,warehouse_external_id,warehouse_name,warehouse_stock,source_date_to,synced_at', { count: 'exact' })
       .eq('organization_id', organizationId)
-      .order('warehouse_stock', { ascending: true }),
+      .order('warehouse_stock', { ascending: true })
+      .limit(200),
     db
       .from('laudus_inventory_reconciliation_service_v1')
       .select('product_external_id,sku,description,unit_of_measure,laudus_stock,motil_stock,quantity_delta')
@@ -170,14 +171,18 @@ export async function loadLaudusInventoryReadiness(
   if (latestSnapshot.error) throw new Error(latestSnapshot.error.message);
   if (readinessResult.error) throw new Error(readinessResult.error.message);
   if (reconciliationSummaryResult.error) throw new Error(reconciliationSummaryResult.error.message);
-  if (freshnessSummaryResult.error) throw new Error(freshnessSummaryResult.error.message);
+  // Missing historical view degrades only freshness metrics, not stock truth.
+  const missingFreshnessView = Boolean(freshnessSummaryResult.error
+    && /laudus_inventory_freshness_summary_service_v1/i.test(freshnessSummaryResult.error.message)
+    && /schema cache|does not exist|PGRST205/i.test(freshnessSummaryResult.error.message));
+  if (freshnessSummaryResult.error && !missingFreshnessView) throw new Error(freshnessSummaryResult.error.message);
   if (negativePositionsResult.error) throw new Error(negativePositionsResult.error.message);
   if (consumableMismatchesResult.error) throw new Error(consumableMismatchesResult.error.message);
   if (authorityResult.error) throw new Error(authorityResult.error.message);
 
   const readiness = (readinessResult.data || null) as LaudusReadinessRow | null;
   const reconciliationSummary = (reconciliationSummaryResult.data || null) as LaudusReconciliationSummaryRow | null;
-  const freshnessSummary = (freshnessSummaryResult.data || null) as LaudusFreshnessSummaryRow | null;
+  const freshnessSummary = missingFreshnessView ? null : (freshnessSummaryResult.data || null) as LaudusFreshnessSummaryRow | null;
   const negativeRaw = (negativePositionsResult.data || []) as LaudusNegativePositionRow[];
   const negativeProductIds = [...new Set(negativeRaw.map((row) => String(row.product_external_id || '')).filter(Boolean))];
   const { data: kardexRows, error: kardexError } = negativeProductIds.length
@@ -203,7 +208,7 @@ export async function loadLaudusInventoryReadiness(
       sku: String(row.sku || ''),
       description: String(row.description || row.sku || ''),
       unit: String(row.unit_of_measure || ''),
-      totalStock: n(row.total_laudus_stock),
+      totalStock: row.total_laudus_stock == null ? null : n(row.total_laudus_stock),
       warehouseCode: String(row.warehouse_external_id || ''),
       warehouseName: String(row.warehouse_name || row.warehouse_external_id || 'Bodega sin nombre'),
       warehouseStock: n(row.warehouse_stock),
@@ -315,13 +320,16 @@ export async function loadLaudusInventoryReadiness(
       comparedProducts: n(reconciliationSummary?.compared_products),
       alignedProducts: n(reconciliationSummary?.aligned_products),
       quantityMismatches,
-      freshMismatches1d: n(freshnessSummary?.fresh_mismatches_1d),
-      staleMismatches7d: n(freshnessSummary?.stale_mismatches_7d),
-      staleMismatches30d: n(freshnessSummary?.stale_mismatches_30d),
+      freshnessAvailable: freshnessSummary !== null,
+      freshMismatches1d: freshnessSummary?.fresh_mismatches_1d == null ? null : n(freshnessSummary.fresh_mismatches_1d),
+      staleMismatches7d: freshnessSummary?.stale_mismatches_7d == null ? null : n(freshnessSummary.stale_mismatches_7d),
+      staleMismatches30d: freshnessSummary?.stale_mismatches_30d == null ? null : n(freshnessSummary.stale_mismatches_30d),
       missingInMotilNonzero,
       laudusOnlyZero: n(reconciliationSummary?.laudus_only_zero),
       negativeProducts: laudusNegativeProducts,
       negativePositions,
+      negativePositionsCount: negativePositionsResult.count ?? null,
+      negativePositionsPartial: negativePositionsResult.count != null && negativePositionsResult.count > negativePositions.length,
       negativeWarehouses: new Set(negativePositions.map((row) => row.warehouseCode).filter(Boolean)).size,
       criticalConsumables,
     },
