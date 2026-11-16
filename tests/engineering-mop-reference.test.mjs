@@ -13,6 +13,7 @@ test('Manual queries target MOP content, not generic project/operational request
   assert.equal(isMopQuestion('Necesito revisar la partida 107-1a'),true);
   assert.equal(isMopQuestion('¿Qué dice la sección 2.308?'),true);
   assert.equal(isMopQuestion('¿Qué ingresos reportó la mina hoy?'),false);
+  assert.equal(isMopQuestion('¿Cuál es el presupuesto vigente de nuestros proyectos?'),false);
 });
 
 test('Manual retrieval prefers exact numerals and never includes person or product names',()=>{
@@ -70,5 +71,6 @@ test('Schema is private and importer is fail-closed by default',async()=>{
   assert.match(api,/No encontré un apartado verificable/);
   assert.match(api,/manualReferences: manual.references/);
   assert.match(api,/manualPartidas: manual.partidas/);
+  assert.match(api,/operationalEvidenceAvailable: Boolean\(evidence\)/);
   assert.match(api,/No autorices tareas/);
 });
