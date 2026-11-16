@@ -63,6 +63,10 @@ test('classification must be manual by engineering lead, before signatures',()=>
     isEngineeringLead:true,classifiedAt:'2026-11-16T15:00:00Z',
   });
   assert.equal(tagged.changesApprovedProgram,true);
+  assert.throws(()=>policy.classifyEngineeringRequest(tagged,{
+    priority:'normal',actorId:'cristian',actorOrganizationId:'la-patagua',
+    isEngineeringLead:true,classifiedAt:'2026-11-16T15:02:00Z',
+  }),/revisión auditada/);
   assert.deepEqual(policy.requiredEngineeringApprovals(tagged),['supervision','gerencia']);
   assert.throws(()=>policy.classifyEngineeringRequest({...tagged,approvals:[signature('supervision')]},{
     priority:'normal',actorId:'cristian',actorOrganizationId:'la-patagua',
