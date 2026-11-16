@@ -1,13 +1,13 @@
 // Pure policy for engineering requests. This module never grants database permissions.
 export const ENGINEERING_REQUEST_PRIORITIES = ['normal', 'alta', 'urgente'] as const;
 export const ENGINEERING_REQUEST_STATES = [
-  'borrador', 'en_revision_supervision', 'en_segunda_validacion',
+  'borrador', 'en_revision_supervision',
   'pendiente_gerencia', 'aprobada', 'rechazada',
 ] as const;
 export type EngineeringPriority = typeof ENGINEERING_REQUEST_PRIORITIES[number];
 export type EngineeringRequestState = typeof ENGINEERING_REQUEST_STATES[number];
 export type EngineeringDecision = 'aprobar' | 'rechazar';
-export type EngineeringApprovalRole = 'supervision' | 'segunda_validacion' | 'gerencia';
+export type EngineeringApprovalRole = 'supervision' | 'gerencia';
 export type EngineeringApprovalEvidence = {
   role: EngineeringApprovalRole;
   actorId: string;
@@ -26,9 +26,9 @@ export type EngineeringRequest = {
 };
 
 export function requiredEngineeringApprovals(request: Pick<EngineeringRequest, 'priority' | 'changesApprovedProgram'>): EngineeringApprovalRole[] {
-  return request.priority === 'urgente' && request.changesApprovedProgram
-    ? ['supervision', 'segunda_validacion', 'gerencia']
-    : ['supervision', 'segunda_validacion'];
+  return request.changesApprovedProgram
+    ? ['supervision', 'gerencia']
+    : ['supervision'];
 }
 
 export function evaluateEngineeringApproval(request: EngineeringRequest, actor: {
@@ -37,13 +37,13 @@ export function evaluateEngineeringApproval(request: EngineeringRequest, actor: 
   if (!actor.canApprove || actor.organizationId !== request.organizationId) {
     return { allowed: false, reason: 'Sin autorización para aprobar en esta organización' };
   }
-  if (!['en_revision_supervision', 'en_segunda_validacion', 'pendiente_gerencia'].includes(request.state)) {
+  if (!['en_revision_supervision', 'pendiente_gerencia'].includes(request.state)) {
     return { allowed: false, reason: 'La solicitud no está en revisión' };
   }
   const roles = requiredEngineeringApprovals(request);
   const completed = request.approvals.filter(a => a.decision === 'aprobar' && a.actorId && a.signedAt && a.evidenceId);
   const nextRole = roles[completed.length];
-  if (!nextRole || actor.role !== nextRole) {
+  if (!nextRole || actor.role !== nextRole || (nextRole === 'gerencia' && request.state !== 'pendiente_gerencia') || (nextRole === 'supervision' && request.state !== 'en_revision_supervision')) {
     return { allowed: false, reason: 'No corresponde esta etapa de validación' };
   }
   if (completed.some(a => a.actorId === actor.id)) {
@@ -57,6 +57,6 @@ export function evaluateEngineeringApproval(request: EngineeringRequest, actor: 
     ? 'aprobada'
     : roles[completed.length + 1] === 'gerencia'
       ? 'pendiente_gerencia'
-      : 'en_segunda_validacion';
+      : 'en_revision_supervision';
   return { allowed: true, reason: 'Aprobación sujeta a registro firmado', nextState };
 }
