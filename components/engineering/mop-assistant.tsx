@@ -86,7 +86,7 @@ export function MopEngineeringAssistant(){
       <div className="whitespace-pre-wrap text-sm leading-relaxed">{response.answer}</div>
       {(response.manualReferences?.length||0)>0?<div className="space-y-2">
         <h3 className="text-sm font-semibold">Referencias del Manual</h3>
-        {response.manualReferences!.map(ref=><details key={ref.documentId+':'+ref.pdfPage+':'+ref.section} className="rounded-md border px-3 py-2">
+        {response.manualReferences!.map((ref,i)=><details key={ref.documentId+':'+ref.pdfPage+':'+ref.section+':'+i} className="rounded-md border px-3 py-2">
           <summary className="cursor-pointer text-sm font-medium">{ref.label}</summary>
           <p className="mt-2 text-xs text-muted-foreground">{ref.title}. La aplicación a La Patagua depende del proyecto, contrato y revisión del responsable técnico.</p>
           <p className="mt-2 whitespace-pre-wrap text-xs">{ref.excerpt}</p>
