@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const policy = await readFile(new URL('../lib/engineering/request-approval-policy.ts', import.meta.url), 'utf8');
 const api = await readFile(new URL('../app/api/ingenieria/proyectos/route.ts', import.meta.url), 'utf8');
 
-test('urgent changes to approved program require management after two signatures', () => {
+test('any change to approved program requires supervisor then CEO, exactly two signatures', () => {
   assert.match(policy, /request\.priority === 'urgente' && request\.changesApprovedProgram/);
   assert.match(policy, /\['supervision', 'segunda_validacion', 'gerencia'\]/);
   assert.match(policy, /'pendiente_gerencia'/);
