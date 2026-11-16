@@ -1,102 +1,222 @@
 'use client';
 
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, CalendarDays, Check, CircleDashed, ShieldCheck } from 'lucide-react';
+import useSWR from 'swr';
+import { ArrowRight, Plus, Save, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
+import { Textarea } from '@/components/ui/textarea';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
-const validations = [
-  { title: 'Reportes que necesita Bodega', owner: 'Esteban + Ariel', detail: 'Definir contenido, frecuencia y destinatarios.' },
-  { title: 'Flujo de información', owner: 'Esteban → Ariel', detail: 'Describir entradas, responsables, registros y salidas actuales.' },
-  { title: 'Tareas por persona', owner: 'Esteban', detail: 'Levantar las tareas de cada integrante de Bodega.' },
-  { title: 'Mínimos críticos por producto', owner: 'Esteban + Ariel', detail: 'Completar un umbral por código y unidad; no aplicar el ejemplo de 5 unidades como dato real.' },
-  { title: 'Stock completo de bodega central', owner: 'MOTIL + Bodega', detail: 'Conciliar el corte y dejar fuente, fecha y evidencia de cada diferencia.' },
-];
+type ActionKey = 'reports' | 'information_flow' | 'worker_tasks' | 'critical_stock' | 'central_stock';
+type ActionStatus = 'pending' | 'in_progress' | 'ready_for_validation' | 'completed' | 'blocked';
+type ActionRecord = { action_key: ActionKey; title: string; owner: string; status: ActionStatus; payload: Record<string, any>; evidence_reference: string | null; updated_at: string };
+type ReportsDraft = { reports: Array<{ name: string; content: string; frequency: string; recipients: string }> };
+type FlowDraft = { source: string; receiver: string; recorded_by: string; output: string; exceptions: string };
+type TasksDraft = { tasks: Array<{ person: string; task: string; frequency: string }> };
+type StockDraft = { items: Array<{ product_code: string; product_name: string; unit: string; proposed_minimum: string; confirmed_by_esteban: boolean; confirmed_by_ariel: boolean }> };
+type CentralDraft = { cutoff_date: string; snapshot_rows: string; source_reference: string; reconciliation_reference: string; delivery_reference: string };
 
-const recommendations = [
-  { title: 'Reposición con aprobación', detail: 'Al llegar al mínimo confirmado, MOTIL prepara una propuesta de pedido. La jefatura revisa stock, crédito y necesidad antes de emitirlo.' },
-  { title: 'Salidas trazables', detail: 'Registrar cada retiro con vale de consumo; habilitar lectura por código de barras para descontar el producto correcto.' },
-  { title: 'Solicitudes comparables', detail: 'Estandarizar los correos de solicitud para clasificar prioridad y medir el tiempo de respuesta.' },
-  { title: 'Urgencias visibles', detail: 'Alertar si una solicitud urgente queda postergada sin atención y mantenerla en una cola con responsable y próxima acción.' },
-  { title: 'Rutinas planificadas', detail: 'Programar tareas repetitivas como órdenes periódicas. Preparar el pedido a Santiago los miércoles y revisar gestión los lunes.' },
-  { title: 'Datos confiables', detail: 'Investigar saldos negativos y diferencias de fin de semana antes de ajustar. Validar fechas de órdenes de compra y corregir cronómetros anómalos.' },
-];
+const fetcher = async (url: string) => {
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error || 'No se pudieron cargar las acciones.');
+  return body as { actions: ActionRecord[] };
+};
+const labels: Record<ActionStatus, string> = { pending: 'Pendiente', in_progress: 'En curso', ready_for_validation: 'Para validar', completed: 'Cerrada', blocked: 'Bloqueada' };
+const variants: Record<ActionStatus, 'outline' | 'secondary' | 'default' | 'destructive'> = { pending: 'outline', in_progress: 'secondary', ready_for_validation: 'default', completed: 'default', blocked: 'destructive' };
+const statusOptions: ActionStatus[] = ['pending', 'in_progress', 'ready_for_validation', 'completed', 'blocked'];
+const blankReport = () => ({ name: '', content: '', frequency: '', recipients: '' });
+const blankTask = () => ({ person: '', task: '', frequency: '' });
+const blankStockItem = () => ({ product_code: '', product_name: '', unit: '', proposed_minimum: '', confirmed_by_esteban: false, confirmed_by_ariel: false });
+
+function ActionCard({ record, status, onStatusChange, onSave, saving, canEdit, children }: {
+  record: ActionRecord; status: ActionStatus; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; children: ReactNode;
+}) {
+  return (
+    <section id={record.action_key} className="scroll-mt-24 rounded-lg border bg-card" aria-labelledby={record.action_key + '-title'}>
+      <div className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div><div className="flex flex-wrap items-center gap-2"><h2 id={record.action_key + '-title'} className="font-semibold">{record.title}</h2><Badge variant={variants[status]}>{labels[status]}</Badge></div><p className="mt-1 text-xs text-muted-foreground">Responsable: {record.owner}</p></div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">Estado
+          <select value={status} disabled={!canEdit || saving} onChange={(event) => onStatusChange(event.target.value as ActionStatus)} className="h-9 rounded-md border bg-background px-2 text-foreground">
+            {statusOptions.map((option) => <option key={option} value={option}>{labels[option]}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="space-y-4 p-4">{children}
+        <div className="grid gap-3 border-t pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="space-y-2"><Label htmlFor={record.action_key + '-evidence'}>Evidencia / referencia</Label><Input id={record.action_key + '-evidence'} value={record.evidence_reference || ''} data-evidence-for={record.action_key} placeholder="Folio, archivo, acta o enlace interno" disabled={!canEdit || saving} /></div>
+          <Button type="button" disabled={!canEdit || saving} onClick={onSave}><Save className="mr-2 h-4 w-4" />{saving ? 'Guardando…' : 'Guardar acción'}</Button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function BodegaAcuerdosPage() {
+  const { canEdit, ready } = useModuleAccess();
+  const editable = ready && canEdit('bodega_inventario');
+  const { data, error, isLoading, mutate } = useSWR('/api/bodega/meeting-actions', fetcher, { revalidateOnFocus: false });
+  const [drafts, setDrafts] = useState<Record<string, any>>({});
+  const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
+  const [evidence, setEvidence] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<ActionKey | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!data?.actions) return;
+    setDrafts(Object.fromEntries(data.actions.map((record) => [record.action_key, record.payload || {}])));
+    setStatuses(Object.fromEntries(data.actions.map((record) => [record.action_key, record.status])));
+    setEvidence(Object.fromEntries(data.actions.map((record) => [record.action_key, record.evidence_reference || ''])));
+  }, [data?.actions]);
+
+  const records = useMemo(() => new Map((data?.actions || []).map((item) => [item.action_key, item])), [data?.actions]);
+  const completed = (data?.actions || []).filter((item) => item.status === 'completed').length;
+  const pending = (data?.actions || []).filter((item) => item.status !== 'completed').length;
+
+  function patchDraft<T extends Record<string, any>>(key: ActionKey, update: Partial<T>) {
+    setDrafts((current) => ({ ...current, [key]: { ...(current[key] || {}), ...update } }));
+  }
+  function patchArray(key: ActionKey, arrayName: string, index: number, field: string, value: unknown) {
+    const rows = [...(drafts[key]?.[arrayName] || [])];
+    rows[index] = { ...rows[index], [field]: value };
+    patchDraft(key, { [arrayName]: rows });
+  }
+  function addRow(key: ActionKey, arrayName: string, row: Record<string, unknown>) {
+    patchDraft(key, { [arrayName]: [...(drafts[key]?.[arrayName] || []), row] });
+  }
+  function removeRow(key: ActionKey, arrayName: string, index: number) {
+    patchDraft(key, { [arrayName]: (drafts[key]?.[arrayName] || []).filter((_: unknown, rowIndex: number) => rowIndex !== index) });
+  }
+  function setStatus(key: ActionKey, value: ActionStatus) { setStatuses((current) => ({ ...current, [key]: value })); }
+
+  async function saveAction(key: ActionKey) {
+    const evidenceInput = document.querySelector<HTMLInputElement>('[data-evidence-for="' + key + '"]');
+    const evidenceReference = evidenceInput?.value || evidence[key] || '';
+    setSaving(key); setMessage(null);
+    try {
+      const response = await fetch('/api/bodega/meeting-actions', {
+        method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ actionKey: key, status: statuses[key] || 'pending', payload: drafts[key] || {}, evidenceReference }),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.error || 'No se pudo guardar la acción.');
+      setMessage('Acción guardada: ' + (records.get(key)?.title || key) + '.');
+      await mutate();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'No se pudo guardar la acción.');
+    } finally { setSaving(null); }
+  }
+
+  const reportDraft: ReportsDraft = drafts.reports || { reports: [] };
+  const flowDraft: FlowDraft = drafts.information_flow || { source: '', receiver: '', recorded_by: '', output: '', exceptions: '' };
+  const taskDraft: TasksDraft = drafts.worker_tasks || { tasks: [] };
+  const stockDraft: StockDraft = drafts.critical_stock || { items: [] };
+  const centralDraft: CentralDraft = drafts.central_stock || { cutoff_date: '', snapshot_rows: '', source_reference: '', reconciliation_reference: '', delivery_reference: '' };
+
+  const cards = [
+    { key: 'reports', title: 'Definir reportes de Bodega' },
+    { key: 'information_flow', title: 'Levantar flujo de información' },
+    { key: 'worker_tasks', title: 'Describir tareas por bodeguero' },
+    { key: 'critical_stock', title: 'Definir mínimos por producto' },
+    { key: 'central_stock', title: 'Conciliar y compartir stock central' },
+  ] as const;
+
+  if (error) return <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error.message}</div>;
+
   return (
     <div className="space-y-6">
       <PageHeader>
         <PageHeaderContent>
-          <PageHeaderEyebrow>Bodega · Reunión del 16 de noviembre</PageHeaderEyebrow>
-          <PageHeaderTitle>Acuerdos y próximos datos</PageHeaderTitle>
-          <PageHeaderDescription>La minuta queda ordenada para completar el levantamiento. Los mínimos, tareas y reportes siguen pendientes de confirmación.</PageHeaderDescription>
+          <PageHeaderEyebrow>Bodega · Reunión 16 de noviembre</PageHeaderEyebrow>
+          <PageHeaderTitle>Acciones de Esteban</PageHeaderTitle>
+          <PageHeaderDescription>Completa cada levantamiento, guarda avances y adjunta evidencia. Los mínimos se guardan como propuesta; no cambian el stock.</PageHeaderDescription>
         </PageHeaderContent>
-        <PageHeaderActions>
-          <Button asChild variant="outline"><Link href="/dashboard/bodega">Volver al inventario</Link></Button>
-        </PageHeaderActions>
+        <PageHeaderActions><Button asChild variant="outline"><Link href="/dashboard/bodega">Abrir inventario y conciliación <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></PageHeaderActions>
       </PageHeader>
 
-      <section className="grid gap-3 md:grid-cols-3" aria-label="Contexto de la reunión">
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><CalendarDays className="h-4 w-4" />Fecha</div>
-          <p className="mt-2 text-sm font-medium">16 de noviembre de 2026</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><CircleDashed className="h-4 w-4" />Estado</div>
-          <p className="mt-2 text-sm font-medium">Levantamiento por completar</p>
-        </div>
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"><ShieldCheck className="h-4 w-4" />Control</div>
-          <p className="mt-2 text-sm font-medium">Sin cambios automáticos de stock ni compras</p>
-        </div>
+      <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Avance de acciones">
+        <div><p className="text-sm font-medium">{isLoading ? 'Cargando acciones…' : completed + ' de ' + (data?.actions.length || 5) + ' acciones cerradas'}</p><p className="mt-1 text-xs text-muted-foreground">{pending} abiertas · el estado y los datos quedan compartidos con el equipo.</p></div>
+        <nav className="flex flex-wrap gap-2" aria-label="Ir a una acción">
+          {cards.map((card, index) => <a key={card.key} href={'#' + card.key} className="rounded-md border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-foreground">A{index + 1}</a>)}
+        </nav>
       </section>
 
-      <section className="space-y-3" aria-labelledby="validations-title">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Para completar con Bodega</p>
-          <h2 id="validations-title" className="mt-1 text-lg font-semibold">Definiciones pendientes</h2>
-        </div>
-        <div className="overflow-hidden rounded-lg border bg-card">
-          {validations.map((item, index) => (
-            <div key={item.title} className="grid gap-1 border-b px-4 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_180px_140px] sm:items-center">
-              <div><p className="text-sm font-medium">{item.title}</p><p className="mt-0.5 text-xs text-muted-foreground">{item.detail}</p></div>
-              <p className="text-xs text-muted-foreground">{item.owner}</p>
-              <Badge variant="outline" className="w-fit"><CircleDashed className="mr-1 h-3 w-3" />Por definir</Badge>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">La jefatura de Bodega confirma los conteos físicos. Los umbrales críticos se completan por producto y unidad cuando Esteban y Ariel los validen.</p>
-      </section>
+      {message ? <p role="status" className="rounded-md border bg-muted/20 px-3 py-2 text-sm">{message}</p> : null}
 
-      <section className="space-y-3" aria-labelledby="recommendations-title">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Diseño operativo</p>
-          <h2 id="recommendations-title" className="mt-1 text-lg font-semibold">Propuestas N3uralia + Ariel</h2>
-        </div>
-        <div className="divide-y rounded-lg border bg-card">
-          {recommendations.map((item) => (
-            <div key={item.title} className="flex gap-3 px-4 py-3">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <div><p className="text-sm font-medium">{item.title}</p><p className="mt-0.5 max-w-4xl text-sm leading-5 text-muted-foreground">{item.detail}</p></div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : null}
 
-      <section className="rounded-lg border border-muted-foreground/20 bg-muted/20 p-4" aria-label="Criterios de seguridad de datos">
-        <p className="text-sm font-medium">Reglas antes de activar</p>
-        <ul className="mt-2 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
-          <li>Laudus y el corte central acreditado mantienen la autoridad del saldo; una diferencia se investiga y conserva con evidencia.</li>
-          <li>Un umbral genera una propuesta de reposición; nunca emite una compra sin aprobación y verificación de crédito.</li>
-          <li>Un retiro sin vale queda como excepción pendiente; no se descuenta ni corrige en silencio.</li>
-          <li>Ubicación y foto de pasillo quedan opcionales hasta que esté instalada la nueva bodega.</li>
-        </ul>
-      </section>
+      {records.get('reports') ? <ActionCard record={records.get('reports')!} status={statuses.reports || 'pending'} onStatusChange={(value) => setStatus('reports', value)} onSave={() => void saveAction('reports')} saving={saving === 'reports'} canEdit={editable}>
+        <div className="space-y-3">
+          <p className="text-sm font-medium">¿Qué reporte necesita Bodega? Agrega uno por fila.</p>
+          {(reportDraft.reports || []).map((row, index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
+            <div className="space-y-1"><Label>Nombre</Label><Input value={row.name} disabled={!editable} onChange={(e) => patchArray('reports','reports',index,'name',e.target.value)} placeholder="Ej.: faltantes de la semana" /></div>
+            <div className="space-y-1"><Label>Contenido</Label><Input value={row.content} disabled={!editable} onChange={(e) => patchArray('reports','reports',index,'content',e.target.value)} placeholder="Campos o cifras requeridas" /></div>
+            <div className="space-y-1"><Label>Frecuencia</Label><Input value={row.frequency} disabled={!editable} onChange={(e) => patchArray('reports','reports',index,'frequency',e.target.value)} placeholder="Diario, semanal…" /></div>
+            <div className="space-y-1"><Label>Destinatarios</Label><div className="flex gap-2"><Input value={row.recipients} disabled={!editable} onChange={(e) => patchArray('reports','reports',index,'recipients',e.target.value)} placeholder="Personas o cargos" /><Button type="button" variant="ghost" size="icon" aria-label="Eliminar reporte" disabled={!editable} onClick={() => removeRow('reports','reports',index)}><Trash2 className="h-4 w-4" /></Button></div></div>
+          </div>)}
+          <Button type="button" variant="outline" size="sm" disabled={!editable} onClick={() => addRow('reports','reports',blankReport())}><Plus className="mr-2 h-4 w-4" />Agregar reporte</Button>
+        </div>
+      </ActionCard> : null}
 
-      <div className="flex justify-end">
-        <Button asChild variant="ghost"><Link href="/dashboard/bodega/repuestos-criticos">Revisar repuestos críticos <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-      </div>
+      {records.get('information_flow') ? <ActionCard record={records.get('information_flow')!} status={statuses.information_flow || 'pending'} onStatusChange={(value) => setStatus('information_flow', value)} onSave={() => void saveAction('information_flow')} saving={saving === 'information_flow'} canEdit={editable}>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-1"><Label>Origen de la información</Label><Input value={flowDraft.source || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{source:e.target.value})} placeholder="Correo, Laudus, vale, WhatsApp…" /></div>
+          <div className="space-y-1"><Label>Quién la recibe</Label><Input value={flowDraft.receiver || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{receiver:e.target.value})} placeholder="Persona o área" /></div>
+          <div className="space-y-1"><Label>Quién la registra y dónde</Label><Input value={flowDraft.recorded_by || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{recorded_by:e.target.value})} placeholder="Responsable y módulo" /></div>
+          <div className="space-y-1"><Label>Resultado que debe quedar</Label><Input value={flowDraft.output || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{output:e.target.value})} placeholder="Stock, solicitud, reporte…" /></div>
+          <div className="space-y-1 md:col-span-2"><Label>Excepciones y pasos manuales</Label><Textarea rows={3} value={flowDraft.exceptions || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{exceptions:e.target.value})} placeholder="Desfase de fin de semana, vale pendiente, nota de crédito…" /></div>
+        </div>
+      </ActionCard> : null}
+
+      {records.get('worker_tasks') ? <ActionCard record={records.get('worker_tasks')!} status={statuses.worker_tasks || 'pending'} onStatusChange={(value) => setStatus('worker_tasks', value)} onSave={() => void saveAction('worker_tasks')} saving={saving === 'worker_tasks'} canEdit={editable}>
+        <div className="space-y-3">
+          <p className="text-sm font-medium">Una fila por persona y tarea habitual.</p>
+          {(taskDraft.tasks || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_2fr_1fr_auto]">
+            <div className="space-y-1"><Label>Persona</Label><Input value={row.person} disabled={!editable} onChange={(e) => patchArray('worker_tasks','tasks',index,'person',e.target.value)} placeholder="Nombre" /></div>
+            <div className="space-y-1"><Label>Tarea</Label><Input value={row.task} disabled={!editable} onChange={(e) => patchArray('worker_tasks','tasks',index,'task',e.target.value)} placeholder="Qué hace y para qué" /></div>
+            <div className="space-y-1"><Label>Frecuencia / disparador</Label><Input value={row.frequency} disabled={!editable} onChange={(e) => patchArray('worker_tasks','tasks',index,'frequency',e.target.value)} placeholder="Diaria, al recibir…" /></div>
+            <Button type="button" variant="ghost" size="icon" aria-label="Eliminar tarea" disabled={!editable} onClick={() => removeRow('worker_tasks','tasks',index)}><Trash2 className="h-4 w-4" /></Button>
+          </div>)}
+          <Button type="button" variant="outline" size="sm" disabled={!editable} onClick={() => addRow('worker_tasks','tasks',blankTask())}><Plus className="mr-2 h-4 w-4" />Agregar tarea</Button>
+        </div>
+      </ActionCard> : null}
+
+      {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable}>
+        <div className="space-y-3">
+          <div><p className="text-sm font-medium">Registra el mínimo acordado para cada código y unidad.</p><p className="mt-1 text-xs text-muted-foreground">Los valores quedan como propuesta hasta que Esteban y Ariel confirmen. No alimentan alertas ni órdenes de compra todavía.</p></div>
+          {(stockDraft.items || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_2fr_120px_130px_150px_150px_auto]">
+            <div className="space-y-1"><Label>Código</Label><Input value={row.product_code} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'product_code',e.target.value)} placeholder="SKU" /></div>
+            <div className="space-y-1"><Label>Producto</Label><Input value={row.product_name} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'product_name',e.target.value)} placeholder="Descripción" /></div>
+            <div className="space-y-1"><Label>Unidad</Label><Input value={row.unit} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'unit',e.target.value)} placeholder="un, kg…" /></div>
+            <div className="space-y-1"><Label>Mínimo propuesto</Label><Input type="number" min="0" step="any" value={row.proposed_minimum} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'proposed_minimum',e.target.value)} placeholder="Sin definir" /></div>
+            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={row.confirmed_by_esteban} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'confirmed_by_esteban',e.target.checked)} />Esteban confirmó</label>
+            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={row.confirmed_by_ariel} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'confirmed_by_ariel',e.target.checked)} />Ariel confirmó</label>
+            <Button type="button" variant="ghost" size="icon" aria-label="Eliminar mínimo" disabled={!editable} onClick={() => removeRow('critical_stock','items',index)}><Trash2 className="h-4 w-4" /></Button>
+          </div>)}
+          <Button type="button" variant="outline" size="sm" disabled={!editable} onClick={() => addRow('critical_stock','items',blankStockItem())}><Plus className="mr-2 h-4 w-4" />Agregar producto crítico</Button>
+        </div>
+      </ActionCard> : null}
+
+      {records.get('central_stock') ? <ActionCard record={records.get('central_stock')!} status={statuses.central_stock || 'pending'} onStatusChange={(value) => setStatus('central_stock', value)} onSave={() => void saveAction('central_stock')} saving={saving === 'central_stock'} canEdit={editable}>
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Primero concilia el corte central completo</p><p className="mt-1 text-xs text-muted-foreground">La cola Laudus muestra cobertura, diferencias y casos que necesitan decisión de jefatura.</p></div><Button asChild variant="outline" size="sm"><Link href="/dashboard/bodega">Abrir conciliación <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-1"><Label>Fecha de corte</Label><Input type="date" value={centralDraft.cutoff_date || ''} disabled={!editable} onChange={(e) => patchDraft('central_stock',{cutoff_date:e.target.value})} /></div>
+            <div className="space-y-1"><Label>Posiciones del archivo</Label><Input type="number" min="1" step="1" value={centralDraft.snapshot_rows || ''} disabled={!editable} onChange={(e) => patchDraft('central_stock',{snapshot_rows:e.target.value})} placeholder="Total de filas válidas" /></div>
+            <div className="space-y-1"><Label>Archivo / fuente</Label><Input value={centralDraft.source_reference || ''} disabled={!editable} onChange={(e) => patchDraft('central_stock',{source_reference:e.target.value})} placeholder="Nombre, folio o sincronización Laudus" /></div>
+            <div className="space-y-1"><Label>Resultado de conciliación</Label><Input value={centralDraft.reconciliation_reference || ''} disabled={!editable} onChange={(e) => patchDraft('central_stock',{reconciliation_reference:e.target.value})} placeholder="Informe, revisión o folio" /></div>
+            <div className="space-y-1 lg:col-span-2"><Label>Envío del stock completo</Label><Input value={centralDraft.delivery_reference || ''} disabled={!editable} onChange={(e) => patchDraft('central_stock',{delivery_reference:e.target.value})} placeholder="Destinatario + fecha + referencia del envío" /></div>
+          </div>
+        </div>
+      </ActionCard> : null}
+
+      {!isLoading && !data?.actions?.length ? <div className="rounded-lg border p-6 text-sm text-muted-foreground">No se cargaron acciones de Bodega.</div> : null}
+      {!editable ? <p className="text-xs text-muted-foreground">Tu perfil puede consultar estas acciones; edición requiere permiso de inventario de Bodega.</p> : null}
     </div>
   );
 }
