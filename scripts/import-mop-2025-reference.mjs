@@ -49,7 +49,7 @@ for await (const line of lines) {
     if (!chunks.has(record.document_key)) throw new Error('Fragmento sin documento ' + record.document_key);
     chunks.get(record.document_key).push(record);
   } else if (record.kind === 'partida') {
-    if (!/^\d{3,4}-\d+$/.test(String(record.item_code)) || !record.unit ||
+    if (!/^\d{3,4}-\d+[a-z]?$/i.test(String(record.item_code)) || !record.unit ||
         typeof record.description !== 'string' || record.document_key !== 'mop-2025-partidas-v5') {
       throw new Error('Partida sin código, unidad o fuente');
     }
