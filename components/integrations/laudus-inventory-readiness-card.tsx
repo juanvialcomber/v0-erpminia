@@ -222,6 +222,11 @@ export function LaudusInventoryReadinessCard() {
         </p>
       </div>
 
+      {!isLoading && data && !data.laudus.freshnessAvailable ? (
+        <p className="border-b bg-amber-500/5 px-4 py-2 text-xs text-muted-foreground">
+          Antigüedad de diferencias pendiente de verificación; los saldos ERP siguen disponibles.
+        </p>
+      ) : null}
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-card p-4">
           <ShieldCheck className="h-4 w-4 text-muted-foreground" />
@@ -244,7 +249,7 @@ export function LaudusInventoryReadinessCard() {
           <p className="mt-2 text-2xl font-semibold">{isLoading || !data ? '—' : `${data.laudus.mappedPhysicalWarehouses}/${data.laudus.physicalWarehouses}`}</p>
           <p className="mt-1 text-xs text-muted-foreground">Bodegas físicas conciliadas con MOTIL</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {isLoading || !data ? '—' : `${count(data.laudus.negativeProducts)} SKU Laudus con saldo negativo`}
+            {isLoading || !data ? '—' : `${count(data.laudus.negativeProducts)} SKU con total negativo · ${count(data.laudus.negativePositionsCount ?? data.laudus.negativePositions.length)} posiciones locales negativas`}
           </p>
         </div>
         <div className="bg-card p-4">

@@ -73,3 +73,6 @@ revoke all on public.laudus_negative_stock_positions_service_v1 from public, ano
 grant select on public.laudus_negative_stock_positions_service_v1 to service_role;
 comment on view public.laudus_negative_stock_positions_service_v1 is
  'Read-only eligible local warehouse negatives, independent of total product balance.';
+
+-- Refresh PostgREST metadata after the view revisions become effective.
+notify pgrst, 'reload schema';
