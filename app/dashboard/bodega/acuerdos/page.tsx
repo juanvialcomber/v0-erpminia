@@ -18,7 +18,7 @@ type ActionRecord = { action_key: ActionKey; title: string; owner: string; statu
 type ReportsDraft = { reports: Array<{ name: string; content: string; frequency: string; recipients: string }> };
 type FlowDraft = { source: string; receiver: string; recorded_by: string; output: string; exceptions: string };
 type TasksDraft = { tasks: Array<{ person: string; task: string; frequency: string }> };
-type StockDraft = { items: Array<{ product_code: string; product_name: string; unit: string; proposed_minimum: string; confirmed_by_esteban: boolean; confirmed_by_ariel: boolean }> };
+type StockDraft = { items: Array<{ product_code: string; product_name: string; unit: string; proposed_minimum: string; current_location?: string; confirmed_by_esteban: boolean; confirmed_by_ariel: boolean }> };
 type CentralDraft = { cutoff_date: string; snapshot_rows: string; source_reference: string; reconciliation_reference: string; delivery_reference: string };
 
 const fetcher = async (url: string) => {
@@ -32,7 +32,7 @@ const variants: Record<ActionStatus, 'outline' | 'secondary' | 'default' | 'dest
 const statusOptions: ActionStatus[] = ['pending', 'in_progress', 'ready_for_validation', 'completed', 'blocked'];
 const blankReport = () => ({ name: '', content: '', frequency: '', recipients: '' });
 const blankTask = () => ({ person: '', task: '', frequency: '' });
-const blankStockItem = () => ({ product_code: '', product_name: '', unit: '', proposed_minimum: '', confirmed_by_esteban: false, confirmed_by_ariel: false });
+const blankStockItem = () => ({ product_code: '', product_name: '', unit: '', proposed_minimum: '', current_location: '', confirmed_by_esteban: false, confirmed_by_ariel: false });
 
 function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusChange, onSave, saving, canEdit, canComplete, children }: {
   record: ActionRecord; status: ActionStatus; evidenceValue: string; onEvidenceChange: (value: string) => void; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; canComplete: boolean; children: ReactNode;
@@ -188,12 +188,13 @@ export default function BodegaAcuerdosPage() {
 
       {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} evidenceValue={evidence.critical_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, critical_stock: value }))} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable} canComplete={canClose}>
         <div className="space-y-3">
-          <div><p className="text-sm font-medium">Registra el mínimo acordado para cada código y unidad.</p><p className="mt-1 text-xs text-muted-foreground">Los valores quedan como propuesta hasta que Esteban y Ariel confirmen. No alimentan alertas ni órdenes de compra todavía.</p></div>
-          {(stockDraft.items || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_2fr_120px_130px_150px_150px_auto]">
+          <div><p className="text-sm font-medium">Registra el mínimo acordado para cada código y unidad.</p><p className="mt-1 text-xs text-muted-foreground">Ubicación actual (pasillo, rack o nivel): opcional y temporal hasta el cambio de bodega. Los mínimos quedan como propuesta; no alimentan alertas ni órdenes todavía.</p></div>
+          {(stockDraft.items || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_2fr_100px_130px_2fr_150px_150px_auto]">
             <div className="space-y-1"><Label>Código</Label><Input value={row.product_code} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'product_code',e.target.value)} placeholder="SKU" /></div>
             <div className="space-y-1"><Label>Producto</Label><Input value={row.product_name} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'product_name',e.target.value)} placeholder="Descripción" /></div>
             <div className="space-y-1"><Label>Unidad</Label><Input value={row.unit} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'unit',e.target.value)} placeholder="un, kg…" /></div>
             <div className="space-y-1"><Label>Mínimo propuesto</Label><Input type="number" min="0" step="any" value={row.proposed_minimum} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'proposed_minimum',e.target.value)} placeholder="Sin definir" /></div>
+            <div className="space-y-1"><Label>Ubicación actual (opcional)</Label><Input value={row.current_location || ''} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'current_location',e.target.value)} placeholder="Pasillo, rack, nivel" /></div>
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={row.confirmed_by_esteban} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'confirmed_by_esteban',e.target.checked)} />Esteban confirmó</label>
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={row.confirmed_by_ariel} disabled={!editable} onChange={(e) => patchArray('critical_stock','items',index,'confirmed_by_ariel',e.target.checked)} />Ariel confirmó</label>
             <Button type="button" variant="ghost" size="icon" aria-label="Eliminar mínimo" disabled={!editable} onClick={() => removeRow('critical_stock','items',index)}><Trash2 className="h-4 w-4" /></Button>
