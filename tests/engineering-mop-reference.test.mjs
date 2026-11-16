@@ -26,12 +26,13 @@ test('Manual citation must be grounded in page number, source hash and verified 
   const input={
     document_id:'mop-2025-v2',document_title:'Procedimientos de Estudios Viales',
     edition:'2025',volume:2,page_number:181,chunk_index:0,
-    section_ref:'2.308',source_sha256:hash,excerpt:'Cubicaciones mediante modelos digitales',
+    section_ref:'2.308',source_sha256:hash,excerpt:'2.308 CUBICACIONES DE MOVIMIENTO DE TIERRAS\nCubicaciones mediante modelos digitales',
     source_url:'https://untrusted.example',
   };
   const item=toMopReference(input);
   assert.equal(item.pdfPage,181);
   assert.equal(item.section,'2.308');
+  assert.equal(toMopReference({...input,excerpt:'ÍNDICE GENERAL\\n2.308 CUBICACIONES\\n2.309 CONTROL DE CALIDAD'}).section,null);
   assert.match(item.label,/Vol. 2.*PDF p. 181.*2.308/);
   assert.equal(item.sourceUrl,MOP_2025_URL);
   assert.equal(item.applicability,'requiere_revision_del_proyecto_y_contrato');
