@@ -3,7 +3,7 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
-import { createClient } from '@supabase/supabase-js';
+// Load Supabase only for writes so dry-run works without application dependencies.
 
 const args = process.argv.slice(2);
 const getFlag = name => {
@@ -89,6 +89,7 @@ const target = new URL(url).hostname.match(/^([a-z0-9]+)\.supabase\.co$/)?.[1];
 if (target !== 'ttlptyheuqeotadtcbaw') {
   throw new Error('Proyecto distinto de MOTIL: identidad de Supabase no verificada');
 }
+const { createClient } = await import('@supabase/supabase-js');
 const db = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
 const batchSize = 220;
 async function requireSuccess(operation) {
