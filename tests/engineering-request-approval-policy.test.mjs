@@ -73,7 +73,14 @@ test('classification must be manual by engineering lead, before signatures',()=>
     isEngineeringLead:true,classifiedAt:'2026-11-16T15:03:00Z',
   }));
 });
-test('request discovery remains read only until approved workflow persistence exists',()=>{
-  assert.doesNotMatch(api, /export async function (POST|PATCH|PUT|DELETE)/);
-  assert.match(api,/readOnly: true/);
+test('draft intake allows create and edit without enabling approval or deletion',()=>{
+  assert.match(api, /export async function GET/);
+  assert.match(api, /export async function POST/);
+  assert.match(api, /export async function PATCH/);
+  assert.doesNotMatch(api, /export async function (PUT|DELETE)/);
+  assert.match(api, /status: 'draft'/);
+  assert.match(api, /\.eq\('status', 'draft'\)/);
+  assert.match(api, /approvalsEnabled: false/);
+  assert.match(api, /getModuleAccessLevel/);
+  assert.match(api, /ENGINEERING_CARGO/);
 });
