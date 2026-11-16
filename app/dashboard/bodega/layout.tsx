@@ -9,6 +9,7 @@ import { useModuleAccess } from '@/hooks/use-module-access';
 const operationItems = [
   { href: '/dashboard/bodega', label: 'Inventario' },
   { href: '/dashboard/bodega/repuestos-criticos', label: 'Repuestos críticos' },
+  { href: '/dashboard/bodega/acuerdos', label: 'Acuerdos' },
 ];
 
 const supportItems = [
