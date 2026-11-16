@@ -18,6 +18,7 @@ test('Manual queries target MOP content, not generic project/operational request
 
 test('Manual retrieval prefers exact numerals and never includes person or product names',()=>{
   assert.equal(deriveMopSearch('¿Qué exige el numeral 2.308 sobre cubicación?'),'2.308');
+  assert.equal(deriveMopSearch('¿Qué especifica la partida 107-1a del Volumen 5?'),'107-1a');
   const query=deriveMopSearch('Cristian de La Patagua pregunta sobre pavimentos y drenajes');
   assert.match(query,/pavimentos/i);
   assert.doesNotMatch(query,/cristian|patagua/i);
