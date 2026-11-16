@@ -2,39 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const route = await readFile(new URL('../app/api/ingenieria/proyectos/route.ts',import.meta.url),'utf8');
-const page = await readFile(new URL('../app/dashboard/ingenieria/proyectos/page.tsx',import.meta.url),'utf8');
-const topography = await readFile(new URL('../app/dashboard/produccion/topografia/page.tsx',import.meta.url),'utf8');
+const route = await readFile(new URL('../app/api/ingenieria/proyectos/route.ts', import.meta.url), 'utf8');
+const page = await readFile(new URL('../app/dashboard/ingenieria/proyectos/page.tsx', import.meta.url), 'utf8');
+const topography = await readFile(new URL('../app/dashboard/produccion/topografia/page.tsx', import.meta.url), 'utf8');
 
-test('Engineering portfolio is protected by server-side module authorization and organization context', () => {
-  assert.match(route, /requireModuleAccess\(request, MODULE_KEYS\.PROD_TOPOGRAFIA\)/);
-  assert.match(route, /if \(!access\.authorized\) return access\.response/);
+test('Engineering intake is protected by server-side role and organization context', () => {
   assert.match(route, /getOrganizationContext\(request\)/);
-  assert.match(route, /if \(!context\.ok\) return context\.response/);
+  assert.match(route, /ENGINEERING_CARGO = 'JEFE INGENIERIA Y PROYECTOS'/);
+  assert.match(route, /getModuleAccessLevel\(context\.userId, context\.role, MODULE_KEYS\.PROD_TOPOGRAFIA\)/);
+  assert.match(route, /\.eq\('organization_id', context\.organizationId\)/);
   assert.match(route, /private, no-store/);
 });
 
-test('Discovery does not mutate production records or invent project facts', () => {
-  assert.match(route, /awaiting_canonical_intake/);
-  assert.match(route, /workflow_not_approved/);
-  assert.match(route, /total: null/);
-  assert.match(route, /readOnly: true/);
+test('Intake persists drafts but does not expose approval or deletion operations', () => {
+  assert.match(route, /export async function GET/);
+  assert.match(route, /export async function POST/);
+  assert.match(route, /export async function PATCH/);
+  assert.doesNotMatch(route, /export async function (PUT|DELETE)/);
+  assert.match(route, /from\('engineering_project_intake_v1'\)/);
+  assert.match(route, /status: 'draft'/);
+  assert.match(route, /\.eq\('status', 'draft'\)/);
   assert.match(route, /approvalsEnabled: false/);
-  assert.doesNotMatch(route, /export async function (POST|PATCH|PUT|DELETE)/);
-  assert.doesNotMatch(route, /\.(insert|update|upsert|delete|rpc)\(/);
+  assert.doesNotMatch(route, /\.upsert\(|\.delete\(|\.rpc\(/);
 });
 
-test('UI explicitly distinguishes unknown projects from zero and protects empty/error states', () => {
-  assert.match(page, /Sin inventario validado/);
-  assert.match(page, /No equivale a cero proyectos/);
-  assert.match(page, /Circuito por definir/);
+test('UI provides the intake fields, draft list, and recoverable loading/error states', () => {
+  assert.match(page, /Iniciar ficha de proyecto/);
+  assert.match(page, /Nombre del proyecto/);
+  assert.match(page, /Área solicitante/);
+  assert.match(page, /Necesidad o problema/);
+  assert.match(page, /Guardar borrador/);
+  assert.match(page, /Fichas guardadas/);
+  assert.match(page, /Continuar/);
+  assert.match(page, /Borrador/);
   assert.match(page, /isLoading/);
   assert.match(page, /error/);
   assert.match(page, /Reintentar/);
-  assert.match(page, /Esta versión es solo lectura/);
+  assert.match(page, /no aprueba alcance, presupuesto ni programa/);
 });
 
-test('Topography retains its existing dashboard and links to the engineering portfolio', () => {
+test('Topography retains its dashboard and links to engineering projects', () => {
   assert.match(topography, /TopografiaDashboard/);
   assert.match(topography, /\/dashboard\/ingenieria\/proyectos/);
 });
