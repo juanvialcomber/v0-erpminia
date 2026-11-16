@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowLeft, ClipboardList, FolderKanban, GitBranch, Landmark, ShieldCheck, Users, FileText, BookOpen, CalendarRange } from 'lucide-react';
+import { ArrowLeft, ClipboardList, FolderKanban, GitBranch, Landmark, ShieldCheck, Users, FileText, CalendarRange } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
+import { MopEngineeringAssistant } from '@/components/engineering/mop-assistant';
 
 type Discovery = {
   portfolio: { status: string; projects: unknown[]; total: number | null };
@@ -28,7 +29,6 @@ const workstreams = [
   { title: 'Solicitudes entre áreas', description: 'Ingreso por departamento, prioridad propuesta y trazabilidad de dos validaciones. Cambios urgentes al programa aprobado requieren Gerencia.', icon: Users },
   { title: 'Programación', description: 'Cartera, hitos, responsables, dependencias y versiones del programa.', icon: CalendarRange },
   { title: 'Avances', description: 'Informe consolidado, pendientes y avance físico respaldado por evidencia.', icon: FileText },
-  { title: 'Asistente y normativa', description: 'Evaluación de presupuestos, borradores de informes y Manual de Carreteras con fuente y versión verificadas.', icon: BookOpen },
 ];
 const stages = [
   { title: 'Solicitudes', description: 'Requerimientos de los departamentos, prioridades y firmas.' , icon: ClipboardList },
@@ -62,6 +62,7 @@ export default function IngenieriaProyectosPage() {
       </section>
       <section aria-label="Organización del departamento" className="space-y-3"><h2 className="text-base font-semibold">Organización</h2><div className="grid gap-3 md:grid-cols-3">{units.map(unit => <div key={unit.title} className="rounded-lg border p-4"><h3 className="font-medium">{unit.title}</h3><p className="mt-1 text-sm text-muted-foreground">{unit.description}</p></div>)}</div></section>
       <section aria-label="Circuitos de trabajo" className="space-y-3"><h2 className="text-base font-semibold">Circuitos de trabajo</h2><div className="grid gap-3 md:grid-cols-2">{workstreams.map(({title,description,icon:Icon}) => <div key={title} className="rounded-lg border p-4"><div className="flex items-center gap-2"><Icon className="h-4 w-4"/><h3 className="font-medium">{title}</h3></div><p className="mt-2 text-sm text-muted-foreground">{description}</p><p className="mt-2 text-xs text-muted-foreground">Pendiente de habilitación operativa</p></div>)}</div></section>
+      <MopEngineeringAssistant />
       <section className="flex gap-3 rounded-lg border p-5" aria-label="Próxima decisión">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
         <div><h2 className="font-medium">Próxima validación</h2><p className="mt-1 text-sm text-muted-foreground">{data.nextAction}</p><p className="mt-2 text-xs text-muted-foreground">Esta versión es solo lectura; no crea, aprueba ni modifica proyectos.</p></div>
