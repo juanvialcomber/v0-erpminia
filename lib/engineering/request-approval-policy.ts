@@ -45,24 +45,35 @@ export function evaluateEngineeringApproval(request: EngineeringRequest, actor: 
   if (!request.classifiedByEngineeringId || !request.classifiedAt) {
     return { allowed: false, reason: 'Ingeniería debe clasificar la solicitud antes de aprobar' };
   }
+  if (!actor.id) {
+    return { allowed: false, reason: 'La firma requiere un actor identificado' };
+  }
   const roles = requiredEngineeringApprovals(request);
-  const completed = request.approvals.filter(a => a.decision === 'aprobar' && a.actorId && a.signedAt && a.evidenceId);
+  // Fail closed: do not silently discard missing, rejected or incomplete signatures.
+  // A missing signature cannot be interpreted as approval of a different stage.
+  const completed = request.approvals;
+  if (completed.length >= roles.length || completed.some((a, i) =>
+    a.decision !== 'aprobar' ||
+    a.role !== roles[i] ||
+    !a.actorId || !a.signedAt || !a.evidenceId ||
+    completed.slice(0, i).some(previous => previous.actorId === a.actorId)
+  )) {
+    return { allowed: false, reason: 'La cadena de validaciones previas es inválida o incompleta' };
+  }
   const nextRole = roles[completed.length];
-  if (!nextRole || actor.role !== nextRole || (nextRole === 'gerencia' && request.state !== 'pendiente_gerencia') || (nextRole === 'supervision' && request.state !== 'en_revision_supervision')) {
+  const expectedState: EngineeringRequestState = nextRole === 'gerencia'
+    ? 'pendiente_gerencia' : 'en_revision_supervision';
+  if (request.state !== expectedState || actor.role !== nextRole) {
     return { allowed: false, reason: 'No corresponde esta etapa de validación' };
   }
   if (completed.some(a => a.actorId === actor.id)) {
     return { allowed: false, reason: 'Un mismo actor no puede firmar dos etapas' };
   }
-  if (completed.some((a, i) => a.role !== roles[i])) {
-    return { allowed: false, reason: 'Las firmas anteriores no siguen el orden exigido' };
+  if (decision === 'rechazar') {
+    return { allowed: true, reason: 'Rechazo sujeto a registro firmado', nextState: 'rechazada' };
   }
-  if (decision === 'rechazar') return { allowed: true, reason: 'Rechazo sujeto a registro firmado', nextState: 'rechazada' };
-  const nextState = completed.length + 1 === roles.length
-    ? 'aprobada'
-    : roles[completed.length + 1] === 'gerencia'
-      ? 'pendiente_gerencia'
-      : 'en_revision_supervision';
+  const nextState: EngineeringRequestState = completed.length + 1 === roles.length
+    ? 'aprobada' : 'pendiente_gerencia';
   return { allowed: true, reason: 'Aprobación sujeta a registro firmado', nextState };
 }
 
