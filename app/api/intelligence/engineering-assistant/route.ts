@@ -84,13 +84,12 @@ export async function GET(request: NextRequest) {
   const [evidence, manualLibrary] = await Promise.all([
     loadBriefing(resolved), getEngineeringMopLibraryStatus(resolved.context.supabase),
   ]);
-  if (!evidence) return NextResponse.json(
-    { error: 'No se pudieron verificar las fuentes de Ingeniería' },
-    { status: 503, headers: privateHeaders },
-  );
+  // Normative MOP references remain available even when operational planning is unavailable.
+  // Do not invent an engineering project status from missing mining/topography sources.
   return NextResponse.json({
     conversation: null,
-    messages: [{
+    operationalEvidenceAvailable: Boolean(evidence),
+    messages: evidence ? [{
       role: 'assistant',
       content: formatEngineeringBriefing(evidence),
       source_refs: [
@@ -99,7 +98,7 @@ export async function GET(request: NextRequest) {
         { source:'production_geology_topography_source_gap_2026_v1' },
         { source:'role_tasks_actionable_v1' },
       ],
-    }],
+    }] : [],
     cargo: resolved.cargoName, memoryCount: 0, persistence: 'stateless_read_only',
     scope: 'ingenieria_topografia', executionVerified: false,
     manualLibrary,
