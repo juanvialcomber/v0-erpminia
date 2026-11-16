@@ -85,8 +85,10 @@ export function classifyEngineeringRequest(request: EngineeringRequest, classifi
   if (!classification.isEngineeringLead || classification.actorOrganizationId !== request.organizationId || !classification.actorId || !classification.classifiedAt) {
     throw new Error('Solo la jefatura de Ingeniería puede clasificar la solicitud');
   }
-  if (request.approvals.length || request.state === 'aprobada' || request.state === 'rechazada') {
-    throw new Error('No se puede reclasificar una solicitud ya firmada');
+  // Retagging would otherwise leave a stale program-change flag. Until an
+  // audited reclassification transition exists, classify only once.
+  if (request.classifiedByEngineeringId || request.classifiedAt || request.approvals.length || request.state === 'aprobada' || request.state === 'rechazada') {
+    throw new Error('La solicitud ya fue clasificada o firmada; requiere revisión auditada');
   }
   return { ...request, priority: classification.priority,
     changesApprovedProgram: request.changesApprovedProgram || classification.priority === 'urgente' || classification.priority === 'critica',
