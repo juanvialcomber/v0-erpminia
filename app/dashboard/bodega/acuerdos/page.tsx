@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, Plus, Save, Trash2 } from 'lucide-react';
@@ -34,8 +34,8 @@ const blankReport = () => ({ name: '', content: '', frequency: '', recipients: '
 const blankTask = () => ({ person: '', task: '', frequency: '' });
 const blankStockItem = () => ({ product_code: '', product_name: '', unit: '', proposed_minimum: '', confirmed_by_esteban: false, confirmed_by_ariel: false });
 
-function ActionCard({ record, status, onStatusChange, onSave, saving, canEdit, children }: {
-  record: ActionRecord; status: ActionStatus; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; children: ReactNode;
+function ActionCard({ record, status, evidenceValue, onEvidenceChange, onStatusChange, onSave, saving, canEdit, children }: {
+  record: ActionRecord; status: ActionStatus; evidenceValue: string; onEvidenceChange: (value: string) => void; onStatusChange: (value: ActionStatus) => void; onSave: () => void; saving: boolean; canEdit: boolean; children: ReactNode;
 }) {
   return (
     <section id={record.action_key} className="scroll-mt-24 rounded-lg border bg-card" aria-labelledby={record.action_key + '-title'}>
@@ -49,7 +49,7 @@ function ActionCard({ record, status, onStatusChange, onSave, saving, canEdit, c
       </div>
       <div className="space-y-4 p-4">{children}
         <div className="grid gap-3 border-t pt-4 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div className="space-y-2"><Label htmlFor={record.action_key + '-evidence'}>Evidencia / referencia</Label><Input id={record.action_key + '-evidence'} value={record.evidence_reference || ''} data-evidence-for={record.action_key} placeholder="Folio, archivo, acta o enlace interno" disabled={!canEdit || saving} /></div>
+          <div className="space-y-2"><Label htmlFor={record.action_key + '-evidence'}>Evidencia / referencia</Label><Input id={record.action_key + '-evidence'} value={evidenceValue} onChange={(event) => onEvidenceChange(event.target.value)} placeholder="Folio, archivo, acta o enlace interno" disabled={!canEdit || saving} /></div>
           <Button type="button" disabled={!canEdit || saving} onClick={onSave}><Save className="mr-2 h-4 w-4" />{saving ? 'Guardando…' : 'Guardar acción'}</Button>
         </div>
       </div>
@@ -95,8 +95,7 @@ export default function BodegaAcuerdosPage() {
   function setStatus(key: ActionKey, value: ActionStatus) { setStatuses((current) => ({ ...current, [key]: value })); }
 
   async function saveAction(key: ActionKey) {
-    const evidenceInput = document.querySelector<HTMLInputElement>('[data-evidence-for="' + key + '"]');
-    const evidenceReference = evidenceInput?.value || evidence[key] || '';
+    const evidenceReference = evidence[key] || '';
     setSaving(key); setMessage(null);
     try {
       const response = await fetch('/api/bodega/meeting-actions', {
@@ -150,7 +149,7 @@ export default function BodegaAcuerdosPage() {
 
       {isLoading ? <div className="h-48 animate-pulse rounded-lg bg-muted" /> : null}
 
-      {records.get('reports') ? <ActionCard record={records.get('reports')!} status={statuses.reports || 'pending'} onStatusChange={(value) => setStatus('reports', value)} onSave={() => void saveAction('reports')} saving={saving === 'reports'} canEdit={editable}>
+      {records.get('reports') ? <ActionCard record={records.get('reports')!} status={statuses.reports || 'pending'} evidenceValue={evidence.reports || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, reports: value }))} onStatusChange={(value) => setStatus('reports', value)} onSave={() => void saveAction('reports')} saving={saving === 'reports'} canEdit={editable}>
         <div className="space-y-3">
           <p className="text-sm font-medium">¿Qué reporte necesita Bodega? Agrega uno por fila.</p>
           {(reportDraft.reports || []).map((row, index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-4">
@@ -163,7 +162,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('information_flow') ? <ActionCard record={records.get('information_flow')!} status={statuses.information_flow || 'pending'} onStatusChange={(value) => setStatus('information_flow', value)} onSave={() => void saveAction('information_flow')} saving={saving === 'information_flow'} canEdit={editable}>
+      {records.get('information_flow') ? <ActionCard record={records.get('information_flow')!} status={statuses.information_flow || 'pending'} evidenceValue={evidence.information_flow || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, information_flow: value }))} onStatusChange={(value) => setStatus('information_flow', value)} onSave={() => void saveAction('information_flow')} saving={saving === 'information_flow'} canEdit={editable}>
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1"><Label>Origen de la información</Label><Input value={flowDraft.source || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{source:e.target.value})} placeholder="Correo, Laudus, vale, WhatsApp…" /></div>
           <div className="space-y-1"><Label>Quién la recibe</Label><Input value={flowDraft.receiver || ''} disabled={!editable} onChange={(e) => patchDraft('information_flow',{receiver:e.target.value})} placeholder="Persona o área" /></div>
@@ -173,7 +172,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('worker_tasks') ? <ActionCard record={records.get('worker_tasks')!} status={statuses.worker_tasks || 'pending'} onStatusChange={(value) => setStatus('worker_tasks', value)} onSave={() => void saveAction('worker_tasks')} saving={saving === 'worker_tasks'} canEdit={editable}>
+      {records.get('worker_tasks') ? <ActionCard record={records.get('worker_tasks')!} status={statuses.worker_tasks || 'pending'} evidenceValue={evidence.worker_tasks || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, worker_tasks: value }))} onStatusChange={(value) => setStatus('worker_tasks', value)} onSave={() => void saveAction('worker_tasks')} saving={saving === 'worker_tasks'} canEdit={editable}>
         <div className="space-y-3">
           <p className="text-sm font-medium">Una fila por persona y tarea habitual.</p>
           {(taskDraft.tasks || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_2fr_1fr_auto]">
@@ -186,7 +185,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable}>
+      {records.get('critical_stock') ? <ActionCard record={records.get('critical_stock')!} status={statuses.critical_stock || 'pending'} evidenceValue={evidence.critical_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, critical_stock: value }))} onStatusChange={(value) => setStatus('critical_stock', value)} onSave={() => void saveAction('critical_stock')} saving={saving === 'critical_stock'} canEdit={editable}>
         <div className="space-y-3">
           <div><p className="text-sm font-medium">Registra el mínimo acordado para cada código y unidad.</p><p className="mt-1 text-xs text-muted-foreground">Los valores quedan como propuesta hasta que Esteban y Ariel confirmen. No alimentan alertas ni órdenes de compra todavía.</p></div>
           {(stockDraft.items || []).map((row,index) => <div key={index} className="grid gap-3 rounded-md border p-3 lg:grid-cols-[1fr_2fr_120px_130px_150px_150px_auto]">
@@ -202,7 +201,7 @@ export default function BodegaAcuerdosPage() {
         </div>
       </ActionCard> : null}
 
-      {records.get('central_stock') ? <ActionCard record={records.get('central_stock')!} status={statuses.central_stock || 'pending'} onStatusChange={(value) => setStatus('central_stock', value)} onSave={() => void saveAction('central_stock')} saving={saving === 'central_stock'} canEdit={editable}>
+      {records.get('central_stock') ? <ActionCard record={records.get('central_stock')!} status={statuses.central_stock || 'pending'} evidenceValue={evidence.central_stock || ''} onEvidenceChange={(value) => setEvidence((current) => ({ ...current, central_stock: value }))} onStatusChange={(value) => setStatus('central_stock', value)} onSave={() => void saveAction('central_stock')} saving={saving === 'central_stock'} canEdit={editable}>
         <div className="space-y-4">
           <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">Primero concilia el corte central completo</p><p className="mt-1 text-xs text-muted-foreground">La cola Laudus muestra cobertura, diferencias y casos que necesitan decisión de jefatura.</p></div><Button asChild variant="outline" size="sm"><Link href="/dashboard/bodega">Abrir conciliación <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
