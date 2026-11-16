@@ -4,7 +4,29 @@
 
 Fuente oficial: https://mc.mop.gob.cl/ . Comunicado Vialidad 29-01-2026: https://vialidad.mop.gob.cl/2026/01/29/vialidad-publico-nueva-edicion-del-manual-de-carreteras/
 
-El MOP declara vigente desde 01-01-2026 la edición 2025. El portal mc.mop.gob.cl solicita correo y código: no se descargaron ni validaron íntegramente los nueve volúmenes; no hay corpus importado ni prueba de derechos de redistribución. El portal genérico MOP aún menciona 2020; priorizar comunicado de Vialidad y archivo oficial autenticado.
+El MOP declara vigente desde 01-01-2026 la edición 2025. El 16-11-2026 se verificó en una sesión de Opera autenticada la tabla oficial de https://mc.mop.gob.cl/Cliente/Index/ con 13 filas (2 resoluciones, modificaciones, V1 Tomo II, V2-V9, partidas V5). TODOS los volúmenes mostrados figuran «Técnico - Vinculante» y los documentos complementarios «Informativo» en el campo Carácter. Se observan botones Descargar, pero el conector disponible solo puede leer y navegar, no accionarlos ni transferir los PDF; no se descargaron ni validaron íntegramente los nueve volúmenes, no hay corpus importado ni prueba de derechos de redistribución. El portal genérico MOP aún menciona 2020; priorizar el catálogo autenticado y el comunicado de Vialidad.
+
+## Catálogo oficial comprobado en Opera (metadatos, NO archivos)
+
+Portal: https://mc.mop.gob.cl/Cliente/Index/ . Campos visibles: Nombre, Vigente al, Resolución, Tipo, Carácter, Descargar. En todas las filas la vigencia mostrada es 01/01/2026. El campo Resolución muestra N°1873 para su propio documento y N°348 para el resto.
+
+| Documento (literal / resumido) | Tipo | Carácter |
+|---|---|---|
+| Resolución DV (Ex.) N° 1873, aprobación edición 2025 | Resolución | Informativo |
+| Resolución DV (Ex.) N° 348, aprobación edición 2025 | Resolución | Informativo |
+| Modificaciones edición 2025 | Complemento | Informativo |
+| Volumen N°1 Tomo II Evaluación de Proyectos Viales Interurbanos | Volumen | Técnico - Vinculante |
+| Volumen N°2 Procedimientos de Estudios Viales | Volumen | Técnico - Vinculante |
+| Volumen N°3 Instrucciones y Criterios de Diseño | Volumen | Técnico - Vinculante |
+| Volumen N°4 Planos de Obras Tipo | Volumen | Técnico - Vinculante |
+| Volumen N°5 Especificaciones Técnicas Generales de Construcción | Volumen | Técnico - Vinculante |
+| Volumen N°6 Seguridad Vial | Volumen | Técnico - Vinculante |
+| Volumen N°7 Mantenimiento Vial | Volumen | Técnico - Vinculante |
+| Volumen N°8 Especificaciones y Métodos de Muestreo, Ensayo y Control | Volumen | Técnico - Vinculante |
+| Volumen N°9 Lineamientos, Criterios y Requisitos para el Desarrollo de Proyectos Viales Sustentables | Volumen | Técnico - Vinculante |
+| Partidas Volumen N°5 edición 2025 | Complemento | Informativo |
+
+Atención: el catálogo expone solo Tomo II del Volumen 1; **no asumir** que Tomos I/III de esta edición estén disponibles sin inspección adicional. «Técnico - Vinculante» es una clasificación del catálogo oficial, **no certifica por sí sola** la obligatoriedad para una obra minera privada. Identificar las modificaciones introducidas por las resoluciones antes de utilizar contenido técnico.
 
 ## Qué es y para qué sirve
 
@@ -66,4 +88,4 @@ Supabase accesible denominada motil contiene profiles, cargos, role_matrix, prod
 
 ## Gate siguiente
 
-Verificar archivos originales vigentes (acceso autorizado), reconciliar tenant desde entorno desplegado, acordar casos reales de Cristian, evaluar respuestas con citas verificadas, y solo entonces integrar la fuente a la API y correr QA end-to-end. Ninguna publicación o ingestión se declara completada.
+Obtener los archivos originales del catálogo autenticado (botones Descargar requieren interacción fuera del conector Opera actual), verificar hashes/edición/páginas de cada archivo; reconciliar tenant desde entorno desplegado, acordar casos reales de Cristian, evaluar respuestas con citas verificadas y solo entonces integrar al asistente y correr QA end-to-end. Ninguna publicación o ingestión se declara completada.
