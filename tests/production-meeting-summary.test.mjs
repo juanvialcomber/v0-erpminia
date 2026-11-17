@@ -8,7 +8,8 @@ test('production meeting summary exposes one fact, one attention signal and one 
   assert.match(dashboard,/Qué pasó/);
   assert.match(dashboard,/Qué requiere atención/);
   assert.match(dashboard,/Qué validar/);
-  assert.match(dashboard,/reviewTotal/);
+  assert.match(dashboard,/hasPendingReview/);
+  assert.match(dashboard,/áreas con registros por revisar/);
   assert.match(dashboard,/La validación sigue siendo humana/);
 });
 

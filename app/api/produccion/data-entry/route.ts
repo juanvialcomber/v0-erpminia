@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { validatePlantEntry } from '@/lib/production/plant-entry-validation.mjs';
 
 type TransportBody = {
   mode: 'mineral_transport';
@@ -57,11 +58,6 @@ function finite(value: unknown) {
   return Number.isFinite(n) ? n : null;
 }
 
-function pct(value: unknown) {
-  const n = finite(value);
-  return n !== null && n >= 0 && n < 100 ? n : null;
-}
-
 export async function POST(request: NextRequest) {
   const access = await requireModuleAccess(request, MODULE_KEYS.PROD_OPERACIONES, true);
   if (!access.authorized) return access.response;
@@ -72,6 +68,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as Body;
   if (!body?.mode) return NextResponse.json({ error: 'mode es obligatorio' }, { status: 400 });
 
+  let rpcPayload: Body = body;
   try {
     if (body.mode === 'mineral_transport') {
       const rawQuantity = finite(body.netWeight);
@@ -96,21 +93,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `No existe regla TM aprobada para ${body.movementDate}` }, { status: 400 });
       }
     } else if (body.mode === 'plant_metallurgy') {
-      const treatedWet = finite(body.treatedWetMetricTons);
-      const mineralMoisture = pct(body.mineralMoisturePct);
-      const headGrade = finite(body.headGrade);
-      if (!body.operationDate || !body.shiftCode?.trim() || treatedWet === null || treatedWet < 0 || mineralMoisture === null || headGrade === null) {
-        return NextResponse.json({ error: 'Fecha, turno, toneladas húmedas, humedad mineral y ley de cabeza válidas son obligatorias' }, { status: 400 });
+      const checked = validatePlantEntry(body);
+      if (!checked.ok) {
+        return NextResponse.json({ error: checked.error }, { status: 400 });
       }
-
-      const concentrateMoisture = body.concentrateMoisturePct == null ? null : pct(body.concentrateMoisturePct);
-      const dispatchMoisture = body.dispatchMoisturePct == null ? null : pct(body.dispatchMoisturePct);
-      if (body.concentrateMoisturePct != null && concentrateMoisture === null) {
-        return NextResponse.json({ error: 'Humedad de concentrado debe estar entre 0 y 100' }, { status: 400 });
-      }
-      if (body.dispatchMoisturePct != null && dispatchMoisture === null) {
-        return NextResponse.json({ error: 'Humedad de despacho debe estar entre 0 y 100' }, { status: 400 });
-      }
+      rpcPayload = checked.payload as PlantBody;
     } else {
       return NextResponse.json({ error: 'mode inválido' }, { status: 400 });
     }
@@ -119,7 +106,7 @@ export async function POST(request: NextRequest) {
       p_organization_id: context.organizationId,
       p_actor_id: context.userId,
       p_mode: body.mode,
-      p_payload: body,
+      p_payload: rpcPayload,
     });
     if (error) throw new Error(error.message);
     if (!data) throw new Error('No fue posible confirmar el ingreso de producción');

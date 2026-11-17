@@ -41,8 +41,8 @@ test('production overview preserves the dashboard contract for data and no-data 
 test('production dashboard distinguishes operational, partial and missing-source areas without making coverage the landing focus', async () => {
   const dashboard = await readFile(dashboardUrl, 'utf8');
 
-  assert.match(dashboard, /label:'Completo'/);
-  assert.match(dashboard, /label:'Incompleto'/);
+  assert.match(dashboard, /label:'Con datos'/);
+  assert.match(dashboard, /label:'Por revisar'/);
   assert.match(dashboard, /label:'Sin datos'/);
   assert.match(dashboard, /Datos disponibles/);
   assert.match(dashboard, /Muestra qué datos existen/);
