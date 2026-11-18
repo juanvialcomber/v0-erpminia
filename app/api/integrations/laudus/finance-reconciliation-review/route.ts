@@ -10,9 +10,34 @@ import {
 } from '@/lib/api/module-access';
 
 type Decision = 'approve' | 'reject';
+type ReviewPriority = 'high_confidence' | 'conflict' | 'review';
 
 function normalize(value: unknown) {
   return String(value ?? '').trim().toLowerCase();
+}
+
+function reviewKind(issueKey: string) {
+  if (
+    issueKey.startsWith('laudus:cxp_inconsistente:') ||
+    issueKey.startsWith('laudus-ap-missing-supplier:') ||
+    issueKey.startsWith('laudus-ap-document-type-conflict:')
+  ) return 'accounts_payable_inconsistency' as const;
+  if (issueKey.startsWith('laudus:purchase_order_unresolved:')) return 'purchase_order_reconciliation' as const;
+  if (issueKey.startsWith('laudus:cost_center_pending:')) return 'cost_center_reconciliation' as const;
+  return 'invoice_trace' as const;
+}
+
+function reviewPriority(issueKey: string, resolutionNote?: string | null): ReviewPriority {
+  const note = normalize(resolutionNote);
+  if (issueKey.startsWith('laudus-ap-document-type-conflict:') || note.includes('conflict')) return 'conflict';
+  if (note.includes('alta confianza')) return 'high_confidence';
+  return 'review';
+}
+
+function reviewPriorityRank(priority: ReviewPriority) {
+  if (priority === 'high_confidence') return 0;
+  if (priority === 'conflict') return 1;
+  return 2;
 }
 
 async function financeDecisionAuthority(userId: string, role?: string | null) {
@@ -48,10 +73,10 @@ export async function GET(request: NextRequest) {
   try {
     const { data: rows, error } = await context.supabase
       .from('data_reconciliation_reviews')
-      .select('id,issue_key,entity_type,entity_id,issue_type,evidence_reference,created_at,updated_at')
+      .select('id,issue_key,entity_type,entity_id,issue_type,field_name,evidence_reference,resolution_note,created_at,updated_at')
       .eq('organization_id', context.organizationId)
       .eq('status', 'open')
-      .or('issue_key.like.laudus:cxp_inconsistente:%,issue_key.like.laudus:open_invoice_trace_once:%,issue_key.like.laudus:purchase_order_unresolved:%,issue_key.like.laudus:cost_center_pending:%')
+      .or('issue_key.like.laudus:cxp_inconsistente:%,issue_key.like.laudus:open_invoice_trace_once:%,issue_key.like.laudus:purchase_order_unresolved:%,issue_key.like.laudus:cost_center_pending:%,issue_key.like.laudus-ap-missing-supplier:%,issue_key.like.laudus-ap-document-type-conflict:%')
       .order('updated_at', { ascending: false })
       .limit(100);
 
@@ -59,24 +84,30 @@ export async function GET(request: NextRequest) {
 
     const authority = await financeDecisionAuthority(context.userId, context.role);
     const canDecide = access.canWrite && authority.allowed;
-
-    return NextResponse.json({
-      rows: (rows || []).map((row) => ({
+    const mappedRows = (rows || []).map((row) => {
+      const issueKey = String(row.issue_key || '');
+      const priority = reviewPriority(issueKey, row.resolution_note);
+      return {
         id: row.id,
-        issueKey: row.issue_key,
+        issueKey,
         entityType: row.entity_type,
         entityId: row.entity_id,
         issueType: row.issue_type,
+        fieldName: row.field_name,
         evidenceReference: row.evidence_reference,
+        resolutionNote: row.resolution_note,
         updatedAt: row.updated_at,
-        kind: String(row.issue_key).startsWith('laudus:cxp_inconsistente:')
-          ? 'accounts_payable_inconsistency'
-          : String(row.issue_key).startsWith('laudus:purchase_order_unresolved:')
-            ? 'purchase_order_reconciliation'
-            : String(row.issue_key).startsWith('laudus:cost_center_pending:')
-              ? 'cost_center_reconciliation'
-              : 'invoice_trace',
-      })),
+        kind: reviewKind(issueKey),
+        priority,
+      };
+    }).sort((a, b) => {
+      const rank = reviewPriorityRank(a.priority) - reviewPriorityRank(b.priority);
+      if (rank !== 0) return rank;
+      return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+    });
+
+    return NextResponse.json({
+      rows: mappedRows,
       canDecide,
       owner: {
         cargo: 'Gerente de Finanzas',
@@ -89,11 +120,13 @@ export async function GET(request: NextRequest) {
         scope: 'Sólo conciliaciones Laudus; no amplía acceso general a Finanzas.',
       },
       summary: {
-        pending: (rows || []).length,
-        accountsPayable: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:cxp_inconsistente:')).length,
-        purchaseOrders: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:purchase_order_unresolved:')).length,
-        costCenters: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:cost_center_pending:')).length,
-        trace: (rows || []).filter((row) => String(row.issue_key).startsWith('laudus:open_invoice_trace_once:')).length,
+        pending: mappedRows.length,
+        accountsPayable: mappedRows.filter((row) => row.kind === 'accounts_payable_inconsistency').length,
+        purchaseOrders: mappedRows.filter((row) => row.kind === 'purchase_order_reconciliation').length,
+        costCenters: mappedRows.filter((row) => row.kind === 'cost_center_reconciliation').length,
+        trace: mappedRows.filter((row) => row.kind === 'invoice_trace').length,
+        highConfidence: mappedRows.filter((row) => row.priority === 'high_confidence').length,
+        conflicts: mappedRows.filter((row) => row.priority === 'conflict').length,
       },
       policy: {
         reasonRequired: true,
@@ -137,7 +170,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data: review, error: loadError } = await context.supabase
       .from('data_reconciliation_reviews')
-      .select('id,issue_key,status')
+      .select('id,issue_key,status,resolution_note')
       .eq('organization_id', context.organizationId)
       .eq('id', reviewId)
       .maybeSingle();
@@ -150,13 +183,16 @@ export async function POST(request: NextRequest) {
       String(review.issue_key).startsWith('laudus:cxp_inconsistente:') ||
       String(review.issue_key).startsWith('laudus:open_invoice_trace_once:') ||
       String(review.issue_key).startsWith('laudus:purchase_order_unresolved:') ||
-      String(review.issue_key).startsWith('laudus:cost_center_pending:');
+      String(review.issue_key).startsWith('laudus:cost_center_pending:') ||
+      String(review.issue_key).startsWith('laudus-ap-missing-supplier:') ||
+      String(review.issue_key).startsWith('laudus-ap-document-type-conflict:');
 
     if (!valid) return NextResponse.json({ error: 'La conciliación no pertenece a Administración y Finanzas.' }, { status: 400 });
 
     const status = decision === 'approve' ? 'accepted' : 'ignored';
     const actor = context.userName || context.userEmail || context.userId;
     const resolutionNote = [
+      review.resolution_note ? String(review.resolution_note) : null,
       `decision=${decision}`,
       'area=administracion_finanzas',
       `authority=${authority.projectLead ? 'project_lead' : 'area_owner'}`,
@@ -164,7 +200,7 @@ export async function POST(request: NextRequest) {
       `reason=${reason}`,
       'canonical_mutation=false',
       'laudus_mutation=false',
-    ].join(' | ');
+    ].filter(Boolean).join(' | ');
 
     const { error: updateError } = await context.supabase
       .from('data_reconciliation_reviews')
