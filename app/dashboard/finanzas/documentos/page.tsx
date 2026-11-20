@@ -128,9 +128,9 @@ export default function DocumentosFinanzasPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Documentos</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Facturación</h1>
           <p className="mt-2 text-muted-foreground">
-            Políticas, procedimientos e instructivos financieros con revisión y respaldo.
+            Documentos tributarios y conciliación. Emisión SII aún no habilitada.
           </p>
         </div>
         <Button asChild>
@@ -154,8 +154,39 @@ export default function DocumentosFinanzasPage() {
         </div>
       </section>
 
+      <section className="rounded-lg border bg-card p-4 sm:p-5" aria-label="Preparación para emitir DTE">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">Emisión tributaria</h2>
+          <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">No habilitada</span>
+        </div>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          La Patagua prepara la emisión en MOTIL; Finanzas debe autorizar cada documento.
+          No se asignan folios, firman XML ni envían documentos al SII desde esta pantalla.
+          La habilitación exige certificado seguro, CAF válido, validación tributaria y pruebas de punta a punta.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-md bg-muted/50 p-3">
+            <p className="text-sm font-medium">1. Preparar</p>
+            <p className="mt-1 text-xs text-muted-foreground">Clientes, ítems, referencias, impuestos y borrador</p>
+          </div>
+          <div className="rounded-md bg-muted/50 p-3">
+            <p className="text-sm font-medium">2. Autorizar</p>
+            <p className="mt-1 text-xs text-muted-foreground">Revisión y aprobación obligatoria de Finanzas</p>
+          </div>
+          <div className="rounded-md bg-muted/50 p-3">
+            <p className="text-sm font-medium">3. Emitir y verificar</p>
+            <p className="mt-1 text-xs text-muted-foreground">Firma, SII, Track ID, estado y custodia; pendiente</p>
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Tipos confirmados por Finanzas: 33 factura, 34 exenta, 46 compra, 52 guía, 56 nota de débito y 61 nota de crédito.
+          Los documentos administrativos de abajo no son DTE emitidos.
+        </p>
+      </section>
+
       <TaxReconciliationCard />
 
+      <h2 className="text-base font-semibold">Documentos administrativos</h2>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="shadow-none">
           <CardHeader className="pb-3">
