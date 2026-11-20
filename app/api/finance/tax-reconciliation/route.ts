@@ -64,23 +64,31 @@ export async function GET(request: NextRequest) {
     if (dtesResult.error) throw dtesResult.error;
     if (invoicesResult.error) throw invoicesResult.error;
 
-    const invoicesByFolio = new Map(
-      (invoicesResult.data || [])
-        .filter((row) => folioKey(row.invoice_number))
-        .map((row) => [folioKey(row.invoice_number), row]),
-    );
+    // Folios are not globally unique. Never reconcile an ambiguous invoice number.
+    const invoicesByFolio = new Map<string, NonNullable<typeof invoicesResult.data>>();
+    for (const invoice of invoicesResult.data || []) {
+      const key = folioKey(invoice.invoice_number);
+      if (!key) continue;
+      const candidates = invoicesByFolio.get(key) || [];
+      candidates.push(invoice);
+      invoicesByFolio.set(key, candidates);
+    }
 
     const rows = (dtesResult.data || []).map((dte) => {
       const direction = classifyDocument(dte.document_type, dte.receiver_tax_id, companyTaxId);
       const comparable = direction === 'inbound_invoice';
-      const invoice = comparable ? invoicesByFolio.get(folioKey(dte.folio)) || null : null;
+      const candidates = comparable ? invoicesByFolio.get(folioKey(dte.folio)) || [] : [];
+      const invoice = candidates.length === 1 ? candidates[0] : null;
+      const ambiguous = comparable && candidates.length > 1;
       const laudusTotal = amount(dte.total_amount);
       const motilTotal = amount(invoice?.total_amount);
 
       let motilStatus: 'match' | 'difference' | 'missing' | 'not_modeled' | 'not_comparable';
       if (direction === 'outbound_invoice') motilStatus = 'not_modeled';
       else if (!comparable) motilStatus = 'not_comparable';
+      else if (ambiguous) motilStatus = 'not_comparable';
       else if (!invoice) motilStatus = 'missing';
+      else if ((dte.currency_code || 'CLP').toUpperCase() !== (invoice.currency || 'CLP').toUpperCase()) motilStatus = 'not_comparable';
       else if (laudusTotal !== null && motilTotal !== null && Math.abs(laudusTotal - motilTotal) <= 1) motilStatus = 'match';
       else motilStatus = 'difference';
 
