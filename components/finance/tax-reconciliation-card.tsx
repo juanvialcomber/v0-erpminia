@@ -84,11 +84,11 @@ export function TaxReconciliationCard() {
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Laudus · MOTIL · SII</p>
           <h2 className="mt-1 text-lg font-semibold">Conciliación tributaria</h2>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Compara evidencia documental sin mezclar compras, ventas y guías. SII permanece en solo lectura y por empresa.
+            Presenta candidatos por folio entre Laudus y MOTIL. No confirma identidad tributaria ni aceptación del SII.
           </p>
         </div>
         <Badge variant={summary?.siiConnected ? 'secondary' : 'outline'}>
-          {summary?.siiConnected ? 'SII conectado' : 'SII pendiente'}
+          {summary?.siiConnected ? 'Certificado configurado' : 'SII pendiente'}
         </Badge>
       </div>
 
@@ -101,9 +101,9 @@ export function TaxReconciliationCard() {
           <div className="grid gap-px border-b bg-border sm:grid-cols-4">
             {[
               ['Documentos', summary?.documents || 0],
-              ['Coinciden', summary?.matches || 0],
-              ['Diferencias', (summary?.differences || 0) + (summary?.missingInMotil || 0)],
-              ['SII', summary?.siiConnected ? 'Conectado' : 'Pendiente'],
+              ['Sin verificar', summary?.nonComparable || 0],
+              ['Sin candidato', summary?.missingInMotil || 0],
+              ['Lectura SII', 'Pendiente'],
             ].map(([label, value]) => (
               <div key={label} className="bg-card px-4 py-3">
                 <p className="text-xs text-muted-foreground">{label}</p>
@@ -140,7 +140,7 @@ export function TaxReconciliationCard() {
                   </div>
                   <div>
                     <Badge variant="outline">
-                      {row.sii.certificateConfigured ? 'Conexión lista' : 'Pendiente conexión'}
+                      {row.sii.certificateConfigured ? 'Certificado configurado' : 'Pendiente conexión'}
                     </Badge>
                     <p className="mt-2 text-xs text-muted-foreground">
                       {row.sii.certificateConfigured ? 'Lectura DTE SII pendiente de implementar' : 'Requiere certificado propio de La Patagua'}
@@ -154,7 +154,7 @@ export function TaxReconciliationCard() {
           <details className="border-t px-4 py-3 text-xs text-muted-foreground">
             <summary className="cursor-pointer select-none hover:text-foreground">Criterio de conciliación</summary>
             <p className="mt-2 max-w-4xl">
-              Las facturas recibidas se comparan sólo contra facturas de proveedor MOTIL por folio y monto. Las facturas emitidas no se comparan contra compras, y las guías no se tratan como facturas. SII no se considera conectado hasta que exista un certificado propio de la organización.
+              El folio permite identificar candidatos, pero no acredita identidad entre facturas. Hasta verificar emisor, receptor, tipo, folio y monto, los candidatos quedan sin conciliar. Las facturas emitidas no se comparan con compras; las guías no son facturas. Un certificado configurado no implica lectura ni aceptación SII.
             </p>
           </details>
         </>

@@ -14,6 +14,7 @@ function folioKey(value: unknown) {
 }
 
 function amount(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
@@ -37,7 +38,13 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
+    // This endpoint is scoped to La Patagua until each tenant has a verified tax identity.
+    // Never apply La Patagua's RUT to an unrelated organization.
     const companyTaxId = rutKey(process.env.LAUDUS_COMPANY_VAT_ID || '84542800-K');
+    const configuredOrganizationId = String(process.env.LA_PATAGUA_ORGANIZATION_ID || '').trim();
+    if (!configuredOrganizationId || configuredOrganizationId !== context.organizationId) {
+      return NextResponse.json({ error: 'Conciliación tributaria no configurada para esta organización.' }, { status: 403 });
+    }
 
     const [dtesResult, invoicesResult, siiResult] = await Promise.all([
       context.supabase
@@ -64,28 +71,37 @@ export async function GET(request: NextRequest) {
     if (dtesResult.error) throw dtesResult.error;
     if (invoicesResult.error) throw invoicesResult.error;
 
-    const invoicesByFolio = new Map(
-      (invoicesResult.data || [])
-        .filter((row) => folioKey(row.invoice_number))
-        .map((row) => [folioKey(row.invoice_number), row]),
-    );
+    // Folios are not globally unique. Never reconcile an ambiguous invoice number.
+    const invoicesByFolio = new Map<string, NonNullable<typeof invoicesResult.data>>();
+    for (const invoice of invoicesResult.data || []) {
+      const key = folioKey(invoice.invoice_number);
+      if (!key) continue;
+      const candidates = invoicesByFolio.get(key) || [];
+      candidates.push(invoice);
+      invoicesByFolio.set(key, candidates);
+    }
 
     const rows = (dtesResult.data || []).map((dte) => {
       const direction = classifyDocument(dte.document_type, dte.receiver_tax_id, companyTaxId);
       const comparable = direction === 'inbound_invoice';
-      const invoice = comparable ? invoicesByFolio.get(folioKey(dte.folio)) || null : null;
+      const candidates = comparable ? invoicesByFolio.get(folioKey(dte.folio)) || [] : [];
+      const invoice = candidates.length === 1 ? candidates[0] : null;
+      const ambiguous = comparable && candidates.length > 1;
       const laudusTotal = amount(dte.total_amount);
       const motilTotal = amount(invoice?.total_amount);
 
       let motilStatus: 'match' | 'difference' | 'missing' | 'not_modeled' | 'not_comparable';
       if (direction === 'outbound_invoice') motilStatus = 'not_modeled';
       else if (!comparable) motilStatus = 'not_comparable';
+      else if (ambiguous) motilStatus = 'not_comparable';
       else if (!invoice) motilStatus = 'missing';
-      else if (laudusTotal !== null && motilTotal !== null && Math.abs(laudusTotal - motilTotal) <= 1) motilStatus = 'match';
-      else motilStatus = 'difference';
+      else if ((dte.currency_code || 'CLP').toUpperCase() !== (invoice.currency || 'CLP').toUpperCase()) motilStatus = 'not_comparable';
+      // Folio alone cannot prove identity across suppliers or DTE types.
+      // Keep a potential candidate for review, but never publish a false match.
+      else motilStatus = 'not_comparable';
 
       const siiStatus = siiResult?.certificateConfigured
-        ? 'connected_pending_document_read'
+        ? 'certificate_configured_document_read_unavailable'
         : 'pending_connection';
 
       return {
@@ -140,7 +156,8 @@ export async function GET(request: NextRequest) {
       missingInMotil: rows.filter((row) => row.motil.status === 'missing').length,
       outboundNotModeled: rows.filter((row) => row.motil.status === 'not_modeled').length,
       nonComparable: rows.filter((row) => row.motil.status === 'not_comparable').length,
-      siiConnected: Boolean(siiResult?.certificateConfigured),
+      siiConnected: false,
+      certificateConfigured: Boolean(siiResult?.certificateConfigured),
     };
 
     return NextResponse.json({
