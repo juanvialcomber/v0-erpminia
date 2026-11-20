@@ -90,8 +90,9 @@ export async function GET(request: NextRequest) {
       else if (ambiguous) motilStatus = 'not_comparable';
       else if (!invoice) motilStatus = 'missing';
       else if ((dte.currency_code || 'CLP').toUpperCase() !== (invoice.currency || 'CLP').toUpperCase()) motilStatus = 'not_comparable';
-      else if (laudusTotal !== null && motilTotal !== null && Math.abs(laudusTotal - motilTotal) <= 1) motilStatus = 'match';
-      else motilStatus = 'difference';
+      // Folio alone cannot prove identity across suppliers or DTE types.
+      // Keep a potential candidate for review, but never publish a false match.
+      else motilStatus = 'not_comparable';
 
       const siiStatus = siiResult?.certificateConfigured
         ? 'connected_pending_document_read'
