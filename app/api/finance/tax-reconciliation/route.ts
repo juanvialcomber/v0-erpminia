@@ -38,7 +38,13 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
+    // This endpoint is scoped to La Patagua until each tenant has a verified tax identity.
+    // Never apply La Patagua's RUT to an unrelated organization.
     const companyTaxId = rutKey(process.env.LAUDUS_COMPANY_VAT_ID || '84542800-K');
+    const configuredOrganizationId = String(process.env.LA_PATAGUA_ORGANIZATION_ID || '').trim();
+    if (!configuredOrganizationId || configuredOrganizationId !== context.organizationId) {
+      return NextResponse.json({ error: 'Conciliación tributaria no configurada para esta organización.' }, { status: 403 });
+    }
 
     const [dtesResult, invoicesResult, siiResult] = await Promise.all([
       context.supabase
@@ -95,7 +101,7 @@ export async function GET(request: NextRequest) {
       else motilStatus = 'not_comparable';
 
       const siiStatus = siiResult?.certificateConfigured
-        ? 'connected_pending_document_read'
+        ? 'certificate_configured_document_read_unavailable'
         : 'pending_connection';
 
       return {
@@ -150,7 +156,8 @@ export async function GET(request: NextRequest) {
       missingInMotil: rows.filter((row) => row.motil.status === 'missing').length,
       outboundNotModeled: rows.filter((row) => row.motil.status === 'not_modeled').length,
       nonComparable: rows.filter((row) => row.motil.status === 'not_comparable').length,
-      siiConnected: Boolean(siiResult?.certificateConfigured),
+      siiConnected: false,
+      certificateConfigured: Boolean(siiResult?.certificateConfigured),
     };
 
     return NextResponse.json({
