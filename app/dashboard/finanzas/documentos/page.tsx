@@ -136,6 +136,22 @@ export default function DocumentosFinanzasPage() {
         </Button>
       </div>
 
+      <section className="rounded-lg border bg-card px-4 py-4" aria-label="Documentos tributarios electrónicos">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Documentos tributarios (DTE)</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Facturas, guías y notas tributarias. La conexión con Tax Core está en preparación:
+              todavía no hay documentos DTE sincronizados ni validados por el SII en esta vista.
+              Los documentos de políticas y procedimientos se mantienen separados.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/finanzas/trazabilidad">Ver trazabilidad financiera</Link>
+          </Button>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="shadow-none">
           <CardHeader className="pb-3">
