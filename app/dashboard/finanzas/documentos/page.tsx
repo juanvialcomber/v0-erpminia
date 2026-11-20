@@ -8,6 +8,7 @@ import { DocumentList, Document } from '@/components/documents/document-list';
 import { DocumentReviewModal, type DocumentReviewDocument } from '@/components/documents/document-review-modal';
 import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TaxReconciliationCard } from '@/components/finance/tax-reconciliation-card';
 
 interface DocumentStats {
   total: number;
@@ -126,7 +127,8 @@ export default function DocumentosFinanzasPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas</p>\n          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Documentos</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Finanzas</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Documentos</h1>
           <p className="mt-2 text-muted-foreground">
             Políticas, procedimientos e instructivos financieros con revisión y respaldo.
           </p>
@@ -141,8 +143,8 @@ export default function DocumentosFinanzasPage() {
           <div>
             <h2 className="text-base font-semibold">Documentos tributarios (DTE)</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Facturas, guías y notas tributarias. La conexión con Tax Core está en preparación:
-              todavía no hay documentos DTE sincronizados ni validados por el SII en esta vista.
+              Facturas, guías y notas tributarias. La conciliación disponible utiliza evidencia de Laudus y MOTIL. Tax Core todavía
+              no aporta documentos XML validados por el SII a esta vista.
               Los documentos de políticas y procedimientos se mantienen separados.
             </p>
           </div>
@@ -151,6 +153,8 @@ export default function DocumentosFinanzasPage() {
           </Button>
         </div>
       </section>
+
+      <TaxReconciliationCard />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         <Card className="shadow-none">
