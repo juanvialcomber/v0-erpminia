@@ -47,7 +47,9 @@ function money(value: number | null, currency: string | null) {
 }
 
 function directionLabel(value: ReconciliationRow['direction']) {
-  if (value === 'inbound_invoice') return 'Factura recibida';\n  if (value === 'purchase_invoice_issued') return 'Factura de compra emitida';\n  if (value === 'purchase_invoice_role_conflict') return 'Factura de compra · validar emisor';
+  if (value === 'inbound_invoice') return 'Factura recibida';
+  if (value === 'purchase_invoice_issued') return 'Factura de compra emitida';
+  if (value === 'purchase_invoice_role_conflict') return 'Factura de compra · validar emisor';
   if (value === 'outbound_invoice') return 'Factura emitida';
   if (value === 'waybill') return 'Guía';
   return 'Otro DTE';
