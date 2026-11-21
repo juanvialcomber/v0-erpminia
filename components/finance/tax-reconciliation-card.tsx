@@ -11,7 +11,7 @@ type ReconciliationRow = {
   counterpartyTaxId: string | null;
   issuedDate: string | null;
   laudus: { status: string; total: number | null; currency: string | null };
-  motil: { status: 'match' | 'difference' | 'missing' | 'not_modeled' | 'not_comparable'; total: number | null; currency: string | null };
+  motil: { status: 'missing' | 'not_modeled' | 'not_comparable'; total: number | null; currency: string | null };
   sii: { status: 'pending_connection' | 'certificate_configured_document_read_unavailable'; certificateConfigured: boolean; writesEnabled: false };
 };
 
@@ -19,8 +19,6 @@ type ReconciliationResponse = {
   generatedAt?: string;
   summary?: {
     documents?: number;
-    matches?: number;
-    differences?: number;
     missingInMotil?: number;
     outboundNotModeled?: number;
     nonComparable?: number;
@@ -56,8 +54,6 @@ function directionLabel(value: ReconciliationRow['direction']) {
 }
 
 function motilLabel(value: ReconciliationRow['motil']['status']) {
-  if (value === 'match') return 'Coincide';
-  if (value === 'difference') return 'Diferencia';
   if (value === 'missing') return 'Sin candidato por folio';
   if (value === 'not_modeled') return 'Aún no modelado';
   return 'No comparable';
@@ -65,7 +61,7 @@ function motilLabel(value: ReconciliationRow['motil']['status']) {
 
 function motilVariant(value: ReconciliationRow['motil']['status']) {
   if (value === 'match') return 'secondary' as const;
-  if (value === 'difference' || value === 'missing') return 'destructive' as const;
+  if (value === 'missing') return 'destructive' as const;
   return 'outline' as const;
 }
 
