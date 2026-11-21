@@ -6,4 +6,4 @@ export type TaxDocumentDirection =
   | 'waybill'
   | 'other';
 export function classifyTaxDocument(documentType: unknown, issuerTaxId: unknown, receiverTaxId: unknown, companyTaxId: unknown): TaxDocumentDirection;
-export function taxDocumentCounterparty(direction: TaxDocumentDirection, issuerTaxId: unknown, receiverTaxId: unknown): string | null;
+export function taxDocumentCounterparty(direction: TaxDocumentDirection, issuerTaxId: unknown, receiverTaxId: unknown, companyTaxId: unknown): string | null;
