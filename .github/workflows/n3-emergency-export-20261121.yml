@@ -1,0 +1,36 @@
+name: N3uralia emergency source archive
+on:
+  push:
+    branches:
+      - emergency-offsite-2026-11-21
+permissions:
+  contents: read
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout complete Git history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create and verify portable Git bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p offsite
+          git cat-file -e c5d88510dacd18730c44f4518eeb10ac2c92bb3f^{commit}
+          git bundle create offsite/motil.bundle --all
+          git bundle verify offsite/motil.bundle
+          git bundle list-heads offsite/motil.bundle > offsite/refs.txt
+          git rev-parse HEAD > offsite/export-commit.txt
+          (cd offsite && sha256sum motil.bundle > checksums.sha256)
+      - name: Upload private downloadable source archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: n3uralia-motil-emergency-20261121
+          path: offsite/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
