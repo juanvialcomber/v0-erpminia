@@ -2,16 +2,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+const classifier = readFileSync(new URL('../lib/finance/tax-document-classification.mjs', import.meta.url), 'utf8');
 const route = readFileSync(new URL('../app/api/finance/tax-reconciliation/route.ts', import.meta.url), 'utf8');
 const card = readFileSync(new URL('../components/finance/tax-reconciliation-card.tsx', import.meta.url), 'utf8');
 const page = readFileSync(new URL('../app/dashboard/finanzas/trazabilidad/page.tsx', import.meta.url), 'utf8');
 const client = readFileSync(new URL('../lib/integrations/n3uralia-tax/client.ts', import.meta.url), 'utf8');
 
 test('tax reconciliation preserves document semantics', () => {
-  assert.match(route, /inbound_invoice/);
-  assert.match(route, /outbound_invoice/);
-  assert.match(route, /waybill/);
-  assert.match(route, /const comparable = direction === 'inbound_invoice'/);
+  assert.match(classifier, /inbound_invoice/);
+  assert.match(classifier, /outbound_invoice/);
+  assert.match(classifier, /code === 52.*waybill/s);
+  assert.match(classifier, /code === 46/);
+  assert.match(route, /classifyTaxDocument\(dte\.document_type, dte\.issuer_tax_id, dte\.receiver_tax_id, companyTaxId\)/);
+  assert.match(route, /const comparable = direction === 'inbound_invoice' \|\| direction === 'purchase_invoice_issued'/);
   assert.match(route, /outbound_invoice'\) motilStatus = 'not_modeled'/);
   assert.match(route, /!comparable\) motilStatus = 'not_comparable'/);
 });
