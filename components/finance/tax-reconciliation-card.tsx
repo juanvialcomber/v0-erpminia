@@ -7,12 +7,12 @@ type ReconciliationRow = {
   id: string;
   documentType: string | null;
   folio: string | null;
-  direction: 'inbound_invoice' | 'outbound_invoice' | 'waybill' | 'other';
+  direction: 'inbound_invoice' | 'outbound_invoice' | 'purchase_invoice_issued' | 'purchase_invoice_role_conflict' | 'waybill' | 'other';
   counterpartyTaxId: string | null;
   issuedDate: string | null;
   laudus: { status: string; total: number | null; currency: string | null };
   motil: { status: 'match' | 'difference' | 'missing' | 'not_modeled' | 'not_comparable'; total: number | null; currency: string | null };
-  sii: { status: 'pending_connection' | 'connected_pending_document_read'; certificateConfigured: boolean; writesEnabled: false };
+  sii: { status: 'pending_connection' | 'certificate_configured_document_read_unavailable'; certificateConfigured: boolean; writesEnabled: false };
 };
 
 type ReconciliationResponse = {
@@ -47,7 +47,7 @@ function money(value: number | null, currency: string | null) {
 }
 
 function directionLabel(value: ReconciliationRow['direction']) {
-  if (value === 'inbound_invoice') return 'Factura recibida';
+  if (value === 'inbound_invoice') return 'Factura recibida';\n  if (value === 'purchase_invoice_issued') return 'Factura de compra emitida';\n  if (value === 'purchase_invoice_role_conflict') return 'Factura de compra · validar emisor';
   if (value === 'outbound_invoice') return 'Factura emitida';
   if (value === 'waybill') return 'Guía';
   return 'Otro DTE';
@@ -56,7 +56,7 @@ function directionLabel(value: ReconciliationRow['direction']) {
 function motilLabel(value: ReconciliationRow['motil']['status']) {
   if (value === 'match') return 'Coincide';
   if (value === 'difference') return 'Diferencia';
-  if (value === 'missing') return 'Falta en MOTIL';
+  if (value === 'missing') return 'Sin candidato por folio';
   if (value === 'not_modeled') return 'Aún no modelado';
   return 'No comparable';
 }
