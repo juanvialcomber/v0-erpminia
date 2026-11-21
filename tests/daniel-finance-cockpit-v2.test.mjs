@@ -22,7 +22,7 @@ test('summary page stays intentionally lightweight',()=>{
 
 test('summary routes detail into canonical finance sections',()=>{
   assert.match(page,/Pagos.*Proveedores.*Centros de costos.*Trazabilidad/s);
-  assert.match(page,/Reportes, fuentes, documentos y calendario/);
+  assert.match(page,/Facturación/);\n  assert.match(page,/Reportes, fuentes y calendario/);\n  assert.match(page,/dashboard\\/finanzas\\/documentos/);
   assert.match(page,/dashboard\/finanzas\/pagos/);
   assert.match(page,/dashboard\/finanzas\/proveedores/);
   assert.match(page,/dashboard\/finanzas\/centros/);
