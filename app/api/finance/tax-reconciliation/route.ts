@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
       const laudusTotal = amount(dte.total_amount);
       const motilTotal = amount(invoice?.total_amount);
 
-      let motilStatus: 'match' | 'difference' | 'missing' | 'not_modeled' | 'not_comparable';
+      let motilStatus: 'missing' | 'not_modeled' | 'not_comparable';
       if (direction === 'outbound_invoice') motilStatus = 'not_modeled';
       else if (!comparable) motilStatus = 'not_comparable';
       else if (ambiguous) motilStatus = 'not_comparable';
@@ -144,8 +144,6 @@ export async function GET(request: NextRequest) {
 
     const summary = {
       documents: rows.length,
-      matches: rows.filter((row) => row.motil.status === 'match').length,
-      differences: rows.filter((row) => row.motil.status === 'difference').length,
       missingInMotil: rows.filter((row) => row.motil.status === 'missing').length,
       outboundNotModeled: rows.filter((row) => row.motil.status === 'not_modeled').length,
       nonComparable: rows.filter((row) => row.motil.status === 'not_comparable').length,
