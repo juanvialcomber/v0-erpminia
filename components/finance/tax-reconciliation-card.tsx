@@ -60,7 +60,6 @@ function motilLabel(value: ReconciliationRow['motil']['status']) {
 }
 
 function motilVariant(value: ReconciliationRow['motil']['status']) {
-  if (value === 'match') return 'secondary' as const;
   if (value === 'missing') return 'destructive' as const;
   return 'outline' as const;
 }
@@ -100,7 +99,7 @@ export function TaxReconciliationCard() {
             {[
               ['Documentos', summary?.documents || 0],
               ['Sin verificar', summary?.nonComparable || 0],
-              ['Sin candidato', summary?.missingInMotil || 0],
+              ['Sin candidato por folio', summary?.missingInMotil || 0],
               ['Lectura SII', 'Pendiente'],
             ].map(([label, value]) => (
               <div key={label} className="bg-card px-4 py-3">
