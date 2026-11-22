@@ -6,11 +6,6 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 type CommitmentStatus = 'open' | 'in_progress' | 'blocked' | 'done';
 const allowedStatuses = new Set<CommitmentStatus>(['open', 'in_progress', 'blocked', 'done']);
 
-const columns = [
-  'id', 'assignee_profile_id', 'title', 'detail', 'domain', 'priority',
-  'status', 'due_date', 'source_reference', 'resolution_note', 'updated_at',
-].join(',');
-
 export async function GET(request: NextRequest) {
   const ctx = await getOrganizationContext(request);
   if (!ctx.ok) return ctx.response;
@@ -21,7 +16,7 @@ export async function GET(request: NextRequest) {
   const showTeam = isAdmin && request.nextUrl.searchParams.get('scope') === 'team';
   let query = ctx.supabase
     .from('motil_operational_commitments')
-    .select(columns)
+    .select('id, assignee_profile_id, title, detail, domain, priority, status, due_date, source_reference, resolution_note, updated_at')
     .eq('organization_id', ctx.organizationId)
     .order('created_at', { ascending: false })
     .limit(100);
