@@ -248,8 +248,6 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
       </div>
     </section> : null}
 
-    {showArielCockpit ? <MaintenanceMaterialsAttention locale={locale} /> : null}
-
     {showArielCockpit && decisionOfDay ? <Card className="shadow-none" aria-label="Decisión del día">
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -275,6 +273,8 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
         </div>
       </CardContent>
     </Card> : null}
+
+    {showArielCockpit ? <MaintenanceMaterialsAttention locale={locale} /> : null}
 
     {showArielCockpit ? <div className="grid gap-4 xl:grid-cols-2">
       <Card className="shadow-none">
