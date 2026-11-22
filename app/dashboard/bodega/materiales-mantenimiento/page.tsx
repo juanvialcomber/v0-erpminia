@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, Boxes, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Boxes, RefreshCw } from 'lucide-react';
+import { useModuleAccess } from '@/hooks/use-module-access';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageHeader, PageHeaderActions, PageHeaderContent, PageHeaderDescription, PageHeaderEyebrow, PageHeaderTitle } from '@/components/ui/page-header';
@@ -70,6 +71,11 @@ const reconciliationLabel: Record<string, string> = {
 
 function dateLabel(value: string | null | undefined) {
   if (!value) return 'Sin fecha';
+  // A calendar date from Laudus is not a UTC timestamp. Otherwise Santiago
+  // displays the previous day for values such as "2026-11-22".
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(value + 'T00:00:00Z'));
+  }
   return new Intl.DateTimeFormat('es-CL', { dateStyle: 'medium', timeZone: 'America/Santiago' }).format(new Date(value));
 }
 
@@ -81,6 +87,8 @@ function timeLabel(value: string | null | undefined) {
 export default function BodegaMaintenanceSupplyPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/bodega/maintenance-supply', fetcher, { revalidateOnFocus: false });
   const [showHistorical, setShowHistorical] = useState(false);
+  const { ready: accessReady, canView } = useModuleAccess();
+  const canOpenOrders = accessReady && canView('mant_operaciones');
 
   const sourceAuthority = data?.sourceAuthority;
   const rows = data?.rows || [];
@@ -93,11 +101,11 @@ export default function BodegaMaintenanceSupplyPage() {
     <PageHeader>
       <PageHeaderContent>
         <PageHeaderEyebrow>Bodega · Mantención</PageHeaderEyebrow>
-        <PageHeaderTitle>Materiales vinculados a OT</PageHeaderTitle>
-        <PageHeaderDescription>Compara materiales requeridos por OT con el corte de Laudus de Bodega Central (002) para validar la transición hacia stock canónico mantenido por MOTIL.</PageHeaderDescription>
+        <PageHeaderTitle>Materiales de OT</PageHeaderTitle>
+        <PageHeaderDescription>Consulta materiales registrados en órdenes de trabajo y compáralos con Bodega Central (002). Esta vista no modifica entregas ni existencias.</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
-        <Button asChild variant="outline"><Link href="/dashboard/bodega"><ArrowLeft className="h-4 w-4" />Volver a Bodega</Link></Button>
+        {canOpenOrders ? <Button asChild variant="outline"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Ver órdenes de trabajo</Link></Button> : null}
         <Button variant="outline" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="h-4 w-4" />Actualizar</Button>
       </PageHeaderActions>
     </PageHeader>
@@ -120,7 +128,7 @@ export default function BodegaMaintenanceSupplyPage() {
     {isLoading ? <StatePanel title="Cargando materiales de OT" description="Consultando requerimientos y la fuente de stock." /> : null}
     {!isLoading && !error && rows.length === 0 ? <StatePanel title="Aún no hay materiales registrados para estas OT" description="Abre una OT vigente y registra sus materiales necesarios. No se crean solicitudes automáticamente." /> : null}
     {!isLoading && !error && rows.length > 0 && activeRows.length === 0 ? (
-      <StatePanel title="Sin materiales solicitados en OT activas" description="Las solicitudes registradas corresponden a OT finalizadas. Son antecedentes históricos, no pedidos pendientes para Bodega." />
+      <StatePanel title="Sin materiales solicitados en OT activas" description="Los materiales registrados pertenecen a OT finalizadas. Para nuevas solicitudes, Planificación debe registrar los materiales en una OT vigente; el historial no representa entregas pendientes." actions={canOpenOrders ? <Button asChild variant="outline" size="sm"><Link href="/dashboard/mantenimiento/ordenes-trabajo">Revisar OT activas</Link></Button> : undefined} />
     ) : null}
 
     {!isLoading && !error && rows.length > 0 ? <div className="space-y-3">
@@ -153,7 +161,7 @@ export default function BodegaMaintenanceSupplyPage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Cantidad solicitada</p><p className="mt-1 font-medium">{quantity(row.quantityRequired, row.unit)}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Existencia observada · Laudus Central (002)</p><p className="mt-1 font-medium">{quantity(row.observedLaudusQuantity, row.unit)}</p></div>
-            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Estado del requerimiento</p><p className="mt-1 font-medium">{row.requirementStatus || 'Sin estado'}</p></div>
+            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Estado del requerimiento</p><p className="mt-1 font-medium">{row.requirementStatus === 'procurement_needed' ? 'Compra por revisar' : row.requirementStatus === 'fulfilled' ? 'Atendido' : row.requirementStatus === 'pending' ? 'Pendiente de revisión' : 'Estado sin confirmar'}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Último dato de stock</p><p className="mt-1 font-medium">{timeLabel(row.stockSyncedAt)}</p></div>
           </div>
           {historical ? <p className="mt-3 text-xs text-muted-foreground">Requerimiento asociado a una OT histórica; se muestra para conciliación y no se presenta como trabajo pendiente.</p> : null}

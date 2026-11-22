@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import useSWR from 'swr';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 type ViewerMode = 'leadership' | 'planning' | 'execution' | 'general';
 type ViewerContext = { mode?: ViewerMode };
@@ -20,6 +21,8 @@ const flowItems: NavItem[] = [
 
 const supportItems: NavItem[] = [
   { href: '/dashboard/mantenimiento', label: 'Resumen' },
+  { href: '/dashboard/acciones', label: 'Mi trabajo' },
+  { href: '/dashboard/bodega/materiales-mantenimiento', label: 'Materiales de OT' },
   { href: '/dashboard/mantenimiento/torre-control', label: 'Torre de control' },
   { href: '/dashboard/mantenimiento/ordenes-trabajo/imputacion', label: 'Imputación' },
   { href: '/dashboard/mantenimiento/equipos', label: 'Activos' },
@@ -34,19 +37,19 @@ const supportItems: NavItem[] = [
 const roleNavigation: Record<ViewerMode, { flow: string[]; support: string[] }> = {
   leadership: {
     flow: ['Planificar', 'Órdenes', 'Cierre'],
-    support: ['Resumen', 'Torre de control', 'Imputación', 'Activos', 'Maestranza', 'Residuos', 'Personal', 'Indicadores', 'Fuentes', 'Laudus'],
+    support: ['Resumen', 'Mi trabajo', 'Materiales de OT', 'Torre de control', 'Imputación', 'Activos', 'Maestranza', 'Residuos', 'Personal', 'Indicadores', 'Fuentes', 'Laudus'],
   },
   planning: {
     flow: ['Planificar', 'Órdenes'],
-    support: ['Resumen', 'Torre de control', 'Activos', 'Fuentes', 'Laudus'],
+    support: ['Resumen', 'Mi trabajo', 'Materiales de OT', 'Torre de control', 'Activos', 'Fuentes', 'Laudus'],
   },
   execution: {
     flow: ['Órdenes', 'Cierre'],
-    support: ['Resumen', 'Torre de control'],
+    support: ['Resumen', 'Mi trabajo', 'Torre de control'],
   },
   general: {
     flow: ['Planificar', 'Órdenes', 'Cierre'],
-    support: ['Resumen', 'Imputación', 'Activos', 'Maestranza', 'Residuos', 'Personal', 'Indicadores', 'Fuentes'],
+    support: ['Resumen', 'Mi trabajo', 'Materiales de OT', 'Imputación', 'Activos', 'Maestranza', 'Residuos', 'Personal', 'Indicadores', 'Fuentes'],
   },
 };
 
@@ -107,6 +110,7 @@ function isSupportActive(pathname: string, href: string) {
 
 export default function MaintenanceLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { canView, ready } = useModuleAccess();
   const { data: viewer } = useSWR<ViewerContext>(
     '/api/maintenance/viewer-context',
     (url) => fetcher<ViewerContext>(url),
@@ -115,7 +119,9 @@ export default function MaintenanceLayout({ children }: { children: ReactNode })
   const mode: ViewerMode = viewer?.mode || 'general';
   const allowed = roleNavigation[mode];
   const visibleFlowItems = flowItems.filter((item) => allowed.flow.includes(item.label));
-  const visibleSupportItems = supportItems.filter((item) => allowed.support.includes(item.label));
+  const visibleSupportItems = supportItems.filter((item) =>
+    allowed.support.includes(item.label) &&
+    (item.href !== '/dashboard/bodega/materiales-mantenimiento' || (ready && canView('bodega_inventario'))));
 
   return (
     <div className="space-y-5">

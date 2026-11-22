@@ -133,10 +133,10 @@ export default function BodegaAcuerdosPage() {
       <PageHeader>
         <PageHeaderContent>
           <PageHeaderEyebrow>Bodega · Reunión 16 de noviembre</PageHeaderEyebrow>
-          <PageHeaderTitle>Acciones de Esteban</PageHeaderTitle>
-          <PageHeaderDescription>Completa cada levantamiento, guarda avances y adjunta evidencia. Los mínimos se guardan como propuesta; no cambian el stock.</PageHeaderDescription>
+          <PageHeaderTitle>Definiciones de Bodega</PageHeaderTitle>
+          <PageHeaderDescription>Registra reportes, responsables, mínimos propuestos y flujos acordados con Esteban y Ariel. Las tareas individuales se gestionan en Mi trabajo; estas definiciones no modifican stock.</PageHeaderDescription>
         </PageHeaderContent>
-        <PageHeaderActions><Button asChild variant="outline"><Link href="/dashboard/bodega">Abrir inventario y conciliación <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></PageHeaderActions>
+        <PageHeaderActions><Button asChild variant="outline"><Link href="/dashboard/acciones">Mi trabajo <ArrowRight className="ml-2 h-4 w-4" /></Link></Button></PageHeaderActions>
       </PageHeader>
 
       <section className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="Avance de acciones">
