@@ -16,6 +16,7 @@ import { DataSourceStatusStrip } from '@/components/data/data-source-status-stri
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
+import { CentralStockCanonicalizationPreview } from '@/components/bodega/central-stock-canonicalization-preview';
 import { LaudusInventoryReconciliationQueue } from '@/components/integrations/laudus-inventory-reconciliation-queue';
 import { ProcurementReceiptInbox } from '@/components/procurement/procurement-receipt-inbox';
 
@@ -73,8 +74,10 @@ export default function BodegaPage() {
         <PageHeaderDescription>{negativeStockMode ? 'Revisa únicamente posiciones con saldo negativo antes de usar disponibilidad, reposición o cobertura para decidir.' : 'Qué existe, qué falta y qué requiere conciliación antes de comprometer mantenimiento o compras.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
+        {!negativeStockMode ? <Button asChild><Link href="/dashboard/bodega/verificar-stock">Verificar stock real</Link></Button> : null}
+        {!negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega/materiales-mantenimiento">Materiales de OT</Link></Button> : null}
         {negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega">Ver todo el inventario</Link></Button> : null}
-        {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
+        {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild variant="outline"><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
       </PageHeaderActions>
     </PageHeader>
 
@@ -91,23 +94,33 @@ export default function BodegaPage() {
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisión</p>
-        <p className="mt-2 text-sm font-medium">{Number(operationalDifferenceSummary?.blockingReviews||0)>0?number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión':'Sin diferencias operacionales bloqueantes'}</p>
+        <p className="mt-2 text-sm font-medium">{!operationalDifferenceSummary ? 'Conciliación aún no disponible' : Number(operationalDifferenceSummary.blockingReviews)>0 ? number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión' : 'Sin diferencias operacionales bloqueantes'}</p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">Los contrastes legacy se conservan como evidencia histórica; no bloquean disponibilidad cuando Laudus es la fuente primaria.</p>
         <Link href={Number(overview.negative_stock_products||0)>0?'/dashboard/bodega?status=negative':'/dashboard/bodega/fuentes'} className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">{Number(overview.negative_stock_products||0)>0?'Conciliar saldos':'Revisar fuentes'} <ArrowRight className="h-3 w-3"/></Link>
       </div>
     </section> : null}
 
-    {!negativeStockMode ? <DataSourceStatusStrip
-      reviewHref="/dashboard/calidad-datos"
-      sources={[
-        sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
-        sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
-        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando la última sincronización del ERP.' }),
-        sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
-      ]}
-    /> : null}
+    {!negativeStockMode ? <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer px-4 py-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        Fuentes y preparación del stock
+        <span className="mt-1 block text-xs font-normal text-muted-foreground">Ver detalles de Laudus, cruces de datos y preparación de saldos. No modifica existencias.</span>
+      </summary>
+      <div className="space-y-4 border-t p-4">
+        {!negativeStockMode ? <DataSourceStatusStrip
+          reviewHref="/dashboard/calidad-datos"
+          sources={[
+            sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
+            sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
+            sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando la última sincronización del ERP.' }),
+            sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
+          ]}
+        /> : null}
 
-    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
+        {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
+
+        {!negativeStockMode ? <CentralStockCanonicalizationPreview /> : null}
+      </div>
+    </details> : null}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
 

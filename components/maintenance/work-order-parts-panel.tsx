@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
+import Link from 'next/link';
 import { AlertCircle, CheckCircle2, PackageSearch, RefreshCw, RotateCcw, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -196,7 +197,7 @@ export function WorkOrderPartsPanel({ workOrderId }: { workOrderId: string }) {
         </div>
 
         <section className="space-y-4 rounded-lg border p-4">
-          <div><h3 className="font-medium">Entregar desde bodega</h3><p className="mt-1 text-sm text-muted-foreground">La entrega descuenta existencias y queda vinculada a esta orden.</p></div>
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="font-medium">Entregar desde bodega</h3><p className="mt-1 text-sm text-muted-foreground">La entrega descuenta existencias y queda vinculada a esta orden.</p></div><Link href="/dashboard/bodega/materiales-mantenimiento" className="text-sm font-medium text-primary underline underline-offset-4">Ver conciliación Bodega–Mantención</Link></div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2"><Label htmlFor={`part-search-${workOrderId}`}>Buscar repuesto</Label><Input id={`part-search-${workOrderId}`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Código, nombre o ubicación" /></div>
             <div className="space-y-2"><Label htmlFor={`part-quantity-${workOrderId}`}>Cantidad a entregar</Label><Input id={`part-quantity-${workOrderId}`} type="number" min={1} step={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value || 1))} /></div>
