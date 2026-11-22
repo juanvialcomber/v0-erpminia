@@ -108,3 +108,11 @@ test('storage is tenant-isolated, service-only, audited, and customer-specific d
   assert.doesNotMatch(migration, /INSERT INTO public\.motil_operational_commitments\s*\(/);
   assert.doesNotMatch(api, /\.from\('warehouse_stock'\)/);
 });
+
+
+test('unapplied optional migration does not crash the existing operational inbox', () => {
+  assert.match(api, /error\.code === '42P01'/);
+  assert.match(api, /error\.code === 'PGRST205'/);
+  assert.match(api, /feature_available: false/);
+  assert.match(ui, /if \(data\?\.feature_available === false\) return null/);
+});
