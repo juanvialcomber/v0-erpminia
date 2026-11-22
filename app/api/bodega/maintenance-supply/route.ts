@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         : Promise.resolve({ data: [], error: null }),
       productIds.length
         ? context.supabase
-            .from('laudus_inventory_reconciliation_service_v1')
+            .from('laudus_central_warehouse_stock_reconciliation_v1')
             .select('canonical_product_id,laudus_stock,unit_of_measure,reconciliation_state,source_date_to,laudus_synced_at')
             .eq('organization_id', context.organizationId)
             .in('canonical_product_id', productIds)
