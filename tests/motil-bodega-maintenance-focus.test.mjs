@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { summarizeMaterialAttention } from '../lib/maintenance/material-attention.mjs';
+import { canReviewMaterialAttention, summarizeMaterialAttention } from '../lib/maintenance/material-attention.mjs';
 import { stockSearchPattern } from '../lib/bodega/stock-search-pattern.mjs';
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), 'utf8');
@@ -13,6 +13,15 @@ const sample = (id, priority, scheduled_date = null) => ({
   work_order_number: id,
   title: 'OT sintética ' + id,
   status: 'open',
+});
+
+test('cross-OT material review accepts ED planning and leadership only, never mechanics', () => {
+  assert.equal(canReviewMaterialAttention('planning', 'ED'), true);
+  assert.equal(canReviewMaterialAttention('leadership', 'ED'), true);
+  assert.equal(canReviewMaterialAttention('planning', 'LEC'), false);
+  assert.equal(canReviewMaterialAttention('execution', 'ED'), false);
+  assert.equal(canReviewMaterialAttention('oversight', 'ED'), false);
+  assert.equal(canReviewMaterialAttention('general', 'ED'), false);
 });
 
 test('materials-review candidates never count an OT with recorded requirements', () => {
@@ -84,8 +93,9 @@ test('maintenance attention is restricted to management scope and keeps material
   const page = read('components/maintenance/materials-attention.tsx');
   const home = read('components/dashboard/maintenance-home.tsx');
   const detail = read('components/maintenance/work-order-detail.tsx');
-  assert.match(api, /canBypassAssignedMaintenanceExecution/);
-  assert.match(api, /canBypassAssignedMaintenanceExecution\(context, accessLevel\)/);
+  assert.match(api, /getUserModuleAccess\(context\.userId\)/);
+  assert.match(api, /resolveMaintenanceViewerMode\(cargoName\)/);
+  assert.match(api, /canReviewMaterialAttention\(viewerMode, accessLevel\)/);
   assert.match(api, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(api, /eq\('organization_id', context\.organizationId\)/);
   assert.match(api, /neq\('status', 'cancelled'\)/);
