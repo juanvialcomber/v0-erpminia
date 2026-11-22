@@ -27,7 +27,7 @@ test('transitional supervisor approval does not require confirmation of requeste
 test('transitional approval UI does not demand false installation attestations', () => {
   assert.match(approval,/Modo transición: puedes aprobar el trabajo sin confirmar instalaciones/);
   assert.match(approval,/confirmMaterialsInstalled/);
-  assert.match(approval,/disabled=\{approving \|\| rejecting\}/);
+  assert.match(approval,/disabled=\\{approving \\|\\| rejecting \\|\\| \\(materialLines > 0 && !materialsTransitionEnabled && !confirmMaterialsInstalled\\)\\}/);
   assert.doesNotMatch(approval,/materialLines > 0 && !confirmMaterialsInstalled/);
   assert.match(approval,/La aprobación no declarará instalaciones/);
 });
