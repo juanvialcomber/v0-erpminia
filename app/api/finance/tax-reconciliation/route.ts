@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       taxCoreResult.readOnly === true &&
       taxCoreResult.siiWritesEnabled === false &&
       taxCoreResult.accountingPromotion === false;
-    const taxCoreDocuments = taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
+    const taxCoreDocuments: TaxCoreSourceDocument[] = taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
       ? taxCoreResult.documents.filter(isTaxCoreSourceDocument).map((document: TaxCoreSourceDocument) => ({
           tenantRut: document.tenantRut,
           issuerRut: document.issuerRut,
