@@ -374,3 +374,15 @@ Estos umbrales habilitan escala inicial, no E4.
 - Resiliencia: si la recuperación Legal falla, el sync procurement principal no cae; la brecha queda explícita en metadata.
 - Nivel actual: L2/L3 habilitador de trazabilidad. El valor L4 se activa sólo después de three-way match y aprobación humana.
 - Métrica siguiente: facturas Legal con traza exacta de OC / facturas Legal observadas; líneas recuperadas; trazas recuperadas; llamadas API consumidas por corrida.
+
+## Foco operativo Bodega y Mantenimiento - 2026-11-22
+
+- **Problema observado:** Bodega requiere iniciar y medir los conteos fisicos de Central (002); Mantenimiento necesita revisar las OT activas sin requerimientos de materiales registrados, sin asumir faltantes.
+- **Cambio:** la verificacion de stock ofrece avance derivado por estado y busqueda por codigo o nombre. Mantenimiento presenta una lista acotada de OT para revision humana de necesidades de repuestos, ordenada por prioridad y fecha.
+- **Fuente:** bodega_central_stock_verification_queue_v1, maintenance_work_orders y work_order_material_requirements (consultas por organizacion, sin nuevas tablas maestras).
+- **Decision humana:** Esteban determina el conteo real y sus prioridades; Ariel decide cuales OT necesitan materiales. La ausencia de requerimientos no demuestra un faltante. Ninguna consulta descuenta stock, genera vales ni impide cerrar una OT.
+- **Metrica Bodega:** conteos vigentes de productos con saldo (= matched + difference) / total productos con saldo de Bodega Central. source_changed demanda nueva verificacion. Reportar numerador, denominador, corte Laudus y fecha de consulta.
+- **Metrica Mantenimiento:** OT activas con requerimientos registrados / OT activas revisadas. Esta tasa mide captura de necesidades, no cobertura de materiales requeridos por toda OT. Si hay paginacion parcial, no publicar porcentaje global.
+- **Calidad:** autorizacion por tenant y rol, ninguna mutacion automatica de inventario, mantenimiento del cierre tecnico del mecanico y de la separacion respecto de aprobacion del supervisor.
+- **Nivel de valor:** L2, visibilidad operacional habilitada. No se declara ahorro, productividad ni beneficio CLP observado sin baseline y trabajo humano residual medidos.
+- **Siguiente medicion:** numero de SKU criticos realmente contados por Esteban, revisiones de OT realizadas por Ariel y tiempo invertido por cada revision; comparar con la misma poblacion y periodo antes de atribuir impacto.
