@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       productIds.length
         ? context.supabase
             .from('laudus_central_warehouse_stock_reconciliation_v1')
-            .select('canonical_product_id,laudus_stock,unit_of_measure,reconciliation_state,source_date_to,laudus_synced_at')
+            .select('canonical_product_id,laudus_stock,unit_of_measure,product_reconciliation_status,reconciliation_state,source_date_to,laudus_synced_at')
             .eq('organization_id', context.organizationId)
             .in('canonical_product_id', productIds)
         : Promise.resolve({ data: [], error: null }),
@@ -103,15 +103,15 @@ export async function GET(request: NextRequest) {
         productId: product.id,
         productCode: product.product_code,
         productName: product.name,
-        unit: product.unit || observation?.unit_of_measure || null,
+        unit: product.unit || (observation?.product_reconciliation_status === 'identity_conflict' ? null : observation?.unit_of_measure) || null,
         quantityRequired: Number(requirement.quantity_required || 0),
         historicalQuantityAvailable: requirement.quantity_available === null ? null : Number(requirement.quantity_available),
         historicalShortage: requirement.quantity_shortage === null ? null : Number(requirement.quantity_shortage),
         requirementStatus: requirement.status,
         requiredDate: requirement.required_date,
         notes: requirement.notes,
-        observedLaudusQuantity: observation ? Number(observation.laudus_stock ?? 0) : null,
-        stockReconciliationState: observation?.reconciliation_state || 'review',
+        observedLaudusQuantity: observation && observation.product_reconciliation_status !== 'identity_conflict' ? Number(observation.laudus_stock ?? 0) : null,
+        stockReconciliationState: observation?.product_reconciliation_status === 'identity_conflict' ? 'review_identity_conflict' : observation?.reconciliation_state || 'review',
         operationalResolution: null,
         stockSourceDate: observation?.source_date_to || null,
         stockSyncedAt: observation?.laudus_synced_at || null,
