@@ -24,6 +24,17 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
+    // Feature rollout is schema-dependent. Do not interrupt the existing
+    // operational inbox if this additive migration has not been applied yet.
+    if (error.code === '42P01' || error.code === 'PGRST205') {
+      return NextResponse.json({
+        items: [],
+        scope: showTeam ? 'team' : 'mine',
+        can_view_team: isAdmin,
+        feature_available: false,
+        reason: 'migration_pending',
+      }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     console.error('[motil-commitments] read failed', error.code);
     return NextResponse.json({ error: 'No se pudieron consultar los compromisos' }, { status: 503 });
   }
