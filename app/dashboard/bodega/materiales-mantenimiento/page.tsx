@@ -59,6 +59,7 @@ const reconciliationLabel: Record<string, string> = {
   aligned: 'Conciliado',
   quantity_mismatch: 'Conciliar cantidad',
   missing_in_motil: 'Sin contraparte MOTIL',
+  review_identity_conflict: 'Revisar identidad del producto',
   laudus_only_zero: 'Laudus: saldo cero',
   review: 'En revisión',
 };
