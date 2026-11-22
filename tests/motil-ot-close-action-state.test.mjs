@@ -42,6 +42,7 @@ test('close screen routes missing-photo action to picker and hides action from n
   assert.match(ui, /closeAction === 'add_photo'/);
   assert.match(ui, /evidenceInputRef\.current\?\.click\(\)/);
   assert.match(ui, /closeAction !== 'view_only'/);
+  assert.match(ui, /closeAction !== 'view_only' \? \(/);
   assert.match(ui, /Sólo el mecánico asignado confirma el cierre/);
   assert.match(ui, /setFluidUsedChoice/);
   assert.match(ui, /fluidWasteChoice/);
