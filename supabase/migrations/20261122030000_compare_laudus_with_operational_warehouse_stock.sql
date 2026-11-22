@@ -17,16 +17,17 @@ comment on column public.warehouse_stock.warehouse_id is
 -- reliable opening-stock baseline. Compare that source alone; do not add stock
 -- across Santiago, Peumo, Don Jaime, Services, or pickup locations.
 --
--- The previous reconciliation compared against public.bodega_inventory, a
--- legacy import table, while maintenance issue/return operations use
--- public.warehouse_stock. This read-only view compares Central against
--- warehouse_stock rows explicitly assigned to Central. Existing MOTIL rows
--- without a reconciled warehouse remain visible as unassigned data elsewhere;
+-- This view is intentionally ADDITIVE and must not redefine the existing
+-- laudus_inventory_reconciliation_service_v1 shared by Bodega reporting,
+-- negative-stock alerts and other operational views. Its historical
+-- organization-wide/legacy-stock semantics are preserved.
+-- Compare Central only against warehouse_stock rows explicitly assigned to
+-- Central; never infer a location for existing unassigned MOTIL rows.
 -- they are never silently treated as Central.
 --
 -- No balance is promoted or overwritten by this migration.
 
-create or replace view public.laudus_inventory_reconciliation_service_v1
+create or replace view public.laudus_central_warehouse_stock_reconciliation_v1
 with (security_invoker = true)
 as
 with central_warehouse as (
@@ -123,5 +124,8 @@ left join motil m
   on m.organization_id = l.organization_id
  and m.canonical_product_id = l.canonical_product_id;
 
-comment on view public.laudus_inventory_reconciliation_service_v1 is
+revoke all on public.laudus_central_warehouse_stock_reconciliation_v1 from public, anon, authenticated;
+grant select on public.laudus_central_warehouse_stock_reconciliation_v1 to service_role;
+
+comment on view public.laudus_central_warehouse_stock_reconciliation_v1 is
   'Server-only comparison of eligible Laudus Bodega Central (002) stock with MOTIL warehouse_stock assigned to the mapped Central warehouse. Read-only; no automatic promotion or overwrite.';
