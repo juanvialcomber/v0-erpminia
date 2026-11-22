@@ -45,6 +45,7 @@ type QueueResponse = {
 type EvidenceResponse = {
   evidence?: Array<{
     id: string;
+    evidence_type: string;
     file_name: string;
     created_at: string;
     signed_url?: string | null;
@@ -109,7 +110,8 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     fetcher,
     { revalidateOnFocus: false },
   );
-  const evidence = evidenceData?.evidence || [];
+  // The close RPC requires a photo, not merely any attached document.
+  const evidence = (evidenceData?.evidence || []).filter((entry) => entry.evidence_type === 'photo');
   const evidenceCount = evidence.length;
 
   const { data: fluidClosureData, error: fluidClosureError, mutate: mutateFluidClosure } = useSWR(
