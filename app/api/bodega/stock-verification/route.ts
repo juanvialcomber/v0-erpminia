@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { stockSearchPattern } from '@/lib/bodega/stock-search-pattern.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const QUANTITY = /^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,6})?$/;
@@ -132,7 +133,7 @@ export async function GET(request: NextRequest) {
     if (sku) {
       // Keep PostgREST OR filters syntactically safe. Search both code and name
       // so Bodega can locate parts without memorizing their SKU.
-      const search = sku.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑüÜ\s._-]/g, '').trim();
+      const search = stockSearchPattern(sku);
       if (!search) return NextResponse.json({ error: 'Busca por código o descripción del producto.' }, { status: 400 });
       query = query.or('sku.ilike.%' + search + '%,description.ilike.%' + search + '%');
     }
