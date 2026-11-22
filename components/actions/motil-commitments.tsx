@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { Button } from '@/components/ui/button';
 
@@ -40,6 +41,20 @@ const statusLabels: Record<Commitment['status'], string> = {
   blocked: 'Bloqueada',
   done: 'Terminada',
 };
+
+const taskRoutes: Record<string, string> = {
+  physical_counts: '/dashboard/bodega/verificar-stock',
+  ot_materials: '/dashboard/bodega/materiales-mantenimiento',
+  ot_clock: '/dashboard/mantenimiento/ordenes-trabajo',
+};
+
+function taskModuleHref(item: Commitment): string {
+  const action = item.source_reference.split(':').pop() || '';
+  return taskRoutes[action] ||
+    (item.domain === 'maintenance'
+      ? '/dashboard/mantenimiento/ordenes-trabajo'
+      : '/dashboard/bodega');
+}
 
 export function MotilCommitments() {
   // Server rejects team scope for non-administrators; no client-side
@@ -119,6 +134,9 @@ export function MotilCommitments() {
                   </div>
                   <h3 className="text-sm font-semibold">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.detail}</p>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={taskModuleHref(item)}>Abrir módulo</Link>
+                  </Button>
                   {item.resolution_note && <p className="text-xs text-muted-foreground">Último registro: {item.resolution_note}</p>}
                   {item.can_update && needsNote && (
                     <div className="flex flex-wrap items-center gap-2">

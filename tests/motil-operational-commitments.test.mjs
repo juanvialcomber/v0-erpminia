@@ -116,3 +116,16 @@ test('unapplied optional migration does not crash the existing operational inbox
   assert.match(api, /feature_available: false/);
   assert.match(ui, /if \(data\?\.feature_available === false\) return null/);
 });
+
+test('role commitments link to the relevant existing operating workflow', () => {
+  assert.match(ui, /physical_counts: '\/dashboard\/bodega\/verificar-stock'/);
+  assert.match(ui, /ot_materials: '\/dashboard\/bodega\/materiales-mantenimiento'/);
+  assert.match(ui, /ot_clock: '\/dashboard\/mantenimiento\/ordenes-trabajo'/);
+  assert.match(ui, /<Link href=\{taskModuleHref\(item\)\}>Abrir módulo<\/Link>/);
+});
+
+test('service role can audit changes but cannot delete commitments or modify prior audit events', () => {
+  const immutable = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261122170000_motil_commitment_audit_immutability.sql'), 'utf8');
+  assert.match(immutable, /REVOKE DELETE, TRUNCATE ON public\.motil_operational_commitments FROM service_role/);
+  assert.match(immutable, /REVOKE UPDATE, DELETE, TRUNCATE ON public\.motil_operational_commitment_events FROM service_role/);
+});
