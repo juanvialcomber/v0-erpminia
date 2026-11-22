@@ -2,9 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
-import { canBypassAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
-import { summarizeMaterialAttention } from '@/lib/maintenance/material-attention.mjs';
+import { getUserModuleAccess, isAdminRole, MODULE_KEYS } from '@/lib/api/module-access';
+import { resolveMaintenanceViewerMode } from '@/lib/maintenance/viewer-mode';
+import { canReviewMaterialAttention, summarizeMaterialAttention } from '@/lib/maintenance/material-attention.mjs';
 
 type Order = {
   id: string;
@@ -26,14 +26,14 @@ export async function GET(request: NextRequest) {
   if (!context.ok) return context.response;
 
   try {
-    const accessLevel = await getModuleAccessLevel(
-      context.userId,
-      context.role,
-      MODULE_KEYS.MANT_OPERACIONES,
-    );
-    // A mechanic may see their assigned OT, but never the full company's
-    // planning queue through this read-only leadership endpoint.
-    if (!canBypassAssignedMaintenanceExecution(context, accessLevel)) {
+    const { cargoName, access } = await getUserModuleAccess(context.userId);
+    const accessLevel = isAdminRole(context.role)
+      ? 'ED'
+      : (access[MODULE_KEYS.MANT_OPERACIONES] || 'SR');
+    const viewerMode = resolveMaintenanceViewerMode(cargoName);
+    // The broader planning queue is never accessible from an execution cargo,
+    // even if that user's module matrix allows editing their assigned OT.
+    if (!canReviewMaterialAttention(viewerMode, accessLevel)) {
       return NextResponse.json({ error: 'Esta revisión corresponde a planificación y supervisión.' }, { status: 403 });
     }
 
