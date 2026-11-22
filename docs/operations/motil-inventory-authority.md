@@ -1,6 +1,6 @@
 # MOTIL Operational Inventory Authority
 
-**Status:** approved product direction; implementation pending.
+**Status:** MOTIL-native count capture and second-person review are implemented in the current change; posting an approved opening balance to operational stock remains pending.
 
 ## Decision
 
@@ -9,7 +9,9 @@ MOTIL is the operational system of record for warehouse balances, stock movement
 ## Canonical data contract
 
 - A balance is scoped to organization, warehouse, canonical product, and unit of measure. Location/bin may be recorded when known.
-- A physical count can be recorded even when Laudus has no matching quantity or its value is stale or disputed.
+- A physical count is recorded from the MOTIL catalog independently of Laudus, including when Laudus has no matching quantity or its value is stale or disputed.
+- The first pilot is scoped to Central (002) and requires an active, assigned counter; a different assigned verifier must review the result.
+- Count evidence and reviews are immutable. Approval means ready for opening-balance posting; it does not make stock available until the operational ledger supports the confirmed unit precision.
 - The counted quantity is evidence first. An authorized warehouse verifier confirms product identity, unit, warehouse, quantity, and evidence before MOTIL accepts it as an opening balance.
 - Each accepted opening balance and subsequent receipt, issue, return, transfer, or adjustment is an attributable, idempotent movement. Current stock is derived from those movements and the accepted opening balance.
 - Laudus observations remain separate, timestamped comparison evidence. They never overwrite a MOTIL balance.
@@ -19,12 +21,13 @@ MOTIL is the operational system of record for warehouse balances, stock movement
 
 ## Maintenance and warehouse flow
 
-1. Bodega records or resolves the product in the MOTIL catalog and captures a physical count.
-2. The assigned verifier confirms the count and its evidence; MOTIL records the opening balance.
-3. Maintenance links material requirements to a work order.
-4. MOTIL reserves and issues only validated MOTIL balances; delivery, installation, and return remain separately traceable.
-5. Purchases and receipts enter MOTIL operational history. Any Laudus reference is reconciled separately and cannot replace the MOTIL movement record.
-6. LECV reports product maturity, adoption, reconciliation coverage, and measured outcomes; unproven savings remain unclaimed.
+1. Bodega selects an active, validated MOTIL product and records the observed quantity, unit, and optional evidence in Central (002).
+2. MOTIL stores the count as immutable evidence, independent of Laudus.
+3. A second assigned verifier approves the count for opening or requests a recount; neither action changes available stock.
+4. After quantity precision and movement-ledger changes are validated, the approved count can be posted idempotently as a MOTIL opening balance.
+5. Maintenance then uses verified MOTIL balances for material requirements, reservations, issues, delivery, installation, and return.
+6. Purchases and receipts enter MOTIL operational history. Any Laudus reference is reconciled separately and cannot replace the MOTIL movement record.
+7. LECV reports product maturity, adoption, reconciliation coverage, and measured outcomes; unproven savings remain unclaimed.
 
 ## Ownership
 
@@ -35,10 +38,11 @@ MOTIL is the operational system of record for warehouse balances, stock movement
 
 ## Rollout and release gates
 
-1. Implement the source-independent count and canonical opening-balance workflow.
-2. Pilot it in the designated central warehouse; reconcile legacy records without bulk-promoting source quantities.
-3. Connect verified MOTIL balances to reservation, issue, return, and work-order cost paths.
-4. Extend the same controlled model to other warehouses and purchasing/receipt workflows.
-5. Verify tenant boundaries, verifier permissions, idempotency, unit precision, movement auditability, and preservation of the existing work-order close flow before production release.
+1. MOTIL-native count capture and second-person review are in place for Central (002); records are append-only and independent of Laudus.
+2. Adapt stock and movement quantity precision, then implement idempotent posting of an approved count as a MOTIL opening balance.
+3. Pilot the opening balance in Central (002) without bulk-promoting Laudus or unassigned legacy rows.
+4. Connect verified MOTIL balances to reservation, issue, return, and work-order cost paths.
+5. Extend the same controlled model to other warehouses and purchasing/receipt workflows.
+6. Verify tenant boundaries, verifier permissions, idempotency, unit precision, movement auditability, and preservation of the existing work-order close flow before production release.
 
-No production balances are changed by this design document. The implementation must not bulk-canonicalize Laudus quantities or unassigned legacy rows.
+The count-and-review workflow does not change production balances. The opening-balance posting remains blocked until the integer-only stock and movement ledger is adapted and its work-order reservation paths are verified. The implementation must not bulk-canonicalize Laudus quantities or unassigned legacy rows.
