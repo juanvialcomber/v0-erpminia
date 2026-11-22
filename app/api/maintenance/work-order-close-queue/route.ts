@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
           .limit(1000),
         context.supabase
           .from('maintenance_fluid_usage_records')
-          .select('work_order_id,created_at')
+          .select('work_order_id,created_at,updated_at')
           .eq('organization_id', context.organizationId)
           .in('work_order_id', chunk),
       ]);
@@ -195,14 +195,14 @@ export async function GET(request: NextRequest) {
       if (peopleResult.error) throw peopleResult.error;
       const profileByPerson = new Map((peopleResult.data || []).map((person) => [person.id, person.profile_id]));
       const mechanicByOrder = new Map((orders || []).map((order) => [order.id, profileByPerson.get(order.assigned_person_id) || null]));
-      const latestByOrder = new Map<string, (typeof declarations extends Array<infer T> ? T : never)>();
+      const latestByOrder = new Map<string, NonNullable<typeof declarations>[number]>();
       for (const declaration of declarations || []) {
         if (!latestByOrder.has(declaration.work_order_id)) latestByOrder.set(declaration.work_order_id, declaration);
       }
-      const usageByOrder = new Map<string, Array<{ created_at: string | null }>>();
+      const usageByOrder = new Map<string, Array<{ created_at: string | null; updated_at: string | null }>>();
       for (const usage of usages || []) {
         const list = usageByOrder.get(usage.work_order_id) || [];
-        list.push({ created_at: usage.created_at });
+        list.push({ created_at: usage.created_at, updated_at: usage.updated_at });
         usageByOrder.set(usage.work_order_id, list);
       }
       for (const id of chunk) {
