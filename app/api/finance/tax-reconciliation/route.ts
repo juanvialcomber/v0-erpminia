@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
       taxCoreResult.siiWritesEnabled === false &&
       taxCoreResult.accountingPromotion === false;
     const taxCoreDocuments = taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
-      ? taxCoreResult.documents.filter(isTaxCoreSourceDocument).map((document) => ({
+      ? taxCoreResult.documents.filter(isTaxCoreSourceDocument).map((document: TaxCoreSourceDocument) => ({
           tenantRut: document.tenantRut,
           issuerRut: document.issuerRut,
           receiverRut: document.receiverRut,
