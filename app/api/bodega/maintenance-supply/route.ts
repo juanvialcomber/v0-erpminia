@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
         : Promise.resolve({ data: [], error: null }),
       productIds.length
         ? context.supabase
-            .from('bodega_inventory_operational_service_v1')
-            .select('canonical_product_id,operational_quantity,unit_of_measure,operational_resolution,reconciliation_state,laudus_stock_date,laudus_synced_at')
+            .from('laudus_inventory_reconciliation_service_v1')
+            .select('canonical_product_id,laudus_stock,unit_of_measure,reconciliation_state,source_date_to,laudus_synced_at')
             .eq('organization_id', context.organizationId)
             .in('canonical_product_id', productIds)
         : Promise.resolve({ data: [], error: null }),
@@ -110,10 +110,10 @@ export async function GET(request: NextRequest) {
         requirementStatus: requirement.status,
         requiredDate: requirement.required_date,
         notes: requirement.notes,
-        observedLaudusQuantity: observation ? Number(observation.operational_quantity || 0) : null,
-        stockReconciliationState: observation?.reconciliation_state || 'missing_in_motil',
-        operationalResolution: observation?.operational_resolution || null,
-        stockSourceDate: observation?.laudus_stock_date || null,
+        observedLaudusQuantity: observation ? Number(observation.laudus_stock ?? 0) : null,
+        stockReconciliationState: observation?.reconciliation_state || 'review',
+        operationalResolution: null,
+        stockSourceDate: observation?.source_date_to || null,
         stockSyncedAt: observation?.laudus_synced_at || null,
       }];
     });
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       rows,
       rowCount: rows.length,
       readOnly: true,
-      stockQuantityMeaning: 'Existencia observada en la fuente; no representa una reserva ni disponibilidad comprometida.',
+      stockQuantityMeaning: 'Saldo observado exclusivamente en Laudus Bodega Central (002); no representa una reserva ni disponibilidad para retirar.',
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo cargar la relación Bodega–Mantención';
