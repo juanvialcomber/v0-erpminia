@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
     const search = String(request.nextUrl.searchParams.get('search') || '').trim().slice(0, 80);
     const page = Number(request.nextUrl.searchParams.get('page') || 0);
     const offset = Number.isFinite(page) ? Math.min(100000, Math.max(0, Math.trunc(page)) * 50) : 0;
+    const countPage = Number(request.nextUrl.searchParams.get('countPage') || 0);
+    const countOffset = Number.isFinite(countPage) ? Math.min(100000, Math.max(0, Math.trunc(countPage)) * 50) : 0;
 
     let catalogQuery = context.supabase.from('bodega_motil_stock_count_catalog_v1')
       .select('canonical_product_id,product_code,product_name,description,unit_of_measure', { count: 'exact' })
@@ -61,12 +63,12 @@ export async function GET(request: NextRequest) {
       catalogQuery = catalogQuery.or('product_code.ilike.%' + pattern + '%,product_name.ilike.%' + pattern + '%,description.ilike.%' + pattern + '%');
     }
 
-    const [{ data: products, error: catalogError, count }, { data: counts, error: countsError }] = await Promise.all([
+    const [{ data: products, error: catalogError, count }, { data: counts, error: countsError, count: countRecordCount }] = await Promise.all([
       catalogQuery.range(offset, offset + 49),
       context.supabase.from('bodega_motil_stock_count_queue_v1')
-        .select('id,warehouse_id,canonical_product_id,product_code,product_name,unit_of_measure,counted_quantity,counted_by,counted_at,note,evidence_reference,decision,reviewed_by,reviewed_at,review_note')
+        .select('id,warehouse_id,canonical_product_id,product_code,product_name,unit_of_measure,counted_quantity,counted_by,counted_at,note,evidence_reference,decision,reviewed_by,reviewed_at,review_note', { count: 'exact' })
         .eq('organization_id', context.organizationId).eq('warehouse_id', warehouse.id)
-        .order('counted_at', { ascending: false }).limit(100),
+        .order('counted_at', { ascending: false }).range(countOffset, countOffset + 49),
     ]);
     if (catalogError) throw catalogError;
     if (countsError) throw countsError;
@@ -78,6 +80,8 @@ export async function GET(request: NextRequest) {
       productCount: count || 0,
       page: Math.floor(offset / 50),
       counts: counts || [],
+      countPage: Math.floor(countOffset / 50),
+      countRecordCount: countRecordCount || 0,
       currentUserId: context.userId,
       canCount: canReview,
       canReview,
