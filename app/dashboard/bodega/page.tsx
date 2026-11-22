@@ -89,7 +89,7 @@ export default function BodegaPage() {
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Diferencias</p>
-        <p className="mt-2 text-sm font-medium">{operationalDifferenceSummary?number(operationalDifferenceSummary.blockingReviews)+' bloqueantes':'Conciliación no disponible'}</p>
+        <p className="mt-2 text-sm font-medium">{operationalDifferenceSummary?number(operationalDifferenceSummary.blockingReviews)+' casos por conciliar':'Conciliación no disponible'}</p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">{operationalDifferenceSummary?(number(operationalDifferenceSummary.legacyMotilStale)+' contrastes históricos MOTIL · Laudus se conserva como referencia'):'No se reemplaza una conciliación ausente por cero.'}</p>
       </div>
       <div className="rounded-lg border bg-card p-4">
