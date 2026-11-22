@@ -79,8 +79,8 @@ export function MaintenanceMaterialsAttention({ locale }: { locale: Locale }) {
       {data?.partial ? (
         <p role="status" className="text-xs text-muted-foreground">
           {english
-            ? 'Partial review. The counts above cover only the first 200 active orders.'
-            : 'Revisión parcial: las cifras corresponden a las primeras 200 OT activas, no a todo el universo.'}
+            ? `Partial review: figures cover ${data.activeOrdersReviewed.toLocaleString('en-US')} of ${data.activeOrdersTotal.toLocaleString('en-US')} active orders. No prioritization until all are reviewed.`
+            : `Revisión parcial: cifras de ${data.activeOrdersReviewed.toLocaleString('es-CL')} de ${data.activeOrdersTotal.toLocaleString('es-CL')} OT activas. Sin priorización hasta revisar todo el universo.`}
         </p>
       ) : null}
       {!error && !isLoading && data && data.reviewCandidates.length > 0 ? (
