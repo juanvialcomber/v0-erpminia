@@ -85,7 +85,7 @@ export default function BodegaMaintenanceSupplyPage() {
       <PageHeaderContent>
         <PageHeaderEyebrow>Bodega · Mantención</PageHeaderEyebrow>
         <PageHeaderTitle>Materiales vinculados a OT</PageHeaderTitle>
-        <PageHeaderDescription>Requerimientos de las órdenes, estado registrado y existencia observada en la fuente vigente.</PageHeaderDescription>
+        <PageHeaderDescription>Compara materiales requeridos por OT con el corte de Laudus para validar la transición hacia stock canónico mantenido por MOTIL.</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
         <Button asChild variant="outline"><Link href="/dashboard/bodega"><ArrowLeft className="h-4 w-4" />Volver a Bodega</Link></Button>
@@ -96,14 +96,14 @@ export default function BodegaMaintenanceSupplyPage() {
     <section className="grid gap-3 md:grid-cols-2">
       <div className="rounded-lg border bg-card p-4">
         <div className="flex items-center gap-2"><Boxes className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fuente de stock</p></div>
-        <p className="mt-2 font-medium">{authorityCurrent ? 'Laudus es la fuente primaria' : 'Fuente de stock en revisión'}</p>
+        <p className="mt-2 font-medium">{authorityCurrent ? 'Laudus como referencia de validación' : 'Corte Laudus en revisión'}</p>
         <p className="mt-1 text-sm text-muted-foreground">{sourceAuthority?.authority_reason || 'La autoridad de stock no está confirmada.'}</p>
         <p className="mt-2 text-xs text-muted-foreground">Corte: {dateLabel(sourceAuthority?.latest_laudus_stock_date)} · Sincronizado: {timeLabel(sourceAuthority?.latest_laudus_stock_sync)}</p>
       </div>
       <div className="rounded-lg border bg-muted/20 p-4">
         <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cómo leer las cantidades</p></div>
-        <p className="mt-2 text-sm">La existencia mostrada es una observación de la fuente. No confirma una reserva, un despacho ni una cantidad disponible para comprometer.</p>
-        <p className="mt-1 text-xs text-muted-foreground">Esta pantalla es de consulta: no descuenta stock, no modifica OT y no crea compras.</p>
+        <p className="mt-2 text-sm">El corte Laudus sirve para validar la cantidad que se dejará registrada en el inventario canónico de MOTIL. La vista compara totales por producto y no confirma una reserva ni una ubicación física.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Esta etapa es de consulta: todavía no importa ni reemplaza saldos. Las acciones operacionales de MOTIL siguen funcionando sin bloqueo.</p>
       </div>
     </section>
 
@@ -130,7 +130,7 @@ export default function BodegaMaintenanceSupplyPage() {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Cantidad solicitada</p><p className="mt-1 font-medium">{quantity(row.quantityRequired, row.unit)}</p></div>
-            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Existencia observada en Laudus</p><p className="mt-1 font-medium">{quantity(row.observedLaudusQuantity, row.unit)}</p></div>
+            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Existencia observada en Laudus · total</p><p className="mt-1 font-medium">{quantity(row.observedLaudusQuantity, row.unit)}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Estado del requerimiento</p><p className="mt-1 font-medium">{row.requirementStatus || 'Sin estado'}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Último dato de stock</p><p className="mt-1 font-medium">{timeLabel(row.stockSyncedAt)}</p></div>
           </div>
