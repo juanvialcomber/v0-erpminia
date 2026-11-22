@@ -85,7 +85,7 @@ export default function BodegaMaintenanceSupplyPage() {
       <PageHeaderContent>
         <PageHeaderEyebrow>Bodega · Mantención</PageHeaderEyebrow>
         <PageHeaderTitle>Materiales vinculados a OT</PageHeaderTitle>
-        <PageHeaderDescription>Compara materiales requeridos por OT con el corte de Laudus para validar la transición hacia stock canónico mantenido por MOTIL.</PageHeaderDescription>
+        <PageHeaderDescription>Compara materiales requeridos por OT con el corte de Laudus de Bodega Central (002) para validar la transición hacia stock canónico mantenido por MOTIL.</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
         <Button asChild variant="outline"><Link href="/dashboard/bodega"><ArrowLeft className="h-4 w-4" />Volver a Bodega</Link></Button>
@@ -130,7 +130,7 @@ export default function BodegaMaintenanceSupplyPage() {
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Cantidad solicitada</p><p className="mt-1 font-medium">{quantity(row.quantityRequired, row.unit)}</p></div>
-            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Existencia observada en Laudus · total</p><p className="mt-1 font-medium">{quantity(row.observedLaudusQuantity, row.unit)}</p></div>
+            <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Existencia observada · Laudus Central (002)</p><p className="mt-1 font-medium">{quantity(row.observedLaudusQuantity, row.unit)}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Estado del requerimiento</p><p className="mt-1 font-medium">{row.requirementStatus || 'Sin estado'}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Último dato de stock</p><p className="mt-1 font-medium">{timeLabel(row.stockSyncedAt)}</p></div>
           </div>
