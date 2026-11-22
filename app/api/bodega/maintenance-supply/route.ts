@@ -65,8 +65,7 @@ export async function GET(request: NextRequest) {
         : Promise.resolve({ data: [], error: null }),
       productIds.length
         ? context.supabase
-            .schema('canonical')
-            .from('products')
+            .from('canonical_products_v1')
             .select('id,product_code,name,unit')
             .eq('organization_id', context.organizationId)
             .in('id', productIds)
@@ -126,7 +125,18 @@ export async function GET(request: NextRequest) {
       stockQuantityMeaning: 'Saldo observado exclusivamente en Laudus Bodega Central (002); no representa una reserva ni disponibilidad para retirar.',
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cargar la relación Bodega–Mantención';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Report the PostgREST error code in server logs, never in the user-facing
+    // response. Keep canonical data and inventory untouched on read failure.
+    const detail = error && typeof error === 'object'
+      ? error as { code?: string; message?: string }
+      : null;
+    console.error('[bodega/maintenance-supply][GET]', {
+      code: detail?.code || 'UNKNOWN',
+      message: detail?.message || 'Unexpected query error',
+    });
+    return NextResponse.json(
+      { error: 'No se pudo cargar la relación Bodega–Mantención' },
+      { status: 500 },
+    );
   }
 }
