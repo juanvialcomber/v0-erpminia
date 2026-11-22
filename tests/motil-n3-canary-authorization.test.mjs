@@ -18,6 +18,7 @@ function harness({
   stockAccess = 'LEC',
   workOrders = [],
   failOrders = false,
+  criticalCount = 0,
 } = {}) {
   const calls = [];
   const orders = workOrders;
@@ -40,7 +41,7 @@ function harness({
         },
         limit(n) {
           trace.limit = n;
-          if (table === 'motil_ai_core_errors') return Promise.resolve({ data: [], count: 0, error: null });
+          if (table === 'motil_ai_core_errors') return Promise.resolve({ data: [], count: trace.filters.some(f => f[0] === 'eq' && f[1] === 'error_code') ? criticalCount : 0, error: null });
           return this;
         },
         maybeSingle() {
@@ -122,6 +123,21 @@ test('planner with Bodega access sees authorized source and both scoped AI domai
   assert.deepEqual(Array.from(ai.filters.find(f => f[0] === 'in' && f[1] === 'domain')[2]), ['maintenance', 'inventory']);
   assert.equal(calls.every(c => c.filters.some(f => f[0] === 'eq' && f[1] === 'organization_id' && f[2] === ORG)), true);
   assert.equal(response.body.noAutomaticRemediation, true);
+});
+
+test('older critical source failures still raise P1 even outside the latest-100 raw sample', async () => {
+  const { GET, calls } = harness({
+    cargoName: 'Jefe de Planificación', role: 'jefe_mantencion', criticalCount: 3,
+  });
+  const result = await GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.status, 'needs_action');
+  assert.equal(result.body.findings[0].code, 'ai_core_repeated_canonical_source_contract_failure');
+  assert.equal(result.body.findings[0].severity, 'P1');
+  const coreCalls = calls.filter(c => c.table === 'motil_ai_core_errors');
+  assert.equal(coreCalls.length, 2);
+  assert.equal(coreCalls.every(c => c.filters.some(f => f[0] === 'eq' && f[1] === 'organization_id' && f[2] === ORG)), true);
+  assert.equal(coreCalls.some(c => c.filters.some(f => f[0] === 'eq' && f[1] === 'error_code' && f[2] === 'canonical_source_contract_failure')), true);
 });
 
 test('a real timer invariant issue becomes a bounded evidence-grounded finding', async () => {
