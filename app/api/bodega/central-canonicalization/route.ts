@@ -35,39 +35,29 @@ export async function GET(request: NextRequest) {
   const offset = Math.max(0, Number(request.nextUrl.searchParams.get('offset') || 0));
 
   try {
+    let rowsQuery = (context.supabase as any)
+      .from('bodega_central_stock_canonicalization_preview_v1')
+      .select('canonical_product_id,sku,description,unit_of_measure,source_quantity,source_position_count,source_identity_count,has_negative_position,has_fractional_position,source_cutoff,source_synced_at,canonicalization_state', { count: 'exact' })
+      .eq('organization_id', context.organizationId)
+      .order('sku', { ascending: true });
+    if (requestedState !== 'all') rowsQuery = rowsQuery.eq('canonicalization_state', requestedState);
+
     const [summaryResult, rowsResult] = await Promise.all([
       (context.supabase as any)
         .from('bodega_central_stock_canonicalization_summary_v1')
         .select('warehouse_id,source_cutoff,source_synced_at,authority_state,products_reviewed,existing_zero_rows_to_assign,opening_rows_to_create,already_canonical,requires_review,identity_conflicts,negative_source_products,fractional_products,stale_source_products,zero_without_opening_balance')
         .eq('organization_id', context.organizationId)
         .maybeSingle(),
-      (context.supabase as any)
-        .from('bodega_central_stock_canonicalization_preview_v1')
-        .select('canonical_product_id,sku,description,unit_of_measure,source_quantity,source_position_count,source_identity_count,has_negative_position,has_fractional_position,source_cutoff,source_synced_at,canonicalization_state')
-        .eq('organization_id', context.organizationId)
-        .order('sku', { ascending: true })
-        .range(offset, offset + limit - 1)
-        .then((query: any) => requestedState === 'all'
-          ? query
-          : query),
+      rowsQuery.range(offset, offset + limit - 1),
     ]);
 
     if (summaryResult.error) throw summaryResult.error;
-
-    // Apply the optional state filter before pagination to keep page counts accurate.
-    let filteredRowsQuery = (context.supabase as any)
-      .from('bodega_central_stock_canonicalization_preview_v1')
-      .select('canonical_product_id,sku,description,unit_of_measure,source_quantity,source_position_count,source_identity_count,has_negative_position,has_fractional_position,source_cutoff,source_synced_at,canonicalization_state', { count: 'exact' })
-      .eq('organization_id', context.organizationId)
-      .order('sku', { ascending: true });
-    if (requestedState !== 'all') filteredRowsQuery = filteredRowsQuery.eq('canonicalization_state', requestedState);
-    const { data: rows, error: rowsError, count } = await filteredRowsQuery.range(offset, offset + limit - 1);
-    if (rowsError) throw rowsError;
+    if (rowsResult.error) throw rowsResult.error;
 
     return NextResponse.json({
       summary: summaryResult.data || null,
-      rows: rows || [],
-      count: count || 0,
+      rows: rowsResult.data || [],
+      count: rowsResult.count || 0,
       limit,
       offset,
       readOnly: true,
