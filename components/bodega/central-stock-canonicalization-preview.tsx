@@ -18,6 +18,7 @@ type Summary = {
   already_canonical: number;
   requires_review: number;
   identity_conflicts: number;
+  missing_motil_products: number;
   negative_source_products: number;
   fractional_products: number;
   stale_source_products: number;
@@ -56,6 +57,7 @@ const labels: Record<string, string> = {
   already_canonical: 'Ya canónico',
   zero_no_opening_balance: 'Saldo cero · sin fila',
   review_identity_conflict: 'Identidad duplicada',
+  review_missing_motil_product: 'Producto no existe en MOTIL',
   review_negative_source: 'Saldo negativo Laudus',
   review_stale_source: 'Corte desactualizado',
   review_source_authority: 'Fuente en revisión',
@@ -105,11 +107,12 @@ export function CentralStockCanonicalizationPreview() {
         <Button variant="outline" size="sm" onClick={() => void mutate()} disabled={isLoading}><RefreshCw className="mr-2 h-4 w-4" />Actualizar</Button>
       </div>
 
-      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-6">
         <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(summary?.products_reviewed)}</p><p className="text-xs text-muted-foreground">Productos revisados</p></div>
         <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(candidateCount)}</p><p className="text-xs text-muted-foreground">Candidatos de apertura</p></div>
         <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(summary?.already_canonical)}</p><p className="text-xs text-muted-foreground">Ya canónicos en Central</p></div>
         <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(summary?.requires_review)}</p><p className="text-xs text-muted-foreground">Requieren revisión</p></div>
+        <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(summary?.missing_motil_products)}</p><p className="text-xs text-muted-foreground">Sin ficha en catálogo MOTIL</p></div>
         <div className="bg-card p-4"><p className="text-2xl font-semibold">{isLoading ? '—' : fmt(summary?.zero_without_opening_balance)}</p><p className="text-xs text-muted-foreground">Saldo cero · sin fila</p></div>
       </div>
 
@@ -130,6 +133,7 @@ export function CentralStockCanonicalizationPreview() {
               <SelectItem value="candidate_create_opening_row">Crear saldo de apertura</SelectItem>
               <SelectItem value="already_canonical">Ya canónico</SelectItem>
               <SelectItem value="review_identity_conflict">Identidad duplicada</SelectItem>
+              <SelectItem value="review_missing_motil_product">Producto no existe en MOTIL</SelectItem>
               <SelectItem value="review_negative_source">Saldo negativo Laudus</SelectItem>
               <SelectItem value="review_fractional_precision">Cantidad decimal</SelectItem>
               <SelectItem value="review_stale_source">Corte desactualizado</SelectItem>
