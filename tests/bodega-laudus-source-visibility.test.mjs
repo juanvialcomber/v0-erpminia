@@ -59,6 +59,6 @@ test('Laudus becomes the effective displayed quantity only when the authority ga
   assert.match(route, /effective_quantity/);
   assert.match(route, /effective_source/);
   assert.match(route, /laudusIsPrimary/);
-  assert.match(page, /Fuente: Laudus/);
-  assert.match(page, /Laudus primario/);
+  assert.match(page, /Laudus · referencia; apertura MOTIL pendiente/);
+  assert.match(page, /Apertura MOTIL pendiente/);
 });
