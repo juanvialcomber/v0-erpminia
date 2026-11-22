@@ -85,7 +85,7 @@ export function MotilCommitments() {
           <h2 className="mt-1 text-xl font-semibold">Bodega y Mantenimiento</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {data?.can_view_team
-              ? 'Vista de equipo: Esteban, Ariel y coordinación de MOTIL.'
+              ? 'Vista de equipo: compromisos por responsable.'
               : 'Sólo tus compromisos asignados.'}
           </p>
         </div>
