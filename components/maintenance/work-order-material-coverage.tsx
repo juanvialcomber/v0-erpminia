@@ -53,7 +53,7 @@ type SupplyStatus = {
 const required = (row: MaterialRow) => Number(row.required ?? row.quantity_required ?? 0);
 const available = (row: MaterialRow) => Number(row.available ?? row.quantity_available ?? 0);
 const issued = (row: MaterialRow) => Number(row.issued ?? 0);
-const reserved = (row: MaterialRow) => Number(row.reserved ?? Math.max(available(row) - issued(row), 0));
+const reserved = (row: MaterialRow) => Number(row.reserved ?? 0);
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
@@ -72,12 +72,17 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
 
   const status = (data?.data || data || {}) as SupplyStatus;
   const rows = Array.isArray(status.materials) ? status.materials : [];
+  // Quantities are comparable only within a product/SKU. Summing units,
+  // kilograms, metres and litres across different lines is not meaningful.
   const shortageCount = rows.filter((row) => shortage(row) > 0).length;
-  const reservedTotal = rows.reduce((sum, row) => sum + reserved(row), 0);
-  const issuedTotal = rows.reduce((sum, row) => sum + issued(row), 0);
-  const requiredTotal = rows.reduce((sum, row) => sum + required(row), 0);
-  const shortageTotal = rows.reduce((sum, row) => sum + shortage(row), 0);
-  const procurementTotal = rows.reduce((sum, row) => sum + inProcurement(row), 0);
+  const reservedLines = rows.filter((row) => reserved(row) > 0).length;
+  const issuedLines = rows.filter((row) => issued(row) > 0).length;
+  const procurementLines = rows.filter((row) => inProcurement(row) > 0).length;
+  const fullyDelivered = rows.length > 0 &&
+    rows.every((row) => required(row) > 0 && issued(row) >= required(row));
+  const coveredLines = rows.filter((row) =>
+    required(row) > 0 && (reserved(row) + issued(row)) >= required(row),
+  ).length;
   const alreadySent = Boolean(status.procurement_request_id) || ['sent_to_procurement', 'partially_covered', 'covered'].includes(status.supply_status || '');
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
   const { data: catalogData, isLoading: catalogLoading } = useSWR<{ rows: CatalogRow[] }>(catalogKey, fetcher, { revalidateOnFocus: false });
@@ -157,13 +162,15 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
 
   const primaryAction = rows.length === 0
     ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
-    : reservedTotal > 0
-      ? { title: 'Hay material reservado para entregar', detail: `${reservedTotal} unidad(es) ya están aseguradas para esta OT.`, action: 'issue' as const }
-      : shortageTotal > 0 && !alreadySent
-        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageTotal} unidad(es) no tienen cobertura reservada ni entregada.`, action: 'procure' as const }
-        : shortageTotal > 0
-          ? { title: 'Compras está gestionando los faltantes', detail: `${procurementTotal || shortageTotal} unidad(es) están registradas en el flujo de abastecimiento.`, action: 'waiting' as const }
-          : { title: 'Materiales listos para ejecución', detail: `${issuedTotal} de ${requiredTotal} unidad(es) requeridas ya fueron entregadas.`, action: 'ready' as const };
+    : reservedLines > 0
+      ? { title: 'Hay materiales reservados para entregar', detail: `${reservedLines} línea(s) con reserva registrada para esta OT.`, action: 'issue' as const }
+      : shortageCount > 0 && !alreadySent
+        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageCount} línea(s) sin cobertura completa.`, action: 'procure' as const }
+        : shortageCount > 0
+          ? { title: 'Compras está gestionando los faltantes', detail: `${procurementLines || shortageCount} línea(s) en seguimiento de abastecimiento.`, action: 'waiting' as const }
+          : fullyDelivered
+            ? { title: 'Materiales entregados a la OT', detail: `${issuedLines} línea(s) con entrega completa registrada.`, action: 'ready' as const }
+            : { title: 'Revisar cobertura y entrega', detail: `${coveredLines} de ${rows.length} líneas tienen cobertura registrada; aún no consta entrega completa.`, action: 'review' as const };
 
   return (
     <Card className="shadow-none">
@@ -173,7 +180,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <CardTitle className="text-base">Materiales de la OT</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">Una sola secuencia: requerir → reservar → entregar → comprar faltantes.</p>
           </div>
-          {rows.length > 0 ? <Badge variant={shortageCount > 0 ? 'destructive' : 'secondary'}>{shortageCount > 0 ? `${shortageCount} línea(s) con faltante` : 'Cobertura completa'}</Badge> : <Badge variant="outline">Sin requerimiento</Badge>}
+          {rows.length > 0 ? <Badge variant={shortageCount > 0 ? 'destructive' : fullyDelivered ? 'secondary' : 'outline'}>{shortageCount > 0 ? `${shortageCount} línea(s) con faltante` : fullyDelivered ? 'Entregado' : 'Pendiente de verificar entrega'}</Badge> : <Badge variant="outline">Sin requerimiento</Badge>}
         </div>
 
         <div className="rounded-lg border bg-muted/20 p-4">
@@ -184,7 +191,8 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
             {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
-            {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Listo</Badge> : null}
+            {primaryAction.action === 'ready' ? <Badge variant="secondary"><CheckCircle2 className="mr-1 h-3.5 w-3.5" />Entregado</Badge> : null}
+            {primaryAction.action === 'review' ? <Badge variant="outline">Revisar entrega</Badge> : null}
           </div>
         </div>
       </CardHeader>
@@ -194,7 +202,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
         {actionMessage ? <div className="rounded-lg border bg-muted/40 p-3 text-sm">{actionMessage}</div> : null}
 
         {rows.length > 0 ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {[['Requerido', requiredTotal], ['Reservado', reservedTotal], ['Entregado', issuedTotal], ['Faltante', shortageTotal], ['En Compras', procurementTotal]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}
+          {[['Líneas requeridas', rows.length], ['Con reserva', reservedLines], ['Con entrega', issuedLines], ['Con faltante', shortageCount], ['En Compras', procurementLines]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}
         </div> : null}
 
         <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div>
