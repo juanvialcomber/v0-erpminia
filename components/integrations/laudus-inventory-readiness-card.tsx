@@ -198,14 +198,14 @@ export function LaudusInventoryReadinessCard() {
         </p>
       </div>
 
-      <div className={`border-b px-4 py-3 text-xs ${data?.authority.laudusIsPrimary ? 'bg-emerald-500/5' : 'bg-amber-500/5'}`}>
+      <div className="border-b bg-amber-500/5 px-4 py-3 text-xs">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-medium">
             {isLoading || !data
               ? 'Verificando autoridad de stock.'
               : data.authority.laudusIsPrimary
                 ? 'Referencia Laudus heredada · apertura MOTIL pendiente'
-                : 'Fuente en revisión · Laudus no se usa como verdad única'}
+                : 'Conciliación pendiente · no se usa como verdad única'}
           </p>
           {!isLoading && data?.authority.latestEmailStockCutoff ? (
             <p className="text-muted-foreground">
