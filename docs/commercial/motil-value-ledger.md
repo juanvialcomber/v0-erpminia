@@ -386,3 +386,18 @@ Estos umbrales habilitan escala inicial, no E4.
 - **Calidad:** autorizacion por tenant y rol, ninguna mutacion automatica de inventario, mantenimiento del cierre tecnico del mecanico y de la separacion respecto de aprobacion del supervisor.
 - **Nivel de valor:** L2, visibilidad operacional habilitada. No se declara ahorro, productividad ni beneficio CLP observado sin baseline y trabajo humano residual medidos.
 - **Siguiente medicion:** numero de SKU criticos realmente contados por Esteban, revisiones de OT realizadas por Ariel y tiempo invertido por cada revision; comparar con la misma poblacion y periodo antes de atribuir impacto.
+
+
+## 2026-11-22 — Baseline inicial de medición LECV: Mantenimiento y Bodega
+
+- **Propósito:** fijar una línea base del estado real del producto y del valor observado para La Patagua. LECV mide madurez y valor; no es una metodología de cobro ni un ciclo de desarrollo.
+- **Corte de Bodega Central (002):** cola read-only `bodega_central_stock_verification_queue_v1`; corte de origen Laudus `2026-11-22T15:10:34Z`, sync observado `2026-11-22T18:11:26Z`.
+- **Universo Bodega:** 10.245 productos en la cola; 5.515 con saldo positivo, 4.725 con saldo cero y 5 con saldo negativo.
+- **Conteo físico:** 0 verificaciones persistidas al corte; cobertura física `0 / 5.515 = 0%` de los productos con saldo positivo. No se han observado diferencias físicas todavía; el valor 0 en diferencias significa que falta evidencia de conteo, no que el inventario sea exacto.
+- **Comparabilidad:** el corte anterior de la publicación reportaba 5.520 productos con saldo sin conteo. El corte actual encuentra 5.515 con saldo positivo. No se atribuye una reducción de cinco a MOTIL: cambió el corte/sync y se debe conciliar el universo comparable antes de interpretar variaciones.
+- **Mantenimiento:** 23 OTs activas (`13 open`, `10 in_progress`), 58 completadas; `0 / 23` con revisión de materiales registrada y `0 / 23` con requerimiento de material asociado en la consulta actual.
+- **Semántica:** ausencia de requerimiento o revisión no significa que una OT no necesite materiales ni que haya stockout. Ariel conserva la decisión operativa; MOTIL sólo visibiliza casos para revisión. Cierre del mecánico y aprobación del supervisor siguen separados.
+- **Madurez / evidencia:** Bodega Central se mantiene en L2 (visibilidad y captura trazable habilitada), con evidencia E1 de cobertura de datos pero todavía sin adopción física. La lista de revisión de materiales de Mantenimiento habilita L3 (detección de una brecha de registro), con E1 de volumen; no hay outcome ni impacto operacional medidos.
+- **Valor demostrado al corte:** no hay ahorro, reducción de tiempo ni impacto CLP demostrados para estos dos cambios. El baseline documenta oportunidad de medición, no beneficio realizado.
+- **Siguiente medición:** registrar conteos y evidencia real de Bodega; registrar cuáles OTs revisó Ariel y su decisión; capturar tiempo de revisión en ambos flujos con una muestra definida por los responsables. Publicar numerador/denominador, fuente y fecha de corte. Comparar sólo cohortes con alcance equivalente.
+- **Gate comercial:** mantener impacto económico como `pendiente de medir`. No usar productos sin contar, OTs sin requerimiento, diferencias potenciales ni monto de inventario como ahorro o ROI. Actualizar la clasificación E2/E3 sólo cuando haya desempeño/outcome observado con evidencia y actor trazables.
