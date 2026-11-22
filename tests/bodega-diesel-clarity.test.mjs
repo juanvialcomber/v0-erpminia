@@ -18,7 +18,7 @@ test('bodega makes conflicting diesel evidence explicit and blocks false certain
   const page = await readFile(pagePath, 'utf8');
   assert.match(page, /Petróleo Diesel/);
   assert.match(page, /Difiere de Laudus/);
-  assert.match(page, /MOTIL · saldo operativo/);
+  assert.match(page, /MOTIL · saldo registrado/);
   assert.match(page, /Laudus · stock ERP/);
   assert.match(page, /Δ MOTIL − Laudus/);
   assert.match(page, /No usar una cifra única para compra, consumo ni valorización hasta conciliar la diferencia/);
@@ -26,19 +26,19 @@ test('bodega makes conflicting diesel evidence explicit and blocks false certain
 
 test('conflicted diesel cannot contaminate trusted inventory valuation in the UI', async () => {
   const page = await readFile(pagePath, 'utf8');
-  assert.match(page, /const valuationTrusted = Boolean\(sourceAuthority\?\.laudusIsPrimary\) && !diesel\?\.hasConflict/);
+  assert.match(page, /const valuationTrusted = sourceAuthority\?\.state === 'motil_primary' && !diesel\?\.hasConflict/);
   assert.match(page, /valuationTrusted \? money\(overview\.total_stock_value\) : 'En conciliación'/);
   assert.match(page, /Petróleo impide una valorización confiable hasta conciliar fuentes/);
   assert.match(page, /conflictedDiesel \? 'En conciliación'/);
   assert.match(page, /Difiere Laudus/);
-  assert.match(page, /Laudus primario/);
+  assert.match(page, /Apertura MOTIL pendiente/);
 });
 
 test('bodega is an operational workspace with visible ERP comparison', async () => {
   const page = await readFile(pagePath, 'utf8');
   assert.match(page, /Qué requiere atención hoy/);
   assert.match(page, /Saldos negativos/);
-  assert.match(page, /Sin stock/);
+  assert.match(page, /Saldo en cero/);
   assert.match(page, /Por reponer/);
   assert.match(page, /Posición de inventario/);
   assert.match(page, /<span>Laudus ERP<\/span>/);
