@@ -53,7 +53,10 @@ test('non-sequential areas separate operational context from tools instead of fa
   ]);
 
   assert.match(warehouse, /Operación de Bodega/);
-  assert.match(warehouse, /Herramientas de Bodega/);
+  assert.match(warehouse, /Operación de Bodega/);
+  assert.match(warehouse, /Más opciones de Bodega/);
+  assert.match(warehouse, /DropdownMenuContent/);
+  assert.match(warehouse, /label: 'Definiciones de Bodega'/);
   assert.match(finance, /Operación financiera/);
   assert.match(finance, /Control financiero/);
   assert.match(sustainability, /Ámbitos de Sostenibilidad y HSE/);
