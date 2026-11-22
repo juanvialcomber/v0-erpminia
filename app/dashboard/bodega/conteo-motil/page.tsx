@@ -39,6 +39,7 @@ type Payload = {
   productCount: number;
   page: number;
   counts: Count[];
+  currentUserId: string;
   canCount: boolean;
   canReview: boolean;
   stockChanged: false;
@@ -247,12 +248,12 @@ export default function ConteoMotilPage() {
             {count.note ? <p className="text-sm text-muted-foreground">Observación: {count.note}</p> : null}
             {count.evidence_reference ? <p className="text-xs text-muted-foreground">Evidencia/ubicación: {count.evidence_reference}</p> : null}
             {count.reviewed_at ? <p className="text-xs text-muted-foreground">Revisado el {formatDate(count.reviewed_at)}{count.review_note ? ' · ' + count.review_note : ''}</p> : null}
-            {data?.canReview && !count.decision && count.counted_by !== undefined ? (
+            {data?.canReview && !count.decision && count.counted_by !== data.currentUserId ? (
               <div className="space-y-2 rounded-md border bg-muted/20 p-3">
                 <Label htmlFor={'review-note-' + count.id}>Nota de revisión {reviewNotes[count.id] ? '(opcional)' : ''}</Label>
                 <Input id={'review-note-' + count.id} value={reviewNotes[count.id] || ''} onChange={(event) => setReviewNotes((prev) => ({ ...prev, [count.id]: event.target.value }))} maxLength={1000} placeholder="Explica el rechazo si solicitas reconteo" />
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" disabled={saving || count.counted_by === undefined} onClick={() => reviewCount(count, 'approved_for_opening')}>Validar para apertura</Button>
+                  <Button size="sm" disabled={saving || count.counted_by === data.currentUserId} onClick={() => reviewCount(count, 'approved_for_opening')}>Validar para apertura</Button>
                   <Button size="sm" variant="outline" disabled={saving || (reviewNotes[count.id] || '').trim().length < 8} onClick={() => reviewCount(count, 'recount_required')}>Solicitar reconteo</Button>
                 </div>
                 <p className="text-xs text-muted-foreground">La revisión debe hacerla otra persona asignada. Esta validación no agrega saldo disponible a MOTIL.</p>
