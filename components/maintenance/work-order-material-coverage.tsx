@@ -51,7 +51,6 @@ type SupplyStatus = {
 };
 
 const required = (row: MaterialRow) => Number(row.required ?? row.quantity_required ?? 0);
-const available = (row: MaterialRow) => Number(row.available ?? row.quantity_available ?? 0);
 const issued = (row: MaterialRow) => Number(row.issued ?? 0);
 const reserved = (row: MaterialRow) => Number(row.reserved ?? 0);
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
