@@ -39,6 +39,8 @@ type Payload = {
   productCount: number;
   page: number;
   counts: Count[];
+  countPage: number;
+  countRecordCount: number;
   currentUserId: string;
   canCount: boolean;
   canReview: boolean;
@@ -67,7 +69,9 @@ export default function ConteoMotilPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [countPage, setCountPage] = useState(0);
   const [activeProduct, setActiveProduct] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState('');
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
   const [evidence, setEvidence] = useState('');
@@ -77,11 +81,12 @@ export default function ConteoMotilPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
-  const key = '/api/bodega/motil-counts?search=' + encodeURIComponent(search) + '&page=' + page;
+  const key = '/api/bodega/motil-counts?search=' + encodeURIComponent(search) + '&page=' + page + '&countPage=' + countPage;
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, { revalidateOnFocus: false });
 
   function openCount(product: Product) {
     setActiveProduct(product.canonical_product_id);
+    setRequestId(crypto.randomUUID());
     setQuantity('');
     setNote('');
     setEvidence('');
@@ -105,6 +110,8 @@ export default function ConteoMotilPage() {
       if (!response.ok) throw new Error(result?.error || 'No fue posible guardar el cambio.');
       setMessage('Registro guardado. No se modificó el stock disponible.');
       setActiveProduct(null);
+      setRequestId('');
+      setCountPage(0);
       await mutate();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'No fue posible guardar el cambio.');
@@ -123,6 +130,8 @@ export default function ConteoMotilPage() {
       setErrorMessage('Confirma que observaste físicamente la cantidad.');
       return;
     }
+    const activeRequestId = requestId || crypto.randomUUID();
+    if (!requestId) setRequestId(activeRequestId);
     void submit({
       action: 'count',
       canonicalProductId: product.canonical_product_id,
@@ -130,7 +139,7 @@ export default function ConteoMotilPage() {
       note: note.trim(),
       evidenceReference: evidence.trim(),
       confirmPhysicalCount: true,
-      requestId: crypto.randomUUID(),
+      requestId: activeRequestId,
     });
   }
 
@@ -213,7 +222,7 @@ export default function ConteoMotilPage() {
                   </label>
                   <div className="flex gap-2">
                     <Button size="sm" disabled={!confirmed || !quantity.trim() || saving} onClick={() => recordCount(product)}>{saving ? 'Guardando…' : 'Guardar conteo MOTIL'}</Button>
-                    <Button size="sm" variant="outline" disabled={saving} onClick={() => setActiveProduct(null)}>Cancelar</Button>
+                    <Button size="sm" variant="outline" disabled={saving} onClick={() => { setActiveProduct(null); setRequestId(''); }}>Cancelar</Button>
                   </div>
                 </div>
               ) : null}
@@ -262,6 +271,13 @@ export default function ConteoMotilPage() {
           </article>
         ))}
         {data && data.counts.length === 0 ? <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Aún no hay conteos guardados.</p> : null}
+        {data && data.countRecordCount > 50 ? (
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="sm" disabled={countPage === 0} onClick={() => setCountPage(Math.max(0, countPage - 1))}>Conteos anteriores</Button>
+            <span className="text-xs text-muted-foreground">Página {countPage + 1} de {Math.ceil(data.countRecordCount / 50)} · {data.countRecordCount.toLocaleString('es-CL')} conteos</span>
+            <Button variant="outline" size="sm" disabled={(countPage + 1) * 50 >= data.countRecordCount} onClick={() => setCountPage(countPage + 1)}>Conteos siguientes</Button>
+          </div>
+        ) : null}
       </section>
     </div>
   );
