@@ -74,7 +74,7 @@ test('maintenance attention is restricted to management scope and keeps material
   const home = read('components/dashboard/maintenance-home.tsx');
   const detail = read('components/maintenance/work-order-detail.tsx');
   assert.match(api, /canBypassAssignedMaintenanceExecution/);
-  assert.match(api, /context\.role/);
+  assert.match(api, /canBypassAssignedMaintenanceExecution\(context, accessLevel\)/);
   assert.match(api, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(api, /eq\('organization_id', context\.organizationId\)/);
   assert.match(api, /neq\('status', 'cancelled'\)/);
