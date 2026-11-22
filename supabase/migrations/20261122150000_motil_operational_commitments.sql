@@ -43,7 +43,6 @@ SET search_path = public
 AS $$
 BEGIN
   IF TG_OP = 'UPDATE' THEN
-    NEW.updated_at := now();
     IF NEW.status = OLD.status AND NEW.resolution_note IS NOT DISTINCT FROM OLD.resolution_note THEN
       RETURN NEW;
     END IF;
@@ -61,5 +60,5 @@ END;
 $$;
 DROP TRIGGER IF EXISTS trg_motil_operational_commitment_audit ON public.motil_operational_commitments;
 CREATE TRIGGER trg_motil_operational_commitment_audit
-BEFORE INSERT OR UPDATE ON public.motil_operational_commitments
+AFTER INSERT OR UPDATE ON public.motil_operational_commitments
 FOR EACH ROW EXECUTE FUNCTION public.motil_track_operational_commitment();
