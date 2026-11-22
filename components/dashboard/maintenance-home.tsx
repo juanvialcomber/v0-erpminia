@@ -12,6 +12,7 @@ import { MobileTerrainPanel } from '@/components/maintenance/mobile-terrain-pane
 import { AutopilotDecisionStrip } from '@/components/maintenance/autopilot-decision-strip';
 import { CanonicalMaintenanceOverview } from '@/components/maintenance/canonical-maintenance-overview';
 import { MaintenanceMaterialsAttention } from '@/components/maintenance/materials-attention';
+import { N3OperationalGuardrails } from '@/components/maintenance/n3-operational-guardrails';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
@@ -273,6 +274,8 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
         </div>
       </CardContent>
     </Card> : null}
+
+    {showArielCockpit ? <N3OperationalGuardrails locale={locale} /> : null}
 
     {showArielCockpit ? <MaintenanceMaterialsAttention locale={locale} /> : null}
 
