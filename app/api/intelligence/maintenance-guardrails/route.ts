@@ -93,13 +93,20 @@ export async function GET(request: NextRequest) {
       : stockResult?.error || !stockResult?.data
         ? { state: 'unavailable' as const }
         : { state: 'observed' as const, syncedAt: stockResult.data.source_synced_at };
-    const coreErrorSource = aiResult.error || criticalResult.error || aiResult.count === null || criticalResult.count === null
+    // Keep each diagnostic path independently useful: raw rows can still
+    // reveal visible failures when the aggregate query fails, and the exact
+    // critical count can still reveal P1 evidence when raw rows fail.
+    const rawCoreErrorsAvailable = !aiResult.error && aiResult.count !== null;
+    const criticalCountAvailable = !criticalResult.error && criticalResult.count !== null;
+    const coreErrorSource = !rawCoreErrorsAvailable && !criticalCountAvailable
       ? { state: 'unavailable' as const }
       : {
           state: 'observed' as const,
-          rows: aiResult.data || [],
-          truncated: (aiResult.count || 0) > MAX_CORE_ERRORS,
-          criticalErrorCount: criticalResult.count || 0,
+          rows: rawCoreErrorsAvailable ? aiResult.data || [] : [],
+          truncated: !rawCoreErrorsAvailable
+            || (aiResult.count || 0) > MAX_CORE_ERRORS
+            || !criticalCountAvailable,
+          ...(criticalCountAvailable ? { criticalErrorCount: criticalResult.count || 0 } : {}),
         };
 
     const evaluated = evaluateMotilOperationalCanaries({
