@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import { Badge } from '@/components/ui/badge';
 
@@ -15,7 +16,36 @@ type ReconciliationRow = {
   sii: { status: 'pending_connection' | 'certificate_configured_document_read_unavailable'; certificateConfigured: boolean; writesEnabled: false };
 };
 
+type TaxCoreDocument = {
+  tenantRut: string;
+  issuerRut: string;
+  receiverRut: string;
+  tenantRole: 'issuer' | 'receiver' | 'both';
+  type: number;
+  folio: number;
+  issuedAt: string;
+  total: number;
+  identity: string;
+  sha256: string;
+  validation: {
+    officialSiiXsd: 'PASS' | 'FAIL' | 'UNAVAILABLE';
+    documentSignature: 'NOT_CHECKED';
+    ted: 'NOT_CHECKED';
+    siiAcceptance: 'NOT_CHECKED';
+  };
+};
+
+type TaxCoreRead = {
+  status: 'available' | 'unavailable';
+  period: string | null;
+  documents: TaxCoreDocument[];
+  hasMore: boolean;
+  nextCursor: string | null;
+  invalidDocuments: number;
+};
+
 type ReconciliationResponse = {
+  taxCore?: TaxCoreRead;
   generatedAt?: string;
   summary?: {
     documents?: number;
@@ -23,6 +53,8 @@ type ReconciliationResponse = {
     outboundNotModeled?: number;
     nonComparable?: number;
     siiConnected?: boolean;
+    taxCoreDocuments?: number;
+    taxCoreXsdFailures?: number;
   };
   rows?: ReconciliationRow[];
 };
@@ -65,6 +97,10 @@ function motilVariant(value: ReconciliationRow['motil']['status']) {
 }
 
 export function TaxReconciliationCard() {
+  const [extraDtes, setExtraDtes] = useState<TaxCoreDocument[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
   const { data, error, isLoading } = useSWR<ReconciliationResponse>(
     '/api/finance/tax-reconciliation',
     fetcher,
@@ -73,6 +109,28 @@ export function TaxReconciliationCard() {
 
   const rows = data?.rows || [];
   const summary = data?.summary;
+  const taxCore = data?.taxCore;
+  const sourceDtes = [...(taxCore?.documents || []), ...extraDtes]
+    .filter((item, index, all) => all.findIndex((candidate) => candidate.sha256 === item.sha256) === index);
+  const cursor = nextCursor ?? taxCore?.nextCursor ?? null;
+  const hasMore = nextCursor !== null || Boolean(taxCore?.hasMore);
+
+  async function loadMoreTaxCore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    setPageError(null);
+    try {
+      const response = await fetcher('/api/finance/tax-reconciliation?taxCoreCursor=' + encodeURIComponent(cursor));
+      const page = (response as ReconciliationResponse).taxCore;
+      if (!page || page.status !== 'available') throw new Error('No se pudo cargar la siguiente página de Tax Core');
+      setExtraDtes((current) => [...current, ...page.documents]);
+      setNextCursor(page.nextCursor);
+    } catch (loadError) {
+      setPageError(loadError instanceof Error ? loadError.message : 'No se pudo cargar más DTE');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-lg border bg-card" aria-label="Conciliación tributaria">
@@ -107,6 +165,54 @@ export function TaxReconciliationCard() {
                 <p className="mt-1 text-lg font-semibold">{value}</p>
               </div>
             ))}
+          </div>
+
+          <div className="border-b px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-medium">XML recibidos en Tax Core</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {taxCore?.status === 'available'
+                    ? `${sourceDtes.length} metadatos · solo lectura · organización La Patagua`
+                    : 'Lectura no disponible; el puente permanece apagado o sin credenciales.'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  XSD oficial solo indica estructura. Firma del documento, TED y aceptación SII: no verificadas.
+                </p>
+              </div>
+              {taxCore?.status === 'available' && (
+                <Badge variant={sourceDtes.some((document) => document.validation.officialSiiXsd === 'FAIL') ? 'destructive' : 'outline'}>
+                  {sourceDtes.filter((document) => document.validation.officialSiiXsd === 'FAIL').length} XSD con error
+                </Badge>
+              )}
+            </div>
+            {sourceDtes.length > 0 && (
+              <div className="mt-3 divide-y rounded-md border">
+                {sourceDtes.map((document) => (
+                  <div key={document.sha256} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                    <div>
+                      <p className="font-medium">Tipo {document.type} · Folio {document.folio}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {document.issuedAt} · {document.tenantRole === 'issuer' ? 'Emitido por La Patagua' : document.tenantRole === 'receiver' ? 'Recibido por La Patagua' : 'La Patagua en ambos roles'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs tabular-nums text-muted-foreground">{money(document.total, 'CLP')}</span>
+                      <Badge variant={document.validation.officialSiiXsd === 'PASS' ? 'secondary' : document.validation.officialSiiXsd === 'FAIL' ? 'destructive' : 'outline'}>
+                        XSD {document.validation.officialSiiXsd === 'PASS' ? 'válido' : document.validation.officialSiiXsd === 'FAIL' ? 'con errores' : 'no disponible'}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {taxCore?.invalidDocuments ? <p className="mt-2 text-xs text-amber-700">Se omitieron {taxCore.invalidDocuments} registros con metadatos inválidos.</p> : null}
+            {pageError && <p role="alert" className="mt-2 text-xs text-destructive">{pageError}</p>}
+            {hasMore && (
+              <button type="button" onClick={loadMoreTaxCore} disabled={loadingMore} className="mt-3 rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">
+                {loadingMore ? 'Cargando…' : 'Cargar más DTE'}
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
