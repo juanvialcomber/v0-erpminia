@@ -7,13 +7,14 @@ import typescript from 'typescript';
 
 const routeSource = readFileSync(resolve(process.cwd(), 'app/api/bodega/stock-verification/route.ts'), 'utf8');
 const ESTEBAN = 'a4616733-3bd1-45dc-8dfd-b483c22fcce1';
+const ARIEL = '6bc039fa-ac0e-4be8-b4ee-444a13996581';
 const OTHER = '11111111-1111-4111-8111-111111111111';
 const ORG = '2bd7fe06-8e4f-4a3a-b261-e3f5d8aa3dee';
 const PRODUCT = '22222222-2222-4222-8222-222222222222';
 const WAREHOUSE = '8727e20d-f4f7-46b9-a0ec-4981b83f998a';
 const SYNCED = '2026-11-22T06:11:41.398105+00:00';
 
-function harness({ actor = ESTEBAN, active = true, sourceQuantity = 10, duplicate = false } = {}) {
+function harness({ actor = ESTEBAN, active = true, sourceQuantity = 10, duplicate = false, temporaryExpired = false, moduleLevel = actor === ARIEL ? 'LEC' : 'ED' } = {}) {
   const writes = [];
   const source = {
     warehouse_id: WAREHOUSE,
@@ -38,7 +39,12 @@ function harness({ actor = ESTEBAN, active = true, sourceQuantity = 10, duplicat
         async maybeSingle() {
           if (table === 'profiles') return { data: { status: active ? 'active' : 'inactive' }, error: null };
           if (table === 'bodega_central_stock_canonicalization_preview_v1') return { data: source, error: null };
-          if (table === 'bodega_stock_verifier_assignments') return { data: actor === ESTEBAN ? { id: 'assignment' } : null, error: null };
+          if (table === 'bodega_stock_verifier_assignments') return {
+            data: actor === ESTEBAN ? { id: 'assignment', expires_at: null }
+              : actor === ARIEL ? { id: 'temporary-assignment', expires_at: temporaryExpired ? '2000-01-01T00:00:00Z' : '2999-01-01T00:00:00Z' }
+              : null,
+            error: null,
+          };
           if (table === 'bodega_stock_physical_verifications') return { data: null, error: null };
           throw new Error('Unexpected read from ' + table);
         },
@@ -63,9 +69,12 @@ function harness({ actor = ESTEBAN, active = true, sourceQuantity = 10, duplicat
   const modules = {
     'next/server': { NextResponse: { json(body, options = {}) { return { body, status: options.status || 200 }; } } },
     '@/lib/api/organization-context': { getOrganizationContext: async () => context },
-    '@/lib/api/module-access': { MODULE_KEYS: { BODEGA_INVENTARIO: 'bodega_inventario' }, requireModuleAccess: async () => ({
-      authorized: true, accessLevel: 'ED', canWrite: true, user: { id: actor }, organizationId: ORG,
-    }) },
+    '@/lib/api/module-access': { MODULE_KEYS: { BODEGA_INVENTARIO: 'bodega_inventario' }, requireModuleAccess: async (_request, _key, requireWrite) => {
+      assert.notEqual(requireWrite, true, 'Stock count role must not depend on broad Bodega edit permission');
+      return moduleLevel === 'SR'
+        ? { authorized: false, response: { status: 403, body: { error: 'Sin acceso' } } }
+        : { authorized: true, accessLevel: moduleLevel, canWrite: moduleLevel === 'ED', user: { id: actor }, organizationId: ORG };
+    } }, 
   };
   runInNewContext(javascript.outputText, {
     module,
@@ -102,6 +111,30 @@ test('Esteban registers an exact physical count without changing operational sto
   assert.equal(writes[0].payload.organization_id, ORG);
   assert.equal(writes[0].payload.warehouse_id, WAREHOUSE);
   assert.equal(writes[0].payload.source_quantity, 10);
+});
+
+test('Ariel can temporarily register a personally counted physical quantity with LEC module access', async () => {
+  const { POST, request, writes } = harness({ actor: ARIEL });
+  const result = await POST(request());
+  assert.equal(result.status, 201);
+  assert.equal(result.body.stockChanged, false);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].table, 'bodega_stock_physical_verifications');
+  assert.equal(writes[0].payload.verified_by, ARIEL);
+});
+
+test('Ariel automatically loses the temporary count permission after expiry', async () => {
+  const { POST, request, writes } = harness({ actor: ARIEL, temporaryExpired: true });
+  const result = await POST(request());
+  assert.equal(result.status, 403);
+  assert.equal(writes.length, 0);
+});
+
+test('lack of Bodega module access denies a temporary verifier', async () => {
+  const { POST, request, writes } = harness({ actor: ARIEL, moduleLevel: 'SR' });
+  const result = await POST(request());
+  assert.equal(result.status, 403);
+  assert.equal(writes.length, 0);
 });
 
 test('an editor who is not the designated Bodega verifier cannot record a count', async () => {
@@ -155,4 +188,9 @@ test('migration keeps physical verification append-only and tenant scoped', () =
   assert.match(migration, /revoke all on public\.bodega_stock_physical_verifications from public, anon, authenticated/);
   assert.match(migration, /grant select, insert on public\.bodega_stock_physical_verifications to service_role/);
   assert.doesNotMatch(migration, /update public\.warehouse_stock|update public\.bodega_inventory/i);
+  const temporary = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261122043000_bodega_central_ariel_temporary_verifier.sql'), 'utf8');
+  assert.match(temporary, /now\(\) \+ interval '14 days'/);
+  assert.match(temporary, /on conflict \(organization_id, warehouse_id, profile_id\) do nothing/);
+  assert.match(temporary, /expires_at timestamptz/);
+  assert.doesNotMatch(temporary, /update public\.warehouse_stock|update public\.bodega_inventory/i);
 });
