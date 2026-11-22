@@ -98,7 +98,7 @@ function motilVariant(value: ReconciliationRow['motil']['status']) {
 
 export function TaxReconciliationCard() {
   const [extraDtes, setExtraDtes] = useState<TaxCoreDocument[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
   const { data, error, isLoading } = useSWR<ReconciliationResponse>(
@@ -112,8 +112,8 @@ export function TaxReconciliationCard() {
   const taxCore = data?.taxCore;
   const sourceDtes = [...(taxCore?.documents || []), ...extraDtes]
     .filter((item, index, all) => all.findIndex((candidate) => candidate.sha256 === item.sha256) === index);
-  const cursor = nextCursor ?? taxCore?.nextCursor ?? null;
-  const hasMore = nextCursor !== null || Boolean(taxCore?.hasMore);
+  const cursor = nextCursor === undefined ? taxCore?.nextCursor ?? null : nextCursor;
+  const hasMore = nextCursor === undefined ? Boolean(taxCore?.hasMore) : Boolean(nextCursor);
 
   async function loadMoreTaxCore() {
     if (!cursor || loadingMore) return;
