@@ -409,6 +409,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
         <WorkOrderFluidUsagePanel workOrderId={id} readOnly />
         <WorkOrderWastePanel workOrderId={id} readOnly />
         <WorkOrderEvidenceAndApproval workOrderId={id} status={workOrder.status} />
+        <div id="materiales-ot" className="scroll-mt-24"><WorkOrderMaterialCoverage workOrderId={id} /></div>
 
         <details className="group rounded-lg border bg-card">
           <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium">
@@ -441,7 +442,6 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
           </summary>
           <div className="space-y-5 border-t p-5">
             <WorkOrderStandardPlanPanel workOrderId={id} />
-            <WorkOrderMaterialCoverage workOrderId={id} />
             <WorkOrderPurchasingFlow workOrderId={id} />
             <EntityTimeline entity="work_order" id={id} limit={50} />
           </div>
@@ -475,7 +475,7 @@ export function WorkOrderDetail({ locale, dictionary }: { locale: Locale; dictio
 
     {!isHistorical ? <>
       <WorkOrderStandardPlanPanel workOrderId={id} />
-      <WorkOrderMaterialCoverage workOrderId={id} />
+      <div id="materiales-ot" className="scroll-mt-24"><WorkOrderMaterialCoverage workOrderId={id} /></div>
       <WorkOrderPartsPanel workOrderId={id} />
       <WorkOrderPurchasingFlow workOrderId={id} />
       <WorkOrderExecutionPanel workOrderId={id} />
