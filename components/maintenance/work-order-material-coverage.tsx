@@ -39,8 +39,9 @@ type CatalogRow = {
   productName: string | null;
   family: string | null;
   unit: string | null;
-  quantityAvailable: number;
-  warehouses: string[];
+  observedLaudusQuantity: number | null;
+  stockReconciliationState: string;
+  stockSyncedAt: string | null;
 };
 
 type SupplyStatus = {
@@ -56,6 +57,14 @@ const reserved = (row: MaterialRow) => Number(row.reserved ?? 0);
 const inProcurement = (row: MaterialRow) => Number(row.in_procurement ?? 0);
 const shortage = (row: MaterialRow) => Number(row.shortage ?? row.quantity_shortage ?? 0);
 const rowKey = (row: MaterialRow) => row.requirement_id || row.id || row.product_id || `${row.product_code}-${row.product_name}`;
+
+function laudusReferenceLabel(item: CatalogRow) {
+  if (item.stockReconciliationState === 'source_unavailable') return 'No se pudo consultar el corte de Laudus.';
+  if (item.stockReconciliationState === 'review_identity_conflict') return 'Identidad en revisión; no hay saldo confiable.';
+  if (item.observedLaudusQuantity === null) return 'Sin saldo Laudus Central vinculado.';
+  const quantity = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 6 }).format(item.observedLaudusQuantity);
+  return `Laudus Central (002): ${quantity} ${item.unit || ''} · sin verificar físicamente.`;
+}
 
 export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string }) {
   const { data, error, isLoading, mutate } = useSWR(`/api/maintenance/work-orders/${workOrderId}/materials`, fetcher);
@@ -84,7 +93,9 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   ).length;
   const alreadySent = Boolean(status.procurement_request_id) || ['sent_to_procurement', 'partially_covered', 'covered'].includes(status.supply_status || '');
   const catalogKey = query.trim().length >= 2 ? `/api/maintenance/material-catalog?q=${encodeURIComponent(query.trim())}` : null;
-  const { data: catalogData, isLoading: catalogLoading } = useSWR<{ rows: CatalogRow[] }>(catalogKey, fetcher, { revalidateOnFocus: false });
+  const { data: catalogData, error: catalogError, isLoading: catalogLoading } = useSWR<{ rows: CatalogRow[]; stockEvidenceAvailable: boolean }>(
+    catalogKey, fetcher, { revalidateOnFocus: false },
+  );
   const catalogRows = useMemo(() => (catalogData?.rows || []).filter((item) => !rows.some((row) => row.product_id === item.productId)), [catalogData, rows]);
 
   const resetEditor = () => {
@@ -212,9 +223,12 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
             <div className="space-y-2"><p className="text-xs font-medium">Cantidad</p><Input type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
             <Button onClick={addMaterial} disabled={!selected || saving || Number(quantity) <= 0}>{saving ? 'Guardando…' : 'Agregar'}</Button>
           </div>
-          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm"><p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p><p className="mt-1 text-xs text-muted-foreground">Stock libre informado: {selected.quantityAvailable} {selected.unit || 'unid.'} · {selected.warehouses.length ? selected.warehouses.join(', ') : 'sin bodega informada'}</p></div> : null}
+          {catalogData?.stockEvidenceAvailable === false ? (
+            <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">El corte Laudus no está disponible. Puedes registrar materiales requeridos, pero no confirmar disponibilidad.</p>
+          ) : null}
+          {selected ? <div className="mt-3 rounded-md border bg-card p-3 text-sm"><p className="font-medium">{selected.productCode || 'Sin código'} · {selected.productName}</p><p className="mt-1 text-xs text-muted-foreground">{laudusReferenceLabel(selected)} El saldo observado no autoriza reservar ni entregar materiales.</p></div> : null}
           {!selected && query.trim().length >= 2 ? <div className="mt-3 max-h-56 overflow-auto rounded-md border bg-card">
-            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin coincidencias disponibles.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">Stock libre {item.quantityAvailable} {item.unit || 'unid.'}{item.family ? ` · ${item.family}` : ''}</p></button>)}
+            {catalogLoading ? <p className="p-3 text-sm text-muted-foreground">Buscando…</p> : catalogError ? <p className="p-3 text-sm text-destructive">No se pudo buscar el catálogo. Vuelve a intentar.</p> : catalogRows.length === 0 ? <p className="p-3 text-sm text-muted-foreground">Sin productos coincidentes.</p> : catalogRows.map((item) => <button key={item.productId} type="button" onClick={() => setSelected(item)} className="block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50"><p className="text-sm font-medium">{item.productCode || 'Sin código'} · {item.productName}</p><p className="mt-0.5 text-xs text-muted-foreground">{laudusReferenceLabel(item)}{item.family ? ` · ${item.family}` : ''}</p></button>)}
           </div> : null}
         </div> : null}
 
