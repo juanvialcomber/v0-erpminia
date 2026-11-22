@@ -26,6 +26,7 @@ function buildCase(stock) {
       status: 'open', priority: 'high', scheduled_date: null,
     }],
     canonical_products_v1: [{ id: PRODUCT, product_code: 'ABC', name: 'Repuesto ABC', unit: 'UD' }],
+    work_order_material_approval_installations: [],
     laudus_central_warehouse_stock_reconciliation_v1: Array.isArray(stock)
       ? stock
       : stock ? [{
@@ -44,7 +45,7 @@ function buildCase(stock) {
       neq() { return this; },
       order() { return this; },
       limit() { return this; },
-      in(column, values) { assert.equal(column === 'id' || column === 'canonical_product_id', true); assert.ok(values.length > 0); return this; },
+      in(column, values) { assert.ok(['id', 'canonical_product_id', 'requirement_id'].includes(column)); assert.ok(values.length > 0); return this; },
       maybeSingle: async () => ({ data: rowSet[0] || null, error: null }),
       then(ok, fail) { return Promise.resolve({ data: rowSet, error: null }).then(ok, fail); },
     };
@@ -135,4 +136,14 @@ test('missing Laudus quantity is unknown rather than zero, even when the mapping
   assert.equal(result.status, 200);
   assert.equal(result.body.rows[0].observedLaudusQuantity, null);
   assert.equal(result.body.rows[0].stockReconciliationState, 'review');
+});
+
+test('an unconfirmed OT requirement is not shown as an installed or issued material', async () => {
+  const { GET, calls } = buildCase('matched');
+  const result = await GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rows[0].reportedInstalledQuantity, null);
+  assert.equal(result.body.rows[0].installationReconciliationStatus, null);
+  assert.match(result.body.installationQuantityMeaning, /No representa retiro, vale ni descuento/);
+  assert.equal(calls.some((call) => call.table === 'work_order_material_approval_installations'), true);
 });
