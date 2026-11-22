@@ -6,6 +6,7 @@ import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 const allowedStates = new Set([
   'review_identity_conflict',
+  'review_missing_motil_product',
   'review_negative_source',
   'review_stale_source',
   'review_source_authority',
@@ -31,8 +32,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Estado de vista previa inválido.' }, { status: 400 });
   }
 
-  const limit = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get('limit') || 25)));
-  const offset = Math.max(0, Number(request.nextUrl.searchParams.get('offset') || 0));
+  const requestedLimit = Number(request.nextUrl.searchParams.get('limit') || 25);
+  const requestedOffset = Number(request.nextUrl.searchParams.get('offset') || 0);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.trunc(requestedLimit))) : 25;
+  const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.trunc(requestedOffset)) : 0;
 
   try {
     let rowsQuery = (context.supabase as any)
