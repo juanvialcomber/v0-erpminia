@@ -39,3 +39,15 @@ test('materials workflow is optional and preserves explicit Bodega execution', (
   assert.match(materials,/issueAvailable/);
   assert.match(materials,/sendShortagesToPurchasing/);
 });
+
+test('staged main release preserves legacy material approval until migration is live', () => {
+  const route = read('app/api/maintenance/work-orders/[id]/review/route.ts');
+  assert.match(migration, /create or replace function public\.motil_ot_materials_transition_ready_v1\(\)/);
+  assert.match(migration, /to service_role/);
+  assert.match(route, /motil_ot_materials_transition_ready_v1/);
+  assert.match(route, /!optionalMaterialsError && optionalMaterialsEnabled === true/);
+  assert.match(route, /materialsTransitionEnabled,/);
+  assert.match(approval, /review\.data\?\.materialsTransitionEnabled === true/);
+  assert.match(approval, /materialLines > 0 && !materialsTransitionEnabled && !confirmMaterialsInstalled/);
+  assert.match(approval, /La habilitación del modo transición está pendiente/);
+});

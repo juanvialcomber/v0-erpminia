@@ -151,4 +151,20 @@ revoke all on function public.approve_work_order_with_material_confirmation_v1(u
 grant execute on function public.approve_work_order_with_material_confirmation_v1(uuid,uuid,uuid,boolean,text)
   to service_role;
 
+
+-- Feature probe: the application fails closed (legacy mandatory confirmation)
+-- until this function is installed in the same transaction as the new RPC.
+create or replace function public.motil_ot_materials_transition_ready_v1()
+returns boolean
+language sql stable
+security invoker
+set search_path to 'public'
+as $
+  select true;
+$;
+revoke all on function public.motil_ot_materials_transition_ready_v1()
+  from public, anon, authenticated;
+grant execute on function public.motil_ot_materials_transition_ready_v1()
+  to service_role;
+
 commit;
