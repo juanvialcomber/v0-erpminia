@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
     if (sku) {
       // Keep PostgREST OR filters syntactically safe. Search both code and name
       // so Bodega can locate parts without memorizing their SKU.
-      const search = sku.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑüÜ\s./-]/g, '').trim();
+      const search = sku.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑüÜ\s._-]/g, '').trim();
       if (!search) return NextResponse.json({ error: 'Busca por código o descripción del producto.' }, { status: 400 });
       query = query.or('sku.ilike.%' + search + '%,description.ilike.%' + search + '%');
     }
