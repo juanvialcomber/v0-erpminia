@@ -94,7 +94,7 @@ export default function BodegaPage() {
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisión</p>
-        <p className="mt-2 text-sm font-medium">{Number(operationalDifferenceSummary?.blockingReviews||0)>0?number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión':'Sin diferencias operacionales bloqueantes'}</p>
+        <p className="mt-2 text-sm font-medium">{!operationalDifferenceSummary ? 'Conciliación aún no disponible' : Number(operationalDifferenceSummary.blockingReviews)>0 ? number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión' : 'Sin diferencias operacionales bloqueantes'}</p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">Los contrastes legacy se conservan como evidencia histórica; no bloquean disponibilidad cuando Laudus es la fuente primaria.</p>
         <Link href={Number(overview.negative_stock_products||0)>0?'/dashboard/bodega?status=negative':'/dashboard/bodega/fuentes'} className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">{Number(overview.negative_stock_products||0)>0?'Conciliar saldos':'Revisar fuentes'} <ArrowRight className="h-3 w-3"/></Link>
       </div>
