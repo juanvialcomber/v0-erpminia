@@ -1,118 +1,35 @@
 export const dynamic = 'force-dynamic';
 
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { isStockBelowMinimum } from '@/lib/inventory-alerts';
+import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+
+async function authorize(request: NextRequest, write: boolean): Promise<NextResponse | null> {
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, write);
+  if (!access.authorized) return access.response;
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+  if (access.user.id !== context.userId || access.organizationId !== context.organizationId) {
+    return NextResponse.json({ error: 'No se pudo verificar tu acceso a esta Bodega.' }, { status: 403 });
+  }
+  return null;
+}
 
 export async function POST(request: NextRequest) {
-  const { sku, tipo, cantidad, razon, location_from, location_to } = await request.json();
-
-  if (!sku || !tipo || typeof cantidad !== 'number' || cantidad <= 0) {
-    return NextResponse.json({ error: 'Datos de movimiento inválidos' }, { status: 400 });
-  }
-
-  if (tipo !== 'entrada' && tipo !== 'salida') {
-    return NextResponse.json({ error: 'Tipo de movimiento inválido' }, { status: 400 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookies) => {
-          cookies.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        },
-      },
-    }
-  );
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
-  const { data: inventory, error: invError } = await supabase
-    .from('bodega_inventory')
-    .select('*')
-    .eq('sku', sku)
-    .single();
-
-  if (invError || !inventory) return NextResponse.json({ error: 'No se encontró el SKU' }, { status: 404 });
-
-  const currentQuantity = Number(inventory.quantity || 0);
-  const movementQuantity = Number(cantidad || 0);
-
-  let newQuantity = currentQuantity;
-  if (tipo === 'entrada') newQuantity += movementQuantity;
-  else newQuantity = Math.max(0, currentQuantity - movementQuantity);
-
-  const { data: updated, error: updateError } = await supabase
-    .from('bodega_inventory')
-    .update({
-      quantity: newQuantity,
-      location: location_to || inventory.location || '',
-    })
-    .eq('sku', sku)
-    .select();
-
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-
-  const { data: movement, error: moveError } = await supabase
-    .from('bodega_movements')
-    .insert({
-      sku,
-      movement_type: tipo,
-      quantity: movementQuantity,
-      reason: razon,
-      performed_by: user.id,
-    })
-    .select();
-
-  if (moveError) return NextResponse.json({ error: moveError.message }, { status: 500 });
-
+  const denied = await authorize(request, true);
+  if (denied) return denied;
+  // The legacy inventory and movement writes are non-atomic and do not
+  // represent the validated operational stock master.
   return NextResponse.json({
-    inventory: updated?.[0],
-    movement: movement?.[0],
-    alert_reorder: isStockBelowMinimum(newQuantity, inventory.min_stock),
-  }, { status: 201 });
+    error: 'Esta vía antigua de movimientos está deshabilitada. Registra la entrega desde la OT validada.',
+  }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const sku = searchParams.get('sku');
-  const limit = parseInt(searchParams.get('limit') || '20');
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (cookies) => {
-          cookies.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        },
-      },
-    }
-  );
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
-  if (!sku) return NextResponse.json({ movements: [], warning: 'Se requiere SKU' });
-
-  const { data, error } = await supabase
-    .from('bodega_movements')
-    .select('*')
-    .eq('sku', sku)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    return NextResponse.json({ movements: [], warning: error.message });
-  }
-
-  return NextResponse.json({ movements: data || [] });
+  const denied = await authorize(request, false);
+  if (denied) return denied;
+  // Legacy unscoped movement history cannot be treated as canonical stock.
+  return NextResponse.json({
+    error: 'El historial anterior no representa el stock operativo. Consulta la trazabilidad de la OT.',
+  }, { status: 410, headers: { 'Cache-Control': 'private, no-store' } });
 }

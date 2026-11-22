@@ -2,63 +2,20 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 
 export async function POST(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, true);
+  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
-
-  try {
-    const body = await request.json();
-    const { stock_id, quantity, reason, reference_doc, reference_id } = body;
-    const { data: authData } = await context.supabase.auth.getUser();
-    const userId = authData.user?.id;
-
-    if (!userId) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    // Get current stock
-    const { data: stock, error: stockError } = await context.supabase
-      .from('warehouse_stock')
-      .select('quantity_on_hand, quantity_reserved')
-      .eq('id', stock_id)
-      .eq('organization_id', context.organizationId)
-      .single();
-
-    if (stockError || !stock) {
-      return NextResponse.json({ error: 'Stock not found' }, { status: 404 });
-    }
-
-    // Log movement
-    const { data: movement, error: moveError } = await context.supabase
-      .from('stock_movements')
-      .insert({
-        stock_id,
-        quantity,
-        reason,
-        movement_type: quantity < 0 ? 'issue' : 'receipt',
-        reference_doc,
-        reference_id,
-        performed_by: userId,
-        organization_id: context.organizationId,
-      })
-      .select()
-      .single();
-
-    if (moveError) throw moveError;
-
-    // Update stock
-    const newQuantity = Math.max(0, (stock.quantity_on_hand || 0) + quantity);
-    const { error: updateError } = await context.supabase
-      .from('warehouse_stock')
-      .update({ quantity_on_hand: newQuantity, updated_at: new Date().toISOString() })
-      .eq('id', stock_id);
-
-    if (updateError) throw updateError;
-
-    return NextResponse.json({ movement, new_quantity: newQuantity }, { status: 201 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo registrar el movimiento';
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (access.user.id !== context.userId || access.organizationId !== context.organizationId) {
+    return NextResponse.json({ error: 'No se pudo verificar tu acceso a esta Bodega.' }, { status: 403 });
   }
+  // Former implementation created a movement before separately updating stock.
+  // Without an atomic transaction and validated voucher, retries can create
+  // duplicate movements and incorrect balances.
+  return NextResponse.json({
+    error: 'El registro directo de movimientos no está habilitado. Usa el flujo de materiales de la OT o solicita revisión de Bodega.',
+  }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } });
 }
