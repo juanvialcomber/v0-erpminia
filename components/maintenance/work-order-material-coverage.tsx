@@ -171,11 +171,11 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
   };
 
   const primaryAction = rows.length === 0
-    ? { title: 'Define los materiales de la OT', detail: 'Agrega el primer producto requerido para activar reserva y abastecimiento.', action: 'add' as const }
+    ? { title: 'Sin materiales registrados', detail: 'La gestión de Bodega es opcional: puedes continuar esta OT y registrar materiales solo cuando corresponda.', action: 'optional' as const }
     : reservedLines > 0
       ? { title: 'Hay materiales reservados para entregar', detail: `${reservedLines} línea(s) con reserva registrada para esta OT.`, action: 'issue' as const }
       : shortageCount > 0 && !alreadySent
-        ? { title: 'Hay faltantes que requieren Compras', detail: `${shortageCount} línea(s) sin cobertura completa.`, action: 'procure' as const }
+        ? { title: 'Faltantes sin cobertura registrada', detail: `${shortageCount} línea(s) a revisar. Puedes solicitar apoyo a Compras sin detener la OT.`, action: 'procure' as const }
         : shortageCount > 0
           ? { title: 'Compras está gestionando los faltantes', detail: `${procurementLines || shortageCount} línea(s) en seguimiento de abastecimiento.`, action: 'waiting' as const }
           : fullyDelivered
@@ -188,13 +188,13 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <CardTitle className="text-base">Materiales de la OT</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Una sola secuencia: requerir → reservar → entregar → comprar faltantes.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Durante la transición de Bodega, esta gestión es opcional y no bloquea la ejecución ni el cierre de la OT.</p>
           </div>
           {rows.length > 0 ? <Badge variant={shortageCount > 0 ? 'destructive' : fullyDelivered ? 'secondary' : 'outline'}>{shortageCount > 0 ? `${shortageCount} línea(s) con faltante` : fullyDelivered ? 'Entregado' : 'Pendiente de verificar entrega'}</Badge> : <Badge variant="outline">Sin requerimiento</Badge>}
         </div>
 
         <div className="rounded-lg border bg-muted/20 p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado y acciones opcionales</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
             {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
@@ -215,7 +215,7 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           {[['Líneas requeridas', rows.length], ['Con reserva', reservedLines], ['Con entrega', issuedLines], ['Con faltante', shortageCount], ['En Compras', procurementLines]].map(([label, value]) => <div key={String(label)} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value}</p></div>)}
         </div> : null}
 
-        <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : 'Agregar otro material'}</Button></div>
+        <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => setAdding((value) => !value)} disabled={saving || issuing || sending}>{adding ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{adding ? 'Cerrar' : rows.length === 0 ? 'Registrar material (opcional)' : 'Agregar otro material'}</Button></div>
 
         {adding ? <div className="rounded-lg border bg-muted/20 p-4">
           <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_120px_auto] md:items-end">
