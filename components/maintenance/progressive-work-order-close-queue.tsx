@@ -32,6 +32,7 @@ type QueueRow = {
   next_plan_step_title: string | null;
   next_plan_step_instructions: string | null;
   next_action: string;
+  fluid_closure_reconfirmation_required?: boolean;
   asset?: { id: string; asset_code: string | null; name: string | null } | null;
 };
 
@@ -355,7 +356,9 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const copy = current.next_action === 'record_fluid_closure'
     ? {
         title: 'Confirmar aceites y residuos',
-        description: 'El mecánico asignado debe registrar o confirmar los fluidos usados y qué ocurrió con el residuo antes de cerrar la OT.',
+        description: current.fluid_closure_reconfirmation_required
+          ? 'Los aceites o fluidos cambiaron desde la última confirmación. Revisa los registros y confirma nuevamente para continuar al cierre.'
+          : 'El mecánico asignado debe registrar o confirmar los fluidos usados y qué ocurrió con el residuo antes de cerrar la OT.',
       }
     : actionKey
       ? { title: t.actionTitles[actionKey], description: t.actionDescriptions[actionKey] }
