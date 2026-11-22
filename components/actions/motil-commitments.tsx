@@ -45,7 +45,7 @@ const statusLabels: Record<Commitment['status'], string> = {
 const taskRoutes: Record<string, string> = {
   physical_counts: '/dashboard/bodega/verificar-stock',
   ot_materials: '/dashboard/bodega/materiales-mantenimiento',
-  ot_clock: '/dashboard/mantenimiento/ordenes-trabajo',
+  ot_clock: '/dashboard/mantenimiento',
 };
 
 function taskModuleHref(item: Commitment): string {
@@ -133,9 +133,21 @@ export function MotilCommitments() {
                     {item.due_date && <span>Fecha: {item.due_date}</span>}
                   </div>
                   <h3 className="text-sm font-semibold">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.detail}</p>
+                  {item.source_reference.endsWith(':ot_clock') ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Una revisión coordinada por Ariel. N3uralia contrasta los eventos y presenta únicamente las OT que aún requieren validación.
+                      </p>
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer font-medium">Ver antecedentes y observaciones de la fase piloto</summary>
+                        <p className="mt-2 whitespace-pre-wrap">{item.detail}</p>
+                      </details>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{item.detail}</p>
+                  )}
                   <Button asChild size="sm" variant="outline">
-                    <Link href={taskModuleHref(item)}>Abrir módulo</Link>
+                    <Link href={taskModuleHref(item)}>{item.source_reference.endsWith(':ot_clock') ? 'Ver revisión en Mantenimiento' : 'Abrir módulo'}</Link>
                   </Button>
                   {item.resolution_note && <p className="text-xs text-muted-foreground">Último registro: {item.resolution_note}</p>}
                   {item.can_update && needsNote && (

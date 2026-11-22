@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
@@ -13,6 +13,7 @@ import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 import { formatAssetIdentity, formatWorkOrderNumber } from '@/lib/maintenance/work-order-display';
 import { createClient as createSupabaseClient } from '@/lib/supabase/client';
 import { WorkOrderFluidUsagePanel } from '@/components/maintenance/work-order-fluid-usage-panel';
+import { classifyCloseAction } from '@/lib/maintenance/close-action-state.mjs';
 
 type QueueRow = {
   work_order_id: string;
@@ -44,6 +45,7 @@ type QueueResponse = {
 type EvidenceResponse = {
   evidence?: Array<{
     id: string;
+    evidence_type: string;
     file_name: string;
     created_at: string;
     signed_url?: string | null;
@@ -103,15 +105,16 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const queue = useMemo(() => rawQueue, [rawQueue]);
   const current = queue[0] || null;
 
-  const { data: evidenceData, mutate: mutateEvidence } = useSWR<EvidenceResponse>(
+  const { data: evidenceData, error: evidenceError, mutate: mutateEvidence } = useSWR<EvidenceResponse>(
     current ? `/api/maintenance/work-orders/${current.work_order_id}/evidence` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
-  const evidence = evidenceData?.evidence || [];
+  // The close RPC requires a photo, not merely any attached document.
+  const evidence = (evidenceData?.evidence || []).filter((entry) => entry.evidence_type === 'photo');
   const evidenceCount = evidence.length;
 
-  const { data: fluidClosureData, mutate: mutateFluidClosure } = useSWR(
+  const { data: fluidClosureData, error: fluidClosureError, mutate: mutateFluidClosure } = useSWR(
     current ? `/api/maintenance/work-orders/${current.work_order_id}/fluids/closure` : null,
     fetcher,
     { revalidateOnFocus: false },
@@ -130,6 +133,15 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
   const [saving, setSaving] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const evidenceInputRef = useRef<HTMLInputElement | null>(null);
+  const closeAction = classifyCloseAction({
+    canEdit: Boolean(data?.canEdit),
+    canDeclare: fluidClosureData?.canDeclare === true,
+    fluidReady: Boolean(fluidClosureData),
+    evidenceReady: Boolean(evidenceData),
+    evidenceCount,
+    hasError: Boolean(evidenceError || fluidClosureError),
+  });
 
   useEffect(() => {
     setActionError(null);
@@ -319,7 +331,11 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     }
 
     if (current.next_action === 'close_work_order') {
-      if (evidenceCount < 1) return setActionError('Agrega al menos una foto antes de cerrar.');
+      if (closeAction === 'add_photo') {
+        evidenceInputRef.current?.click();
+        return;
+      }
+      if (closeAction !== 'ready') return setActionError('Sólo el mecánico asignado puede cerrar la OT cuando su evidencia esté verificada.');
       return request(`/api/maintenance/work-orders/${current.work_order_id}/close`, {
         actual_duration_hours: Number(current.actual_duration_hours || 0),
         root_cause: current.root_cause,
@@ -363,6 +379,21 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
     : actionKey
       ? { title: t.actionTitles[actionKey], description: t.actionDescriptions[actionKey] }
       : t.fallbackAction;
+  const closeCopy = current.next_action === 'close_work_order'
+    ? {
+        ...copy,
+        title: closeAction === 'view_only' ? 'Cierre pendiente del mecánico asignado' : closeAction === 'add_photo' ? 'Agregar foto para cerrar la OT' : copy.title,
+        description: closeAction === 'view_only'
+          ? 'La supervisión puede revisar esta OT. Sólo el mecánico asignado confirma el cierre.'
+          : closeAction === 'add_photo'
+            ? 'Los controles técnicos están completos; falta una foto de evidencia antes del cierre.'
+            : closeAction === 'loading'
+              ? 'Comprobando la asignación y las fotos de evidencia.'
+              : closeAction === 'error'
+                ? 'No se pudo verificar la asignación o la evidencia. Actualiza antes de continuar.'
+                : copy.description,
+      }
+    : copy;
   const inline = [
     'complete_standard_plan_step',
     'record_root_cause',
@@ -402,8 +433,8 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
 
           <div className="border-t pt-5">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente paso</p>
-            <h2 className="mt-2 text-xl font-semibold">{copy.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{copy.description}</p>
+            <h2 className="mt-2 text-xl font-semibold">{closeCopy.title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{closeCopy.description}</p>
           </div>
 
           {current.next_action === 'complete_standard_plan_step' ? (
@@ -535,21 +566,24 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                 <div>
                   <p className="font-medium">Evidencia</p>
                   <p className="text-sm text-muted-foreground">
-                    {evidenceCount > 0 ? `${evidenceCount} foto${evidenceCount === 1 ? '' : 's'}` : 'Agrega una foto para cerrar.'}
+                    {evidenceCount > 0 ? `${evidenceCount} foto${evidenceCount === 1 ? '' : 's'}` : closeAction === 'view_only' ? 'Falta una foto del ejecutor.' : 'Agrega una foto para cerrar.'}
                   </p>
                 </div>
+                {(closeAction === 'add_photo' || closeAction === 'ready') ? (
                 <label className="inline-flex h-10 cursor-pointer items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent">
                   <Camera className="mr-2 h-4 w-4" />
                   {uploadingEvidence ? 'Subiendo...' : 'Agregar fotos'}
                   <input
                     className="sr-only"
                     type="file"
+                    ref={evidenceInputRef}
                     multiple
                     accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                     disabled={uploadingEvidence}
                     onChange={(event) => void uploadEvidence(event.target.files)}
                   />
                 </label>
+                ) : null}
               </div>
 
               {evidenceCount > 0 ? (
@@ -588,12 +622,12 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
           ) : null}
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            {inline && data?.canEdit ? (
-              <Button className="sm:min-w-48" onClick={() => void performNextAction()} disabled={saving || (current.next_action === 'record_fluid_closure' && !fluidClosureData?.canDeclare)}>
+            {inline && data?.canEdit && (current.next_action !== 'close_work_order' || closeAction !== 'view_only') ? (
+              <Button className="sm:min-w-48" onClick={() => void performNextAction()} disabled={saving || uploadingEvidence || (current.next_action === 'close_work_order' && (closeAction === 'loading' || closeAction === 'error')) || (current.next_action === 'record_fluid_closure' && !fluidClosureData?.canDeclare)}>
                 {saving
                   ? t.actions.saving
                   : current.next_action === 'close_work_order'
-                    ? 'Cerrar OT'
+                    ? closeAction === 'add_photo' ? 'Agregar foto para cerrar' : 'Cerrar OT'
                     : current.next_action === 'record_fluid_closure'
                     ? fluidUsedChoice === 'no'
                       ? 'Confirmar sin uso de aceites'

@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
+import { stockSearchPattern } from '@/lib/bodega/stock-search-pattern.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const QUANTITY = /^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,6})?$/;
@@ -92,6 +93,36 @@ export async function GET(request: NextRequest) {
     const primaryId = current.find((row) => row.expires_at === null)?.profile_id;
     const support = current.find((row) => row.expires_at !== null && names.has(row.profile_id));
 
+    // A dedicated, read-only progress request avoids repeating aggregate
+    // counts for every SKU search and pagination click.
+    if (params.get('summary') === '1') {
+      const states = ['pending', 'matched', 'difference', 'source_changed'] as const;
+      const results = await Promise.all(states.map(async (verificationState) => {
+        const { count, error } = await context.supabase
+          .from('bodega_central_stock_verification_queue_v1')
+          .select('canonical_product_id', { head: true, count: 'exact' })
+          .eq('organization_id', context.organizationId)
+          .eq('warehouse_id', warehouse.warehouse_id)
+          .neq('source_quantity', 0)
+          .eq('verification_state', verificationState);
+        if (error) throw error;
+        if (count === null) throw new Error('No se pudo contar la cobertura de Bodega.');
+        return [verificationState, count] as const;
+      }));
+      const counts = Object.fromEntries(results) as Record<(typeof states)[number], number>;
+      return NextResponse.json({
+        warehouseName: 'Bodega Central (002)',
+        sourceCutoff: warehouse.source_cutoff,
+        sourceSyncedAt: warehouse.source_synced_at,
+        scope: 'with-stock',
+        counts: {
+          ...counts,
+          total: states.reduce((sum, key) => sum + counts[key], 0),
+        },
+        readOnlyStock: true,
+      });
+    }
+
     let query = context.supabase.from('bodega_central_stock_verification_queue_v1')
       .select('canonical_product_id,sku,description,unit_of_measure,source_quantity,source_synced_at,source_cutoff,canonicalization_state,source_identity_count,counted_quantity,verified_source_quantity,verified_at,verification_note,verification_state,difference_from_current_source', { count: 'exact' })
       .eq('organization_id', context.organizationId)
@@ -99,7 +130,13 @@ export async function GET(request: NextRequest) {
       .order('sku', { ascending: true });
     if (withStock) query = query.neq('source_quantity', 0);
     if (state !== 'all') query = query.eq('verification_state', state);
-    if (sku) query = query.ilike('sku', '%' + sku.replace(/[%_,]/g, '') + '%');
+    if (sku) {
+      // Keep PostgREST OR filters syntactically safe. Search both code and name
+      // so Bodega can locate parts without memorizing their SKU.
+      const search = stockSearchPattern(sku);
+      if (!search) return NextResponse.json({ error: 'Busca por código o descripción del producto.' }, { status: 400 });
+      query = query.or('sku.ilike.%' + search + '%,description.ilike.%' + search + '%');
+    }
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
 

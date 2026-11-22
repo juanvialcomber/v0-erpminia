@@ -30,6 +30,21 @@ type Row = {
   difference_from_current_source: number | null;
 };
 
+type VerificationProgress = {
+  warehouseName: string;
+  sourceCutoff: string | null;
+  sourceSyncedAt: string | null;
+  scope: 'with-stock';
+  readOnlyStock: true;
+  counts: {
+    total: number;
+    pending: number;
+    matched: number;
+    difference: number;
+    source_changed: number;
+  };
+};
+
 type Payload = {
   warehouseName: string;
   responsibleName: string;
@@ -57,6 +72,13 @@ const fetcher = async (url: string): Promise<Payload> => {
   const payload = await res.json().catch(() => null);
   if (!res.ok) throw new Error(payload?.error || 'No se pudo consultar el stock.');
   return payload as Payload;
+};
+
+const progressFetcher = async (url: string): Promise<VerificationProgress> => {
+  const res = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(payload?.error || 'No se pudo revisar el avance de conteos.');
+  return payload as VerificationProgress;
 };
 
 const qty = (value: number | null | undefined) => value === null || value === undefined
@@ -89,6 +111,12 @@ export default function BodegaStockVerificationPage() {
     + '&state=' + encodeURIComponent(state) + '&sku=' + encodeURIComponent(sku)
     + '&offset=' + offset + '&limit=25';
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, { revalidateOnFocus: false });
+  const { data: progress, error: progressError, isLoading: progressLoading, mutate: refreshProgress } =
+    useSWR('/api/bodega/stock-verification?summary=1', progressFetcher, { revalidateOnFocus: false });
+  const verifiedNow = (progress?.counts.matched || 0) + (progress?.counts.difference || 0);
+  const progressPercent = progress && progress.counts.total > 0
+    ? Math.round((verifiedNow / progress.counts.total) * 100)
+    : null;
   const rows = data?.rows || [];
 
   function startReview(row: Row) {
@@ -143,7 +171,7 @@ export default function BodegaStockVerificationPage() {
       if (!res.ok || result?.recorded !== true) throw new Error(result?.error || 'No fue posible guardar la revisión.');
       setSavedAt(result.verifiedAt || '');
       setActiveId(null);
-      await mutate();
+      await Promise.all([mutate(), refreshProgress()]);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'No fue posible guardar el conteo.');
     } finally {
@@ -164,6 +192,40 @@ export default function BodegaStockVerificationPage() {
         <p className="text-sm text-muted-foreground">Responsable principal: <strong>{data?.responsibleName || 'Jefe de Bodega'}</strong>. {data?.temporarySupportName ? <>Apoyo temporal: <strong>{data.temporarySupportName}</strong> hasta {date(data.temporarySupportUntil)}. </> : null}Confirma únicamente cantidades contadas físicamente. Registrar un conteo no cambia las existencias de MOTIL ni de Laudus.</p>
         <p className="text-xs text-muted-foreground">Último corte Laudus: {date(data?.sourceCutoff)} · Sincronizado: {date(data?.sourceSyncedAt)}</p>
       </header>
+
+      <section aria-label="Avance de conteos físicos" className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold">Avance · productos con saldo en Central</h2>
+          <p className="text-xs text-muted-foreground">
+            {progressError ? 'No disponible' : progressLoading || !progress ? 'Cargando avance…'
+              : verifiedNow.toLocaleString('es-CL') + ' de ' + progress.counts.total.toLocaleString('es-CL')
+                + ' con conteo vigente' + (progressPercent === null ? '' : ' · ' + progressPercent + '%')}
+          </p>
+        </div>
+        <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4">
+          {([
+            { key: 'pending', label: 'Por contar', value: progress?.counts.pending },
+            { key: 'matched', label: 'Coinciden', value: progress?.counts.matched },
+            { key: 'difference', label: 'Con diferencia', value: progress?.counts.difference },
+            { key: 'source_changed', label: 'Revisar cambio Laudus', value: progress?.counts.source_changed },
+          ] as const).map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={state === item.key && scope === 'with-stock'}
+              className="bg-card p-4 text-left transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring aria-pressed:bg-muted/40"
+              onClick={() => changeFilter(item.key, 'with-stock')}
+            >
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">
+                {progressLoading || progressError || !progress ? '—' : (item.value ?? 0).toLocaleString('es-CL')}
+              </p>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">Esteban define qué productos críticos revisar primero; Ariel puede apoyarlo. Un conteo no actualiza el stock y un cambio posterior de Laudus exige reconfirmación.</p>
+        {progressError ? <p role="status" className="text-xs text-destructive">No se pudo obtener el avance de Bodega. Puedes continuar registrando conteos.</p> : null}
+      </section>
 
       {data && !data.canVerify ? (
         <div className="rounded-md border p-3 text-sm text-muted-foreground">
@@ -191,7 +253,7 @@ export default function BodegaStockVerificationPage() {
           </select>
         </div>
         <form className="flex min-w-[200px] flex-[2] gap-2" onSubmit={(event) => { event.preventDefault(); setSku(skuInput.trim()); setOffset(0); setActiveId(null); }}>
-          <div className="min-w-0 flex-1 space-y-1"><Label htmlFor="stock-verify-sku">Código</Label><Input id="stock-verify-sku" placeholder="Buscar SKU" value={skuInput} onChange={(e) => setSkuInput(e.target.value)} /></div>
+          <div className="min-w-0 flex-1 space-y-1"><Label htmlFor="stock-verify-sku">Código o producto</Label><Input id="stock-verify-sku" placeholder="Ej. ACERO001 o rodamiento" value={skuInput} onChange={(e) => setSkuInput(e.target.value)} /></div>
           <Button className="self-end" type="submit" variant="secondary">Buscar</Button>
         </form>
       </section>
