@@ -15,6 +15,12 @@ type Order = {
   scheduled_date: string | null;
 };
 
+// Match operational OT statuses used by the mechanic's My Work view.
+// Paused may also appear as an OT status in historical migrations.
+const ACTIVE_STATUSES = ['open', 'assigned', 'pending', 'planned', 'in_progress', 'paused'];
+const ORDER_PAGE_SIZE = 200;
+const MAX_ORDERS_REVIEWED = 1000;
+
 export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
@@ -31,17 +37,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Esta revisión corresponde a planificación y supervisión.' }, { status: 403 });
     }
 
+    // Review the whole active population before ranking candidates. The first
+    // page alone cannot identify the most critical OT across a large tenant.
     const { data, count, error } = await context.supabase
       .from('maintenance_work_orders')
       .select('id,work_order_number,title,priority,status,scheduled_date', { count: 'exact' })
       .eq('organization_id', context.organizationId)
       .not('created_by', 'is', null)
-      .in('status', ['open', 'in_progress'])
-      .order('scheduled_date', { ascending: true, nullsFirst: false })
-      .limit(200);
+      .in('status', ACTIVE_STATUSES)
+      .order('id', { ascending: true })
+      .range(0, ORDER_PAGE_SIZE - 1);
     if (error) throw error;
     if (count === null) throw new Error('No se pudo determinar la cobertura de órdenes.');
-    const orders = (data || []) as Order[];
+    const orders = [...((data || []) as Order[])];
+    while (orders.length < count && orders.length < MAX_ORDERS_REVIEWED) {
+      const offset = orders.length;
+      const { data: nextOrders, error: pageError } = await context.supabase
+        .from('maintenance_work_orders')
+        .select('id,work_order_number,title,priority,status,scheduled_date')
+        .eq('organization_id', context.organizationId)
+        .not('created_by', 'is', null)
+        .in('status', ACTIVE_STATUSES)
+        .order('id', { ascending: true })
+        .range(offset, Math.min(offset + ORDER_PAGE_SIZE, MAX_ORDERS_REVIEWED) - 1);
+      if (pageError) throw pageError;
+      if (!nextOrders?.length) throw new Error('No fue posible leer toda la página de OT activas.');
+      orders.push(...(nextOrders as Order[]));
+    }
     const orderIds = orders.map((order) => order.id);
     const recorded = new Set<string>();
 
@@ -61,11 +83,14 @@ export async function GET(request: NextRequest) {
     }
 
     const summary = summarizeMaterialAttention(orders, recorded);
+    const partial = count > orders.length;
     return NextResponse.json({
       source: 'maintenance_work_orders + work_order_material_requirements',
       activeOrdersTotal: count,
       ...summary,
-      partial: count > orders.length,
+      // Never present a "top 5" when unseen orders may rank higher.
+      reviewCandidates: partial ? [] : summary.reviewCandidates,
+      partial,
       mandatory: false,
       asOf: new Date().toISOString(),
     });
