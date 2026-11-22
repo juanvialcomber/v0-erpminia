@@ -74,6 +74,7 @@ export default function BodegaPage() {
         <PageHeaderDescription>{negativeStockMode ? 'Revisa únicamente posiciones con saldo negativo antes de usar disponibilidad, reposición o cobertura para decidir.' : 'Qué existe, qué falta y qué requiere conciliación antes de comprometer mantenimiento o compras.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
+        {!negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega/verificar-stock">Verificar stock real</Link></Button> : null}
         {!negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega/materiales-mantenimiento">Materiales de OT</Link></Button> : null}
         {negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega">Ver todo el inventario</Link></Button> : null}
         {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
