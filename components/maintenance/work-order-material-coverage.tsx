@@ -197,7 +197,6 @@ export function WorkOrderMaterialCoverage({ workOrderId }: { workOrderId: string
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado y acciones opcionales</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div><p className="font-medium">{primaryAction.title}</p><p className="mt-1 text-sm text-muted-foreground">{primaryAction.detail}</p></div>
-            {primaryAction.action === 'add' ? <Button size="sm" onClick={() => setAdding(true)} disabled={saving || issuing || sending}><Plus className="mr-2 h-4 w-4" />Agregar material</Button> : null}
             {primaryAction.action === 'issue' ? <Button size="sm" onClick={issueAvailable} disabled={issuing || sending || saving}><PackageCheck className="mr-2 h-4 w-4" />{issuing ? 'Entregando…' : 'Entregar reservas'}</Button> : null}
             {primaryAction.action === 'procure' ? <Button size="sm" onClick={sendShortagesToPurchasing} disabled={sending || issuing || saving || !status.supply_need_id}><ShoppingCart className="mr-2 h-4 w-4" />{sending ? 'Enviando…' : 'Enviar a Compras'}</Button> : null}
             {primaryAction.action === 'waiting' ? <Badge variant="secondary">En Compras</Badge> : null}
