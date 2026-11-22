@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveDataHealthAccess } from '@/lib/intelligence/data-health-access';
 import { getOrganizationContext } from '@/lib/api/organization-context';
-import { getTaxCoreOrganizationCertificateStatus } from '@/lib/integrations/n3uralia-tax/client';
+import { getTaxCoreOrganizationCertificateStatus, getTaxCoreOrganizationDtes } from '@/lib/integrations/n3uralia-tax/client';
 import { classifyTaxDocument, taxDocumentCounterparty } from '@/lib/finance/tax-document-classification.mjs';
 
 function rutKey(value: unknown) {
@@ -12,6 +12,43 @@ function rutKey(value: unknown) {
 
 function folioKey(value: unknown) {
   return String(value || '').replace(/[^0-9]/g, '');
+}
+
+type TaxCoreSourceDocument = {
+  tenantRut: string;
+  issuerRut: string;
+  receiverRut: string;
+  tenantRole: 'issuer' | 'receiver' | 'both';
+  type: number;
+  folio: number;
+  issuedAt: string;
+  total: number;
+  identity: string;
+  sha256: string;
+  validation: {
+    officialSiiXsd: 'PASS' | 'FAIL' | 'UNAVAILABLE';
+    unavailableCode?: string;
+    errors: Array<{ message: string; fileName: string | null; lineNumber: number | null }>;
+    documentSignature: 'NOT_CHECKED';
+    ted: 'NOT_CHECKED';
+    siiAcceptance: 'NOT_CHECKED';
+  };
+};
+
+function isTaxCoreSourceDocument(value: unknown): value is TaxCoreSourceDocument {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Partial<TaxCoreSourceDocument>;
+  const validation = item.validation;
+  return rutKey(item.tenantRut) === '84542800K' &&
+    typeof item.issuerRut === 'string' && typeof item.receiverRut === 'string' &&
+    ['issuer', 'receiver', 'both'].includes(item.tenantRole || '') &&
+    Number.isSafeInteger(item.type) && Number.isSafeInteger(item.folio) &&
+    typeof item.issuedAt === 'string' && Number.isSafeInteger(item.total) &&
+    typeof item.sha256 === 'string' && /^[a-f0-9]{64}$/.test(item.sha256) &&
+    item.identity === `${item.issuerRut}:${item.type}:${item.folio}` &&
+    Boolean(validation && ['PASS', 'FAIL', 'UNAVAILABLE'].includes(validation.officialSiiXsd) &&
+      Array.isArray(validation.errors) && validation.documentSignature === 'NOT_CHECKED' &&
+      validation.ted === 'NOT_CHECKED' && validation.siiAcceptance === 'NOT_CHECKED');
 }
 
 function amount(value: unknown) {
@@ -39,7 +76,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Conciliación tributaria no configurada para esta organización.' }, { status: 403 });
     }
 
-    const [dtesResult, invoicesResult, siiResult] = await Promise.all([
+    const requestUrl = new URL(request.url);
+    const taxCorePeriod = requestUrl.searchParams.get('period') || undefined;
+    const taxCoreCursor = requestUrl.searchParams.get('taxCoreCursor') || undefined;
+    const [dtesResult, invoicesResult, siiResult, taxCoreResult] = await Promise.all([
       context.supabase
         .from('laudus_dtes_service_v1')
         .select('external_id,document_type,folio,issuer_tax_id,receiver_tax_id,issued_date,net_amount,tax_amount,total_amount,currency_code,status,observed_at')
@@ -59,6 +99,21 @@ export async function GET(request: NextRequest) {
         siiWritesEnabled: false,
         unavailableReason: error instanceof Error ? error.message : 'tax_core_unavailable',
       })),
+      getTaxCoreOrganizationDtes(context.organizationId, {
+        period: taxCorePeriod,
+        limit: 50,
+        cursor: taxCoreCursor,
+      }).catch((error) => ({
+        ok: false,
+        organizationId: context.organizationId,
+        taxpayerRut: null,
+        documents: [],
+        hasMore: false,
+        nextCursor: null,
+        siiWritesEnabled: false,
+        accountingPromotion: false,
+        unavailableReason: error instanceof Error ? error.message : 'tax_core_dte_read_unavailable',
+      })),
     ]);
 
     if (dtesResult.error) throw dtesResult.error;
@@ -73,6 +128,36 @@ export async function GET(request: NextRequest) {
       candidates.push(invoice);
       invoicesByFolio.set(key, candidates);
     }
+
+    const taxCoreIdentityMatches =
+      taxCoreResult?.ok === true &&
+      taxCoreResult.organizationId === context.organizationId &&
+      rutKey(taxCoreResult.taxpayerRut) === companyTaxId;
+    const taxCoreDocuments = taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
+      ? taxCoreResult.documents.filter(isTaxCoreSourceDocument).map((document) => ({
+          tenantRut: document.tenantRut,
+          issuerRut: document.issuerRut,
+          receiverRut: document.receiverRut,
+          tenantRole: document.tenantRole,
+          type: document.type,
+          folio: document.folio,
+          issuedAt: document.issuedAt,
+          total: document.total,
+          identity: document.identity,
+          sha256: document.sha256,
+          validation: document.validation,
+        }))
+      : [];
+    const taxCoreRead = {
+      status: taxCoreIdentityMatches ? 'available' as const : 'unavailable' as const,
+      period: taxCorePeriod || null,
+      documents: taxCoreDocuments,
+      hasMore: taxCoreIdentityMatches && Boolean(taxCoreResult.hasMore),
+      nextCursor: taxCoreIdentityMatches ? taxCoreResult.nextCursor || null : null,
+      invalidDocuments: taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
+        ? taxCoreResult.documents.length - taxCoreDocuments.length
+        : 0,
+    };
 
     const rows = (dtesResult.data || []).map((dte) => {
       const direction = classifyTaxDocument(dte.document_type, dte.issuer_tax_id, dte.receiver_tax_id, companyTaxId);
@@ -161,6 +246,8 @@ export async function GET(request: NextRequest) {
         laudusReadOnly: true,
         motilCanonicalMutated: false,
         siiWritesEnabled: false,
+        taxCoreMetadataReadImplemented: taxCoreIdentityMatches,
+        taxCoreXmlReturned: false,
         siiDocumentReadImplemented: false,
       },
     });
