@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { canBypassAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { summarizeMaterialAttention } from '@/lib/maintenance/material-attention.mjs';
 
 type Order = {
   id: string;
@@ -12,16 +13,6 @@ type Order = {
   priority: string | null;
   status: string | null;
   scheduled_date: string | null;
-};
-
-const priorityRank: Record<string, number> = {
-  critical: 0,
-  urgent: 0,
-  emergency: 0,
-  high: 1,
-  medium: 2,
-  normal: 2,
-  low: 3,
 };
 
 export async function GET(request: NextRequest) {
@@ -69,30 +60,12 @@ export async function GET(request: NextRequest) {
       for (const requirement of requirements || []) recorded.add(requirement.work_order_id);
     }
 
-    const without = orders.filter((order) => !recorded.has(order.id));
-    without.sort((a, b) => {
-      const aPriority = priorityRank[String(a.priority || '').toLowerCase()] ?? 4;
-      const bPriority = priorityRank[String(b.priority || '').toLowerCase()] ?? 4;
-      if (aPriority !== bPriority) return aPriority - bPriority;
-      const dateComparison = String(a.scheduled_date || '9999').localeCompare(String(b.scheduled_date || '9999'));
-      return dateComparison || String(a.work_order_number || a.id).localeCompare(String(b.work_order_number || b.id));
-    });
-
+    const summary = summarizeMaterialAttention(orders, recorded);
     return NextResponse.json({
       source: 'maintenance_work_orders + work_order_material_requirements',
       activeOrdersTotal: count,
-      activeOrdersReviewed: orders.length,
-      requirementsRegisteredOrders: recorded.size,
-      withoutRegisteredRequirements: without.length,
+      ...summary,
       partial: count > orders.length,
-      reviewCandidates: without.slice(0, 5).map((order) => ({
-        workOrderId: order.id,
-        workOrderNumber: order.work_order_number,
-        title: order.title,
-        priority: order.priority,
-        status: order.status,
-        scheduledDate: order.scheduled_date,
-      })),
       mandatory: false,
       asOf: new Date().toISOString(),
     });
