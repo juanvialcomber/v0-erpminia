@@ -38,6 +38,13 @@ test('same-count replacement after confirmation requires reconfirmation', () => 
   ]), false);
 });
 
+test('editing an existing fluid row after confirmation requires reconfirmation', () => {
+  assert.equal(isCurrent(declaration(1), profile, [{
+    ...usage(),
+    updated_at: '2026-11-22T12:40:00Z',
+  }]), false);
+});
+
 test('a previous mechanic declaration cannot be reused after reassignment', () => {
   assert.equal(isCurrent(declaration(1), 'different-mechanic', [usage()]), false);
   assert.equal(isCurrent(declaration(1), null, [usage()]), false);
