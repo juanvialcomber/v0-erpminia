@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const [summaryResult, rowsResult] = await Promise.all([
       (context.supabase as any)
         .from('bodega_central_stock_canonicalization_summary_v1')
-        .select('warehouse_id,source_cutoff,source_synced_at,authority_state,products_reviewed,existing_zero_rows_to_assign,opening_rows_to_create,already_canonical,requires_review,identity_conflicts,negative_source_products,fractional_products,stale_source_products,zero_without_opening_balance')
+        .select('warehouse_id,source_cutoff,source_synced_at,authority_state,products_reviewed,existing_zero_rows_to_assign,opening_rows_to_create,already_canonical,requires_review,identity_conflicts,missing_motil_products,negative_source_products,fractional_products,stale_source_products,zero_without_opening_balance')
         .eq('organization_id', context.organizationId)
         .maybeSingle(),
       rowsQuery.range(offset, offset + limit - 1),
