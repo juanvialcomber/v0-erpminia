@@ -569,7 +569,7 @@ export function ProgressiveWorkOrderCloseQueue({ locale, dictionary }: { locale:
                     {evidenceCount > 0 ? `${evidenceCount} foto${evidenceCount === 1 ? '' : 's'}` : closeAction === 'view_only' ? 'Falta una foto del ejecutor.' : 'Agrega una foto para cerrar.'}
                   </p>
                 </div>
-                {closeAction !== 'view_only' ? (
+                {(closeAction === 'add_photo' || closeAction === 'ready') ? (
                 <label className="inline-flex h-10 cursor-pointer items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent">
                   <Camera className="mr-2 h-4 w-4" />
                   {uploadingEvidence ? 'Subiendo...' : 'Agregar fotos'}
