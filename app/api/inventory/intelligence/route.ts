@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
       !dieselLaudus ||
       dieselLaudus.reconciliation_state !== 'aligned'
     );
-    const hasDieselConflict = !laudusIsPrimary && dieselSourcesDiffer;
+    const hasDieselConflict = dieselSourcesDiffer;
 
     const summary = reconciliationSummaryResult.data
       ? {
