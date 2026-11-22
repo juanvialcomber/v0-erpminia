@@ -131,6 +131,21 @@ test('repeated real scoped core errors are grouped by code without raw prompts',
   assert.equal(result.findings.every((f) => !('prompt' in f.evidence)), true);
 });
 
+test('critical aggregate count survives raw diagnostic truncation', () => {
+  const result = run([], { coreErrorSource: {
+    state: 'observed',
+    rows: Array.from({ length: 100 }, () => ({
+      error_code: 'noncritical_error', created_at: NOW,
+    })),
+    criticalErrorCount: 3,
+    truncated: true,
+  } });
+  assert.equal(result.status, 'needs_action');
+  assert.equal(result.findings[0].code, 'ai_core_repeated_canonical_source_contract_failure');
+  assert.equal(result.findings[0].severity, 'P1');
+  assert.equal(result.findings.some(x => x.code === 'core_error_scan_partial'), true);
+});
+
 test('partial population or diagnostics cannot incorrectly say healthy', () => {
   const partial = run([order('ot-1')], { totalWorkOrders: 90 });
   assert.equal(partial.coverage.complete, false);
