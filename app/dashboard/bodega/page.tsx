@@ -16,6 +16,7 @@ import { DataSourceStatusStrip } from '@/components/data/data-source-status-stri
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
+import { CentralStockCanonicalizationPreview } from '@/components/bodega/central-stock-canonicalization-preview';
 import { LaudusInventoryReconciliationQueue } from '@/components/integrations/laudus-inventory-reconciliation-queue';
 import { ProcurementReceiptInbox } from '@/components/procurement/procurement-receipt-inbox';
 
@@ -109,6 +110,8 @@ export default function BodegaPage() {
     /> : null}
 
     {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
+
+    {!negativeStockMode ? <CentralStockCanonicalizationPreview /> : null}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
 
