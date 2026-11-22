@@ -43,6 +43,9 @@ test('Tax Core bridge is tenant-scoped, metadata-only, and displays validation l
   assert.match(route, /getTaxCoreOrganizationDtes/);
   assert.match(route, /taxCore: taxCoreRead/);
   assert.match(route, /taxCoreXmlReturned: false/);
+  assert.match(route, /taxCoreResult\.readOnly === true/);
+  assert.match(route, /taxCoreResult\.siiWritesEnabled === false/);
+  assert.match(route, /taxCoreResult\.accountingPromotion === false/);
   assert.match(route, /documentSignature: 'NOT_CHECKED'/);
   assert.match(card, /XML recibidos en Tax Core/);
   assert.match(card, /Firma del documento, TED y aceptación SII: no verificadas/);
