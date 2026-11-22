@@ -59,6 +59,42 @@ test('normally paused, idle and distinct running orders are not incidents', () =
   assert.equal(result.coverage.complete, true);
 });
 
+test('timer open across a weekend is a high-priority review, not 96h of labor', () => {
+  const candidate = order('ote-weekend', {
+    timer_status: 'running',
+    timer_start_time: '2026-11-20T12:31:54Z',
+    assigned_person_id: 'technician-1',
+  });
+  const result = run([candidate]);
+  const warning = result.findings.find((row) => row.code === 'long_unpaused_timer');
+  assert.ok(warning);
+  assert.equal(warning.severity, 'P1');
+  assert.equal(result.status, 'needs_action');
+  assert.equal(warning.evidence.workOrderId, 'ote-weekend');
+  assert.match(warning.nextAction, /sin sumar automáticamente/);
+  assert.equal(result.policy.noAutomatedClose, true);
+  assert.equal(result.policy.operationalMutationExecuted, false);
+});
+
+test('an uninterrupted timer between 24 and 36 hours is a secondary signal only', () => {
+  const result = run([order('ot-26h', {
+    timer_status: 'running',
+    timer_start_time: '2026-11-21T16:20:00Z',
+  })]);
+  const signal = result.findings.find((row) => row.code === 'long_unpaused_timer');
+  assert.equal(signal?.severity, 'P2');
+  assert.equal(result.status, 'review');
+});
+
+test('a safely paused stale timer cannot continue increasing wall-clock hours', () => {
+  const paused = run([order('ote-corrected', {
+    timer_status: 'paused',
+    timer_start_time: null,
+  })]);
+  assert.equal(paused.findings.some((row) => row.code === 'long_unpaused_timer'), false);
+  assert.equal(paused.status, 'no_issues_observed');
+});
+
 test('a pending physical count is NOT an inventory error or a blocker', () => {
   const result = run([order('ot-1')]);
   assert.deepEqual(result.findings, []);
