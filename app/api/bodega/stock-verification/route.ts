@@ -20,8 +20,10 @@ type SourceRow = {
   source_identity_count: number;
 };
 
-async function contextFor(request: NextRequest, write = false) {
-  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, write);
+async function contextFor(request: NextRequest) {
+  // This route has a narrower write permission than Bodega module editing:
+  // a current, named physical verifier assignment is required for POST.
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
   if (!access.authorized) return { ok: false as const, response: access.response };
   const context = await getOrganizationContext(request);
   if (!context.ok) return { ok: false as const, response: context.response };
@@ -47,7 +49,7 @@ async function centralWarehouse(context: Extract<Awaited<ReturnType<typeof getOr
 export async function GET(request: NextRequest) {
   const gate = await contextFor(request);
   if (!gate.ok) return gate.response;
-  const { context, canWrite } = gate;
+  const { context } = gate;
   const params = request.nextUrl.searchParams;
   const state = params.get('state') || 'all';
   if (!allowedStates.has(state)) {
@@ -68,17 +70,27 @@ export async function GET(request: NextRequest) {
 
     const { data: assignments, error: assignmentError } = await context.supabase
       .from('bodega_stock_verifier_assignments')
-      .select('profile_id')
+      .select('profile_id,expires_at')
       .eq('organization_id', context.organizationId)
       .eq('warehouse_id', warehouse.warehouse_id)
       .eq('is_active', true)
       .limit(10);
     if (assignmentError) throw assignmentError;
-    const canVerify = canWrite && (assignments || []).some((row: { profile_id: string }) => row.profile_id === context.userId);
-    const responsibleId = assignments?.[0]?.profile_id;
-    const { data: responsible } = responsibleId
-      ? await context.supabase.from('profiles').select('full_name').eq('id', responsibleId).eq('organization_id', context.organizationId).maybeSingle()
-      : { data: null };
+    type Assignment = { profile_id: string; expires_at: string | null };
+    const currentTime = Date.now();
+    const current = ((assignments || []) as Assignment[]).filter((row) =>
+      !row.expires_at || Date.parse(row.expires_at) > currentTime);
+    const assignedIds = [...new Set(current.map((row) => row.profile_id))];
+    const { data: people, error: peopleError } = assignedIds.length
+      ? await context.supabase.from('profiles').select('id,full_name,status')
+          .eq('organization_id', context.organizationId).in('id', assignedIds)
+      : { data: [], error: null };
+    if (peopleError) throw peopleError;
+    const names = new Map((people || []).filter((row) => row.status === 'active')
+      .map((row) => [row.id, row.full_name]));
+    const canVerify = current.some((row) => row.profile_id === context.userId) && names.has(context.userId);
+    const primaryId = current.find((row) => row.expires_at === null)?.profile_id;
+    const support = current.find((row) => row.expires_at !== null && names.has(row.profile_id));
 
     let query = context.supabase.from('bodega_central_stock_verification_queue_v1')
       .select('canonical_product_id,sku,description,unit_of_measure,source_quantity,source_synced_at,source_cutoff,canonicalization_state,source_identity_count,counted_quantity,verified_source_quantity,verified_at,verification_note,verification_state,difference_from_current_source', { count: 'exact' })
@@ -93,7 +105,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       warehouseName: 'Bodega Central (002)',
-      responsibleName: responsible?.full_name || 'Jefe de Bodega asignado',
+      responsibleName: names.get(primaryId || '') || 'Jefe de Bodega asignado',
+      temporarySupportName: support ? names.get(support.profile_id) : null,
+      temporarySupportUntil: support?.expires_at || null,
       canVerify,
       sourceCutoff: warehouse.source_cutoff,
       sourceSyncedAt: warehouse.source_synced_at,
@@ -110,7 +124,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const gate = await contextFor(request, true);
+  const gate = await contextFor(request);
   if (!gate.ok) return gate.response;
   const { context } = gate;
 
@@ -155,13 +169,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: assignment, error: assignmentError } = await context.supabase
-      .from('bodega_stock_verifier_assignments').select('id')
+      .from('bodega_stock_verifier_assignments').select('id,expires_at')
       .eq('organization_id', context.organizationId)
       .eq('warehouse_id', snapshot.warehouse_id)
       .eq('profile_id', context.userId).eq('is_active', true).maybeSingle();
     if (assignmentError) throw assignmentError;
-    if (!assignment) {
-      return NextResponse.json({ error: 'La validación física está asignada al responsable de Bodega.' }, { status: 403 });
+    if (!assignment || (assignment.expires_at && Date.parse(assignment.expires_at) <= Date.now())) {
+      return NextResponse.json({ error: 'No tienes una autorización vigente para confirmar conteos físicos.' }, { status: 403 });
     }
 
     // Optimistic source check: the reviewer must see the same Laudus cut as
