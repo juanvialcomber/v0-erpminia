@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS public.motil_operational_commitments (
 CREATE INDEX IF NOT EXISTS motil_operational_commitments_assignee_idx
   ON public.motil_operational_commitments (organization_id, assignee_profile_id, status, due_date);
 ALTER TABLE public.motil_operational_commitments ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.motil_operational_commitments FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.motil_operational_commitments TO service_role;
 
 CREATE TABLE IF NOT EXISTS public.motil_operational_commitment_events (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -35,6 +37,9 @@ CREATE TABLE IF NOT EXISTS public.motil_operational_commitment_events (
 CREATE INDEX IF NOT EXISTS motil_operational_commitment_events_org_idx
   ON public.motil_operational_commitment_events (organization_id, commitment_id, created_at);
 ALTER TABLE public.motil_operational_commitment_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.motil_operational_commitment_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON public.motil_operational_commitment_events TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.motil_operational_commitment_events_id_seq TO service_role;
 
 CREATE OR REPLACE FUNCTION public.motil_track_operational_commitment()
 RETURNS trigger
@@ -42,6 +47,10 @@ LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = NEW.assignee_profile_id AND p.organization_id = NEW.organization_id AND p.status = 'active')
+    OR NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = NEW.created_by_profile_id AND p.organization_id = NEW.organization_id AND p.status = 'active') THEN
+    RAISE EXCEPTION 'Commitment actor or assignee does not belong to the same active organization';
+  END IF;
   IF TG_OP = 'UPDATE' THEN
     IF NEW.status = OLD.status AND NEW.resolution_note IS NOT DISTINCT FROM OLD.resolution_note THEN
       RETURN NEW;
