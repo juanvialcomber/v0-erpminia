@@ -71,7 +71,7 @@ export default function BodegaPage() {
       <PageHeaderContent>
         <PageHeaderEyebrow>Abastecimiento</PageHeaderEyebrow>
         <PageHeaderTitle>{negativeStockMode ? 'Conciliar stock negativo' : 'Bodega'}</PageHeaderTitle>
-        <PageHeaderDescription>{negativeStockMode ? 'Revisa únicamente posiciones con saldo negativo antes de usar disponibilidad, reposición o cobertura para decidir.' : 'MOTIL guía la bodega. Los saldos registrados requieren conteo físico y revisión antes de considerarse disponibles.'}</PageHeaderDescription>
+        <PageHeaderDescription>{negativeStockMode ? 'Revisa saldos negativos de referencia para conciliar; no representan saldo MOTIL validado.' : 'MOTIL guía la bodega. Los saldos registrados requieren conteo físico y revisión antes de considerarse disponibles.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
         {!negativeStockMode ? <Button asChild><Link href="/dashboard/bodega/conteo-motil">Iniciar conteo MOTIL</Link></Button> : null}
@@ -94,7 +94,7 @@ export default function BodegaPage() {
       </div>
       <div className="rounded-lg border bg-card p-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decisión</p>
-        <p className="mt-2 text-sm font-medium">{!operationalDifferenceSummary ? 'Conciliación aún no disponible' : Number(operationalDifferenceSummary.blockingReviews)>0 ? number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión' : 'Sin diferencias operacionales bloqueantes'}</p>
+        <p className="mt-2 text-sm font-medium">{!operationalDifferenceSummary ? 'Conciliación aún no disponible' : Number(operationalDifferenceSummary.blockingReviews)>0 ? number(operationalDifferenceSummary.blockingReviews)+' casos requieren revisión' : 'Sin casos prioritarios de conciliación'}</p>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">Los cruces con Laudus quedan como evidencia de conciliación; no habilitan disponibilidad en MOTIL.</p>
         <Link href={Number(overview.negative_stock_products||0)>0?'/dashboard/bodega?status=negative':'/dashboard/bodega/fuentes'} className="mt-3 inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2">{Number(overview.negative_stock_products||0)>0?'Conciliar saldos':'Revisar fuentes'} <ArrowRight className="h-3 w-3"/></Link>
       </div>
