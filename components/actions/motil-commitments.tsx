@@ -24,6 +24,7 @@ type Payload = {
   scope: 'mine' | 'team';
   can_view_team: boolean;
   source: string;
+  feature_available?: boolean;
 };
 
 async function fetcher(url: string): Promise<Payload> {
@@ -72,6 +73,8 @@ export function MotilCommitments() {
       setSaving(null);
     }
   }
+
+  if (data?.feature_available === false) return null;
 
   const items = data?.items || [];
   const pending = items.filter((item) => item.status !== 'done');
