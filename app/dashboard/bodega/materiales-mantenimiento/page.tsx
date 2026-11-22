@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { AlertTriangle, ArrowLeft, Boxes, RefreshCw } from 'lucide-react';
@@ -55,6 +56,9 @@ const quantity = (value: number | null, unit: string | null) => value === null
   ? 'Sin coincidencia actual'
   : new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(value) + (unit ? ' ' + unit : '');
 
+const historicalOrderStatuses = new Set(['completed', 'closed', 'cancelled', 'canceled']);
+const isHistoricalOrder = (status: string | null) => historicalOrderStatuses.has(String(status || '').toLowerCase());
+
 const reconciliationLabel: Record<string, string> = {
   aligned: 'Conciliado',
   quantity_mismatch: 'Conciliar cantidad',
@@ -76,9 +80,13 @@ function timeLabel(value: string | null | undefined) {
 
 export default function BodegaMaintenanceSupplyPage() {
   const { data, error, isLoading, mutate } = useSWR('/api/bodega/maintenance-supply', fetcher, { revalidateOnFocus: false });
+  const [showHistorical, setShowHistorical] = useState(false);
 
   const sourceAuthority = data?.sourceAuthority;
   const rows = data?.rows || [];
+  const activeRows = rows.filter((row) => !isHistoricalOrder(row.workOrderStatus));
+  const historicalRows = rows.filter((row) => isHistoricalOrder(row.workOrderStatus));
+  const visibleRows = showHistorical ? [...activeRows, ...historicalRows] : activeRows;
   const authorityCurrent = sourceAuthority?.authority_state === 'laudus_primary';
 
   return <div className="space-y-6">
@@ -110,12 +118,25 @@ export default function BodegaMaintenanceSupplyPage() {
 
     {error ? <StatePanel title="No se pudo cargar la relación" description={error.message} /> : null}
     {isLoading ? <StatePanel title="Cargando materiales de OT" description="Consultando requerimientos y la fuente de stock." /> : null}
-    {!isLoading && !error && rows.length === 0 ? <StatePanel title="No hay requerimientos de materiales registrados" description="Las OT aparecerán aquí cuando Mantención registre materiales requeridos." /> : null}
+    {!isLoading && !error && rows.length === 0 ? <StatePanel title="Aún no hay materiales registrados para estas OT" description="Abre una OT vigente y registra sus materiales necesarios. No se crean solicitudes automáticamente." /> : null}
+    {!isLoading && !error && rows.length > 0 && activeRows.length === 0 ? (
+      <StatePanel title="Sin materiales solicitados en OT activas" description="Las solicitudes registradas corresponden a OT finalizadas. Son antecedentes históricos, no pedidos pendientes para Bodega." />
+    ) : null}
 
     {!isLoading && !error && rows.length > 0 ? <div className="space-y-3">
-      <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Requerimientos encontrados</h2><Badge variant="outline">{rows.length} líneas</Badge></div>
-      {rows.map((row) => {
-        const historical = ['completed', 'closed', 'cancelled', 'canceled'].includes(String(row.workOrderStatus || '').toLowerCase());
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Materiales solicitados · OT activas</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">{activeRows.length} actuales</Badge>
+          {historicalRows.length > 0 ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setShowHistorical((current) => !current)}>
+              {showHistorical ? 'Ocultar historial' : `Ver ${historicalRows.length} históricos`}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {visibleRows.map((row) => {
+        const historical = isHistoricalOrder(row.workOrderStatus);
         const stateLabel = reconciliationLabel[row.stockReconciliationState] || 'Revisar fuente';
         return <article key={row.requirementId} className="rounded-lg border bg-card p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

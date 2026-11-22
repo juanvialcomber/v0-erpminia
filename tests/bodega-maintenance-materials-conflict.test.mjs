@@ -25,12 +25,14 @@ function buildCase(stock) {
       id: 'ot-1', work_order_number: 'OT-1', title: 'Cambiar repuesto',
       status: 'open', priority: 'high', scheduled_date: null,
     }],
-    products: [{ id: PRODUCT, product_code: 'ABC', name: 'Repuesto ABC', unit: 'UD' }],
-    laudus_central_warehouse_stock_reconciliation_v1: stock ? [{
-      canonical_product_id: PRODUCT, laudus_stock: 23,
-      product_reconciliation_status: stock, reconciliation_state: 'missing_in_motil',
-      unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
-    }] : [],
+    canonical_products_v1: [{ id: PRODUCT, product_code: 'ABC', name: 'Repuesto ABC', unit: 'UD' }],
+    laudus_central_warehouse_stock_reconciliation_v1: Array.isArray(stock)
+      ? stock
+      : stock ? [{
+        canonical_product_id: PRODUCT, laudus_stock: 23,
+        product_reconciliation_status: stock, reconciliation_state: 'missing_in_motil',
+        unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
+      }] : [],
   };
   function from(table, schema = 'public') {
     calls.push({ table, schema });
@@ -48,7 +50,7 @@ function buildCase(stock) {
     };
     return query;
   }
-  const supabase = { from, schema(name) { return { from: (table) => from(table, name) }; } };
+  const supabase = { from, schema(name) { throw new Error('Disallowed private schema API: ' + name); } };
   const output = typescript.transpileModule(source, {
     compilerOptions: { target: typescript.ScriptTarget.ES2022, module: typescript.ModuleKind.CommonJS },
     fileName: 'maintenance-supply.ts',
@@ -78,6 +80,7 @@ test('an ambiguous Laudus-to-MOTIL product mapping is not presented as available
   assert.equal(result.body.rows[0].stockReconciliationState, 'review_identity_conflict');
   assert.equal(result.body.readOnly, true);
   assert.equal(calls.some((c) => c.table === 'laudus_inventory_reconciliation_service_v1'), false);
+  assert.equal(calls.some((c) => c.table === 'canonical_products_v1' && c.schema === 'public'), true);
 });
 
 test('an unambiguous Central 002 match remains visible only as observed source quantity', async () => {
@@ -92,6 +95,43 @@ test('an unambiguous Central 002 match remains visible only as observed source q
 test('missing Central stock evidence remains unknown rather than becoming a false zero', async () => {
   const { GET } = buildCase(null);
   const result = await GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rows[0].observedLaudusQuantity, null);
+  assert.equal(result.body.rows[0].stockReconciliationState, 'review');
+});
+
+
+test('maintenance supply remains tenant-filtered and uses the public product projection', async () => {
+  const { GET, calls } = buildCase('matched');
+  const result = await GET({});
+  assert.equal(result.status, 200);
+  assert.equal(calls.some((c) => c.table === 'canonical_products_v1' && c.schema === 'public'), true);
+  assert.equal(calls.some((c) => c.schema === 'canonical'), false);
+  assert.equal(result.body.rows[0].productName, 'Repuesto ABC');
+  assert.equal(result.body.rows[0].unit, 'UD');
+});
+
+
+test('multiple Laudus source identities for one canonical product never select an arbitrary quantity', async () => {
+  const stock = [
+    { canonical_product_id: PRODUCT, laudus_stock: 5, product_reconciliation_status: 'matched',
+      reconciliation_state: 'missing_in_motil', unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null },
+    { canonical_product_id: PRODUCT, laudus_stock: 11, product_reconciliation_status: 'matched',
+      reconciliation_state: 'missing_in_motil', unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null },
+  ];
+  const result = await buildCase(stock).GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rows[0].observedLaudusQuantity, null);
+  assert.equal(result.body.rows[0].stockReconciliationState, 'review_identity_conflict');
+  assert.equal(result.body.readOnly, true);
+});
+
+test('missing Laudus quantity is unknown rather than zero, even when the mapping is unique', async () => {
+  const result = await buildCase([{
+    canonical_product_id: PRODUCT, laudus_stock: null,
+    product_reconciliation_status: 'matched', reconciliation_state: 'review',
+    unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
+  }]).GET({});
   assert.equal(result.status, 200);
   assert.equal(result.body.rows[0].observedLaudusQuantity, null);
   assert.equal(result.body.rows[0].stockReconciliationState, 'review');

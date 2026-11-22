@@ -107,6 +107,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id: workOrderId } = await params;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
+  if (access.user.id !== context.userId || access.organizationId !== context.organizationId) {
+    return NextResponse.json({ error: 'No se pudo comprobar la organización del usuario.' }, { status: 403 });
+  }
 
   try {
     const scope = await getMaintenanceWorkOrderScope(context.supabase, context.organizationId, workOrderId);
@@ -123,10 +126,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const productIds = [...new Set((parts || []).map((row) => row.canonical_product_id).filter(Boolean))];
     const stockIds = [...new Set([...(parts || []).map((row) => row.warehouse_stock_id), ...(movements || []).map((row) => row.stock_id)].filter(Boolean))];
-    const [{ data: products }, { data: stock }] = await Promise.all([
-      productIds.length ? context.supabase.schema('canonical').from('products').select('id, product_code, name, unit').in('id', productIds) : Promise.resolve({ data: [] }),
-      stockIds.length ? context.supabase.from('warehouse_stock').select('id, part_code, part_name, quantity_on_hand, quantity_available, unit_cost').in('id', stockIds) : Promise.resolve({ data: [] }),
+    const [{ data: products, error: productError }, { data: stock, error: stockError }] = await Promise.all([
+      productIds.length
+        ? context.supabase.from('canonical_products_v1')
+            .select('id, product_code, name, unit')
+            .eq('organization_id', context.organizationId)
+            .in('id', productIds)
+        : Promise.resolve({ data: [], error: null }),
+      stockIds.length
+        ? context.supabase.from('warehouse_stock')
+            .select('id, part_code, part_name, quantity_on_hand, quantity_available, unit_cost')
+            .eq('organization_id', context.organizationId)
+            .in('id', stockIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
+    if (productError || stockError) throw productError || stockError;
 
     const productMap = new Map((products || []).map((item) => [item.id, item]));
     const stockMap = new Map((stock || []).map((item) => [item.id, item]));
@@ -150,7 +164,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       record_scope: scope,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cargar la trazabilidad de repuestos';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const detail = error && typeof error === 'object'
+      ? error as { code?: string; message?: string }
+      : null;
+    console.error('[maintenance/reserve-parts][GET]', {
+      code: detail?.code || 'UNKNOWN',
+      message: detail?.message || 'Stock read failed',
+    });
+    return NextResponse.json({ error: 'No se pudo cargar la trazabilidad de repuestos.' }, { status: 500 });
   }
 }

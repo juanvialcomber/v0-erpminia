@@ -25,13 +25,25 @@ test('material workspace renders the operational progression', () => {
 });
 
 test('material issue action depends on explicit reservations', () => {
-  assert.match(component, /reservedTotal > 0/);
+  assert.match(component, /reservedLines > 0/);
+  assert.match(component, /reserved = \(row: MaterialRow\) => Number\(row\.reserved \?\? 0\)/);
+  assert.doesNotMatch(component, /reservedTotal > 0/);
   assert.match(component, /Entregar reservas/);
   assert.doesNotMatch(component, /availableCount > 0/);
 });
 
 test('procurement action is shown only before the shortage is handed off', () => {
-  assert.match(component, /shortageTotal > 0 && !alreadySent/);
+  assert.match(component, /shortageCount > 0 && !alreadySent/);
+  assert.match(component, /shortageCount > 0/);
+  assert.doesNotMatch(component, /shortageTotal > 0 && !alreadySent/);
   assert.match(component, /Enviar a Compras/);
   assert.match(component, /Compras está gestionando los faltantes/);
+});
+
+
+test('a zero-shortage display does not claim delivery until each required line is issued', () => {
+  assert.match(component, /const fullyDelivered\s*=\s*rows\.length > 0/);
+  assert.match(component, /issued\(row\) >= required\(row\)/);
+  assert.match(component, /Revisar cobertura y entrega/);
+  assert.match(component, /Pendiente de verificar entrega/);
 });

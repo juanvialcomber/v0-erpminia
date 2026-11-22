@@ -16,6 +16,16 @@ type RequirementRow = {
   notes: string | null;
 };
 
+type StockObservation = {
+  canonical_product_id: string;
+  laudus_stock: number | string | null;
+  unit_of_measure: string | null;
+  product_reconciliation_status: string | null;
+  reconciliation_state: string | null;
+  source_date_to: string | null;
+  laudus_synced_at: string | null;
+};
+
 type WorkOrderRow = {
   id: string;
   work_order_number: string | null;
@@ -65,8 +75,7 @@ export async function GET(request: NextRequest) {
         : Promise.resolve({ data: [], error: null }),
       productIds.length
         ? context.supabase
-            .schema('canonical')
-            .from('products')
+            .from('canonical_products_v1')
             .select('id,product_code,name,unit')
             .eq('organization_id', context.organizationId)
             .in('id', productIds)
@@ -85,13 +94,25 @@ export async function GET(request: NextRequest) {
 
     const workOrders = new Map((workOrdersResult.data || []).map((row: WorkOrderRow) => [row.id, row]));
     const products = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
-    const stock = new Map((stockResult.data || []).map((row: any) => [row.canonical_product_id, row]));
+    // More than one Laudus source row may map to the same canonical product.
+    // Never use last-row-wins for stock decisions: that silently picks an
+    // arbitrary quantity when source identities have not been reconciled.
+    const stockByProduct = new Map<string, StockObservation[]>();
+    for (const observation of (stockResult.data || []) as StockObservation[]) {
+      if (!observation.canonical_product_id) continue;
+      const current = stockByProduct.get(observation.canonical_product_id) || [];
+      current.push(observation);
+      stockByProduct.set(observation.canonical_product_id, current);
+    }
 
     const rows = requirements.flatMap((requirement) => {
       const workOrder = workOrders.get(requirement.work_order_id);
       const product = products.get(requirement.canonical_product_id);
       if (!workOrder || !product) return [];
-      const observation = stock.get(requirement.canonical_product_id) || null;
+      const observations = stockByProduct.get(requirement.canonical_product_id) || [];
+      const ambiguous = observations.length > 1 ||
+        observations.some((row) => row.product_reconciliation_status === 'identity_conflict');
+      const observation = ambiguous ? null : observations[0] || null;
       return [{
         requirementId: requirement.id,
         workOrderId: workOrder.id,
@@ -110,8 +131,8 @@ export async function GET(request: NextRequest) {
         requirementStatus: requirement.status,
         requiredDate: requirement.required_date,
         notes: requirement.notes,
-        observedLaudusQuantity: observation && observation.product_reconciliation_status !== 'identity_conflict' ? Number(observation.laudus_stock ?? 0) : null,
-        stockReconciliationState: observation?.product_reconciliation_status === 'identity_conflict' ? 'review_identity_conflict' : observation?.reconciliation_state || 'review',
+        observedLaudusQuantity: observation?.laudus_stock == null ? null : Number(observation.laudus_stock),
+        stockReconciliationState: ambiguous ? 'review_identity_conflict' : observation?.reconciliation_state || 'review',
         operationalResolution: null,
         stockSourceDate: observation?.source_date_to || null,
         stockSyncedAt: observation?.laudus_synced_at || null,
@@ -126,7 +147,18 @@ export async function GET(request: NextRequest) {
       stockQuantityMeaning: 'Saldo observado exclusivamente en Laudus Bodega Central (002); no representa una reserva ni disponibilidad para retirar.',
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo cargar la relación Bodega–Mantención';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Report the PostgREST error code in server logs, never in the user-facing
+    // response. Keep canonical data and inventory untouched on read failure.
+    const detail = error && typeof error === 'object'
+      ? error as { code?: string; message?: string }
+      : null;
+    console.error('[bodega/maintenance-supply][GET]', {
+      code: detail?.code || 'UNKNOWN',
+      message: detail?.message || 'Unexpected query error',
+    });
+    return NextResponse.json(
+      { error: 'No se pudo cargar la relación Bodega–Mantención' },
+      { status: 500 },
+    );
   }
 }
