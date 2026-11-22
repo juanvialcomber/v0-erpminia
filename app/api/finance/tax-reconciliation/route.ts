@@ -234,6 +234,8 @@ export async function GET(request: NextRequest) {
       nonComparable: rows.filter((row) => row.motil.status === 'not_comparable').length,
       siiConnected: false,
       certificateConfigured: Boolean(siiResult?.certificateConfigured),
+      taxCoreDocuments: taxCoreDocuments.length,
+      taxCoreXsdFailures: taxCoreDocuments.filter((document) => document.validation.officialSiiXsd === 'FAIL').length,
     };
 
     return NextResponse.json({
@@ -242,6 +244,7 @@ export async function GET(request: NextRequest) {
       companyTaxId,
       summary,
       rows,
+      taxCore: taxCoreRead,
       boundaries: {
         laudusReadOnly: true,
         motilCanonicalMutated: false,
