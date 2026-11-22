@@ -119,6 +119,22 @@ test('stable keys deduplicate multiple rechecks and bounded output preserves sev
   assert.equal(a.truncated, true);
 });
 
+test('a late P1 cannot disappear behind eight earlier P2 observations', () => {
+  const minor = Array.from({ length: 8 }, (_, i) =>
+    order('old-' + i, { timer_status: 'idle', timer_start_time: NOW }));
+  const lateCritical = order('very-late', { status: 'completed', timer_status: 'running', timer_start_time: NOW });
+  const result = run([...minor, lateCritical], { maxFindings: 8 });
+  assert.equal(result.totalSignals, 9);
+  assert.equal(result.findings.length, 8);
+  assert.equal(result.truncated, true);
+  assert.equal(result.status, 'needs_action');
+  assert.equal(result.findings[0].severity, 'P1');
+  assert.equal(result.findings[0].code, 'terminal_timer_active');
+  const missingSource = run(minor, { stockSource: { state: 'unavailable' }, maxFindings: 8 });
+  assert.equal(missingSource.status, 'needs_action');
+  assert.equal(missingSource.findings[0].code, 'warehouse_source_unavailable');
+});
+
 test('API and cockpit enforce scoped read-only contracts and passive on-open detection', () => {
   const route = readFileSync(resolve(process.cwd(), 'app/api/intelligence/maintenance-guardrails/route.ts'), 'utf8');
   const ui = readFileSync(resolve(process.cwd(), 'components/maintenance/n3-operational-guardrails.tsx'), 'utf8');
