@@ -74,10 +74,10 @@ export default function BodegaPage() {
         <PageHeaderDescription>{negativeStockMode ? 'Revisa únicamente posiciones con saldo negativo antes de usar disponibilidad, reposición o cobertura para decidir.' : 'Qué existe, qué falta y qué requiere conciliación antes de comprometer mantenimiento o compras.'}</PageHeaderDescription>
       </PageHeaderContent>
       <PageHeaderActions>
-        {!negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega/verificar-stock">Verificar stock real</Link></Button> : null}
+        {!negativeStockMode ? <Button asChild><Link href="/dashboard/bodega/verificar-stock">Verificar stock real</Link></Button> : null}
         {!negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega/materiales-mantenimiento">Materiales de OT</Link></Button> : null}
         {negativeStockMode ? <Button asChild variant="outline"><Link href="/dashboard/bodega">Ver todo el inventario</Link></Button> : null}
-        {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
+        {ready && canEdit('bodega_inventario') && canEdit('fin_compras') ? <Button asChild variant="outline"><Link href="/dashboard/compras/importar-existencias"><Upload className="h-4 w-4" />Importar existencias</Link></Button> : null}
       </PageHeaderActions>
     </PageHeader>
 
@@ -100,19 +100,27 @@ export default function BodegaPage() {
       </div>
     </section> : null}
 
-    {!negativeStockMode ? <DataSourceStatusStrip
-      reviewHref="/dashboard/calidad-datos"
-      sources={[
-        sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
-        sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
-        sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando la última sincronización del ERP.' }),
-        sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
-      ]}
-    /> : null}
+    {!negativeStockMode ? <details className="rounded-lg border bg-card">
+      <summary className="cursor-pointer px-4 py-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        Fuentes y preparación del stock
+        <span className="mt-1 block text-xs font-normal text-muted-foreground">Ver detalles de Laudus, cruces de datos y preparación de saldos. No modifica existencias.</span>
+      </summary>
+      <div className="space-y-4 border-t p-4">
+        {!negativeStockMode ? <DataSourceStatusStrip
+          reviewHref="/dashboard/calidad-datos"
+          sources={[
+            sourceStatus.source('inventory', { key: 'inventory', label: 'Bodega MOTIL', state: 'pending', detail: 'Existencias, reservas, conteos y movimientos operacionales.' }),
+            sourceStatus.source('canonical', { key: 'canonical', label: 'Productos canónicos', state: 'pending', detail: 'Identidad, unidad, familia y costo de referencia.' }),
+            sourceStatus.source('laudus', { key: 'laudus', label: 'Laudus', state: 'pending', detail: 'Verificando la última sincronización del ERP.' }),
+            sourceStatus.source('procurement', { key: 'procurement', label: 'Compras', state: 'pending', detail: 'Órdenes, recepciones y necesidades vinculables al producto.' }),
+          ]}
+        /> : null}
 
-    {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
+        {!negativeStockMode ? <LaudusInventoryReadinessCard /> : null}
 
-    {!negativeStockMode ? <CentralStockCanonicalizationPreview /> : null}
+        {!negativeStockMode ? <CentralStockCanonicalizationPreview /> : null}
+      </div>
+    </details> : null}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
 
