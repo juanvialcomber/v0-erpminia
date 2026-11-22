@@ -11,6 +11,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { MobileTerrainPanel } from '@/components/maintenance/mobile-terrain-panel';
 import { AutopilotDecisionStrip } from '@/components/maintenance/autopilot-decision-strip';
 import { CanonicalMaintenanceOverview } from '@/components/maintenance/canonical-maintenance-overview';
+import { MaintenanceMaterialsAttention } from '@/components/maintenance/materials-attention';
 import { WhatsappOperationalUpdates } from '@/components/production/whatsapp-operational-updates';
 import type { Dictionary, Locale } from '@/lib/i18n/dictionaries';
 
@@ -246,6 +247,8 @@ export function MaintenanceHome({ locale, dictionary }: { locale: Locale; dictio
         </Link>)}
       </div>
     </section> : null}
+
+    {showArielCockpit ? <MaintenanceMaterialsAttention locale={locale} /> : null}
 
     {showArielCockpit && decisionOfDay ? <Card className="shadow-none" aria-label="Decisión del día">
       <CardHeader className="pb-3">
