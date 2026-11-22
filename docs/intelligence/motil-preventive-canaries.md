@@ -15,6 +15,7 @@ Estado: CODE_INSPECTED / QA_PENDING. Cliente: MOTIL - Compania Minera La Patagua
 1. OT terminada con timer running/paused o running sin inicio valido: P1.
 2. Dos OT running para el mismo ejecutor: P1.
 3. Pausa con timer_start_time activo: P1; idle con inicio residual: P2.
+3b. Cronometro running continuo durante 24-35 horas: P2; desde 36 horas: P1. El reloj mide tiempo calendario, no horas reales de trabajo. Se debe verificar con el mecanico antes de ajustar; nunca acumular el fin de semana por defecto.
 4. Corte de Laudus no disponible: P1; sin fecha o mayor a 36 horas: P2.
 5. Codigo de error de fuente de IA repetido al menos dos veces en 24 horas: P1; otro error AI repetido al menos tres veces: P2.
 6. Recuento parcial por limite de 1000 OT o 100 errores: revision parcial, nunca declarar sano el universo.
