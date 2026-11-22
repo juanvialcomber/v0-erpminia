@@ -107,7 +107,7 @@ test('a planner without Bodega permission sees OT only and no inventory AI metad
   assert.equal(response.body.coverage.stockSourceChecked, false);
   assert.equal(calls.some(c => c.table === 'bodega_central_stock_canonicalization_summary_v1'), false);
   const ai = calls.find(c => c.table === 'motil_ai_core_errors');
-  assert.deepEqual(ai.filters.find(f => f[0] === 'in' && f[1] === 'domain')[2], ['maintenance']);
+  assert.deepEqual(Array.from(ai.filters.find(f => f[0] === 'in' && f[1] === 'domain')[2]), ['maintenance']);
   assert.equal(response.body.totalSignals, 0);
 });
 
@@ -119,7 +119,7 @@ test('planner with Bodega access sees authorized source and both scoped AI domai
   assert.equal(response.body.coverage.stockSourceChecked, true);
   assert.equal(response.body.coverage.coreErrorsChecked, true);
   const ai = calls.find(c => c.table === 'motil_ai_core_errors');
-  assert.deepEqual(ai.filters.find(f => f[0] === 'in' && f[1] === 'domain')[2], ['maintenance', 'inventory']);
+  assert.deepEqual(Array.from(ai.filters.find(f => f[0] === 'in' && f[1] === 'domain')[2]), ['maintenance', 'inventory']);
   assert.equal(calls.every(c => c.filters.some(f => f[0] === 'eq' && f[1] === 'organization_id' && f[2] === ORG)), true);
   assert.equal(response.body.noAutomaticRemediation, true);
 });
