@@ -135,5 +135,5 @@ test('PostgREST syntax characters are removed from the search filter', async () 
   assert.equal(result.status, 200);
   const filters = c.calls.filter((call) => call.filter).map((call) => call.filter);
   assert.equal(filters.length, 1);
-  assert.doesNotMatch(filters[0], /[(),]/);
+  assert.equal(filters[0], 'product_code.ilike.%aceite otro eq admin%,name.ilike.%aceite otro eq admin%');
 });
