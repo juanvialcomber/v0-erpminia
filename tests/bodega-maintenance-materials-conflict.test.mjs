@@ -26,11 +26,13 @@ function buildCase(stock) {
       status: 'open', priority: 'high', scheduled_date: null,
     }],
     canonical_products_v1: [{ id: PRODUCT, product_code: 'ABC', name: 'Repuesto ABC', unit: 'UD' }],
-    laudus_central_warehouse_stock_reconciliation_v1: stock ? [{
-      canonical_product_id: PRODUCT, laudus_stock: 23,
-      product_reconciliation_status: stock, reconciliation_state: 'missing_in_motil',
-      unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
-    }] : [],
+    laudus_central_warehouse_stock_reconciliation_v1: Array.isArray(stock)
+      ? stock
+      : stock ? [{
+        canonical_product_id: PRODUCT, laudus_stock: 23,
+        product_reconciliation_status: stock, reconciliation_state: 'missing_in_motil',
+        unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
+      }] : [],
   };
   function from(table, schema = 'public') {
     calls.push({ table, schema });
@@ -107,4 +109,30 @@ test('maintenance supply remains tenant-filtered and uses the public product pro
   assert.equal(calls.some((c) => c.schema === 'canonical'), false);
   assert.equal(result.body.rows[0].productName, 'Repuesto ABC');
   assert.equal(result.body.rows[0].unit, 'UD');
+});
+
+
+test('multiple Laudus source identities for one canonical product never select an arbitrary quantity', async () => {
+  const stock = [
+    { canonical_product_id: PRODUCT, laudus_stock: 5, product_reconciliation_status: 'matched',
+      reconciliation_state: 'missing_in_motil', unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null },
+    { canonical_product_id: PRODUCT, laudus_stock: 11, product_reconciliation_status: 'matched',
+      reconciliation_state: 'missing_in_motil', unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null },
+  ];
+  const result = await buildCase(stock).GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rows[0].observedLaudusQuantity, null);
+  assert.equal(result.body.rows[0].stockReconciliationState, 'review_identity_conflict');
+  assert.equal(result.body.readOnly, true);
+});
+
+test('missing Laudus quantity is unknown rather than zero, even when the mapping is unique', async () => {
+  const result = await buildCase([{
+    canonical_product_id: PRODUCT, laudus_stock: null,
+    product_reconciliation_status: 'matched', reconciliation_state: 'review',
+    unit_of_measure: 'UD', source_date_to: null, laudus_synced_at: null,
+  }]).GET({});
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rows[0].observedLaudusQuantity, null);
+  assert.equal(result.body.rows[0].stockReconciliationState, 'review');
 });
