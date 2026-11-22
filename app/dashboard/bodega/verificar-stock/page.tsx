@@ -33,6 +33,8 @@ type Row = {
 type Payload = {
   warehouseName: string;
   responsibleName: string;
+  temporarySupportName: string | null;
+  temporarySupportUntil: string | null;
   canVerify: boolean;
   sourceCutoff: string | null;
   sourceSyncedAt: string | null;
@@ -159,13 +161,13 @@ export default function BodegaStockVerificationPage() {
       <header className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bodega Central · 002</p>
         <h1 className="text-2xl font-semibold">Verificar stock real</h1>
-        <p className="text-sm text-muted-foreground">Responsable de validación: <strong>{data?.responsibleName || 'Jefe de Bodega'}</strong>. Compara el stock informado por Laudus con un conteo físico. Confirmar un conteo no cambia las existencias de MOTIL ni de Laudus.</p>
+        <p className="text-sm text-muted-foreground">Responsable principal: <strong>{data?.responsibleName || 'Jefe de Bodega'}</strong>. {data?.temporarySupportName ? <>Apoyo temporal: <strong>{data.temporarySupportName}</strong> hasta {date(data.temporarySupportUntil)}. </> : null}Confirma únicamente cantidades contadas físicamente. Registrar un conteo no cambia las existencias de MOTIL ni de Laudus.</p>
         <p className="text-xs text-muted-foreground">Último corte Laudus: {date(data?.sourceCutoff)} · Sincronizado: {date(data?.sourceSyncedAt)}</p>
       </header>
 
       {data && !data.canVerify ? (
         <div className="rounded-md border p-3 text-sm text-muted-foreground">
-          Puedes consultar las revisiones, pero solo el responsable de Bodega designado puede confirmar conteos físicos.
+          Puedes consultar las revisiones, pero solo el responsable de Bodega o su apoyo temporal vigente pueden confirmar conteos físicos.
         </div>
       ) : null}
       {savedAt ? <div className="flex items-center gap-2 rounded-md border p-3 text-sm"><CheckCircle2 className="h-4 w-4" />Conteo registrado el {date(savedAt)}. No se modificó el stock.</div> : null}
