@@ -120,8 +120,9 @@ test('unapplied optional migration does not crash the existing operational inbox
 test('role commitments link to the relevant existing operating workflow', () => {
   assert.match(ui, /physical_counts: '\/dashboard\/bodega\/verificar-stock'/);
   assert.match(ui, /ot_materials: '\/dashboard\/bodega\/materiales-mantenimiento'/);
-  assert.match(ui, /ot_clock: '\/dashboard\/mantenimiento\/ordenes-trabajo'/);
-  assert.match(ui, /<Link href=\{taskModuleHref\(item\)\}>Abrir módulo<\/Link>/);
+  assert.match(ui, /ot_clock: '\/dashboard\/mantenimiento'/);
+  assert.match(ui, /<Link href=\{taskModuleHref\(item\)\}>\{item\.source_reference\.endsWith\(':ot_clock'\)/);
+  assert.match(ui, /Una revisión coordinada por Ariel/);
 });
 
 test('service role can audit changes but cannot delete commitments or modify prior audit events', () => {
