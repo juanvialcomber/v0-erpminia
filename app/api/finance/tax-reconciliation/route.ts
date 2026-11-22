@@ -132,7 +132,10 @@ export async function GET(request: NextRequest) {
     const taxCoreIdentityMatches =
       taxCoreResult?.ok === true &&
       taxCoreResult.organizationId === context.organizationId &&
-      rutKey(taxCoreResult.taxpayerRut) === companyTaxId;
+      rutKey(taxCoreResult.taxpayerRut) === companyTaxId &&
+      taxCoreResult.readOnly === true &&
+      taxCoreResult.siiWritesEnabled === false &&
+      taxCoreResult.accountingPromotion === false;
     const taxCoreDocuments = taxCoreIdentityMatches && Array.isArray(taxCoreResult.documents)
       ? taxCoreResult.documents.filter(isTaxCoreSourceDocument).map((document) => ({
           tenantRut: document.tenantRut,
