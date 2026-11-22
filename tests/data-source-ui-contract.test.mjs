@@ -8,12 +8,17 @@ const files = [
   '../app/dashboard/mantenimiento/equipos/page.tsx',
 ];
 
-test('Laudus readiness is driven by the shared backend source state in all prepared modules', () => {
+test('Laudus readiness respects each module operational authority', () => {
   for (const path of files) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8');
     assert.match(source, /useDataSourceStatus/);
     assert.match(source, /sourceStatus\.source\('laudus'/);
-    assert.match(source, /sourceStatus\.state\('laudus'\) === 'updated'/);
+    if (path.includes('/bodega/')) {
+      assert.match(source, /label: 'Laudus · referencia', state: 'pending'/);
+      assert.doesNotMatch(source, /sourceStatus\.state\('laudus'\) === 'updated'/);
+    } else {
+      assert.match(source, /sourceStatus\.state\('laudus'\) === 'updated'/);
+    }
   }
 });
 
