@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { requireOperationalMaintenanceWorkOrder } from '@/lib/maintenance/work-order-scope';
 import { requireAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { isFluidClosureDeclarationCurrent } from '@/lib/maintenance/fluid-closure-consistency.mjs';
 
 type MaintenanceWorkOrderRow = {
   id: string;
@@ -59,16 +60,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: currentFluidUsage, error: currentFluidUsageError } = await context.supabase
       .from('maintenance_fluid_usage_records')
-      .select('id,used_at')
+      .select('id,created_at')
       .eq('organization_id', context.organizationId)
       .eq('work_order_id', id);
     if (currentFluidUsageError) throw currentFluidUsageError;
 
-    const currentUsageCount = (currentFluidUsage || []).length;
-    const declaredUsageCount = Number(fluidPayload.fluid_usage_count || 0);
-    if (currentUsageCount !== declaredUsageCount) {
+    // The queue and the final gate must agree even if a mechanic adds a new
+    // fluid entry after declaring the initial quantity. Never close on stale evidence.
+    if (!isFluidClosureDeclarationCurrent(
+      fluidDeclaration,
+      context.userId,
+      currentFluidUsage || [],
+    )) {
       return NextResponse.json(
-        { error: 'Los datos de aceites/fluidos cambiaron después de la confirmación. El mecánico debe revisar y confirmar nuevamente antes de cerrar.' },
+        { error: 'Los registros de aceites/fluidos cambiaron o la declaración no coincide. Confirma nuevamente aceites y residuos antes de cerrar.' },
         { status: 409 },
       );
     }
