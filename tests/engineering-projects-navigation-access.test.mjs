@@ -8,7 +8,7 @@ const api = await readFile(new URL('../app/api/intelligence/engineering-assistan
 const auth = await readFile(new URL('../app/api/auth/login/route.ts', import.meta.url), 'utf8');
 
 test('projects navigation requires canonical module-access cargo and read capability', () => {
-  assert.match(sidebar, /cargoName!=='JEFE INGENIERIA Y PROYECTOS'/);
+  assert.match(sidebar, /!privileged && item.href==='\/dashboard\/ingenieria\/proyectos' && cargoName!=='JEFE INGENIERIA Y PROYECTOS'/);
   assert.match(sidebar, /moduleKey: 'prod_topografia'/);
   assert.match(sidebar, /href: '\/dashboard\/ingenieria\/proyectos'/);
   assert.match(sidebar, /canView\(item.moduleKey\)/);
@@ -29,4 +29,13 @@ test('engineering assistant preserves read-only restrictions for projects leader
   assert.match(api, /getModuleAccessLevel\(context\.userId, context\.role, MODULE_KEYS\.PROD_TOPOGRAFIA\)/);
   assert.match(api, /operationalMutationExecuted: false/);
   assert.doesNotMatch(api, /\.(insert|update|upsert|delete|rpc)\(/);
+});
+
+
+test('verified administrators see Engineering and Administration independent of cargo', () => {
+  assert.match(sidebar, /const privileged=isAdmin;/);
+  assert.match(sidebar, /if\(!privileged && item.href==='\/dashboard\/ingenieria\/proyectos'/);
+  assert.match(sidebar, /\{main:true,areas:true,admin:true\}/);
+  assert.match(sidebar, /if\(!role\|\|!ready\)return\[\]/);
+  assert.match(sidebar, /if\(enforced&&item.moduleKey\)/);
 });
