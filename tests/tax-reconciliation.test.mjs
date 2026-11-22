@@ -35,3 +35,17 @@ test('traceability exposes the three-source reconciliation without write actions
   assert.doesNotMatch(card, /Emitir|Presentar|Pagar|Rectificar/);
   assert.doesNotMatch(route, /\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
 });
+
+
+test('Tax Core bridge is tenant-scoped, metadata-only, and displays validation limits', () => {
+  assert.match(client, /getTaxCoreOrganizationDtes/);
+  assert.match(client, /dte\\/lapatagua-source/);
+  assert.match(route, /getTaxCoreOrganizationDtes\\(context\\.organizationId/);
+  assert.match(route, /taxCore: taxCoreRead/);
+  assert.match(route, /taxCoreXmlReturned: false/);
+  assert.match(route, /document\\.validation\\.documentSignature/);
+  assert.match(card, /XML recibidos en Tax Core/);
+  assert.match(card, /Firma del documento, TED y aceptación SII: no verificadas/);
+  assert.match(card, /Cargar más DTE/);
+  assert.doesNotMatch(card, /sourcePath|xmlContent|rawXml/);
+});
