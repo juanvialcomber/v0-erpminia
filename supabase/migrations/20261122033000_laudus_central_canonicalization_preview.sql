@@ -104,6 +104,7 @@ select
   um.reusable_stock_id,
   case
     when s.source_identity_count > 1 then 'review_identity_conflict'
+    when cp.id is null then 'review_missing_motil_product'
     when s.has_negative_position then 'review_negative_source'
     when s.source_synced_at is null or now() - s.source_synced_at > interval '8 hours' then 'review_stale_source'
     when coalesce(r.authority_state, '') <> 'laudus_primary' then 'review_source_authority'
@@ -119,6 +120,9 @@ select
     else 'candidate_create_opening_row'
   end as canonicalization_state
 from source_by_product s
+left join canonical.products cp
+  on cp.id = s.canonical_product_id
+ and cp.organization_id = s.organization_id
 join central_warehouse w on w.organization_id = s.organization_id
 left join central_motil cm
   on cm.organization_id = s.organization_id
@@ -146,6 +150,7 @@ select
   count(*) filter (where canonicalization_state = 'already_canonical')::bigint as already_canonical,
   count(*) filter (where canonicalization_state like 'review_%')::bigint as requires_review,
   count(*) filter (where canonicalization_state = 'review_identity_conflict')::bigint as identity_conflicts,
+  count(*) filter (where canonicalization_state = 'review_missing_motil_product')::bigint as missing_motil_products,
   count(*) filter (where canonicalization_state = 'review_negative_source')::bigint as negative_source_products,
   count(*) filter (where canonicalization_state = 'review_fractional_precision')::bigint as fractional_products,
   count(*) filter (where canonicalization_state = 'review_stale_source')::bigint as stale_source_products,
