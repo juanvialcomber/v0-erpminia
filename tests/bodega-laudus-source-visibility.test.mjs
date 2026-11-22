@@ -9,8 +9,8 @@ test('Bodega presents Laudus as live ERP evidence, not a pending integration', (
 
   assert.doesNotMatch(page, /pendiente de habilitación comercial de API/i);
   assert.doesNotMatch(page, /Esperando acceso y primera sincronización/i);
-  assert.match(card, /Laudus es la fuente primaria de stock cuando está fresco/);
-  assert.match(card, /Correo y WhatsApp actúan como contraste/);
+  assert.match(card, /Laudus se conserva como referencia de conciliación/);
+  assert.match(card, /correo, WhatsApp y el conteo físico se revisan antes de reconocer la apertura MOTIL/);
   assert.match(card, /mappedPhysicalWarehouses/);
   assert.match(card, /latestStockSync/);
   assert.match(readiness, /laudus_inventory_readiness_service_v1/);
@@ -59,6 +59,6 @@ test('Laudus becomes the effective displayed quantity only when the authority ga
   assert.match(route, /effective_quantity/);
   assert.match(route, /effective_source/);
   assert.match(route, /laudusIsPrimary/);
-  assert.match(page, /Fuente: Laudus/);
-  assert.match(page, /Laudus primario/);
+  assert.match(page, /Laudus · referencia; apertura MOTIL pendiente/);
+  assert.match(page, /Apertura MOTIL pendiente/);
 });

@@ -43,15 +43,15 @@ test('reconciliation readiness uses the authority gate instead of treating legac
 });
 
 test('UI exposes Laudus authority and cross-source reconciliation without auto-overwriting MOTIL', () => {
-  assert.match(card, /Laudus es la fuente primaria de stock cuando está fresco/);
-  assert.match(card, /Correo y WhatsApp actúan como contraste/);
-  assert.match(card, /Fuente primaria: Laudus/);
-  assert.match(card, /Fuente en revisión/);
+  assert.match(card, /Laudus se conserva como referencia de conciliación/);
+  assert.match(card, /correo, WhatsApp y el conteo físico se revisan antes de reconocer la apertura MOTIL/);
+  assert.match(card, /Referencia Laudus heredada · apertura MOTIL pendiente/);
+  assert.match(card, /Conciliación pendiente · no se usa como verdad única/);
   assert.match(card, /Productos Laudus elegibles enlazados al catálogo/);
   assert.match(card, /Saldos distintos entre MOTIL y Laudus/);
   assert.match(card, /SKU con saldo Laudus sin existencia MOTIL/);
   assert.match(card, /Bodegas físicas conciliadas con MOTIL/);
-  assert.match(card, /Laudus primario · validación cruzada activa/);
+  assert.match(card, /Laudus · referencia heredada/);
   assert.match(card, /Conciliación activa · sin overwrite automático/);
 });
 
