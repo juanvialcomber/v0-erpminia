@@ -16,6 +16,13 @@ type RequirementRow = {
   notes: string | null;
 };
 
+type InstallationDeclaration = {
+  requirement_id: string;
+  installed_quantity: number | string;
+  warehouse_reconciliation_status: string;
+  confirmed_at: string | null;
+};
+
 type StockObservation = {
   canonical_product_id: string;
   laudus_stock: number | string | null;
@@ -62,6 +69,7 @@ export async function GET(request: NextRequest) {
     if (authorityResult.error) throw authorityResult.error;
 
     const requirements = (requirementsResult.data || []) as RequirementRow[];
+    const requirementIds = [...new Set(requirements.map((row) => row.id).filter(Boolean))];
     const workOrderIds = [...new Set(requirements.map((row) => row.work_order_id).filter(Boolean))];
     const productIds = [...new Set(requirements.map((row) => row.canonical_product_id).filter(Boolean))];
 
@@ -92,6 +100,23 @@ export async function GET(request: NextRequest) {
     const secondaryError = workOrdersResult.error || productsResult.error || stockResult.error;
     if (secondaryError) throw secondaryError;
 
+    // Declarations are evidence from supervisors, not warehouse issues.
+    // Fetch only requirements visible in this tenant-scoped view, in bounded batches.
+    const declarationChunks: InstallationDeclaration[] = [];
+    for (let offset = 0; offset < requirementIds.length; offset += 50) {
+      const { data: declarations, error: declarationsError } = await context.supabase
+        .from('work_order_material_approval_installations')
+        .select('requirement_id,installed_quantity,warehouse_reconciliation_status,confirmed_at')
+        .eq('organization_id', context.organizationId)
+        .in('requirement_id', requirementIds.slice(offset, offset + 50))
+        .limit(50);
+      if (declarationsError) throw declarationsError;
+      declarationChunks.push(...((declarations || []) as InstallationDeclaration[]));
+    }
+    const declarationsByRequirement = new Map(
+      declarationChunks.map((row) => [row.requirement_id, row]),
+    );
+
     const workOrders = new Map((workOrdersResult.data || []).map((row: WorkOrderRow) => [row.id, row]));
     const products = new Map((productsResult.data || []).map((row: any) => [row.id, row]));
     // More than one Laudus source row may map to the same canonical product.
@@ -109,6 +134,7 @@ export async function GET(request: NextRequest) {
       const workOrder = workOrders.get(requirement.work_order_id);
       const product = products.get(requirement.canonical_product_id);
       if (!workOrder || !product) return [];
+      const declaration = declarationsByRequirement.get(requirement.id) || null;
       const observations = stockByProduct.get(requirement.canonical_product_id) || [];
       const ambiguous = observations.length > 1 ||
         observations.some((row) => row.product_reconciliation_status === 'identity_conflict');
@@ -129,6 +155,10 @@ export async function GET(request: NextRequest) {
         historicalQuantityAvailable: requirement.quantity_available === null ? null : Number(requirement.quantity_available),
         historicalShortage: requirement.quantity_shortage === null ? null : Number(requirement.quantity_shortage),
         requirementStatus: requirement.status,
+        // Confirmed by supervisor; do NOT interpret as physical issue or reconciled stock.
+        reportedInstalledQuantity: declaration ? Number(declaration.installed_quantity) : null,
+        installationReconciliationStatus: declaration?.warehouse_reconciliation_status || null,
+        installedReportDate: declaration?.confirmed_at || null,
         requiredDate: requirement.required_date,
         notes: requirement.notes,
         observedLaudusQuantity: observation?.laudus_stock == null ? null : Number(observation.laudus_stock),
@@ -144,6 +174,7 @@ export async function GET(request: NextRequest) {
       rows,
       rowCount: rows.length,
       readOnly: true,
+      installationQuantityMeaning: 'Cantidad declarada instalada por supervisión; pendiente de revisión de Bodega. No representa retiro, vale ni descuento de inventario.',
       stockQuantityMeaning: 'Saldo observado exclusivamente en Laudus Bodega Central (002); no representa una reserva ni disponibilidad para retirar.',
     });
   } catch (error) {
