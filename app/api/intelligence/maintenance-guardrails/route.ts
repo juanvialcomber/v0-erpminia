@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       db.from('motil_ai_core_errors')
         .select('error_code,created_at', { count: 'exact' })
         .eq('organization_id', context.organizationId)
-        .in('domain', ['maintenance', 'inventory'])
+        .in('domain', canReadStock ? ['maintenance', 'inventory'] : ['maintenance'])
         .gte('created_at', new Date(now.getTime() - 24 * 3600_000).toISOString())
         .order('created_at', { ascending: false })
         .limit(MAX_CORE_ERRORS),
