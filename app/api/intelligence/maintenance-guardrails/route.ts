@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
     }
 
     const canReadStock = admin || ['ED', 'LEC'].includes(rights.access[MODULE_KEYS.BODEGA_INVENTARIO] || 'SR');
-    const [stockResult, aiResult] = await Promise.all([
+    const since = new Date(now.getTime() - 24 * 3600_000).toISOString();
+    const scopedDomains = canReadStock ? ['maintenance', 'inventory'] : ['maintenance'];
+    const [stockResult, aiResult, criticalResult] = await Promise.all([
       canReadStock
         ? db.from('bodega_central_stock_canonicalization_summary_v1')
             .select('source_synced_at')
@@ -67,23 +69,38 @@ export async function GET(request: NextRequest) {
       db.from('motil_ai_core_errors')
         .select('error_code,created_at', { count: 'exact' })
         .eq('organization_id', context.organizationId)
-        .in('domain', canReadStock ? ['maintenance', 'inventory'] : ['maintenance'])
-        .gte('created_at', new Date(now.getTime() - 24 * 3600_000).toISOString())
+        .in('domain', scopedDomains)
+        .gte('created_at', since)
         .order('created_at', { ascending: false })
         .limit(MAX_CORE_ERRORS),
+      // Count all critical failures without downloading their text or raw
+      // records: the newest-100 sample alone can omit older P1 evidence.
+      db.from('motil_ai_core_errors')
+        .select('id', { head: true, count: 'exact' })
+        .eq('organization_id', context.organizationId)
+        .in('domain', scopedDomains)
+        .eq('error_code', 'canonical_source_contract_failure')
+        .gte('created_at', since)
+        .limit(1),
     ]);
 
     if (stockResult?.error) console.warn('[motil-canaries] stock source unavailable', { code: stockResult.error.code || null });
     if (aiResult.error) console.warn('[motil-canaries] intelligence error source unavailable', { code: aiResult.error.code || null });
+    if (criticalResult.error) console.warn('[motil-canaries] critical source count unavailable', { code: criticalResult.error.code || null });
 
     const stockSource = !canReadStock
       ? { state: 'not_authorized' as const }
       : stockResult?.error || !stockResult?.data
         ? { state: 'unavailable' as const }
         : { state: 'observed' as const, syncedAt: stockResult.data.source_synced_at };
-    const coreErrorSource = aiResult.error
+    const coreErrorSource = aiResult.error || criticalResult.error || aiResult.count === null || criticalResult.count === null
       ? { state: 'unavailable' as const }
-      : { state: 'observed' as const, rows: aiResult.data || [], truncated: (aiResult.count || 0) > MAX_CORE_ERRORS };
+      : {
+          state: 'observed' as const,
+          rows: aiResult.data || [],
+          truncated: (aiResult.count || 0) > MAX_CORE_ERRORS,
+          criticalErrorCount: criticalResult.count || 0,
+        };
 
     const evaluated = evaluateMotilOperationalCanaries({
       workOrders: orders,
