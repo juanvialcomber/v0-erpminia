@@ -21,7 +21,7 @@ with laudus as (
     min(p.unit_of_measure) as unit_of_measure,
     min(p.operational_category) as operational_category,
     min(p.inventory_eligibility) as inventory_eligibility,
-    min(p.reconciliation_status) as product_reconciliation_status,
+    case when count(distinct p.external_id) > 1 then 'identity_conflict' else min(p.reconciliation_status) end as product_reconciliation_status,
     coalesce(sum(s.stock), 0)::numeric as laudus_stock,
     count(s.id)::bigint as stock_position_count,
     count(*) filter (where s.stock <> 0)::bigint as nonzero_stock_position_count,
@@ -36,7 +36,6 @@ with laudus as (
     and p.reconciliation_status = 'matched'
     and p.canonical_product_id is not null
   group by p.organization_id, p.canonical_product_id
-  having count(distinct p.external_id) = 1
 ),
 motil as (
   select
