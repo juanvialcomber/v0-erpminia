@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
       productCount: count || 0,
       page: Math.floor(offset / 50),
       counts: counts || [],
+      currentUserId: context.userId,
       canCount: canReview,
       canReview,
       stockChanged: false,
