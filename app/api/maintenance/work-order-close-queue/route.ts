@@ -5,6 +5,7 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { resolveWorkshopHeadScope, workshopHeadOrderFilter } from '@/lib/maintenance/workshop-site-scope';
 import { canBypassAssignedMaintenanceExecution } from '@/lib/maintenance/work-order-execution-access';
+import { isFluidClosureDeclarationCurrent } from '@/lib/maintenance/fluid-closure-consistency.mjs';
 
 type CloseQueueRow = {
   organization_id: string;
@@ -155,16 +156,65 @@ export async function GET(request: NextRequest) {
     const rows = (data || []) as CloseQueueRow[];
 
     const rowIds = rows.map((row) => row.work_order_id);
-    const fluidDeclarationIds = new Set<string>();
-    if (rowIds.length > 0) {
-      const { data: fluidDeclarations, error: fluidDeclarationError } = await context.supabase
-        .from('work_order_events')
-        .select('work_order_id')
-        .eq('organization_id', context.organizationId)
-        .eq('event_type', 'fluid_closure_declared')
-        .in('work_order_id', rowIds.slice(0, 250));
-      if (fluidDeclarationError) throw fluidDeclarationError;
-      for (const event of fluidDeclarations || []) fluidDeclarationIds.add(String(event.work_order_id));
+    const validFluidDeclarations = new Set<string>();
+    const fluidReconfirmationRequired = new Set<string>();
+    // The queue is tenant scoped. Read evidence in bounded batches and use
+    // the same validity rule as the close endpoint, not mere event existence.
+    for (let offset = 0; offset < rowIds.length; offset += 50) {
+      const chunk = rowIds.slice(offset, offset + 50);
+      const [{ data: orders, error: ordersError }, { data: declarations, error: declarationsError }, { data: usages, error: usagesError }] = await Promise.all([
+        context.supabase
+          .from('maintenance_work_orders')
+          .select('id,assigned_person_id')
+          .eq('organization_id', context.organizationId)
+          .in('id', chunk),
+        context.supabase
+          .from('work_order_events')
+          .select('work_order_id,actor_id,event_at,payload')
+          .eq('organization_id', context.organizationId)
+          .eq('event_type', 'fluid_closure_declared')
+          .in('work_order_id', chunk)
+          .order('event_at', { ascending: false })
+          .limit(1000),
+        context.supabase
+          .from('maintenance_fluid_usage_records')
+          .select('work_order_id,created_at,updated_at')
+          .eq('organization_id', context.organizationId)
+          .in('work_order_id', chunk),
+      ]);
+      if (ordersError || declarationsError || usagesError) throw ordersError || declarationsError || usagesError;
+
+      const personIds = [...new Set((orders || []).map((order) => order.assigned_person_id).filter((id): id is string => Boolean(id)))];
+      const peopleResult = personIds.length
+        ? await context.supabase.from('people')
+          .select('id,profile_id')
+          .eq('organization_id', context.organizationId)
+          .eq('employment_status', 'active')
+          .in('id', personIds)
+        : { data: [], error: null };
+      if (peopleResult.error) throw peopleResult.error;
+      const profileByPerson = new Map((peopleResult.data || []).map((person) => [person.id, person.profile_id]));
+      const mechanicByOrder = new Map((orders || []).map((order) => [order.id, profileByPerson.get(order.assigned_person_id) || null]));
+      const latestByOrder = new Map<string, NonNullable<typeof declarations>[number]>();
+      for (const declaration of declarations || []) {
+        if (!latestByOrder.has(declaration.work_order_id)) latestByOrder.set(declaration.work_order_id, declaration);
+      }
+      const usageByOrder = new Map<string, Array<{ created_at: string | null; updated_at: string | null }>>();
+      for (const usage of usages || []) {
+        const list = usageByOrder.get(usage.work_order_id) || [];
+        list.push({ created_at: usage.created_at, updated_at: usage.updated_at });
+        usageByOrder.set(usage.work_order_id, list);
+      }
+      for (const id of chunk) {
+        const declaration = latestByOrder.get(id) || null;
+        const valid = isFluidClosureDeclarationCurrent(
+          declaration,
+          mechanicByOrder.get(id),
+          usageByOrder.get(id) || [],
+        );
+        if (valid) validFluidDeclarations.add(id);
+        else if (declaration) fluidReconfirmationRequired.add(id);
+      }
     }
     const assetIds = [...new Set(rows.map((row) => row.canonical_asset_id).filter((id): id is string => Boolean(id)))];
     const assetMap = new Map<string, AssetRow>();
@@ -180,7 +230,7 @@ export async function GET(request: NextRequest) {
 
     const queue = rows
       .map((row) => {
-        const hasFluidClosureDeclaration = fluidDeclarationIds.has(row.work_order_id);
+        const hasFluidClosureDeclaration = validFluidDeclarations.has(row.work_order_id);
         const nextAction = row.next_action === 'close_work_order' && !hasFluidClosureDeclaration
           ? 'record_fluid_closure'
           : row.next_action;
@@ -189,6 +239,7 @@ export async function GET(request: NextRequest) {
           next_action: nextAction,
           ready_to_close: Boolean(row.ready_to_close) && hasFluidClosureDeclaration,
           fluid_closure_declared: hasFluidClosureDeclaration,
+          fluid_closure_reconfirmation_required: fluidReconfirmationRequired.has(row.work_order_id),
           asset: row.canonical_asset_id ? assetMap.get(row.canonical_asset_id) || null : null,
         };
       })

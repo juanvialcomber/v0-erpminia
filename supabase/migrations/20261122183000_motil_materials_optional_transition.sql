@@ -159,9 +159,9 @@ returns boolean
 language sql stable
 security invoker
 set search_path to 'public'
-as $
+as $transition$
   select true;
-$;
+$transition$;
 revoke all on function public.motil_ot_materials_transition_ready_v1()
   from public, anon, authenticated;
 grant execute on function public.motil_ot_materials_transition_ready_v1()

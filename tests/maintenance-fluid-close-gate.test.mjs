@@ -22,7 +22,9 @@ test('only assigned mechanic can declare and close OT fluid data', () => {
 test('fluid declaration is mandatory before close and becomes stale if fluid records change', () => {
   assert.match(closeRoute, /fluid_closure_declared/);
   assert.match(closeRoute, /mecánico asignado debe confirmar los aceites\/fluidos/);
-  assert.match(closeRoute, /currentUsageCount !== declaredUsageCount/);
+  assert.match(closeRoute, /isFluidClosureDeclarationCurrent/);
+  assert.match(closeQueue, /isFluidClosureDeclarationCurrent/);
+  assert.match(closeQueue, /fluid_closure_reconfirmation_required/);
   assert.match(closeQueue, /record_fluid_closure/);
   assert.match(closeQueue, /ready_to_close: Boolean\(row\.ready_to_close\) && hasFluidClosureDeclaration/);
 });
