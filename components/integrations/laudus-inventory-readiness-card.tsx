@@ -194,7 +194,7 @@ export function LaudusInventoryReadinessCard() {
           <LaudusSourceMark state={sourceState} />
         </div>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-          Laudus es la fuente primaria de stock cuando está fresco y no existe evidencia oficial contradictoria. Correo y WhatsApp actúan como contraste y abren conciliación antes de aceptar una cifra como vigente.
+          Laudus se conserva como referencia de conciliación. Sus saldos, el correo, WhatsApp y el conteo físico se revisan antes de reconocer la apertura MOTIL; ninguna cifra Laudus habilita disponibilidad.
         </p>
       </div>
 
@@ -204,7 +204,7 @@ export function LaudusInventoryReadinessCard() {
             {isLoading || !data
               ? 'Verificando autoridad de stock.'
               : data.authority.laudusIsPrimary
-                ? 'Fuente primaria: Laudus'
+                ? 'Referencia Laudus heredada · apertura MOTIL pendiente'
                 : 'Fuente en revisión · Laudus no se usa como verdad única'}
           </p>
           {!isLoading && data?.authority.latestEmailStockCutoff ? (
@@ -366,7 +366,7 @@ export function LaudusInventoryReadinessCard() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {data?.authority.laudusIsPrimary ? 'Laudus primario · validación cruzada activa' : 'Conciliación activa · sin overwrite automático'}
+          {data?.authority.laudusIsPrimary ? 'Laudus · referencia heredada' : 'Conciliación activa · sin overwrite automático'}
         </p>
       </div>
     </section>
