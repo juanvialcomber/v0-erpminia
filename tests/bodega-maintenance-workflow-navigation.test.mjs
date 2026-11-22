@@ -12,7 +12,8 @@ const materials = read('app/dashboard/bodega/materiales-mantenimiento/page.tsx')
 const definitions = read('app/dashboard/bodega/acuerdos/page.tsx');
 
 test('warehouse navigation separates operational actions, personal work and definitions', () => {
-  assert.match(warehouse, /href: '\/dashboard\/bodega\/verificar-stock', label: 'Conteos'/);
+  assert.match(warehouse, /href: '\/dashboard\/bodega\/conteo-motil', label: 'Conteo MOTIL'/);
+  assert.match(warehouse, /href: '\/dashboard\/bodega\/verificar-stock', label: 'Comparación Laudus'/);
   assert.match(warehouse, /href: '\/dashboard\/bodega\/materiales-mantenimiento', label: 'Materiales de OT'/);
   assert.match(warehouse, /href="\/dashboard\/acciones"/);
   assert.match(warehouse, /href: '\/dashboard\/bodega\/acuerdos', label: 'Definiciones de Bodega'/);

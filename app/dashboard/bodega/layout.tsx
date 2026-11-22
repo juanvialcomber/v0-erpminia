@@ -11,12 +11,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // One entry for each real workflow. Secondary tools stay available under "Más".
 const operationItems = [
   { href: '/dashboard/bodega', label: 'Inventario' },
-  { href: '/dashboard/bodega/verificar-stock', label: 'Conteos' },
+  { href: '/dashboard/bodega/conteo-motil', label: 'Conteo MOTIL' },
   { href: '/dashboard/bodega/materiales-mantenimiento', label: 'Materiales de OT' },
   { href: '/dashboard/bodega/repuestos-criticos', label: 'Repuestos críticos' },
 ];
 
 const secondaryItems = [
+  { href: '/dashboard/bodega/verificar-stock', label: 'Comparación Laudus' },
   { href: '/dashboard/bodega/acuerdos', label: 'Definiciones de Bodega' },
   { href: '/dashboard/bodega/productos-360', label: 'Producto 360°' },
   { href: '/dashboard/bodega/inteligencia', label: 'Inteligencia' },
