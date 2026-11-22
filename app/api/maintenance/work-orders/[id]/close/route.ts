@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: currentFluidUsage, error: currentFluidUsageError } = await context.supabase
       .from('maintenance_fluid_usage_records')
-      .select('id,created_at')
+      .select('id,created_at,updated_at')
       .eq('organization_id', context.organizationId)
       .eq('work_order_id', id);
     if (currentFluidUsageError) throw currentFluidUsageError;
