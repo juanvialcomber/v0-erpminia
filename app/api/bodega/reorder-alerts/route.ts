@@ -2,9 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { listInventoryStockAlerts } from '@/lib/api/inventory-stock-alerts';
 
 export async function GET(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
+  if (!access.authorized) return access.response;
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
@@ -22,7 +25,11 @@ export async function GET(request: NextRequest) {
       category: item.category,
       location: item.location_label,
       reorder_qty: Math.max(0, item.reorder_level * 2 - item.quantity_on_hand),
-      days_until_stockout: item.quantity_on_hand > 0 ? Math.ceil(item.quantity_on_hand) : 0,
+      // Units on hand are not days of coverage: a consumption rate is required.
+      days_until_stockout: null,
+      stockout_forecast_state: 'unavailable_without_consumption_rate',
+      // The reorder quantity is an estimate, not an approved purchase order.
+      reorder_approval_required: true,
     }));
 
     return NextResponse.json({
