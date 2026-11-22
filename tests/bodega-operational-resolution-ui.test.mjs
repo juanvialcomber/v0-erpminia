@@ -30,10 +30,10 @@ test('Bodega UI explains reconciled stock states in operational language', async
   assert.match(page, /Alineado/);
   assert.match(page, /Revisar evidencia/);
   assert.doesNotMatch(page, /operational_resolution === 'legacy_motil_stale'.*Difiere Laudus/);
-  assert.match(page, /bloqueantes/);
+  assert.match(page, /casos por conciliar/);
   assert.match(page, /contrastes históricos MOTIL/);
-  assert.match(page, /Sin diferencias operacionales bloqueantes/);
-  assert.match(page, /no bloquean disponibilidad cuando Laudus es la fuente primaria/);
+  assert.match(page, /Sin casos prioritarios de conciliación/);
+  assert.match(page, /no habilitan disponibilidad en MOTIL/);
 });
 
 
