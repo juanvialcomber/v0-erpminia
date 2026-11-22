@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { summarizeMaterialAttention } from '../lib/maintenance/material-attention.mjs';
+import { stockSearchPattern } from '../lib/bodega/stock-search-pattern.mjs';
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), 'utf8');
 const sample = (id, priority, scheduled_date = null) => ({
@@ -50,6 +51,15 @@ test('empty and complete review sets show exact zero counts', () => {
   assert.equal(result.requirementsRegisteredOrders, 1);
 });
 
+test('warehouse search treats underscores as literal characters, not SQL wildcards', () => {
+  assert.equal(stockSearchPattern('ABC_123'), 'ABC\\_123');
+  assert.equal(stockSearchPattern('RODAMIENTO'), 'RODAMIENTO');
+  assert.equal(stockSearchPattern('_'), '\\_');
+  assert.equal(stockSearchPattern('%'), null);
+  assert.equal(stockSearchPattern('a,b'), 'ab');
+  assert.equal(stockSearchPattern('  CAMIÓN .  '), 'CAMIÓN .');
+});
+
 test('Bodega progress is read-only, tenant scoped, count based and does not mutate Laudus', () => {
   const api = read('app/api/bodega/stock-verification/route.ts');
   const page = read('app/dashboard/bodega/verificar-stock/page.tsx');
@@ -60,6 +70,7 @@ test('Bodega progress is read-only, tenant scoped, count based and does not muta
   assert.match(api, /neq\('source_quantity', 0\)/);
   assert.match(api, /query = query\.or\('sku\.ilike\.%'/);
   assert.match(api, /description\.ilike\./);
+  assert.match(api, /stockSearchPattern\(sku\)/);
   assert.match(page, /stock-verification\?summary=1/);
   assert.match(page, /Math\.round\(\(verifiedNow \/ progress\.counts\.total\) \* 100\)/);
   assert.match(page, /progress\.counts\.total > 0/);
@@ -78,7 +89,12 @@ test('maintenance attention is restricted to management scope and keeps material
   assert.match(api, /MODULE_KEYS\.MANT_OPERACIONES/);
   assert.match(api, /eq\('organization_id', context\.organizationId\)/);
   assert.match(api, /neq\('status', 'cancelled'\)/);
-  assert.match(api, /limit\(200\)/);
+  assert.match(api, /const ORDER_PAGE_SIZE = 200/);
+  assert.match(api, /const MAX_ORDERS_REVIEWED = 1000/);
+  assert.match(api, /'assigned', 'pending', 'planned', 'in_progress', 'paused'/);
+  assert.match(api, /\.in\('status', ACTIVE_STATUSES\)/);
+  assert.match(api, /while \(orders\.length < count && orders\.length < MAX_ORDERS_REVIEWED\)/);
+  assert.match(api, /reviewCandidates: partial \? \[\] : summary\.reviewCandidates/);
   assert.match(api, /offset \+ 50/);
   assert.match(api, /mandatory: false/);
   assert.doesNotMatch(api, /\.insert\(|\.update\(|\.delete\(/);
