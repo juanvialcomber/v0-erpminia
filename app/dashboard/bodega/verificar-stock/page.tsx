@@ -71,7 +71,7 @@ function normalizeCount(value: string) {
 
 export default function BodegaStockVerificationPage() {
   const [scope, setScope] = useState('with-stock');
-  const [state, setState] = useState('all');
+  const [state, setState] = useState('pending');
   const [skuInput, setSkuInput] = useState('');
   const [sku, setSku] = useState('');
   const [offset, setOffset] = useState(0);
