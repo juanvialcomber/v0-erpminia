@@ -44,6 +44,8 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
   const [declaringFluids, setDeclaringFluids] = useState(false);
   const [fluidDeclarationError, setFluidDeclarationError] = useState<string | null>(null);
   const materialLines = review.data?.materialRequirementsCount ?? 0;
+  // Defaults to the old safe approval policy until the DB migration exists.
+  const materialsTransitionEnabled = review.data?.materialsTransitionEnabled === true;
   const fluidClosure = review.data?.fluidClosure || null;
   const fluidClosurePayload = (fluidClosure?.payload || {}) as {
     fluids_used?: boolean;
@@ -272,7 +274,7 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
                 <>
                   <p className="flex items-center gap-2 text-sm font-medium"><CheckCircle2 className="h-4 w-4" />Aprobada</p>
                   <p className="mt-1 text-xs text-muted-foreground">{currentReview.reviewed_by_name || 'Supervisor'} · {formatDate(currentReview.reviewed_at)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{(review.data?.approvedInstallations || []).length} repuesto(s) registrados como instalados por aprobación · conciliación de bodega pendiente</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{(review.data?.approvedInstallations || []).length > 0 ? `${(review.data?.approvedInstallations || []).length} línea(s) declaradas instaladas por supervisión; conciliación de Bodega pendiente.` : 'Sin instalación declarada por supervisión; Bodega podrá conciliar los materiales cuando corresponda.'}</p>
                 </>
               ) : (
                 <>
@@ -282,13 +284,21 @@ export function WorkOrderEvidenceAndApproval({ workOrderId, status }: { workOrde
               )}
             </div>
             {canApprove ? <div className="space-y-3">
-              {materialLines > 0 ? <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" checked={confirmMaterialsInstalled} onChange={(event) => setConfirmMaterialsInstalled(event.target.checked)} className="mt-1" />
-                <span>Confirmo que los {materialLines} repuestos requeridos fueron instalados. La regularización de bodega queda pendiente.</span>
-              </label> : null}
+              {materialLines > 0 ? <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">{materialsTransitionEnabled
+                  ? 'Modo transición: puedes aprobar el trabajo sin confirmar instalaciones ni movimientos de Bodega.'
+                  : 'La habilitación del modo transición está pendiente. Por ahora, la aprobación sigue requiriendo confirmar la instalación cuando se solicitan materiales.'}</p>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" checked={confirmMaterialsInstalled} onChange={(event) => setConfirmMaterialsInstalled(event.target.checked)} className="mt-1" />
+                  <span>{materialsTransitionEnabled
+                    ? `Confirmo voluntariamente que todos los ${materialLines} materiales requeridos fueron realmente instalados.`
+                    : `Confirmo que todos los ${materialLines} materiales requeridos fueron realmente instalados.`}</span>
+                </label>
+                <p className="text-xs text-muted-foreground">{confirmMaterialsInstalled ? 'Solo se registrará la confirmación del supervisor; no se descontará stock.' : 'La aprobación no declarará instalaciones. Bodega podrá revisarlas posteriormente.'}</p>
+              </div> : null}
               {approvalError ? <p role="alert" className="text-sm text-destructive">{approvalError}</p> : null}
               <div className="space-y-2">
-                <Button onClick={() => void approve()} disabled={approving || rejecting || (materialLines > 0 && !confirmMaterialsInstalled)}><CheckCircle2 className="mr-2 h-4 w-4" />{approving ? 'Aprobando…' : 'Aprobar OT'}</Button>
+                <Button onClick={() => void approve()} disabled={approving || rejecting || (materialLines > 0 && !materialsTransitionEnabled && !confirmMaterialsInstalled)}><CheckCircle2 className="mr-2 h-4 w-4" />{approving ? 'Aprobando…' : 'Aprobar OT'}</Button>
                 {canReject ? (
                   <div className="space-y-2 rounded-md border p-3">
                     <Input value={rejectionNote} onChange={(event) => setRejectionNote(event.target.value)} placeholder="Qué debe corregir el mecánico" aria-label="Motivo de rechazo de OT" />

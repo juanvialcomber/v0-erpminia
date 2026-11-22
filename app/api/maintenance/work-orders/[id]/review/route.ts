@@ -105,9 +105,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const hasValidFluidDeclaration = Boolean(fluidDeclaration && (fluidDeclaration.payload as any)?.declared_by_assigned_executor === true);
   const legacyFluidDeclarationExemption = isLegacyFluidDeclarationExempt(workOrder, fluidDeclaration, (fluidUsage || []).length);
   const reviewer = await getReviewerPerson(context);
+  // A deploy to main can precede its additive database migration. When this
+  // capability is absent, preserve the existing confirmation requirement.
+  const { data: optionalMaterialsEnabled, error: optionalMaterialsError } = await context.supabase.rpc(
+    'motil_ot_materials_transition_ready_v1',
+  );
+  const materialsTransitionEnabled = !optionalMaterialsError && optionalMaterialsEnabled === true;
   return NextResponse.json({
     approvedInstallations: approvedInstallations || [],
     materialRequirementsCount: materialRequirementsCount || 0,
+    materialsTransitionEnabled,
     fluidClosure: fluidDeclaration || null,
     fluidUsage: fluidUsage || [],
     legacyFluidDeclarationExemption,

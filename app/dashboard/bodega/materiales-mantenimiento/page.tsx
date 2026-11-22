@@ -25,6 +25,9 @@ type Row = {
   historicalQuantityAvailable: number | null;
   historicalShortage: number | null;
   requirementStatus: string | null;
+  reportedInstalledQuantity: number | null;
+  installationReconciliationStatus: string | null;
+  installedReportDate: string | null;
   requiredDate: string | null;
   notes: string | null;
   observedLaudusQuantity: number | null;
@@ -164,6 +167,14 @@ export default function BodegaMaintenanceSupplyPage() {
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Estado del requerimiento</p><p className="mt-1 font-medium">{row.requirementStatus === 'procurement_needed' ? 'Compra por revisar' : row.requirementStatus === 'fulfilled' ? 'Atendido' : row.requirementStatus === 'pending' ? 'Pendiente de revisión' : 'Estado sin confirmar'}</p></div>
             <div className="rounded-md bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Último dato de stock</p><p className="mt-1 font-medium">{timeLabel(row.stockSyncedAt)}</p></div>
           </div>
+          {row.reportedInstalledQuantity !== null ? (
+            <p className="mt-3 rounded-md border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              Supervisión declaró {quantity(row.reportedInstalledQuantity, row.unit)} como instalados.
+              {row.installationReconciliationStatus === 'reconciled'
+                ? ' La conciliación está registrada.'
+                : ' Pendiente de conciliar con Bodega. Esto no es una entrega verificada ni descuenta existencias.'}
+            </p>
+          ) : null}
           {historical ? <p className="mt-3 text-xs text-muted-foreground">Requerimiento asociado a una OT histórica; se muestra para conciliación y no se presenta como trabajo pendiente.</p> : null}
           {row.notes ? <p className="mt-3 text-sm text-muted-foreground">{row.notes}</p> : null}
         </article>;

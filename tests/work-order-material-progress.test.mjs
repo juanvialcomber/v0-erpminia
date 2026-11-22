@@ -21,7 +21,9 @@ test('material workspace renders the operational progression', () => {
   assert.match(component, /Entregado/);
   assert.match(component, /Faltante/);
   assert.match(component, /En Compras/);
-  assert.match(component, /Siguiente acción/);
+  assert.match(component, /Estado y acciones opcionales/);
+  assert.match(component, /gestión de Bodega es opcional/);
+  assert.doesNotMatch(component, /Siguiente acción/);
 });
 
 test('material issue action depends on explicit reservations', () => {
