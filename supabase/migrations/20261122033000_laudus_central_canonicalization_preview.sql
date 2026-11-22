@@ -154,7 +154,7 @@ select
   count(*) filter (where canonicalization_state = 'review_negative_source')::bigint as negative_source_products,
   count(*) filter (where canonicalization_state = 'review_fractional_precision')::bigint as fractional_products,
   count(*) filter (where canonicalization_state = 'review_stale_source')::bigint as stale_source_products,
-  count(*) filter (where canonicalization_state = 'zero_no_opening_balance')::bigint as zero_without_position
+  count(*) filter (where canonicalization_state = 'zero_no_opening_balance')::bigint as zero_without_opening_balance
 from public.bodega_central_stock_canonicalization_preview_v1
 group by organization_id, warehouse_id;
 
