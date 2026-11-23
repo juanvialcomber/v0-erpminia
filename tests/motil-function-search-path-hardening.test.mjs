@@ -7,7 +7,7 @@ const migrationUrl = new URL(
   import.meta.url,
 );
 const storageMigrationUrl = new URL(
-  '../supabase/migrations/20261123173000_lock_private_storage_to_signed_or_server_access.sql',
+  '../supabase/migrations/20261123164424_lock_private_storage_to_signed_or_server_access.sql',
   import.meta.url,
 );
 const blobUploadRouteUrl = new URL(
