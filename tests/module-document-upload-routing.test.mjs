@@ -18,7 +18,7 @@ test('canonical upload preserves source module category and uploader', async () 
   assert.match(route, /formData\.get\('category'\)/);
   assert.match(route, /module,/);
   assert.match(route, /category,/);
-  assert.match(route, /uploaded_by: auth\.user\.id/);
+  assert.match(route, /uploaded_by: access\.user\.id/);
   assert.match(route, /from\('module_documents'\)/);
 });
 
@@ -28,9 +28,9 @@ test('canonical upload and reads are organization scoped and preserve provenance
   const listRoute = await readFile(new URL('../app/api/documents/list/route.ts', import.meta.url), 'utf8');
   const listComponent = await readFile(new URL('../components/documents/document-list.tsx', import.meta.url), 'utf8');
 
-  assert.match(uploadRoute, /organization_id: auth\.organizationId/);
+  assert.match(uploadRoute, /organization_id: access\.organizationId/);
   assert.match(uploadRoute, /provenance_status: 'operational'/);
-  assert.match(uploadRoute, /\.eq\('organization_id', auth\.organizationId\)/);
+  assert.match(uploadRoute, /\.eq\('organization_id', access\.organizationId\)/);
   assert.match(listRoute, /\.eq\('organization_id', auth\.organizationId\)/);
   assert.match(listComponent, /Fuente canónica/);
 });
