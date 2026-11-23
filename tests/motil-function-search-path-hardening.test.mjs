@@ -14,6 +14,10 @@ const blobUploadRouteUrl = new URL(
   '../app/api/compras/import-existencias/upload/route.ts',
   import.meta.url,
 );
+const contractorFolderUploadUrl = new URL(
+  '../app/api/carpeta-arranque/[id]/upload-doc/route.ts',
+  import.meta.url,
+);
 
 test('pure MOTIL SQL helpers resolve built-ins from a fixed safe schema', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
@@ -34,4 +38,13 @@ test('MOTIL Blob upload route never returns the account-level token', async () =
   assert.doesNotMatch(source, /x-get-client-token/);
   assert.match(source, /handleUpload\(/);
   assert.match(source, /organizationId:\s*auth\.organizationId/);
+});
+
+test('MOTIL contractor-folder uploads enforce edit access and organization ownership', async () => {
+  const source = await readFile(contractorFolderUploadUrl, 'utf8');
+  assert.match(source, /MODULE_KEYS\.LEGAL_EECC/);
+  assert.match(source, /MODULE_KEYS\.HSE_DOCUMENTACION/);
+  assert.match(source, /getModuleAccessLevel\(/);
+  assert.match(source, /eq\('organization_id', organizationId\)/);
+  assert.match(source, /eq\('rut', carpeta\.empresa_rut\)/);
 });
