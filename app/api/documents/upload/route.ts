@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveAuthContext } from '@/lib/api/auth-session';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,13 +59,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El archivo no debe superar 50MB' }, { status: 400 });
     }
 
+    const access = await requireDocumentModuleAccess(request, module, true);
+    if (!access.authorized) return access.response;
+    if (!access.organizationId || access.organizationId !== auth.organizationId || !access.user) {
+      return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
+    }
+
     const supabase = getSupabaseServerClient();
 
     if (!bypassDuplicate) {
       const { data: existingDocs, error: searchError } = await supabase
         .from('module_documents')
         .select('id, document_name, status')
-        .eq('organization_id', auth.organizationId)
+        .eq('organization_id', access.organizationId)
         .eq('module', module)
         .eq('category', category)
         .eq('document_name', file.name)
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
       .from('module_documents')
       .insert([
         {
-          organization_id: auth.organizationId,
+          organization_id: access.organizationId,
           module,
           category,
           document_name: title || file.name,
@@ -134,7 +141,7 @@ export async function POST(request: NextRequest) {
           valid_until: validUntil || null,
           status: 'draft',
           provenance_status: 'operational',
-          uploaded_by: auth.user.id,
+          uploaded_by: access.user.id,
         },
       ])
       .select()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 // Prevent static generation - this route needs runtime env vars
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,11 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
     const body = await req.json();
     const { format, documentIds, filters } = exportSchema.parse(body);
+    const access = await requireDocumentModuleAccess(req, filters.module);
+    if (!access.authorized) return access.response;
+    if (!access.organizationId) {
+      return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
+    }
 
     // Build query
     let query = supabase
@@ -88,6 +94,7 @@ export async function POST(req: NextRequest) {
          valid_from, valid_until, tags, version, 
          created_at, file_url`
       )
+      .eq('organization_id', access.organizationId)
       .eq('module', filters.module);
 
     if (documentIds && documentIds.length > 0) {

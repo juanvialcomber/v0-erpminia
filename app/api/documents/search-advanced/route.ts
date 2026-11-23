@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 const searchSchema = z.object({
   query: z.string().optional().default(''),
@@ -72,12 +73,18 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
     const body = await req.json();
     const filters = searchSchema.parse(body);
+    const access = await requireDocumentModuleAccess(req, filters.module);
+    if (!access.authorized) return access.response;
+    if (!access.organizationId) {
+      return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
+    }
 
     let query = supabase
       .from('module_documents')
       .select(
         'id, document_name, category, status, tags, file_path, file_url, created_at, valid_until, document_code, description'
       )
+      .eq('organization_id', access.organizationId)
       .eq('module', filters.module)
       .eq('is_active', true)
       .order('created_at', { ascending: false });

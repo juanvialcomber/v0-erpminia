@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireAuth } from '@/lib/api/guard';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 export const dynamic = 'force-dynamic';
 
-// Roles allowed to review documents
-const REVIEWER_ROLES = ['reviewer', 'admin', 'supervisor', 'manager', 'gerente'];
-
 export async function POST(request: NextRequest) {
   try {
-    const auth = await resolveAuthContext(request);
-    if (!auth) {
+    const auth = await requireAuth(request);
+    if (!auth.authorized || !auth.user || !auth.organizationId) {
       return NextResponse.json(
         { error: 'No autenticado. Inicia sesión nuevamente.' },
         { status: 401 }
@@ -33,20 +31,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Only reviewers/admins can act on the review workflow
-    if (auth.role && !REVIEWER_ROLES.includes(auth.role)) {
-      return NextResponse.json(
-        { error: 'No tienes rol de revisor para esta acción' },
-        { status: 403 }
-      );
-    }
-
     const supabase = getSupabaseServerClient();
 
     const { data: doc } = await supabase
       .from('module_documents')
-      .select('id')
+      .select('id, module')
       .eq('id', documentId)
+      .eq('organization_id', auth.organizationId)
       .single();
 
     if (!doc) {
@@ -54,6 +45,12 @@ export async function POST(request: NextRequest) {
         { error: 'Documento no encontrado' },
         { status: 404 }
       );
+    }
+
+    const access = await requireDocumentModuleAccess(request, doc.module, true);
+    if (!access.authorized) return access.response;
+    if (access.organizationId !== auth.organizationId) {
+      return NextResponse.json({ error: 'Documento fuera de la organización activa' }, { status: 404 });
     }
 
     let newStatus = '';
@@ -98,7 +95,8 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('module_documents')
       .update(updateData)
-      .eq('id', documentId);
+      .eq('id', documentId)
+      .eq('organization_id', auth.organizationId);
 
     if (updateError) {
       console.error('[v0] Update error:', updateError);
