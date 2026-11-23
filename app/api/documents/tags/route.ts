@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 // Prevent static generation - this route needs runtime env vars
 export const dynamic = 'force-dynamic';
@@ -19,9 +20,15 @@ type DocumentTagsRow = {
 
 export async function GET(req: NextRequest) {
   try {
+    const module = req.nextUrl.searchParams.get('module') || 'prevención';
+    const access = await requireDocumentModuleAccess(req, module);
+    if (!access.authorized) return access.response;
+    if (!access.organizationId) {
+      return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const module = req.nextUrl.searchParams.get('module') || 'prevención';
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
       return NextResponse.json(
@@ -40,6 +47,7 @@ export async function GET(req: NextRequest) {
     const { data: docs, error } = await supabase
       .from('module_documents')
       .select('tags')
+      .eq('organization_id', access.organizationId)
       .eq('module', module)
       .not('tags', 'is', null);
 

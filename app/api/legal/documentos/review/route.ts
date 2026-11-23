@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 type ReviewLevel = 'L1' | 'L2';
 type ReviewStatus = 'cumple' | 'no_cumple' | null;
@@ -14,12 +14,12 @@ type ReviewRequestBody = {
 };
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const auth = await resolveAuthContext(request);
-
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const access = await requireDocumentModuleAccess(request, 'legal', true);
+  if (!access.authorized) return access.response;
+  if (!access.organizationId || !access.user) {
+    return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
   }
+  const supabase = await createClient();
 
   const { docId, level, status, observations } = (await request.json()) as ReviewRequestBody;
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   const updateData: Record<string, string | null> = {
     [`${level.toLowerCase()}_status`]: status,
     [`${level.toLowerCase()}_observations`]: observations || null,
-    [`reviewed_by_${level.toLowerCase()}`]: auth.user.id,
+    [`reviewed_by_${level.toLowerCase()}`]: access.user.id,
     [`reviewed_at_${level.toLowerCase()}`]: new Date().toISOString(),
   };
 
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     .from('module_documents')
     .update(updateData)
     .eq('id', docId)
+    .eq('organization_id', access.organizationId)
     .eq('module', 'legal')
     .select()
     .single();
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
           reviewLevel: level,
           status,
           observations,
-          recipientEmail: auth.user.email,
+          recipientEmail: access.user.email,
         }),
       }
     );

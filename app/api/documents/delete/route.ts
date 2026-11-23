@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireAuth } from '@/lib/api/guard';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 export const dynamic = 'force-dynamic';
 
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await resolveAuthContext(request);
-    if (!auth) {
+    const auth = await requireAuth(request);
+    if (!auth.authorized || !auth.user || !auth.organizationId) {
       return NextResponse.json(
         { error: 'No autenticado. Inicia sesión nuevamente.' },
         { status: 401 }
@@ -26,8 +27,9 @@ export async function DELETE(request: NextRequest) {
 
     const { data: document, error: fetchError } = await supabase
       .from('module_documents')
-      .select('uploaded_by')
+      .select('uploaded_by, organization_id, module')
       .eq('id', documentId)
+      .eq('organization_id', auth.organizationId)
       .single();
 
     if (fetchError || !document) {
@@ -37,8 +39,14 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    const moduleAccess = await requireDocumentModuleAccess(request, document.module, true);
+    if (!moduleAccess.authorized) return moduleAccess.response;
+    if (moduleAccess.organizationId !== auth.organizationId) {
+      return NextResponse.json({ error: 'Documento fuera de la organización activa' }, { status: 404 });
+    }
+
     // Owner or admin can delete
-    const isAdmin = auth.role === 'admin';
+    const isAdmin = ['admin', 'superadmin', 'super_admin'].includes(String(auth.role || '').trim().toLowerCase());
     if (document.uploaded_by !== auth.user.id && !isAdmin) {
       return NextResponse.json(
         { error: 'No tienes permiso para eliminar este documento' },
@@ -49,7 +57,8 @@ export async function DELETE(request: NextRequest) {
     const { error: deleteError } = await supabase
       .from('module_documents')
       .update({ is_active: false, deleted_at: new Date().toISOString() })
-      .eq('id', documentId);
+      .eq('id', documentId)
+      .eq('organization_id', auth.organizationId);
 
     if (deleteError) {
       console.error('[v0] Delete error:', deleteError);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveAuthContext } from '@/lib/api/auth-session';
+import { getModuleAccessLevel, MODULE_KEYS } from '@/lib/api/module-access';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -24,18 +25,41 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const auth = await resolveAuthContext(request);
   if (!auth) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
 
+  const [legalAccess, hseAccess] = await Promise.all([
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.LEGAL_EECC),
+    getModuleAccessLevel(auth.user.id, auth.role, MODULE_KEYS.HSE_DOCUMENTACION),
+  ]);
+  if (legalAccess !== 'ED' && hseAccess !== 'ED') {
+    return NextResponse.json({ error: 'Sin permiso de edición documental' }, { status: 403 });
+  }
+
+  const organizationId = auth.organizationId || auth.user.organization_id;
+  if (!organizationId) return NextResponse.json({ error: 'Organización no disponible' }, { status: 403 });
+
   const { id: carpetaId } = await params;
   const supabase = getSupabaseServerClient();
 
-  // Verify carpeta exists
+  // Verify the folder belongs to an active contractor in the caller's organization.
   const { data: carpeta, error: carpetaError } = await supabase
     .from('carpetas_arranque')
-    .select('id, status, contacto_email, empresa_nombre')
+    .select('id, status, contacto_email, empresa_nombre, empresa_rut')
     .eq('id', carpetaId)
     .single();
 
   if (carpetaError || !carpeta) {
     return NextResponse.json({ error: 'Carpeta no encontrada' }, { status: 404 });
+  }
+
+  const { data: company, error: companyError } = await supabase
+    .from('eecc')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('is_active', true)
+    .eq('rut', carpeta.empresa_rut)
+    .limit(1)
+    .maybeSingle();
+  if (companyError || !company) {
+    return NextResponse.json({ error: 'Carpeta fuera de la organización' }, { status: 404 });
   }
 
   if (['aprobado', 'en_revision_l1', 'en_revision_l2'].includes(carpeta.status)) {

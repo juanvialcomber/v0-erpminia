@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 // Prevent static generation - this route needs runtime env vars
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
     const body = await req.json();
     const { documentIds, tagsToAdd, tagsToRemove, module } = bulkUpdateSchema.parse(body);
+    const access = await requireDocumentModuleAccess(req, module, true);
+    if (!access.authorized) return access.response;
+    if (!access.organizationId) {
+      return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
+    }
 
     if (documentIds.length === 0) {
       return NextResponse.json({ error: 'No hay documentos seleccionados' }, { status: 400 });
@@ -37,6 +43,7 @@ export async function POST(req: NextRequest) {
       .from('module_documents')
       .select('id, tags')
       .in('id', documentIds)
+      .eq('organization_id', access.organizationId)
       .eq('module', module);
 
     if (fetchError) throw fetchError;
@@ -57,6 +64,7 @@ export async function POST(req: NextRequest) {
 
       return {
         id: doc.id,
+        organization_id: access.organizationId,
         tags: updatedTags,
         updated_at: new Date().toISOString(),
       };

@@ -2,15 +2,13 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { requireDocumentModuleAccess } from '@/lib/api/document-module-access';
 
 export async function GET(request: NextRequest) {
+  const access = await requireDocumentModuleAccess(request, 'legal');
+  if (!access.authorized) return access.response;
+  if (!access.organizationId) return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
   const supabase = await createClient();
-
-  const auth = await resolveAuthContext(request);
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search') || '';
@@ -19,6 +17,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('module_documents')
     .select('id, document_name, document_type, description, status, file_path, file_url, uploaded_at, uploaded_by')
+    .eq('organization_id', access.organizationId)
     .eq('module', 'legal')
     .is('deleted_at', null)
     .order('uploaded_at', { ascending: false });
@@ -67,11 +66,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireDocumentModuleAccess(request, 'legal', true);
+  if (!access.authorized) return access.response;
+  if (!access.organizationId || !access.user) return NextResponse.json({ error: 'Organización activa requerida' }, { status: 403 });
   const supabase = await createClient();
-  const auth = await resolveAuthContext(request);
-  if (!auth) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-  }
 
   const contentType = request.headers.get('content-type') || '';
 
@@ -120,12 +118,13 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase
     .from('module_documents')
     .insert({
+      organization_id: access.organizationId,
       document_name: title,
       document_type: documentType || category || 'legal',
       description: description || null,
       module: 'legal',
       status: 'draft',
-      uploaded_by: auth.user.id,
+      uploaded_by: access.user.id,
     })
     .select()
     .single();
