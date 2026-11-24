@@ -19,6 +19,7 @@ function harness({
   workOrders = [],
   failOrders = false,
   criticalCount = 0,
+  stockSyncedAt = NOW,
 } = {}) {
   const calls = [];
   const orders = workOrders;
@@ -46,7 +47,7 @@ function harness({
         },
         maybeSingle() {
           if (table !== 'bodega_central_stock_canonicalization_summary_v1') throw new Error('Unexpected singleton');
-          return Promise.resolve({ data: { source_synced_at: NOW }, error: null });
+          return Promise.resolve({ data: { source_synced_at: stockSyncedAt }, error: null });
         },
       };
       return builder;
@@ -88,6 +89,11 @@ function harness({
     require(name) {
       if (!mockedModules[name]) throw new Error('Unexpected module ' + name);
       return mockedModules[name];
+    },
+    // Freeze the route clock so freshness assertions never age out.
+    Date: class extends Date {
+      constructor(...args) { super(...(args.length ? args : [NOW])); }
+      static now() { return Date.parse(NOW); }
     },
     console: { warn() {}, error() {} },
   });
@@ -158,4 +164,17 @@ test('failed OT source never produces a false healthy diagnosis', async () => {
   const result = await GET({});
   assert.equal(result.status, 503);
   assert.equal(calls.some(c => c.table === 'motil_ai_core_errors'), false);
+});
+
+test('an authorized stale Bodega source still requires review', async () => {
+  const { GET } = harness({
+    cargoName: 'Jefe de Planificación', role: 'jefe_mantencion',
+    stockSyncedAt: new Date(Date.parse(NOW) - 37 * 60 * 60 * 1000).toISOString(),
+  });
+  const response = await GET({});
+  assert.equal(response.status, 200);
+  assert.equal(response.body.status, 'review');
+  assert.equal(response.body.findings.some(f => f.code === 'warehouse_source_stale'), true);
+  assert.equal(response.body.coverage.stockSourceChecked, true);
+  assert.equal(response.body.noAutomaticRemediation, true);
 });
