@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext, type OrganizationSuccessContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
 
 type WarehouseZoneRow = {
@@ -203,50 +204,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const context = await getOrganizationContext(request);
-    if (!context.ok) {
-      return context.response;
-    }
-
-    const { organizationId, supabase } = context;
-    const body = await request.json();
-    const { part_code, part_name, quantity_on_hand, reorder_level, reorder_quantity, unit_cost } = body as {
-      part_code?: string;
-      part_name?: string;
-      quantity_on_hand?: number | string;
-      reorder_level?: number | string;
-      reorder_quantity?: number | string;
-      unit_cost?: number | string;
-    };
-
-    const { data: bins } = await supabase
-      .from('warehouse_bins')
-      .select('id')
-      .limit(1);
-
-    const bin_id = Array.isArray(bins) ? bins[0]?.id || null : null;
-
-    const { data: newItem, error } = await supabase
-      .from('warehouse_stock')
-      .insert({
-        organization_id: organizationId,
-        part_code,
-        part_name,
-        quantity_on_hand: Number(quantity_on_hand || 0),
-        reorder_level: Number(reorder_level || 0),
-        reorder_quantity: Number(reorder_quantity || 0),
-        unit_cost: Number(unit_cost || 0),
-        bin_id,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json(newItem, { status: 201 });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'No se pudo agregar el stock de bodega';
-    return NextResponse.json({ error: message }, { status: 500 });
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO, true);
+  if (!access.authorized) return access.response;
+  const context = await getOrganizationContext(request);
+  if (!context.ok) return context.response;
+  if (access.user.id !== context.userId || access.organizationId !== context.organizationId) {
+    return NextResponse.json({ error: 'No se pudo verificar tu acceso a esta Bodega.' }, { status: 403 });
   }
+
+  // Manual stock creation previously assigned an arbitrary first bin and
+  // bypassed physical counting and Laudus reconciliation. Require a controlled
+  // import/approval flow instead of silently creating an unverified balance.
+  return NextResponse.json({
+    error: 'Las altas de existencias requieren revisión de Bodega. Utiliza la importación y conciliación autorizadas.',
+  }, { status: 409, headers: { 'Cache-Control': 'private, no-store' } });
 }
