@@ -177,9 +177,17 @@ export function MobileWorkOrderFlow({
   const displaySeconds = baseSeconds + runningSeconds;
 
   async function request(url: string, options: RequestInit) {
-    const response = await fetch(url, { credentials: 'include', ...options });
+    const response = await fetch(url, { credentials: 'include', cache: 'no-store', ...options });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || 'No se pudo guardar el cambio.');
+    return payload;
+  }
+
+  function assertTimerTransition(action: 'play' | 'pause' | 'resume' | 'terminate', payload: any) {
+    const expected = action === 'pause' ? 'paused' : action === 'terminate' ? 'idle' : 'running';
+    if (payload?.timer_status !== expected) {
+      throw new Error('El servidor no confirmó el estado del cronómetro. Actualiza la OT antes de continuar.');
+    }
   }
 
   async function uploadEvidence(files: FileList | null) {
@@ -270,11 +278,12 @@ export function MobileWorkOrderFlow({
         body: JSON.stringify({ status: 'in_progress' }),
       });
       if (timerStatus === 'idle') {
-        await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+        const timerResult = await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'play' }),
         });
+        assertTimerTransition('play', timerResult);
       }
       await Promise.all([onWorkOrderChange(), mutate()]);
     } catch (cause) {
@@ -292,11 +301,12 @@ export function MobileWorkOrderFlow({
     setBusy(true);
     setMessage(null);
     try {
-      await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+      const timerResult = await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, notes: notes || null }),
       });
+      assertTimerTransition(action, timerResult);
       await mutate();
       if (action === 'pause') {
         setShowPauseForm(false);
@@ -356,11 +366,12 @@ export function MobileWorkOrderFlow({
     setMessage(null);
     try {
       if (timerStatus === 'running' || timerStatus === 'paused') {
-        await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
+        const timerResult = await request(`/api/maintenance/work-orders/${workOrderId}/timer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'terminate' }),
         });
+        assertTimerTransition('terminate', timerResult);
       }
       router.push(`/dashboard/mantenimiento/ordenes-trabajo/cierre?workOrderId=${encodeURIComponent(workOrderId)}`);
     } catch (cause) {

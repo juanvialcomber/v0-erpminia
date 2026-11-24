@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const accessLevel = await getModuleAccessLevel(context.userId, context.role, MODULE_KEYS.MANT_OPERACIONES);
-    if (!accessLevel) return NextResponse.json({ error: 'Sin acceso a Mantenimiento.' }, { status: 403 });
+    if (accessLevel === 'SR') return NextResponse.json({ error: 'Sin acceso a Mantenimiento.' }, { status: 403 });
 
     const { data: orders, error: orderError } = await context.supabase
       .from('maintenance_work_orders')
