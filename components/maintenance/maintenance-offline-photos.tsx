@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
+import { optimizeEvidencePhoto } from '@/lib/maintenance/optimize-evidence-photo';
 
 type LocalPhoto = { id: string; workOrderId: string; scope: string; file: Blob; fileName: string; mimeType: string; capturedAt: string };
 const DB = 'motil-maintenance-photos-v1';
@@ -52,13 +53,15 @@ export function MaintenanceOfflinePhotos({ workOrderId, offlineScope }: { workOr
     if (!files?.length) return;
     setWorking(true);
     try {
-      for (const file of Array.from(files)) {
-        if (!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(file.type) || file.size > 20 * 1024 * 1024 || !file.size) throw new Error('Fotografía no válida. Máximo 20 MB por imagen.');
+      for (const sourceFile of Array.from(files)) {
+        if (!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(sourceFile.type) || sourceFile.size > 20 * 1024 * 1024 || !sourceFile.size) throw new Error('Fotografía no válida. Máximo 20 MB por imagen.');
+        const optimized = await optimizeEvidencePhoto(sourceFile);
+        const file = optimized.file;
         const photo: LocalPhoto = { id: crypto.randomUUID(), workOrderId, scope: offlineScope, file, fileName: file.name, mimeType: file.type, capturedAt: new Date().toISOString() };
         await save(photo);
         setPhotos((previous) => [...previous, photo]);
       }
-      setMessage('Fotos guardadas en este dispositivo, pendientes de sincronizar.');
+      setMessage('Fotos optimizadas y guardadas en este dispositivo, pendientes de sincronizar.');
     } catch (err) { setMessage(err instanceof Error ? err.message : 'No se pudieron conservar las fotografías.'); }
     finally { setWorking(false); }
   }
