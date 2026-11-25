@@ -210,6 +210,13 @@ export default function PayablesPage() {
 
     {!error && !isLoading && data ? <section className="space-y-3" aria-label="Plan semanal de pagos"><div><h2 className="text-lg font-semibold">Plan de pagos · próximos 7 días</h2><Link href="/dashboard/finanzas/conciliacion" className="text-sm underline">Comparar facturas con Laudus</Link><p className="text-sm text-muted-foreground">Sólo obligaciones aprobadas en MOTIL. No constituye autorización de transferencia.</p></div>{weeklyPlan.length ? <div className="divide-y rounded-lg border bg-card">{weeklyPlan.map(group => <div key={group.currency} className="grid gap-3 p-4 sm:grid-cols-4"><p className="text-sm font-medium">{group.currency}</p>{([['Vencidas',group.overdue],['Próximos 7 días',group.nextSevenDays],['Sin vencimiento',group.undated]] as const).map(([label, bucket]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>)}</div>)}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas para programar. Revisa por separado las facturas informadas por Laudus.</p>}</section> : null}
 
+    {!isLoading && !error && data?.sourceAvailability?.observedPayables !== 'available' ? (
+      <Card className="shadow-none"><CardContent className="p-4 text-sm" role="status">
+        <p className="font-medium">Exposición Laudus no verificable</p>
+        <p className="mt-1 text-muted-foreground">{data?.sourceAvailability?.observedPayables === 'incomplete' ? 'La consulta excede su cobertura máxima.' : 'No se pudo consultar la fuente financiera.'} No significa saldo cero.</p>
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => void mutate()}>Actualizar consulta</Button>
+      </CardContent></Card>
+    ) : null}
     {observedPayables && observedPayables.openItems > 0 ? (
       <Card className="shadow-none">
         <CardHeader>
@@ -254,6 +261,13 @@ export default function PayablesPage() {
       </Card>
     ) : null}
 
+    {!isLoading && !error && data?.sourceAvailability?.paymentReview !== 'available' ? (
+      <Card className="shadow-none"><CardContent className="p-4 text-sm" role="status">
+        <p className="font-medium">Revisión de aplicaciones de pago no disponible</p>
+        <p className="mt-1 text-muted-foreground">{data?.sourceAvailability?.paymentReview === 'incomplete' ? 'Cobertura incompleta.' : 'No se pudo consultar Laudus.'} No se puede concluir que no existan diferencias.</p>
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => void mutate()}>Actualizar consulta</Button>
+      </CardContent></Card>
+    ) : null}
     {paymentReview && paymentReview.itemCount > 0 ? (
       <Card className="shadow-none">
         <CardHeader>
@@ -274,7 +288,7 @@ export default function PayablesPage() {
               <p className="mt-1 text-xs text-muted-foreground">{number(paymentReview.itemCount)} facturas</p>
             </div>
             <div className="rounded-lg bg-muted/40 p-4">
-              <p className="text-xs text-muted-foreground">Duplicado exacto</p>
+              <p className="text-xs text-muted-foreground">Importe equivalente al doble</p>
               <p className="mt-1 text-xl font-semibold">{number(paymentReview.exactDoubleCount)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{money(paymentReview.exactDoubleAmountClp, 'CLP')}</p>
             </div>
@@ -289,7 +303,7 @@ export default function PayablesPage() {
               <div key={row.purchase_invoice_external_id} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{row.supplier_name || 'Proveedor por revisar'} · Factura {row.doc_number || 's/n'}</p>
-                  <p className="text-xs text-muted-foreground">{row.review_reason === 'exact_double_total' ? 'Pago total aplicado dos veces' : 'Pago adicional sobre factura'} · {number(row.payment_count)} aplicaciones</p>
+                  <p className="text-xs text-muted-foreground">{row.review_reason === 'exact_double_total' ? 'Importe aplicado equivalente al doble de la factura' : 'Pago adicional sobre factura'} · {number(row.payment_count)} aplicaciones</p>
                 </div>
                 <p className="text-xs text-muted-foreground sm:text-right">Factura {money(row.total_amount, row.currency || 'CLP')}</p>
                 <p className="text-sm font-semibold tabular-nums sm:text-right">Exceso {money(row.excess_amount, row.currency || 'CLP')}</p>
@@ -302,10 +316,10 @@ export default function PayablesPage() {
     ) : null}
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">CxP MOTIL pendientes</p>{outstandingByCurrency.length ? <div className="mt-1 space-y-1">{outstandingByCurrency.map(([currency,value]) => <p key={currency} className="text-xl font-semibold">{money(value,currency)}</p>)}</div> : <p className="mt-1 text-2xl font-semibold">0</p>}</CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Sin vencimiento</p><p className="mt-1 text-2xl font-semibold">{dueMissing.length}</p></CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{overdue.length}</p></CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Pagos por conciliar</p><p className="mt-1 text-2xl font-semibold">{unreconciled.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">CxP MOTIL pendientes</p>{isLoading || error || !data ? <p className="mt-1 text-2xl font-semibold">—</p> : outstandingByCurrency.length ? <div className="mt-1 space-y-1">{outstandingByCurrency.map(([currency,value]) => <p key={currency} className="text-xl font-semibold">{money(value,currency)}</p>)}</div> : <p className="mt-1 text-2xl font-semibold">0</p>}</CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Sin vencimiento</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : dueMissing.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : overdue.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Pagos por conciliar</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : unreconciled.length}</p></CardContent></Card>
     </div>
 
     {overdueBySupplier.length ? (
@@ -345,7 +359,7 @@ export default function PayablesPage() {
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
-      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
+      {!isLoading && !error && data && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
 
