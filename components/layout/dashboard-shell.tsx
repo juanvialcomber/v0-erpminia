@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
+import { GlobalWeatherBanner } from '@/components/layout/global-weather-banner';
 import { Header } from '@/components/layout/header';
 import { DailyManagementContextNav } from '@/components/layout/daily-management-context-nav';
 import { DocumentationContextNav } from '@/components/layout/documentation-context-nav';
@@ -59,6 +60,7 @@ export function DashboardShell({ children, locale, dictionary }: { children: Rea
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header sidebarCollapsed={collapsed} onToggleSidebar={toggleSidebar} locale={locale} dictionary={dictionary} />
+        <GlobalWeatherBanner locale={locale} userId={user?.id ?? null} />
         <DailyManagementContextNav dictionary={dictionary} />
         <DocumentationContextNav dictionary={dictionary} />
         <OperationalAttentionContextNav dictionary={dictionary} />
