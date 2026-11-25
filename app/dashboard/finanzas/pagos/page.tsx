@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { buildPaymentPlan } from '@/lib/finance/payment-plan';
 import useSWR from 'swr';
 import { CheckCircle2, Clock3, Landmark, ReceiptText } from 'lucide-react';
@@ -207,7 +208,7 @@ export default function PayablesPage() {
 
     {!error && !isLoading && canEdit ? <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card> : null}
 
-    {!error && !isLoading && data ? <section className="space-y-3" aria-label="Plan semanal de pagos"><div><h2 className="text-lg font-semibold">Plan de pagos · próximos 7 días</h2><p className="text-sm text-muted-foreground">Sólo obligaciones aprobadas en MOTIL. No constituye autorización de transferencia.</p></div>{weeklyPlan.length ? <div className="divide-y rounded-lg border bg-card">{weeklyPlan.map(group => <div key={group.currency} className="grid gap-3 p-4 sm:grid-cols-4"><p className="text-sm font-medium">{group.currency}</p>{([['Vencidas',group.overdue],['Próximos 7 días',group.nextSevenDays],['Sin vencimiento',group.undated]] as const).map(([label, bucket]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>)}</div>)}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas para programar. Revisa por separado las facturas informadas por Laudus.</p>}</section> : null}
+    {!error && !isLoading && data ? <section className="space-y-3" aria-label="Plan semanal de pagos"><div><h2 className="text-lg font-semibold">Plan de pagos · próximos 7 días</h2><Link href="/dashboard/finanzas/conciliacion" className="text-sm underline">Comparar facturas con Laudus</Link><p className="text-sm text-muted-foreground">Sólo obligaciones aprobadas en MOTIL. No constituye autorización de transferencia.</p></div>{weeklyPlan.length ? <div className="divide-y rounded-lg border bg-card">{weeklyPlan.map(group => <div key={group.currency} className="grid gap-3 p-4 sm:grid-cols-4"><p className="text-sm font-medium">{group.currency}</p>{([['Vencidas',group.overdue],['Próximos 7 días',group.nextSevenDays],['Sin vencimiento',group.undated]] as const).map(([label, bucket]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>)}</div>)}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas para programar. Revisa por separado las facturas informadas por Laudus.</p>}</section> : null}
 
     {observedPayables && observedPayables.openItems > 0 ? (
       <Card className="shadow-none">
