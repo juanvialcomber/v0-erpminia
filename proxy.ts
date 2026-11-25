@@ -200,7 +200,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (path === '/api/actions/state') return true;
   // Route-level finance permissions and organization checks govern review decisions.
   if (path === '/api/integrations/laudus/finance-reconciliation-review') return readOnly || method === 'POST';
-  if (path === '/api/finance/invoice-reconciliation' || path === '/api/finance/purchase-order-evidence' || path === '/api/project-control/portfolio') return readOnly;
+  if (path === '/api/finance/invoice-reconciliation' || path === '/api/finance/purchase-trace' || path === '/api/finance/purchase-order-evidence' || path === '/api/project-control/portfolio') return readOnly;
   if (path.startsWith('/api/procurement/')) return readOnly;
   if (path === '/api/pipeline/operational') return readOnly;
 
