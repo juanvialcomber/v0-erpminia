@@ -1,5 +1,6 @@
 'use client';
 
+import { SharedProjectPortfolio } from '@/components/project-control/shared-project-portfolio';
 import { FormEvent, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { MopEngineeringAssistant } from '@/components/engineering/mop-assistant';
@@ -132,6 +133,8 @@ export default function IngenieriaProyectosPage() {
           <PageHeaderDescription>Registra los proyectos que el equipo levantará y completa sus antecedentes por etapas.</PageHeaderDescription>
         </PageHeaderContent>
       </PageHeader>
+
+      <SharedProjectPortfolio />
 
       <section className="flex flex-wrap items-center justify-between gap-3 border-y py-3" aria-label="Estado de la cartera">
         <div>

@@ -198,7 +198,7 @@ function financeManagerAllowed(path: string, method: string): boolean {
   if (path.startsWith('/api/auth/') || path === '/api/me' || path.startsWith('/api/me/')) return true;
   if (path === '/api/actions/inbox' || path === '/api/data-sources/status' || path === '/api/weather/summary') return readOnly;
   if (path === '/api/actions/state') return true;
-  if (path === '/api/finance/invoice-reconciliation' || path === '/api/finance/purchase-order-evidence') return readOnly;
+  if (path === '/api/finance/invoice-reconciliation' || path === '/api/finance/purchase-order-evidence' || path === '/api/project-control/portfolio') return readOnly;
   if (path.startsWith('/api/procurement/')) return readOnly;
   if (path === '/api/pipeline/operational') return readOnly;
 
