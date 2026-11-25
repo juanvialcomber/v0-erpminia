@@ -27,5 +27,27 @@ export async function GET(request: NextRequest) {
     console.error('[finance/invoice-reconciliation] lookup failed', error?.code);
     return NextResponse.json({ error: 'No se pudo comparar las facturas. Intenta nuevamente.' }, { status: 503 });
   }
-  return NextResponse.json(data, { headers: { 'Cache-Control': 'private, no-store' } });
+  const summary = data.summary;
+  if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
+    return NextResponse.json({ error: 'No se pudo verificar el resumen de conciliación.' }, { status: 503 });
+  }
+  const count = (key: string) => {
+    const value = summary[key];
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  };
+  // Coverage is not an error. A candidate is not an approved reconciliation.
+  const groups = [
+    { status: 'invoice_difference', count: count('invoice_difference'), action: 'Contrastar documento original, moneda y total.' },
+    { status: 'payment_difference', count: count('payment_difference'), action: 'Contrastar comprobantes de pago y saldo pendiente.' },
+    { status: 'ambiguous', count: count('ambiguous'), action: 'Verificar identidad y tipo de documento antes de vincular.' },
+    { status: 'approval_missing', count: count('approval_missing'), action: 'Verificar la obligación y su aprobación.' },
+    { status: 'currency_missing', count: count('currency_missing'), action: 'Verificar moneda en el documento fuente.' },
+    { status: 'identity_missing', count: count('identity_missing'), action: 'Completar RUT y folio desde el documento fuente.' },
+  ].filter(group => group.count > 0);
+  return NextResponse.json({ ...data, reviewPlan: {
+    groups,
+    coverage: { laudusOnly: count('laudus_only'), motilOnly: count('motil_only') },
+    candidates: count('candidate_consistent'),
+    persisted: false,
+  } }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
