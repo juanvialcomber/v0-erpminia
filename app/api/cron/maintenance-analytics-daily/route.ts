@@ -6,10 +6,13 @@ import { NextRequest, NextResponse } from 'next/server';
  * Runs once per day to pre-compute analytics and populate aggregation tables
  * Can be called via Vercel Crons or external scheduler
  */
-export async function POST(req: NextRequest) {
-  // Verify cron secret if provided
+export const dynamic = 'force-dynamic';
+
+async function runAggregation(req: NextRequest) {
+  // Fail closed when the scheduler secret is absent or invalid.
   const cronSecret = req.headers.get('authorization');
-  if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 24 || cronSecret !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -19,8 +22,9 @@ export async function POST(req: NextRequest) {
     console.log('[v0] Starting daily maintenance analytics aggregation...');
 
     // Get all organizations (in this case, just the main one)
-    const { data: orgs } = await sb.from('organizations').select('id');
+    const { data: orgs, error: orgError } = await sb.from('organizations').select('id');
 
+    if (orgError) throw new Error('Organization query failed');
     if (!orgs || orgs.length === 0) {
       return NextResponse.json({ error: 'No organizations found' }, { status: 400 });
     }
@@ -37,7 +41,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
+export async function GET(req: NextRequest) {
+  return runAggregation(req);
+}
+
+export async function POST(req: NextRequest) {
+  return runAggregation(req);
+}
+
+async function aggregateAnalyticsForOrg(sb: ReturnType<typeof createClient>, orgId: string) {
   const today = new Date().toISOString().split('T')[0];
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -54,12 +66,13 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
     }
 
     // Fetch work orders
-    const { data: workOrders } = await sb
+    const { data: workOrders, error: workOrderError } = await sb
       .from('maintenance_work_orders')
       .select('id, status, priority, created_at, completion_date, scheduled_date, total_timer_minutes')
       .eq('organization_id', orgId)
-      .gte('created_at', thirtyDaysAgo.toISOString()) as { data: WorkOrder[] | null };
+      .gte('created_at', thirtyDaysAgo.toISOString());
 
+    if (workOrderError) throw new Error('Work order query failed');
     const woList: WorkOrder[] = workOrders || [];
 
     // Calculate metrics
@@ -90,7 +103,7 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
     const totalHoursLogged = woList.reduce((sum: number, wo: WorkOrder) => sum + (wo.total_timer_minutes || 0), 0) / 60;
 
     // Insert aggregation data
-    await sb.from('maintenance_analytics_daily').upsert(
+    const { error: writeError } = await sb.from('maintenance_analytics_daily').upsert(
       {
         organization_id: orgId,
         analysis_date: today,
@@ -105,6 +118,7 @@ async function aggregateAnalyticsForOrg(sb: any, orgId: string) {
       { onConflict: 'organization_id,analysis_date' }
     );
 
+    if (writeError) throw new Error('Analytics write failed');
     console.log(`[v0] Aggregated ${orgId} analytics for ${today}`);
   } catch (error) {
     console.error(`[v0] Error aggregating org ${orgId}:`, error);
