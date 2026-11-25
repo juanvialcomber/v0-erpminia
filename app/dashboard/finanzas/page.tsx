@@ -6,6 +6,7 @@ import { LaudusFinanceReconciliationQueue } from '@/components/integrations/laud
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
 
 const primarySections = [
+  ['/dashboard/finanzas/documentos', 'Facturación', 'DTE, conciliación y evidencia tributaria'],
   ['/dashboard/finanzas/pagos', 'Pagos', 'Vencimientos, pagos y conciliación'],
   ['/dashboard/finanzas/proveedores', 'Proveedores', 'Exposición y concentración'],
   ['/dashboard/finanzas/activos', 'Activos', 'Valor, seguro y mantenimiento'],
@@ -16,7 +17,6 @@ const primarySections = [
 const secondarySections = [
   ['/dashboard/finanzas/reportes', 'Reportes'],
   ['/dashboard/finanzas/fuentes', 'Fuentes y calidad'],
-  ['/dashboard/finanzas/documentos', 'Documentos'],
   ['/dashboard/finanzas/calendario', 'Calendario'],
 ] as const;
 
@@ -67,7 +67,7 @@ export default function FinancePage() {
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
             <div>
               <p className="text-sm font-medium">Más secciones</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Reportes, fuentes, documentos y calendario</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Reportes, fuentes y calendario</p>
             </div>
             <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
             <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>

@@ -86,3 +86,32 @@ export async function getTaxCoreOrganizationCertificateStatus(organizationId: st
   const query = new URLSearchParams({ organizationId }).toString();
   return requestTaxCore(`/api/v1/certificates/status?${query}`, {}, token);
 }
+
+
+export async function getTaxCoreOrganizationDtes(
+  organizationId: string,
+  options: { period?: string; limit?: number; cursor?: string } = {},
+) {
+  const token = motilToken();
+  if (!token) {
+    return {
+      ok: false,
+      organizationId,
+      taxpayerRut: null,
+      documents: [],
+      hasMore: false,
+      siiWritesEnabled: false,
+      accountingPromotion: false,
+      unavailableReason: 'motil_service_token_not_configured' as const,
+    };
+  }
+
+  const query = new URLSearchParams({ organizationId });
+  if (options.period) query.set('period', options.period);
+  if (options.limit) query.set('limit', String(options.limit));
+  if (options.cursor) query.set('cursor', options.cursor);
+
+  return requestTaxCore(`/api/v1/dte/lapatagua-source?${query.toString()}`, {
+    timeoutMs: 20000,
+  }, token);
+}
