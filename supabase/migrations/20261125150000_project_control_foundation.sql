@@ -71,7 +71,7 @@ create table public.project_control_close_reviews (
  id uuid primary key default gen_random_uuid(),
  organization_id uuid not null references public.organizations(id),
  close_id uuid not null,
- area text not null check(area in ('engineering','legal','accounting','finance')),
+ area text not null check(area in ('engineering','legal','finance')),
  reviewer_id uuid not null references public.profiles(id),
  decision text not null check(decision in ('accepted','returned')),
  evidence_reference text not null check(length(btrim(evidence_reference))>0),
