@@ -7,11 +7,14 @@ const prioritiesUrl = new URL('../components/dashboard/home-decision-priorities.
 const dictUrl = new URL('../lib/i18n/dictionaries.ts', import.meta.url);
 
 const shell = await readFile(shellUrl, 'utf8');
+const home = await readFile(new URL('../components/dashboard/dashboard-home.tsx', import.meta.url), 'utf8');
 const priorities = await readFile(prioritiesUrl, 'utf8');
 const dict = await readFile(dictUrl, 'utf8');
 
 test('Inicio surfaces prioritized Decision Cases without creating another module', () => {
-  assert.match(shell, /pathname === '\/dashboard' \? <HomeDecisionPriorities locale=\{locale\} dictionary=\{dictionary\} \/> : null/);
+  assert.doesNotMatch(shell, /<HomeDecisionPriorities/);
+  assert.match(home, /mode === 'management' && !personaKey \? <HomeDecisionPriorities dictionary=\{dictionary\} locale=\{locale\}/);
+  assert.ok(home.indexOf('<HomeDecisionPriorities') > home.indexOf('data-testid="dashboard-more-details"'));
   assert.match(priorities, /\/api\/intelligence\/decision-cases\/prioritized\?limit=3/);
   assert.match(priorities, /const cases = priorities\.data\?\.cases \|\| \[\]/);
 });

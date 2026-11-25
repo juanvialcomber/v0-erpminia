@@ -29,7 +29,7 @@ const fetcher = async (url: string): Promise<Payload> => {
 };
 
 function label(row: Row) {
-  if (row.kind === 'accounts_payable_inconsistency') return 'CxP inconsistente';
+  if (row.kind === 'accounts_payable_inconsistency') return 'Cuenta por pagar inconsistente';
   if (row.kind === 'purchase_order_reconciliation') return 'OC pendiente de conciliación';
   if (row.kind === 'cost_center_reconciliation') return 'Centro de costo pendiente';
   return 'Trazabilidad de factura';
@@ -62,9 +62,15 @@ export function LaudusFinanceReconciliationQueue() {
         body: JSON.stringify({ reviewId: row.id, decision, reason: reason.trim() }),
       });
       const payload = await response.json().catch(() => null);
+      if (response.status === 409) {
+        await mutate();
+        setReason('');
+        setMessage('El caso cambió. Revisa la evidencia del siguiente caso antes de decidir.');
+        return;
+      }
       if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
       setReason('');
-      setMessage(decision === 'approve' ? 'Caso aprobado y registrado.' : 'Caso rechazado y motivo registrado.');
+      setMessage(decision === 'approve' ? 'Evidencia aceptada. No se modificó Laudus.' : 'Evidencia no adoptada. Motivo registrado.');
       await mutate();
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'No fue posible registrar la decisión.');
@@ -73,27 +79,10 @@ export function LaudusFinanceReconciliationQueue() {
     }
   }
 
-  if (error) {
-    return <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error.message}</section>;
-  }
-
-  if (isLoading) {
-    return <section className="h-40 animate-pulse rounded-lg bg-muted" />;
-  }
-
-  if (!row) {
-    return (
-      <section className="rounded-lg border bg-card p-5">
-        <div className="flex items-start gap-2">
-          <CheckCircle2 className="mt-0.5 h-4 w-4" />
-          <div>
-            <p className="text-sm font-medium">Conciliación financiera al día</p>
-            <p className="mt-1 text-xs text-muted-foreground">No quedan excepciones Laudus pendientes de decisión humana.</p>
-          </div>
-        </div>
-      </section>
-    );
-  }
+  // Only the authorized decision maker receives a task; read-only users keep their financial overview.
+  if (isLoading) return null;
+  if (error) return <section className="rounded-lg border p-4 text-sm" role="status"><p>No fue posible consultar las revisiones financieras. No significa que no existan pendientes.</p><Button variant="outline" size="sm" className="mt-2" onClick={() => void mutate()}>Reintentar</Button></section>;
+  if (!data?.canDecide || !row) return null;
 
   return (
     <section className="rounded-lg border bg-card">
@@ -102,11 +91,11 @@ export function LaudusFinanceReconciliationQueue() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Administración y Finanzas</p>
             <div className="mt-1 flex items-center gap-2">
-              <h2 className="text-lg font-semibold">Conciliar excepción Laudus</h2>
+              <h2 className="text-lg font-semibold">Revisar inconsistencia de Laudus</h2>
               <LaudusSourceMark state="review" />
             </div>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-              MOTIL no pudo resolver este caso de forma determinística. La decisión queda registrada y no modifica pagos, facturas, asientos ni Laudus automáticamente.
+              Revisa el respaldo y decide si corresponde aceptar la conciliación. Esto no modifica pagos ni facturas.
             </p>
           </div>
           <div className="text-right text-xs text-muted-foreground">
@@ -126,7 +115,7 @@ export function LaudusFinanceReconciliationQueue() {
         <div className="mt-3 flex items-start gap-2 rounded-md border bg-muted/20 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
           <p className="text-xs leading-5 text-muted-foreground">
-            Aprobar acepta esta evidencia para la conciliación. Rechazar conserva el caso como evidencia no adoptada. En ambos casos el motivo queda disponible para programar reglas futuras.
+            Aceptar registra tu revisión de la evidencia, no corrige la factura ni el pago. No adoptar conserva el caso como evidencia descartada. El motivo queda registrado.
           </p>
         </div>
 
@@ -149,7 +138,7 @@ export function LaudusFinanceReconciliationQueue() {
             onClick={() => void decide('reject')}
           >
             <XCircle className="mr-2 h-4 w-4" />
-            {saving === 'reject' ? 'Registrando…' : 'Rechazar'}
+            {saving === 'reject' ? 'Registrando…' : 'No adoptar evidencia'}
           </Button>
           <Button
             type="button"
@@ -157,7 +146,7 @@ export function LaudusFinanceReconciliationQueue() {
             onClick={() => void decide('approve')}
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            {saving === 'approve' ? 'Registrando…' : 'Aprobar'}
+            {saving === 'approve' ? 'Registrando…' : 'Aceptar evidencia'}
           </Button>
         </div>
 

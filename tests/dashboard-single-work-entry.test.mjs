@@ -7,7 +7,7 @@ const home = await readFile(new URL('../components/dashboard/dashboard-home.tsx'
 test('dashboard starts from one role-specific work inbox', () => {
   assert.match(home, /Mi trabajo/);
   assert.match(home, /\/dashboard\/acciones/);
-  assert.match(home, /const tasks = \(inbox\.data\?\.tasks \|\| \[\]\)\.slice\(0, 5\)/);
+  assert.match(home, /const tasks = \(inbox\.data\?\.tasks \|\| \[\]\)\.filter\(task => task\.responsibility === 'owner' \|\| task\.responsibility === 'escalation'\)\.slice\(0, 3\)/);
   assert.match(home, /resolveMode\(inbox\.data\?\.profile\?\.cargoName\)/);
 });
 

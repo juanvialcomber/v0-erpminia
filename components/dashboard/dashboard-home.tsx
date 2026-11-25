@@ -29,6 +29,7 @@ type RoleTask = {
   responsibility: 'owner' | 'support' | 'escalation';
   module_route: string;
   urgency_label?: string | null;
+  role_action?: string | null;
 };
 
 type InboxSummary = { total: number; owners: number; support: number; escalations: number; critical: number; overdue: number; backlog: number };
@@ -37,6 +38,7 @@ type InboxPayload = {
   summary?: InboxSummary;
   tasks?: RoleTask[];
   coverageAvailable?: boolean;
+  degraded?: boolean;
 };
 
 type ProductionOverview = {
@@ -350,9 +352,9 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
   const config = personaKey
     ? configForPersona(personaKey, inbox.data)
     : configFor(mode, production.data, maintenance.data, inbox.data, t, locale);
-  const tasks = (inbox.data?.tasks || []).slice(0, 5);
+  const tasks = (inbox.data?.tasks || []).filter(task => task.responsibility === 'owner' || task.responsibility === 'escalation').slice(0, 3);
   const loading = inbox.isLoading;
-  const inboxUnavailable = Boolean(inbox.error) || (!loading && !inbox.data);
+  const inboxUnavailable = Boolean(inbox.error) || Boolean(inbox.data?.degraded) || (!loading && !inbox.data);
 
   return (
     <div className="space-y-6">
@@ -374,9 +376,6 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
 
       {inboxUnavailable ? <StatePanel tone="warning" title={t.roleUnresolvedTitle} description={t.roleUnresolvedDescription} /> : null}
 
-      {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} coverageAvailable={inbox.data?.coverageAvailable} /> : null}
-
-      {personaKey === 'daniel_finance' ? <LaudusFinanceStatusStrip compact /> : null}
 
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-4">
@@ -390,7 +389,7 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
         {loading ? <StatePanel tone="loading" title={t.loadingTitle} />
           : inboxUnavailable ? <StatePanel tone="warning" title={t.workUnavailableTitle} description={t.workUnavailableDescription} />
           : tasks.length === 0 ? <div className="flex items-center gap-3 rounded-lg border px-4 py-4">{mode==='engineering'?<AlertTriangle className="h-5 w-5 text-muted-foreground" />:<CheckCircle2 className="h-5 w-5 text-muted-foreground" />}<div><p className="text-sm font-medium">{mode==='engineering'?'Sin tareas registradas en Ingeniería':t.emptyTitle}</p><p className="text-xs text-muted-foreground">{mode==='engineering'?'La bandeja vacía no acredita cumplimiento del plan ni ausencia de brechas técnicas. Consulta Topografía.':t.emptyDescription}</p></div></div>
-          : <div className="overflow-hidden rounded-lg border bg-card">{tasks.map((task) => <Link key={task.task_key} href={task.module_route || '/dashboard/acciones'} className="group flex items-center gap-4 border-b px-4 py-3 last:border-0 hover:bg-muted/30"><AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-medium">{task.title}</p>{task.severity === 'critical' ? <Badge variant="destructive">{t.criticalBadge}</Badge> : null}</div><p className="truncate text-xs text-muted-foreground">{task.evidence_summary || task.urgency_label || task.domain}</p></div><ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" /></Link>)}</div>}
+          : <div className="overflow-hidden rounded-lg border bg-card">{tasks.map((task) => <Link key={task.task_key} href={task.module_route || '/dashboard/acciones'} className="group flex items-center gap-4 border-b px-4 py-3 last:border-0 hover:bg-muted/30"><AlertTriangle className="h-4 w-4 shrink-0 text-muted-foreground" /><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-medium">{task.title}</p>{task.severity === 'critical' ? <Badge variant="destructive">{t.criticalBadge}</Badge> : null}</div><p className="text-xs leading-relaxed text-muted-foreground">{task.role_action || task.evidence_summary || task.urgency_label || task.domain}</p></div><ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1" /></Link>)}</div>}
       </section>
 
       <details className="group rounded-lg border bg-card" data-testid="dashboard-more-details" onToggle={(event) => setMoreOpen(event.currentTarget.open)}>
@@ -398,6 +397,8 @@ export function DashboardHome({ locale, dictionary }: { locale: Locale; dictiona
           Ver más · Indicadores y accesos
         </summary>
         <div className="space-y-6 border-t p-4">
+          {personaKey && !inboxUnavailable ? <PersonaSummaryStrip personaKey={personaKey} summary={inbox.data?.summary} loading={loading} coverageAvailable={inbox.data?.coverageAvailable} /> : null}
+          {personaKey === 'daniel_finance' ? <LaudusFinanceStatusStrip compact /> : null}
           <div>
             <h2 className="text-base font-semibold">{config.title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{config.description}</p>

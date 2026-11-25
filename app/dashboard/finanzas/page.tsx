@@ -3,19 +3,20 @@ import { ArrowRight } from 'lucide-react';
 import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
 import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
 import { LaudusFinanceReconciliationQueue } from '@/components/integrations/laudus-finance-reconciliation-queue';
+import { PurchaseOrderEvidence } from '@/components/finance/purchase-order-evidence';
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
 
 const primarySections = [
   ['/dashboard/finanzas/pagos', 'Pagos', 'Vencimientos, pagos y conciliación'],
-  ['/dashboard/finanzas/proveedores', 'Proveedores', 'Exposición y concentración'],
+  ['/dashboard/finanzas/proveedores', 'Proveedores', 'Saldos pendientes por proveedor'],
   ['/dashboard/finanzas/activos', 'Activos', 'Valor, seguro y mantenimiento'],
   ['/dashboard/finanzas/centros', 'Centros de costos', 'Atribución y actividad'],
-  ['/dashboard/finanzas/trazabilidad', 'Trazabilidad', 'Origen y evidencia financiera'],
+  ['/dashboard/finanzas/trazabilidad', 'Trazabilidad', 'Respaldo de cifras y movimientos'],
 ] as const;
 
 const secondarySections = [
   ['/dashboard/finanzas/reportes', 'Reportes'],
-  ['/dashboard/finanzas/fuentes', 'Fuentes y calidad'],
+  ['/dashboard/finanzas/fuentes', 'Información y respaldo'],
   ['/dashboard/finanzas/documentos', 'Documentos'],
   ['/dashboard/finanzas/calendario', 'Calendario'],
 ] as const;
@@ -30,15 +31,14 @@ export default function FinancePage() {
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Resumen financiero</h1>
           </div>
           <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-right">
-            Exposición, decisiones y evidencia. El detalle operativo vive en cada sección.
+            Revisa compromisos, vencimientos y decisiones de pago.
           </p>
         </div>
       </section>
 
-      <LaudusFinanceStatusStrip />
-      <LaudusFinanceControlCard />
       <LaudusFinanceReconciliationQueue />
-      <AssetCandidateReviewSignal />
+      <PurchaseOrderEvidence />
+      <LaudusFinanceControlCard />
 
       <section className="space-y-3" aria-label="Secciones de Finanzas">
         <div className="flex items-end justify-between gap-3 border-t pt-5">
@@ -84,6 +84,13 @@ export default function FinancePage() {
           </div>
         </details>
       </section>
+      <details className="rounded-lg border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Información de respaldo</summary>
+        <div className="space-y-4 border-t p-4">
+          <LaudusFinanceStatusStrip />
+          <AssetCandidateReviewSignal />
+        </div>
+      </details>
     </div>
   );
 }

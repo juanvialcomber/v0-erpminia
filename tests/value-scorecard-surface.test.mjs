@@ -9,7 +9,7 @@ test('finance cockpit separates Laudus exposure from canonical MOTIL payables', 
 
   assert.match(api, /motil_laudus_finance_review_queue/);
   assert.match(card, /Exposición abierta/);
-  assert.match(card, /Qué debe resolver Daniel primero/);
+  assert.match(card, /Qué requiere atención/);
   assert.match(page, /Pagos.*Proveedores.*Centros de costos.*Trazabilidad/s);
   assert.doesNotMatch(page, /Preparado para nuevas fuentes/);
   assert.doesNotMatch(page, /Trazabilidad económica y SERNAGEOMIN/);

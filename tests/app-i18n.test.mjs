@@ -86,7 +86,8 @@ test('dashboard home is a server wrapper over a locale-aware client', () => {
   for (const literal of ['Mi Planta', 'Mi Mantención', 'Mi Bodega', 'Resumen ejecutivo', 'Acciones pendientes', 'Por qué importa:']) {
     assert.doesNotMatch(dashboardHome, new RegExp(literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `dashboard-home must not hardcode ${literal}`);
   }
-  assert.match(shell, /pathname === '\/dashboard' \? <HomeDecisionPriorities locale=\{locale\} dictionary=\{dictionary\} \/> : null/);
+  assert.doesNotMatch(shell, /<HomeDecisionPriorities/);
+  assert.match(dashboardHome, /mode === 'management' && !personaKey \? <HomeDecisionPriorities dictionary=\{dictionary\} locale=\{locale\}/);
 });
 
 test('actions inbox is a server wrapper over a locale-aware client', () => {

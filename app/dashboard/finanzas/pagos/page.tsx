@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { buildPaymentPlan } from '@/lib/finance/payment-plan';
 import useSWR from 'swr';
 import { CheckCircle2, Clock3, Landmark, ReceiptText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +28,11 @@ const money = (value: unknown, currency = 'CLP') => {
   }
 };
 const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 });
-const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+const localDate = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type: string) => parts.find(value => value.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
 
 type Payable = { id:string; invoice_number:string; supplier_name:string; approved_amount:number; paid_amount:number; outstanding_amount:number; due_date?:string|null; days_to_due?:number|null; status:string; currency:string };
 type Payment = { id:string; payable_id:string; amount:number; currency:string; payment_date:string; payment_reference?:string|null; notes?:string|null; reconciled_at?:string|null; reconciliation_reference?:string|null; reconciliation_notes?:string|null };
@@ -80,9 +86,13 @@ export default function PayablesPage() {
   const unreconciled = payments.filter((row) => !row.reconciled_at);
   const payableWithBalance = payables.filter((row) => row.due_date && Number(row.outstanding_amount) > 0);
 
+  const today = localDate();
+  const paymentPlan = useMemo(() => buildPaymentPlan(payables, today), [payables, today]);
+  const missingCurrency = payables.filter(row => Number(row.outstanding_amount) > 0 && !/^[A-Z]{3}$/.test(row.currency?.trim().toUpperCase() ?? '')).length;
+
   const overdueBySupplier = useMemo(() => {
     const groups = new Map<string, { supplierName: string; items: number; amount: number; oldestDays: number }>();
-    for (const row of overdue) {
+    for (const row of overdue.filter(row => row.currency === 'CLP')) {
       const key = row.supplier_name || 'Sin proveedor';
       const current = groups.get(key) || { supplierName: key, items: 0, amount: 0, oldestDays: 0 };
       current.items += 1;
@@ -153,7 +163,7 @@ export default function PayablesPage() {
     if (await post({ action:'reconcile_payment', paymentId:selectedPayment.id, reference:reconciliationReference.trim(), notes:reconciliationNotes.trim() || null })) closeDialog();
   };
 
-  let nextTitle = 'Sin CxP MOTIL pendientes';
+  let nextTitle = 'Sin obligaciones aprobadas pendientes';
   let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en la fuente financiera se revisa en Resumen y Proveedores.';
   let nextControl: React.ReactNode = null;
   if (dueMissing.length) {
@@ -161,7 +171,7 @@ export default function PayablesPage() {
     nextDescription = `Factura ${dueMissing[0].invoice_number}: la obligación aprobada aún no tiene fecha de vencimiento.`;
     nextControl = <Button onClick={() => openDue(dueMissing[0])} disabled={!canEdit}><Clock3 className="mr-2 h-4 w-4"/>Definir vencimiento</Button>;
   } else if (overdue.length) {
-    nextTitle = 'Registrar pago vencido';
+    nextTitle = 'Revisar obligación vencida';
     nextDescription = `Factura ${overdue[0].invoice_number}: mantiene saldo vencido pendiente de pago.`;
     nextControl = <Button onClick={() => openPay(overdue[0])} disabled={!canEdit}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>;
   } else if (unreconciled.length) {
@@ -175,16 +185,16 @@ export default function PayablesPage() {
   }
 
   return <div className="space-y-6">
-    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Factura aprobada → vencimiento → pago → conciliación</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola acción principal por vez. El costo ya fue reconocido por la recepción aceptada; Tesorería administra obligación, salida de caja y conciliación.</p></section>
+    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Pagos y vencimientos</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Planifica vencimientos, registra pagos efectuados y concilia sus comprobantes.</p></section>
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
-    {canEdit && paymentRequestsData?.data?.some((row)=>row.status==='pending_signatures') ? (
+    {canEdit && paymentRequestsData?.data?.some((row)=>row.status==='pending_signatures' && row.can_current_user_sign) ? (
       <Card className="shadow-none">
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Aprobación humana</p><CardTitle className="mt-1">Solicitudes por firmar</CardTitle><CardDescription>Dos firmas distintas son obligatorias. Firmar no ejecuta la transferencia.</CardDescription></div>
-            <Badge variant="outline">{paymentRequestsData.data.filter((row)=>row.status==='pending_signatures').length} pendientes</Badge>
+            <Badge variant="outline">{paymentRequestsData.data.filter((row)=>row.status==='pending_signatures' && row.can_current_user_sign).length} pendientes</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -202,8 +212,35 @@ export default function PayablesPage() {
       </Card>
     ) : null}
 
-    <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card>
+    {!error && !isLoading && canEdit ? <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card> : null}
 
+    {!error && !isLoading && data ? (
+      <section className="space-y-3" aria-label="Plan de pagos a 90 días">
+        <div><h2 className="text-lg font-semibold">Plan de pagos · próximos 90 días</h2>
+          <Link href="/dashboard/finanzas/conciliacion" className="text-sm underline">Comparar facturas con Laudus</Link>
+          <p className="text-sm text-muted-foreground">Obligaciones aprobadas en MOTIL, por moneda y fecha de vencimiento. Los tramos no se superponen. No representa caja disponible ni autorización de transferencia.</p>
+        </div>
+        {missingCurrency > 0 ? <p className="rounded-lg border p-3 text-sm" role="status">{missingCurrency} obligaciones con moneda sin identificar: revisar antes de sumar.</p> : null}
+        {paymentPlan.length ? <div className="space-y-3">{paymentPlan.map(group => (
+          <Card key={group.currency} className="shadow-none">
+            <CardHeader><CardTitle>{group.currency}</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 grid-cols-2 md:grid-cols-4">
+              {([['Vencidas',group.overdue],['Hoy a 7 días',group.nextSevenDays],['8 a 15 días',group.days8to15],['16 a 30 días',group.days16to30],['31 a 90 días',group.days31to90],['Más de 90 días',group.beyond90],['Sin vencimiento válido',group.undated]] as const).map(([label,bucket]) => (
+                <div key={label} className="min-w-0 border-t pt-2"><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums break-words">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas con monto positivo y moneda identificada para programar. Revisa por separado las facturas informadas por Laudus.</p>}
+      </section>
+    ) : null}
+
+    {!isLoading && !error && data?.sourceAvailability?.observedPayables !== 'available' ? (
+      <Card className="shadow-none"><CardContent className="p-4 text-sm" role="status">
+        <p className="font-medium">Exposición Laudus no verificable</p>
+        <p className="mt-1 text-muted-foreground">{data?.sourceAvailability?.observedPayables === 'incomplete' ? 'La consulta excede su cobertura máxima.' : 'No se pudo consultar la fuente financiera.'} No significa saldo cero.</p>
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => void mutate()}>Actualizar consulta</Button>
+      </CardContent></Card>
+    ) : null}
     {observedPayables && observedPayables.openItems > 0 ? (
       <Card className="shadow-none">
         <CardHeader>
@@ -248,6 +285,13 @@ export default function PayablesPage() {
       </Card>
     ) : null}
 
+    {!isLoading && !error && data?.sourceAvailability?.paymentReview !== 'available' ? (
+      <Card className="shadow-none"><CardContent className="p-4 text-sm" role="status">
+        <p className="font-medium">Revisión de aplicaciones de pago no disponible</p>
+        <p className="mt-1 text-muted-foreground">{data?.sourceAvailability?.paymentReview === 'incomplete' ? 'Cobertura incompleta.' : 'No se pudo consultar Laudus.'} No se puede concluir que no existan diferencias.</p>
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => void mutate()}>Actualizar consulta</Button>
+      </CardContent></Card>
+    ) : null}
     {paymentReview && paymentReview.itemCount > 0 ? (
       <Card className="shadow-none">
         <CardHeader>
@@ -268,7 +312,7 @@ export default function PayablesPage() {
               <p className="mt-1 text-xs text-muted-foreground">{number(paymentReview.itemCount)} facturas</p>
             </div>
             <div className="rounded-lg bg-muted/40 p-4">
-              <p className="text-xs text-muted-foreground">Duplicado exacto</p>
+              <p className="text-xs text-muted-foreground">Importe equivalente al doble</p>
               <p className="mt-1 text-xl font-semibold">{number(paymentReview.exactDoubleCount)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{money(paymentReview.exactDoubleAmountClp, 'CLP')}</p>
             </div>
@@ -283,7 +327,7 @@ export default function PayablesPage() {
               <div key={row.purchase_invoice_external_id} className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_130px_130px] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{row.supplier_name || 'Proveedor por revisar'} · Factura {row.doc_number || 's/n'}</p>
-                  <p className="text-xs text-muted-foreground">{row.review_reason === 'exact_double_total' ? 'Pago total aplicado dos veces' : 'Pago adicional sobre factura'} · {number(row.payment_count)} aplicaciones</p>
+                  <p className="text-xs text-muted-foreground">{row.review_reason === 'exact_double_total' ? 'Importe aplicado equivalente al doble de la factura' : 'Pago adicional sobre factura'} · {number(row.payment_count)} aplicaciones</p>
                 </div>
                 <p className="text-xs text-muted-foreground sm:text-right">Factura {money(row.total_amount, row.currency || 'CLP')}</p>
                 <p className="text-sm font-semibold tabular-nums sm:text-right">Exceso {money(row.excess_amount, row.currency || 'CLP')}</p>
@@ -296,10 +340,10 @@ export default function PayablesPage() {
     ) : null}
 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">CxP MOTIL pendientes</p>{outstandingByCurrency.length ? <div className="mt-1 space-y-1">{outstandingByCurrency.map(([currency,value]) => <p key={currency} className="text-xl font-semibold">{money(value,currency)}</p>)}</div> : <p className="mt-1 text-2xl font-semibold">0</p>}</CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Sin vencimiento</p><p className="mt-1 text-2xl font-semibold">{dueMissing.length}</p></CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{overdue.length}</p></CardContent></Card>
-      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Pagos por conciliar</p><p className="mt-1 text-2xl font-semibold">{unreconciled.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">CxP MOTIL pendientes</p>{isLoading || error || !data ? <p className="mt-1 text-2xl font-semibold">—</p> : outstandingByCurrency.length ? <div className="mt-1 space-y-1">{outstandingByCurrency.map(([currency,value]) => <p key={currency} className="text-xl font-semibold">{money(value,currency)}</p>)}</div> : <p className="mt-1 text-2xl font-semibold">0</p>}</CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Sin vencimiento</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : dueMissing.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Vencidas</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : overdue.length}</p></CardContent></Card>
+      <Card className="shadow-none"><CardContent className="p-5"><p className="text-sm text-muted-foreground">Pagos por conciliar</p><p className="mt-1 text-2xl font-semibold">{isLoading || error || !data ? '—' : unreconciled.length}</p></CardContent></Card>
     </div>
 
     {overdueBySupplier.length ? (
@@ -310,10 +354,10 @@ export default function PayablesPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración vencida</p>
               <CardTitle className="mt-1">Proveedores que explican la mayor exposición</CardTitle>
               <CardDescription>
-                Top 5 concentra {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
+                Los cinco principales proveedores concentran {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
               </CardDescription>
             </div>
-            <Badge variant="outline">{overdue.length} partidas vencidas</Badge>
+            <Badge variant="outline">{overdue.filter(row => row.currency === 'CLP').length} partidas vencidas en CLP</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -331,7 +375,7 @@ export default function PayablesPage() {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Concentración observada sobre obligaciones vencidas en MOTIL. No implica prioridad automática de pago ni evaluación de riesgo del proveedor.
+            Concentración observada sobre obligaciones vencidas en pesos chilenos (CLP) en MOTIL. No implica prioridad automática de pago ni evaluación de riesgo del proveedor.
           </p>
         </CardContent>
       </Card>
@@ -339,7 +383,7 @@ export default function PayablesPage() {
 
     <Card className="shadow-none"><CardHeader><CardTitle>Obligaciones</CardTitle><CardDescription>Detalle completo; la acción prioritaria se concentra arriba.</CardDescription></CardHeader><CardContent className="space-y-3">
       {isLoading ? <p className="text-sm text-muted-foreground">Cargando...</p> : null}
-      {!isLoading && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
+      {!isLoading && !error && data && !payables.length ? <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No hay cuentas por pagar aprobadas en MOTIL. Esto no significa que la fuente financiera no tenga exposición abierta.</p> : null}
       {payables.map((row)=><div key={row.id} className="rounded-lg border p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">Factura {row.invoice_number}</p><Badge variant="outline">{row.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{row.supplier_name} · aprobado {money(row.approved_amount,row.currency)} · pagado {money(row.paid_amount,row.currency)}</p><p className="mt-1 text-sm">Saldo {money(row.outstanding_amount,row.currency)}{row.due_date ? ` · vence ${row.due_date}` : ' · vencimiento pendiente'}</p></div><div className="flex flex-wrap gap-2">{!row.due_date && canEdit ? <Button size="sm" variant="outline" onClick={()=>openDue(row)}>Definir vencimiento</Button> : null}{row.due_date && Number(row.outstanding_amount)>0 && canEdit ? <Button size="sm" variant="outline" onClick={()=>openPay(row)}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>:null}</div></div></div>)}
     </CardContent></Card>
 
