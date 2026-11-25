@@ -11,6 +11,6 @@ test('global source banner stays hidden unless a source needs attention', () => 
   assert.doesNotMatch(banner, /source\.state === 'pending'/);
 });
 
-test('dashboard shell includes one shared source-attention surface', () => {
-  assert.match(shell, /DataSourceAttentionBanner/);
+test('dashboard shell does not broadcast generic source alerts', () => {
+  assert.doesNotMatch(shell, /DataSourceAttentionBanner/);
 });
