@@ -45,7 +45,28 @@ export async function GET(request: NextRequest) {
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
+  const view = request.nextUrl.searchParams.get('view') ?? 'open';
+  const page = Number(request.nextUrl.searchParams.get('page') ?? '1');
+  if (!['open','history'].includes(view) || !Number.isSafeInteger(page) || page < 1 || page > 10000) {
+    return NextResponse.json({ error: 'Selección inválida.' }, { status: 400 });
+  }
+  const headers = { 'Cache-Control': 'private, no-store' };
   try {
+    if (view === 'history') {
+      const authority = await financeDecisionAuthority(context.userId, context.role);
+      if (!authority.allowed || !access.canWrite) return NextResponse.json({ error: 'Sin acceso al historial de decisiones.' }, { status: 403, headers });
+      const { data: history, count, error: historyError } = await context.supabase
+        .from('data_reconciliation_reviews')
+        .select('id,issue_type,status,evidence_reference,resolution_note,reviewed_at,updated_at', { count: 'exact' })
+        .eq('organization_id', context.organizationId)
+        .in('status', ['accepted','ignored','resolved'])
+        .or('issue_key.like.laudus:cxp_inconsistente:%,issue_key.like.laudus:open_invoice_trace_once:%,issue_key.like.laudus:purchase_order_unresolved:%,issue_key.like.laudus:cost_center_pending:%')
+        .order('updated_at', { ascending: false })
+        .order('id')
+        .range((page - 1) * 25, page * 25 - 1);
+      if (historyError || count === null) throw historyError ?? new Error('Missing history count');
+      return NextResponse.json({ rows: history ?? [], total: count, page }, { headers });
+    }
     const { data: rows, error } = await context.supabase
       .from('data_reconciliation_reviews')
       .select('id,issue_key,entity_type,entity_id,issue_type,evidence_reference,created_at,updated_at')
@@ -100,7 +121,7 @@ export async function GET(request: NextRequest) {
         canonicalMutation: false,
         laudusMutation: false,
       },
-    });
+    }, { headers });
   } catch (error) {
     console.error('[laudus/finance-reconciliation-review][GET]', error);
     return NextResponse.json({ error: 'No fue posible cargar la conciliación financiera.' }, { status: 500 });
