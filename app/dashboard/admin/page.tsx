@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 const areas = [
   { title: 'Usuarios', description: 'Cuentas, altas e importación.', href: '/dashboard/admin/users', icon: Users },
-  { title: 'Roles y cargos', description: 'Cargos, permisos y solicitudes de cambio.', href: '/dashboard/admin/roles', icon: ShieldCheck },
+  { title: 'Roles y cargos', description: 'Asignar responsabilidades y revisar permisos.', href: '/dashboard/admin/roles', icon: ShieldCheck },
+  { title: 'Solicitudes de acceso', description: 'Revisar cambios y aprobaciones pendientes.', href: '/dashboard/admin/roles/aprobaciones', icon: ShieldCheck },
 ];
 
 export default function AdministrationPage() {
@@ -24,14 +24,13 @@ export default function AdministrationPage() {
     <div className="space-y-6">
       <section className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Administración</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Usuarios y accesos</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Administra quién entra, qué cargo tiene y qué puede hacer.</p></div>
-        <Button asChild><Link href="/dashboard/admin/users">Gestionar usuarios</Link></Button>
       </section>
 
       <section className="overflow-hidden rounded-lg border">
         {areas.map((area) => { const Icon = area.icon; return <Link key={area.href} href={area.href} className="group flex items-center gap-4 border-b px-4 py-5 last:border-b-0 hover:bg-muted/35"><div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted"><Icon className="h-4 w-4"/></div><div className="min-w-0 flex-1"><p className="font-medium">{area.title}</p><p className="mt-0.5 text-sm text-muted-foreground">{area.description}</p></div><ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1"/></Link>; })}
       </section>
 
-      <p className="text-sm text-muted-foreground">Los cambios de matriz de permisos requieren aprobación de jefatura de área y gerencia antes de aplicarse.</p>
+      <p className="text-sm text-muted-foreground">Los cambios de permisos necesitan aprobación de la jefatura de área y de gerencia.</p>
     </div>
   );
 }
