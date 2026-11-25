@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
 import { LaudusFinanceStatusStrip } from '@/components/integrations/laudus-finance-status-strip';
 import { LaudusFinanceReconciliationQueue } from '@/components/integrations/laudus-finance-reconciliation-queue';
+import { PurchaseOrderEvidence } from '@/components/finance/purchase-order-evidence';
 import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate-review-signal';
 
 const primarySections = [
@@ -36,6 +37,7 @@ export default function FinancePage() {
       </section>
 
       <LaudusFinanceReconciliationQueue />
+      <PurchaseOrderEvidence />
       <LaudusFinanceControlCard />
 
       <section className="space-y-3" aria-label="Secciones de Finanzas">
