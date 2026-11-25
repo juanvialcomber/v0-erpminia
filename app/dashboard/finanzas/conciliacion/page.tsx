@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
+import { LaudusFinanceReconciliationQueue } from '@/components/integrations/laudus-finance-reconciliation-queue';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { FinanceReconciliationHistory } from '@/components/integrations/finance-reconciliation-history';
@@ -28,7 +29,8 @@ type Row = {
   laudus_due_date: string | null; motil_due_date: string | null;
   laudus_synced_at: string | null; status: Status;
 };
-type Result = { summary: Partial<Record<Status,number>>; total: number; rows: Row[] };
+type Result = { summary: Partial<Record<Status,number>>; total: number; rows: Row[]; reviewPlan?: { groups: {status:Status;count:number;action:string}[]; coverage:{laudusOnly:number;motilOnly:number};candidates:number } };
+const reviewUrl = '/api/integrations/laudus/finance-reconciliation-review';
 const fmt = (amount: number | null, currency: string | null) => {
   if (amount == null || !Number.isFinite(Number(amount))) return 'Sin dato';
   if (!currency) return Number(amount).toLocaleString('es-CL') + ' · moneda desconocida';
@@ -44,6 +46,29 @@ export default function InvoiceReconciliationPage() {
   const [status,setStatus] = useState('');
   const [page,setPage] = useState(1);
   const {data,error,isLoading,mutate} = useSWR('/api/finance/invoice-reconciliation?page='+page+'&status='+encodeURIComponent(status),fetcher,{revalidateOnFocus:false});
+  const { mutate: refreshShared } = useSWRConfig();
+  const {data:reviewAccess} = useSWR<{canDecide:boolean;projectLead?:{currentUser:boolean}}>(reviewUrl, async url => {
+    const response = await fetch(url,{credentials:'include',cache:'no-store'});
+    if (!response.ok) throw new Error('Sin acceso a revisiones');
+    return response.json();
+  },{revalidateOnFocus:false,shouldRetryOnError:false});
+  const [registering,setRegistering] = useState<Status|null>(null);
+  const [receipt,setReceipt] = useState('');
+  const [registrationError,setRegistrationError] = useState('');
+  async function registerGroup(group:Status){
+    if(registering || !reviewAccess?.canDecide || reviewAccess.projectLead?.currentUser)return;
+    setRegistering(group);setReceipt('');setRegistrationError('');
+    try{
+      const response=await fetch(reviewUrl,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'register_invoice_group',group})});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok)throw new Error(result?.error??'No se pudo registrar la revisión.');
+      if(!result || !Number.isInteger(result.created) || !Number.isInteger(result.existing) || !Number.isInteger(result.verified))throw new Error('No se recibió confirmación del registro. Actualiza antes de reintentar.');
+      setReceipt(labels[group]+': '+result.created+' casos nuevos, '+result.existing+' ya registrados, '+result.verified+' verificados.');
+      await refreshShared(key=>typeof key==='string'&&(key===reviewUrl||key.startsWith(reviewUrl+'?')));
+      await mutate();
+    }catch(error){setRegistrationError(error instanceof Error?error.message:'No se pudo registrar la revisión.');}
+    finally{setRegistering(null);}
+  }
   const total = data?.total ?? 0;
   const pageCount = Math.max(1,Math.ceil(total/50));
   return <main className="space-y-5">
@@ -65,6 +90,20 @@ export default function InvoiceReconciliationPage() {
         <p className="text-xs text-muted-foreground">{total.toLocaleString('es-CL')} registros en esta selección</p>
       </> : null}
     </section>
+    {!error && data?.reviewPlan ? <section className="rounded-lg border bg-card p-4 space-y-3">
+      <h2 className="font-semibold">Diferencias por revisar</h2>
+      <p className="text-xs text-muted-foreground">Registra sólo los grupos que necesitan revisión. Los casos anteriores conservan su decisión; no se modifican facturas ni pagos.</p>
+      {data.reviewPlan.groups.length ? <div className="divide-y rounded-md border">{data.reviewPlan.groups.map(group=><div key={group.status} className="flex flex-wrap items-center justify-between gap-3 p-3">
+        <div className="min-w-0"><h3 className="text-sm font-medium">{labels[group.status]} · {group.count}</h3><p className="text-xs text-muted-foreground">{group.action}</p></div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={()=>{setStatus(group.status);setPage(1);}}>Ver facturas</Button>
+        {reviewAccess?.canDecide && !reviewAccess.projectLead?.currentUser ? <Button size="sm" disabled={registering!==null||group.count>100} onClick={()=>void registerGroup(group.status)}>{registering===group.status?'Registrando…':'Registrar revisión'}</Button>:null}</div>
+        {group.count>100?<p className="w-full text-xs text-muted-foreground">Grupo superior a 100 registros: requiere procesamiento por lotes.</p>:null}
+      </div>)}</div>:<p className="text-sm text-muted-foreground">Sin diferencias clasificadas para revisión.</p>}
+      <p className="text-xs text-muted-foreground">Cobertura: {data.reviewPlan.coverage.laudusOnly} sólo Laudus · {data.reviewPlan.coverage.motilOnly} sólo MOTIL. Coincidencias candidatas: {data.reviewPlan.candidates}.</p>
+      {receipt?<p role="status" className="text-sm">{receipt}</p>:null}
+      {registrationError?<p role="alert" className="text-sm text-destructive">{registrationError}</p>:null}
+    </section>:null}
+    <LaudusFinanceReconciliationQueue />
     <FinanceReconciliationHistory />
     {!error && data ? <section className="space-y-3">
       {data.rows.length===0 ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay registros en esta selección.</p> : data.rows.map((row,index)=><details key={(row.laudus_id??'')+':'+(row.motil_invoice_id??'')+':'+index} className="rounded-lg border bg-card">
