@@ -264,6 +264,7 @@ export function ActionsInbox({ locale, dictionary }: { locale: Locale; dictionar
                     return <div key={task.task_key} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{task.title}</p>
+                        {task.role_action && isOwner ? <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{task.role_action}</p> : null}
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant={task.severity === 'critical' ? 'destructive' : 'outline'}>{t.severity[task.severity]}</Badge>
                           <span>{task.responsibility_label}</span>
@@ -272,7 +273,7 @@ export function ActionsInbox({ locale, dictionary }: { locale: Locale; dictionar
                         <details className="mt-2 text-sm" data-testid="task-row-details">
                           <summary className="w-fit cursor-pointer text-xs text-muted-foreground hover:text-foreground">Ver detalles</summary>
                           <div className="mt-2 space-y-2 border-l pl-3 text-sm text-muted-foreground">
-                            {task.role_action ? <p className="font-medium text-foreground">{task.role_action}</p> : null}
+                            {task.role_action && !isOwner ? <p className="font-medium text-foreground">{task.role_action}</p> : null}
                             {task.evidence_summary ? <p>{task.evidence_summary}</p> : null}
                             <p>{task.domain} · {task.cargo_name}</p>
                             {state?.status === 'read' ? <p>{t.readBadge}</p> : null}
