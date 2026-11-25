@@ -30,7 +30,7 @@ export default function FinancePage() {
       <section className="px-1 pt-1 sm:px-0">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Finanzas</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Resumen financiero</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Administración y Finanzas</h1>
           </div>
           <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-right">
