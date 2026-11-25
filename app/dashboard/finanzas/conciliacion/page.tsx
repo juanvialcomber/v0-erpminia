@@ -4,6 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { FinanceReconciliationHistory } from '@/components/integrations/finance-reconciliation-history';
 
 const labels = {
   invoice_difference: 'Diferencia de factura',
@@ -64,6 +65,7 @@ export default function InvoiceReconciliationPage() {
         <p className="text-xs text-muted-foreground">{total.toLocaleString('es-CL')} registros en esta selección</p>
       </> : null}
     </section>
+    <FinanceReconciliationHistory />
     {!error && data ? <section className="space-y-3">
       {data.rows.length===0 ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay registros en esta selección.</p> : data.rows.map((row,index)=><details key={(row.laudus_id??'')+':'+(row.motil_invoice_id??'')+':'+index} className="rounded-lg border bg-card">
         <summary className="cursor-pointer p-4 text-sm">
