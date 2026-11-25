@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { buildPaymentPlan } from '@/lib/finance/payment-plan';
 import useSWR from 'swr';
 import { CheckCircle2, Clock3, Landmark, ReceiptText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,7 @@ const money = (value: unknown, currency = 'CLP') => {
   }
 };
 const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 });
-const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
 type Payable = { id:string; invoice_number:string; supplier_name:string; approved_amount:number; paid_amount:number; outstanding_amount:number; due_date?:string|null; days_to_due?:number|null; status:string; currency:string };
 type Payment = { id:string; payable_id:string; amount:number; currency:string; payment_date:string; payment_reference?:string|null; notes?:string|null; reconciled_at?:string|null; reconciliation_reference?:string|null; reconciliation_notes?:string|null };
@@ -80,9 +81,11 @@ export default function PayablesPage() {
   const unreconciled = payments.filter((row) => !row.reconciled_at);
   const payableWithBalance = payables.filter((row) => row.due_date && Number(row.outstanding_amount) > 0);
 
+  const weeklyPlan = useMemo(() => buildPaymentPlan(payables, localDate()), [payables]);
+
   const overdueBySupplier = useMemo(() => {
     const groups = new Map<string, { supplierName: string; items: number; amount: number; oldestDays: number }>();
-    for (const row of overdue) {
+    for (const row of overdue.filter(row => row.currency === 'CLP')) {
       const key = row.supplier_name || 'Sin proveedor';
       const current = groups.get(key) || { supplierName: key, items: 0, amount: 0, oldestDays: 0 };
       current.items += 1;
@@ -153,7 +156,7 @@ export default function PayablesPage() {
     if (await post({ action:'reconcile_payment', paymentId:selectedPayment.id, reference:reconciliationReference.trim(), notes:reconciliationNotes.trim() || null })) closeDialog();
   };
 
-  let nextTitle = 'Sin CxP MOTIL pendientes';
+  let nextTitle = 'Sin obligaciones aprobadas pendientes';
   let nextDescription = 'No hay cuentas por pagar aprobadas en MOTIL que requieran intervención. La exposición observada en la fuente financiera se revisa en Resumen y Proveedores.';
   let nextControl: React.ReactNode = null;
   if (dueMissing.length) {
@@ -161,7 +164,7 @@ export default function PayablesPage() {
     nextDescription = `Factura ${dueMissing[0].invoice_number}: la obligación aprobada aún no tiene fecha de vencimiento.`;
     nextControl = <Button onClick={() => openDue(dueMissing[0])} disabled={!canEdit}><Clock3 className="mr-2 h-4 w-4"/>Definir vencimiento</Button>;
   } else if (overdue.length) {
-    nextTitle = 'Registrar pago vencido';
+    nextTitle = 'Revisar obligación vencida';
     nextDescription = `Factura ${overdue[0].invoice_number}: mantiene saldo vencido pendiente de pago.`;
     nextControl = <Button onClick={() => openPay(overdue[0])} disabled={!canEdit}><ReceiptText className="mr-2 h-4 w-4"/>Registrar pago</Button>;
   } else if (unreconciled.length) {
@@ -175,16 +178,16 @@ export default function PayablesPage() {
   }
 
   return <div className="space-y-6">
-    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Factura aprobada → vencimiento → pago → conciliación</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Una sola acción principal por vez. El costo ya fue reconocido por la recepción aceptada; Tesorería administra obligación, salida de caja y conciliación.</p></section>
+    <section className="border-b border-border/70 pb-6"><p className="text-sm font-medium text-muted-foreground">Finanzas · Tesorería</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Pagos y vencimientos</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">Planifica vencimientos, registra pagos efectuados y concilia sus comprobantes.</p></section>
     {message ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{message}</div> : null}
     {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error.message}</div> : null}
 
-    {canEdit && paymentRequestsData?.data?.some((row)=>row.status==='pending_signatures') ? (
+    {canEdit && paymentRequestsData?.data?.some((row)=>row.status==='pending_signatures' && row.can_current_user_sign) ? (
       <Card className="shadow-none">
         <CardHeader>
           <div className="flex items-start justify-between gap-3">
             <div><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Aprobación humana</p><CardTitle className="mt-1">Solicitudes por firmar</CardTitle><CardDescription>Dos firmas distintas son obligatorias. Firmar no ejecuta la transferencia.</CardDescription></div>
-            <Badge variant="outline">{paymentRequestsData.data.filter((row)=>row.status==='pending_signatures').length} pendientes</Badge>
+            <Badge variant="outline">{paymentRequestsData.data.filter((row)=>row.status==='pending_signatures' && row.can_current_user_sign).length} pendientes</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -202,7 +205,9 @@ export default function PayablesPage() {
       </Card>
     ) : null}
 
-    <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card>
+    {!error && !isLoading && canEdit ? <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card> : null}
+
+    {!error && !isLoading && data ? <section className="space-y-3" aria-label="Plan semanal de pagos"><div><h2 className="text-lg font-semibold">Plan de pagos · próximos 7 días</h2><p className="text-sm text-muted-foreground">Sólo obligaciones aprobadas en MOTIL. No constituye autorización de transferencia.</p></div>{weeklyPlan.length ? <div className="divide-y rounded-lg border bg-card">{weeklyPlan.map(group => <div key={group.currency} className="grid gap-3 p-4 sm:grid-cols-4"><p className="text-sm font-medium">{group.currency}</p>{([['Vencidas',group.overdue],['Próximos 7 días',group.nextSevenDays],['Sin vencimiento',group.undated]] as const).map(([label, bucket]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>)}</div>)}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas para programar. Revisa por separado las facturas informadas por Laudus.</p>}</section> : null}
 
     {observedPayables && observedPayables.openItems > 0 ? (
       <Card className="shadow-none">
@@ -310,7 +315,7 @@ export default function PayablesPage() {
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Concentración vencida</p>
               <CardTitle className="mt-1">Proveedores que explican la mayor exposición</CardTitle>
               <CardDescription>
-                Top 5 concentra {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
+                Los cinco principales proveedores concentran {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
               </CardDescription>
             </div>
             <Badge variant="outline">{overdue.length} partidas vencidas</Badge>
@@ -331,7 +336,7 @@ export default function PayablesPage() {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Concentración observada sobre obligaciones vencidas en MOTIL. No implica prioridad automática de pago ni evaluación de riesgo del proveedor.
+            Concentración observada sobre obligaciones vencidas en pesos chilenos (CLP) en MOTIL. No implica prioridad automática de pago ni evaluación de riesgo del proveedor.
           </p>
         </CardContent>
       </Card>
