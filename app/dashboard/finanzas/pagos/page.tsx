@@ -319,7 +319,7 @@ export default function PayablesPage() {
                 Los cinco principales proveedores concentran {number(overdueSupplierConcentration)}% del saldo vencido. Prioriza revisión por proveedor antes de recorrer factura por factura.
               </CardDescription>
             </div>
-            <Badge variant="outline">{overdue.length} partidas vencidas</Badge>
+            <Badge variant="outline">{overdue.filter(row => row.currency === 'CLP').length} partidas vencidas en CLP</Badge>
           </div>
         </CardHeader>
         <CardContent>
