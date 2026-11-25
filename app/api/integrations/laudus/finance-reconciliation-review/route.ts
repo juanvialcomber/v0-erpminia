@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       'laudus_mutation=false',
     ].join(' | ');
 
-    const { error: updateError } = await context.supabase
+    const { data: updatedReview, error: updateError } = await context.supabase
       .from('data_reconciliation_reviews')
       .update({
         status,
@@ -177,9 +177,12 @@ export async function POST(request: NextRequest) {
       })
       .eq('organization_id', context.organizationId)
       .eq('id', reviewId)
-      .eq('status', 'open');
+      .eq('status', 'open')
+      .select('id')
+      .maybeSingle();
 
     if (updateError) throw updateError;
+    if (!updatedReview) return NextResponse.json({ error: 'Otra persona ya revisó este caso. Actualiza la bandeja.' }, { status: 409 });
 
     return NextResponse.json({
       ok: true,
