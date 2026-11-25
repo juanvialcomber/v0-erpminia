@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { getUserModuleAccess } from '@/lib/api/module-access';
 import { loadPersonalMaintenanceTasks } from '@/lib/maintenance/personal-work-order-inbox';
 
 type RoleTask = {
@@ -404,8 +405,23 @@ export async function GET(request: NextRequest) {
     catalogByPrefix.set(row.task_prefix, list);
   }
 
+  const dataHealthModules: Record<string, string[]> = {
+    'data_health:inventory:negative_stock': ['bodega_inventario'],
+    'data_health:inventory:freshness': ['fin_compras'],
+    'data_health:maintenance:missing_asset': ['mant_operaciones'],
+    'data_health:production:freshness': ['prod_operaciones'],
+    'data_health:production:transport_freshness': ['prod_operaciones'],
+    'data_health:production:plant_freshness': ['prod_operaciones'],
+    'data_health:production:drilling_freshness': ['prod_sondaje_exploracion', 'prod_sondaje_produccion'],
+  };
+  const dataHealthRows = baseRows.filter((task) => task.task_key.startsWith('data_health:'));
+  const access = dataHealthRows.length ? await getUserModuleAccess(context.userId) : null;
   const nowMs = Date.now();
-  const rawTasks = baseRows.map((base) => {
+  const rawTasks = baseRows.filter((task) => {
+    if (!task.task_key.startsWith('data_health:')) return true;
+    const modules = dataHealthModules[task.task_key];
+    return task.responsibility === 'owner' && Boolean(task.role_action?.trim()) && Boolean(modules?.length && access?.hasCargo && modules.some((module) => access.access[module] === 'ED'));
+  }).map((base) => {
     const state = stateMap.get(base.task_key);
     const snoozedUntil = state?.snoozed_until || null;
     const visibleNow = !(state?.status === 'snoozed' && snoozedUntil && new Date(snoozedUntil).getTime() > nowMs);
