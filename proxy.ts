@@ -27,6 +27,7 @@ const PUBLIC_API_ROUTES = new Set([
   // Service-to-service accounting reply bridge validates GREENAPI_WEBHOOK_TOKEN in the handler.
   '/api/integrations/n3uralia-tax/whatsapp-send',
   // The cron handler validates CRON_SECRET before doing any work.
+  '/api/cron/weather-capture',
   '/api/cron/whatsapp-daily',
   '/api/cron/whatsapp-history',
   '/api/cron/whatsapp-media',
@@ -195,7 +196,7 @@ async function financeManagerMatrixAllowed(identityId: string, path: string, met
 function financeManagerAllowed(path: string, method: string): boolean {
   const readOnly = ['GET','HEAD','OPTIONS'].includes(method);
   if (path.startsWith('/api/auth/') || path === '/api/me' || path.startsWith('/api/me/')) return true;
-  if (path === '/api/actions/inbox' || path === '/api/data-sources/status') return readOnly;
+  if (path === '/api/actions/inbox' || path === '/api/data-sources/status' || path === '/api/weather/summary') return readOnly;
   if (path === '/api/actions/state') return true;
   if (path.startsWith('/api/procurement/')) return readOnly;
   if (path === '/api/pipeline/operational') return readOnly;
