@@ -18,6 +18,6 @@ export async function GET(request: NextRequest) {
   const {data,error} = await context.supabase.rpc('motil_purchase_order_evidence_v1', {
     p_organization_id:context.organizationId,p_status:status || null,p_offset:(page-1)*50,p_limit:50,
   });
-  if (error || !data) return NextResponse.json({error:'No se pudo verificar la evidencia de compras'}, {status:503,headers});
+  if (error || !data || Array.isArray(data) || typeof data !== 'object' || !Array.isArray(data.rows) || !data.coverage || typeof data.total !== 'number') return NextResponse.json({error:'No se pudo verificar la evidencia de compras'}, {status:503,headers});
   return NextResponse.json(data,{headers});
 }
