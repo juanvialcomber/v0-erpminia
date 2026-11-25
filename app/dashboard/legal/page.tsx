@@ -1,5 +1,6 @@
 'use client';
 
+import { SharedProjectPortfolio } from '@/components/project-control/shared-project-portfolio';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ArrowRight, BellRing, CheckCircle2, CircleDollarSign, FolderCheck } from 'lucide-react';
@@ -90,6 +91,8 @@ export default function LegalPage() {
         )}
         {inboxData?.warnings?.length ? <p className="border-t px-4 py-2 text-xs text-muted-foreground">{inboxData.warnings.join(' ')}</p> : null}
       </section>
+
+      <SharedProjectPortfolio />
 
       <section className="grid gap-3 lg:grid-cols-3" aria-label="Excepciones operativas">
         <Link href="/dashboard/legal/avances-pagos" className="rounded-md border p-4 transition-colors hover:bg-muted/30">
