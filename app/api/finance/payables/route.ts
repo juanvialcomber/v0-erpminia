@@ -130,22 +130,26 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     payables: visiblePayables,
     payments: visiblePayments,
-    observedPayables: {
+    observedPayables: observedLaudusError || observedLaudus.length >= observedMaxRows ? null : {
       source: 'Laudus',
       readOnly: true,
       ...observedSummary,
       items: observedRows.slice(0, 50),
       semantics: 'Exposición financiera observada en Laudus. No constituye una CxP aprobada en MOTIL ni habilita pagos.',
     },
-    paymentReview: {
+    paymentReview: anomalyError || anomalyCandidates.length >= anomalyMaxRows ? null : {
       source: 'Laudus',
       readOnly: true,
       ...paymentReviewSummary,
       rows: paymentReviewRows.slice(0, 20),
       semantics: 'Aplicaciones de pago en Laudus superiores al total nominal de la factura. Requieren revisión documental antes de cualquier ajuste.',
     },
+    sourceAvailability: {
+      observedPayables: observedLaudusError ? 'unavailable' : observedLaudus.length >= observedMaxRows ? 'incomplete' : 'available',
+      paymentReview: anomalyError ? 'unavailable' : anomalyCandidates.length >= anomalyMaxRows ? 'incomplete' : 'available',
+    },
     canEdit: access.canWrite,
-  });
+  }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 export async function POST(request: NextRequest) {
