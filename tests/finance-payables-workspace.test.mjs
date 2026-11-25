@@ -81,7 +81,8 @@ test('treasury surfaces Laudus payment overapplications as read-only review evid
   assert.match(route,/additional_partial_excess/);
   assert.match(route,/Requieren revisión documental antes de cualquier ajuste/);
   assert.match(page,/Aplicaciones de pago por revisar/);
-  assert.match(page,/Duplicado exacto/);
+  assert.match(page,/Importe equivalente al doble/);
+  assert.doesNotMatch(page,/Duplicado exacto/);
   assert.match(page,/Pago adicional parcial/);
   assert.match(page,/MOTIL no modifica los registros contables de origen/);
 });
@@ -93,4 +94,15 @@ test('Laudus payment review paginates beyond the default 1000 paid-invoice cap',
   assert.match(route,/\.range\(from, from \+ anomalyPageSize - 1\)/);
   assert.match(route,/anomalyCandidates\.push\(\.\.\.page\)/);
   assert.match(route,/if \(page\.length < anomalyPageSize\) break/);
+});
+
+
+test('unavailable or truncated Laudus evidence is never published as a verified zero',()=>{
+  assert.match(route,/observedPayables: observedLaudusError \|\| observedLaudus\.length >= observedMaxRows \? null/);
+  assert.match(route,/paymentReview: anomalyError \|\| anomalyCandidates\.length >= anomalyMaxRows \? null/);
+  assert.match(route,/sourceAvailability:/);
+  assert.match(page,/Exposición Laudus no verificable/);
+  assert.match(page,/No significa saldo cero/);
+  assert.match(page,/No se puede concluir que no existan diferencias/);
+  assert.match(page,/isLoading \|\| error \|\| !data \? '—'/);
 });
