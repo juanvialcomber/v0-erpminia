@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   if (!secret || secret.length < 24 || request.headers.get('authorization') !== 'Bearer ' + secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const key = process.env.WEATHERAPI_KEY;
+  const key = process.env.WEATHER_API_KEY;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const role = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key || !url || !role) {
