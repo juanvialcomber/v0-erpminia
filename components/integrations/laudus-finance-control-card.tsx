@@ -130,11 +130,13 @@ const fetcher = async (url: string): Promise<FinanceControl> => {
 };
 
 function number(value: unknown) {
+  if (value == null || value === '') return '—';
   const numeric = Number(value);
   return Number.isFinite(numeric) ? new Intl.NumberFormat('es-CL').format(numeric) : '—';
 }
 
 function money(value: unknown) {
+  if (value == null || value === '') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '—';
   return new Intl.NumberFormat('es-CL', {
@@ -145,6 +147,7 @@ function money(value: unknown) {
 }
 
 function compactMoney(value: unknown) {
+  if (value == null || value === '') return '—';
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '—';
   return new Intl.NumberFormat('es-CL', {
@@ -220,13 +223,13 @@ export function LaudusFinanceControlCard() {
     { revalidateOnFocus: false },
   );
 
-  if (error) {
+  if (error || (!isLoading && !data)) {
     return (
       <Card className="shadow-none">
         <CardContent className="p-5">
           <LaudusSourceMark state="offline" className="mb-3" />
           <p className="text-sm font-medium">Control Laudus no disponible</p>
-          <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
+          <p className="mt-1 text-xs text-muted-foreground">No se pudo consultar la información financiera. Vuelve a intentar más tarde.</p>
         </CardContent>
       </Card>
     );
@@ -301,7 +304,7 @@ export function LaudusFinanceControlCard() {
       if (!response.ok) throw new Error(payload?.error || 'No fue posible registrar la decisión.');
       setDecisionByPriority((current) => ({ ...current, [priorityKey]: decision }));
       await decisionEvidence.mutate();
-      setDecisionNotice('Decisión registrada. No se modificó Laudus ni el dato canónico.');
+      setDecisionNotice('Decisión registrada. No se modificaron las cuentas ni los pagos.');
     } catch (decisionError) {
       setDecisionNotice(decisionError instanceof Error ? decisionError.message : 'No fue posible registrar la decisión.');
     }
@@ -333,21 +336,11 @@ export function LaudusFinanceControlCard() {
   };
 
   const priorities = [
-    freshnessIsStale
-      ? {
-          key: 'freshness',
-          rank: 130,
-          title: 'Revisar actualización de Laudus',
-          evidence: `Última sincronización operativa: ${shortDate(data?.freshness?.latestOperationalSync)} · ${number(operationalSyncAgeDays)} día(s) de antigüedad`,
-          action: 'Revisar fuente',
-          href: '/dashboard/finanzas/fuentes',
-        }
-      : null,
     overduePayableAmount > 0
       ? {
           key: 'overdue',
           rank: 100 + overdueSharePct,
-          title: 'Revisar CxP vencida',
+          title: 'Revisar cuentas vencidas',
           evidence: `${number(overduePayables)} partidas · ${compactMoney(overduePayableAmount)} · ${number(overdueSharePct)}% del saldo abierto`,
           action: 'Revisar vencidas',
           href: '/dashboard/finanzas/pagos',
@@ -370,7 +363,7 @@ export function LaudusFinanceControlCard() {
           title: 'Revisar concentración por proveedor',
           evidence: `${shortSupplier(topSupplier.supplierName)} concentra ${number(topSupplierSharePct)}% · ${compactMoney(topSupplier.amountClp)} del saldo abierto`,
           action: 'Ver proveedor',
-          href: '/dashboard/finanzas/pagos',
+          href: '/dashboard/finanzas/proveedores',
         }
       : null,
     pendingDeposit > 0
@@ -393,20 +386,13 @@ export function LaudusFinanceControlCard() {
           href: '/dashboard/finanzas/centros',
         }
       : null,
-    !accountingCurrent
-      ? {
-          key: 'accounting',
-          rank: 40,
-          title: 'Mantener contabilidad histórica fuera de decisiones actuales',
-          evidence: `Último asiento: ${shortDate(data?.accounting?.latestEntryDate)} · usar sólo como contexto histórico`,
-          action: 'Ver trazabilidad',
-          href: '/dashboard/finanzas/trazabilidad',
-        }
-      : null,
+
   ]
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .sort((left, right) => right.rank - left.rank)
     .slice(0, 3);
+
+  if (isLoading) return <Card className="shadow-none"><CardContent className="p-5 text-sm text-muted-foreground">Consultando información financiera…</CardContent></Card>;
 
   return (
     <Card className="overflow-hidden border-border/80 bg-card shadow-none">
@@ -459,7 +445,7 @@ export function LaudusFinanceControlCard() {
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Prioridades</p>
-                <p className="mt-1 text-sm font-medium">Qué debe resolver Daniel primero</p>
+                <p className="mt-1 text-sm font-medium">Qué requiere atención</p>
               </div>
               <span className="text-xs text-muted-foreground">{priorities.length} por resolver</span>
             </div>
@@ -500,12 +486,24 @@ export function LaudusFinanceControlCard() {
         ) : (
           <div className="flex items-center gap-2 rounded-lg border p-4 text-sm">
             <BadgeCheck className="h-4 w-4"/>
-            Sin decisiones financieras urgentes detectadas en la evidencia Laudus disponible.
+            No se detectaron prioridades en la información disponible.
           </div>
         )}
 
         {decisionNotice ? <p className="text-xs text-muted-foreground">{decisionNotice}</p> : null}
 
+        <details className="group rounded-lg border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Medición de productividad</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Registro opcional de tiempos y decisiones
+              </p>
+            </div>
+            <span className="text-xs text-muted-foreground group-open:hidden">Medir</span>
+            <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
+          </summary>
+          <div className="border-t p-4">
         <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3" aria-label="LEC Finanzas">
           <div className="bg-card px-4 py-3">
             <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Level</p>
@@ -534,19 +532,8 @@ export function LaudusFinanceControlCard() {
           </div>
         </section>
 
-        <details className="group rounded-lg border bg-card">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <p className="text-sm font-medium">Medición LEC de Daniel</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Baseline manual: {number(baselineSampleCount)}/3 · decisiones cronometradas: {number(timedDecisionCount)}/20
-              </p>
-            </div>
-            <span className="text-xs text-muted-foreground group-open:hidden">Medir</span>
-            <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
-          </summary>
-          <div className="border-t p-4">
-            <p className="text-xs text-muted-foreground">
+
+            <p className="mt-3 text-xs text-muted-foreground">
               Cronometra una revisión manual comparable sin asistencia de MOTIL. No incluye espera, ejecución posterior ni trabajo contable no relacionado.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -556,7 +543,7 @@ export function LaudusFinanceControlCard() {
                   setBaselineRunning(true);
                   setBaselineNotice('Medición activa. Realiza casos comparables por el método manual y vuelve al terminar.');
                 }}>
-                  Iniciar baseline manual
+                  Medir revisión manual
                 </Button>
               ) : (
                 <Button type="button" size="sm" onClick={() => void saveBaseline()}>
