@@ -28,7 +28,11 @@ const money = (value: unknown, currency = 'CLP') => {
   }
 };
 const number = (value: unknown) => Number(value || 0).toLocaleString('es-CL', { maximumFractionDigits: 1 });
-const localDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const localDate = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const part = (type: string) => parts.find(value => value.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
 
 type Payable = { id:string; invoice_number:string; supplier_name:string; approved_amount:number; paid_amount:number; outstanding_amount:number; due_date?:string|null; days_to_due?:number|null; status:string; currency:string };
 type Payment = { id:string; payable_id:string; amount:number; currency:string; payment_date:string; payment_reference?:string|null; notes?:string|null; reconciled_at?:string|null; reconciliation_reference?:string|null; reconciliation_notes?:string|null };
@@ -82,7 +86,9 @@ export default function PayablesPage() {
   const unreconciled = payments.filter((row) => !row.reconciled_at);
   const payableWithBalance = payables.filter((row) => row.due_date && Number(row.outstanding_amount) > 0);
 
-  const weeklyPlan = useMemo(() => buildPaymentPlan(payables, localDate()), [payables]);
+  const today = localDate();
+  const paymentPlan = useMemo(() => buildPaymentPlan(payables, today), [payables, today]);
+  const missingCurrency = payables.filter(row => Number(row.outstanding_amount) > 0 && !/^[A-Z]{3}$/.test(row.currency?.trim().toUpperCase() ?? '')).length;
 
   const overdueBySupplier = useMemo(() => {
     const groups = new Map<string, { supplierName: string; items: number; amount: number; oldestDays: number }>();
@@ -208,7 +214,25 @@ export default function PayablesPage() {
 
     {!error && !isLoading && canEdit ? <Card className="shadow-none"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Siguiente acción</p><p className="mt-1 text-lg font-semibold">{nextTitle}</p><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p></div>{nextControl}</CardContent></Card> : null}
 
-    {!error && !isLoading && data ? <section className="space-y-3" aria-label="Plan semanal de pagos"><div><h2 className="text-lg font-semibold">Plan de pagos · próximos 7 días</h2><Link href="/dashboard/finanzas/conciliacion" className="text-sm underline">Comparar facturas con Laudus</Link><p className="text-sm text-muted-foreground">Sólo obligaciones aprobadas en MOTIL. No constituye autorización de transferencia.</p></div>{weeklyPlan.length ? <div className="divide-y rounded-lg border bg-card">{weeklyPlan.map(group => <div key={group.currency} className="grid gap-3 p-4 sm:grid-cols-4"><p className="text-sm font-medium">{group.currency}</p>{([['Vencidas',group.overdue],['Próximos 7 días',group.nextSevenDays],['Sin vencimiento',group.undated]] as const).map(([label, bucket]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>)}</div>)}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas para programar. Revisa por separado las facturas informadas por Laudus.</p>}</section> : null}
+    {!error && !isLoading && data ? (
+      <section className="space-y-3" aria-label="Plan de pagos a 90 días">
+        <div><h2 className="text-lg font-semibold">Plan de pagos · próximos 90 días</h2>
+          <Link href="/dashboard/finanzas/conciliacion" className="text-sm underline">Comparar facturas con Laudus</Link>
+          <p className="text-sm text-muted-foreground">Obligaciones aprobadas en MOTIL, por moneda y fecha de vencimiento. Los tramos no se superponen. No representa caja disponible ni autorización de transferencia.</p>
+        </div>
+        {missingCurrency > 0 ? <p className="rounded-lg border p-3 text-sm" role="status">{missingCurrency} obligaciones con moneda sin identificar: revisar antes de sumar.</p> : null}
+        {paymentPlan.length ? <div className="space-y-3">{paymentPlan.map(group => (
+          <Card key={group.currency} className="shadow-none">
+            <CardHeader><CardTitle>{group.currency}</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 grid-cols-2 md:grid-cols-4">
+              {([['Vencidas',group.overdue],['Hoy a 7 días',group.nextSevenDays],['8 a 15 días',group.days8to15],['16 a 30 días',group.days16to30],['31 a 90 días',group.days31to90],['Más de 90 días',group.beyond90],['Sin vencimiento válido',group.undated]] as const).map(([label,bucket]) => (
+                <div key={label} className="min-w-0 border-t pt-2"><p className="text-xs text-muted-foreground">{label}</p><p className="font-semibold tabular-nums break-words">{money(bucket.amount,group.currency)}</p><p className="text-xs text-muted-foreground">{bucket.count} obligaciones</p></div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}</div> : <p className="rounded-lg border p-4 text-sm text-muted-foreground">No hay obligaciones aprobadas con monto positivo y moneda identificada para programar. Revisa por separado las facturas informadas por Laudus.</p>}
+      </section>
+    ) : null}
 
     {!isLoading && !error && data?.sourceAvailability?.observedPayables !== 'available' ? (
       <Card className="shadow-none"><CardContent className="p-4 text-sm" role="status">
