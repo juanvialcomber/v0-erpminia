@@ -45,7 +45,7 @@ test('pending Laudus payments are shown as source-state cases, not inferred debt
 
 test('finance summary stays neutral and does not overclaim urgency', () => {
   assert.match(page, /Resumen financiero/);
-  assert.match(page, /Exposición, decisiones y evidencia/);
+  assert.match(page, /Revisa compromisos, vencimientos y decisiones de pago/);
   assert.doesNotMatch(page, /Sin decisiones urgentes en la muestra actual/);
 });
 
@@ -102,12 +102,12 @@ test('Laudus date-only values preserve Santiago calendar semantics', () => {
 
 
 test('Daniel receives a bounded daily priority queue before secondary analytics', () => {
-  assert.match(card, /Qué debe resolver Daniel primero/);
+  assert.match(card, /Qué requiere atención/);
   assert.match(card, /slice\(0, 3\)/);
-  assert.match(card, /Revisar CxP vencida/);
+  assert.match(card, /Revisar cuentas vencidas/);
   assert.match(card, /Preparar vencimientos de 7 días/);
   assert.match(card, /Cerrar atribución por centro de costo/);
-  assert.match(card, /Sin decisiones financieras urgentes detectadas/);
+  assert.match(card, /No se detectaron prioridades en la información disponible/);
 });
 
 
@@ -121,7 +121,7 @@ test('Daniel priority queue can surface supplier concentration without inferring
 test('Daniel cockpit follows MOTIL decision-first visual hierarchy', () => {
   assert.match(card, /Resumen financiero ejecutivo/);
   assert.match(card, /Exposición abierta/);
-  assert.match(card, /Qué debe resolver Daniel primero/);
+  assert.match(card, /Qué requiere atención/);
   assert.match(card, /por resolver/);
   assert.match(card, /Cobertura financiera/);
 });
@@ -168,9 +168,9 @@ test('Daniel sees stale Laudus evidence before acting on financial priorities', 
   assert.match(loader, /operationalSyncAgeDays/);
   assert.match(loader, /expectedCadence: 'daily'/);
   assert.match(card, /Dato atrasado/);
-  assert.match(card, /Revisar actualización de Laudus/);
-  assert.match(card, /Última sincronización operativa/);
-  assert.match(card, /href: '\/dashboard\/finanzas\/fuentes'/);
+  assert.match(card, /freshnessIsStale \? <Badge variant="destructive">Dato atrasado/);
+  assert.match(card, /freshnessText\(data\?\.freshness\?\.latestOperationalSync\)/);
+  assert.ok(card.indexOf('Dato atrasado') < card.indexOf('Prioridades financieras de hoy'));
 });
 
 
@@ -194,10 +194,10 @@ test('Daniel cockpit exposes persisted LEC evidence and conservative E3 gate', (
   const priorityRoute = fs.readFileSync('app/api/value/finance-priority-decision/route.ts','utf8');
   assert.match(priorityRoute, /medianDecisionSeconds/);
   assert.match(priorityRoute, /timedDecisions/);
-  assert.match(card, /Medición LEC de Daniel/);
+  assert.match(card, /Medición de productividad/);
   assert.match(card, /baselineSampleCount >= 3 && timedDecisionCount >= 20 \? 'E3'/);
   assert.match(card, /No se monetiza hasta E4/);
-  assert.match(card, /Iniciar baseline manual/);
+  assert.match(card, /Medir revisión manual/);
   assert.match(baselineRoute, /manual Laudus review timed outside MOTIL assistance/);
 });
 
