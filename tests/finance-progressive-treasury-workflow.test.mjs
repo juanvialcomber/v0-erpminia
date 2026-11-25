@@ -8,9 +8,9 @@ const route = fs.readFileSync('app/api/finance/payables/route.ts','utf8');
 test('treasury exposes one explicit next action',()=>{
   assert.match(page,/Siguiente acción/);
   assert.match(page,/Definir vencimiento/);
-  assert.match(page,/Registrar pago vencido/);
+  assert.match(page,/Revisar obligación vencida/);
   assert.match(page,/Conciliar pago/);
-  assert.match(page,/Sin CxP MOTIL pendientes/);
+  assert.match(page,/Sin obligaciones aprobadas pendientes/);
 });
 
 test('treasury replaces browser prompts with traceable dialogs',()=>{
