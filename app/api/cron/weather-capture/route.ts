@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -25,18 +25,20 @@ const providerSchema = z.object({ current: currentSchema });
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || secret.length < 24 || request.headers.get('authorization') !== 'Bearer ' + secret) {
+    console.warn('[weather-capture] authorization rejected');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const key = process.env.WEATHER_API_KEY;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const role = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key || !url || !role) {
+    console.warn('[weather-capture] missing configuration');
     return NextResponse.json({ error: 'Weather capture not configured' }, { status: 503 });
   }
   try {
-    const db = createClient(url, role, { auth: { persistSession: false, autoRefreshToken: false } });
+    const db = getSupabaseServerClient();
     const { data, error } = await db.rpc('motil_weather_sites_v1');
-    if (error) throw new Error('site_lookup_failed');
+    if (error) { console.warn('[weather-capture] site lookup failed', error.code); throw new Error('site_lookup_failed'); }
     const sites = z.array(siteSchema).max(20).parse(data);
     if (!sites.length) return NextResponse.json({ error: 'No verified active sites' }, { status: 503 });
     // Bound parallelism and request time. No credentials in logs or responses.
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest) {
           endpoint.searchParams.set('q', site.latitude + ',' + site.longitude);
           endpoint.searchParams.set('aqi', 'no');
           const response = await fetch(endpoint, { cache: 'no-store', signal: AbortSignal.timeout(8000), redirect: 'error' });
-          if (!response.ok) return { site_id: site.site_id, status: 'provider_failed' };
+          if (!response.ok) { console.warn('[weather-capture] provider HTTP status', response.status); return { site_id: site.site_id, status: 'provider_failed' }; }
           const { current } = providerSchema.parse(await response.json());
           const observedAt = new Date(current.last_updated_epoch * 1000);
           const age = Date.now() - observedAt.getTime();
@@ -78,8 +80,10 @@ export async function GET(request: NextRequest) {
       results.push(...batch);
     }
     const failed = results.filter(item => item.status !== 'inserted' && item.status !== 'duplicate_or_inactive').length;
+    console.info('[weather-capture] completed', { sites: sites.length, failed, statuses: results.map(item => item.status) });
     return NextResponse.json({ ok: failed === 0, sites: sites.length, inserted: results.filter(item => item.status === 'inserted').length, failed, results }, { status: failed ? 503 : 200, headers: { 'Cache-Control': 'no-store' } });
   } catch {
+    console.warn('[weather-capture] capture initialization failed');
     return NextResponse.json({ error: 'Weather capture failed' }, { status: 503 });
   }
 }
