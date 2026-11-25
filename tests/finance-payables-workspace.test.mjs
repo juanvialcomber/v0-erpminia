@@ -47,7 +47,9 @@ test('finance navigation exposes the payments workspace with honest empty states
 test('payables workspace reduces overdue review by supplier concentration',()=>{
   assert.match(page,/Concentración vencida/);
   assert.match(page,/Proveedores que explican la mayor exposición/);
-  assert.match(page,/Top 5 concentra/);
+  assert.match(page,/Los cinco principales proveedores concentran/);
+  assert.match(page,/overdue\.filter\(row => row\.currency === 'CLP'\)\.length/);
+  assert.match(page,/Concentración observada sobre obligaciones vencidas en pesos chilenos/);
   assert.match(page,/Prioriza revisión por proveedor antes de recorrer factura por factura/);
   assert.match(page,/No implica prioridad automática de pago ni evaluación de riesgo del proveedor/);
 });
