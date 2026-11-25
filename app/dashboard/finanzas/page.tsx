@@ -1,3 +1,4 @@
+import { SharedProjectPortfolio } from '@/components/project-control/shared-project-portfolio';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { LaudusFinanceControlCard } from '@/components/integrations/laudus-finance-control-card';
@@ -37,6 +38,8 @@ export default function FinancePage() {
       </section>
 
       <LaudusFinanceReconciliationQueue />
+      <SharedProjectPortfolio />
+
       <PurchaseOrderEvidence />
       <LaudusFinanceControlCard />
 
