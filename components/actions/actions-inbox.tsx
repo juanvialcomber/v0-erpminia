@@ -18,6 +18,7 @@ type Task = {
   title: string;
   evidence_summary: string | null;
   responsibility: 'owner' | 'support' | 'escalation';
+  role_action?: string | null;
   occurred_at: string | null;
   due_at: string | null;
   urgency_state: string;
@@ -271,6 +272,7 @@ export function ActionsInbox({ locale, dictionary }: { locale: Locale; dictionar
                         <details className="mt-2 text-sm" data-testid="task-row-details">
                           <summary className="w-fit cursor-pointer text-xs text-muted-foreground hover:text-foreground">Ver detalles</summary>
                           <div className="mt-2 space-y-2 border-l pl-3 text-sm text-muted-foreground">
+                            {task.role_action ? <p className="font-medium text-foreground">{task.role_action}</p> : null}
                             {task.evidence_summary ? <p>{task.evidence_summary}</p> : null}
                             <p>{task.domain} · {task.cargo_name}</p>
                             {state?.status === 'read' ? <p>{t.readBadge}</p> : null}
