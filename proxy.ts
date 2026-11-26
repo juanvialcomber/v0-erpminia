@@ -60,6 +60,34 @@ const DASHBOARD_EDIT_ROUTE_MODULES: Array<{ prefix: string; module: string }> = 
   { prefix: '/dashboard/finanzas/pagos', module: 'fin_finanzas' },
 ];
 
+
+function isVoucherPath(path: string) {
+  return path === '/dashboard/bodega/vales' || path === '/api/bodega/vales' || path === '/api/bodega/vales/qr';
+}
+// Narrow nominal permission: never grants access to other Bodega routes.
+async function voucherProxyAccess(identityId: string, path: string) {
+  if (!isVoucherPath(path) || process.env.MOTIL_WAREHOUSE_VOUCHERS_ENABLED !== 'true') return false;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return false;
+  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  let profileId = identityId;
+  let profile = await db.from('profiles').select('id,organization_id,status').eq('id', profileId).maybeSingle();
+  if (profile.error) return false;
+  if (!profile.data) {
+    const link = await db.from('auth_profile_identity_links').select('profile_id').eq('auth_user_id', identityId).maybeSingle();
+    if (link.error || !link.data?.profile_id) return false;
+    profileId = link.data.profile_id;
+    profile = await db.from('profiles').select('id,organization_id,status').eq('id', profileId).maybeSingle();
+  }
+  if (profile.error || profile.data?.status !== 'active') return false;
+  const org = profile.data.organization_id;
+  const [access, settings] = await Promise.all([
+    db.from('warehouse_voucher_access').select('can_request,can_approve,can_deliver').eq('organization_id', org).eq('profile_id', profileId).gt('expires_at', new Date().toISOString()).maybeSingle(),
+    db.from('warehouse_voucher_settings').select('enabled').eq('organization_id', org).maybeSingle(),
+  ]);
+  return !access.error && !settings.error && settings.data?.enabled === true && Boolean(access.data && (access.data.can_request || access.data.can_approve || access.data.can_deliver));
+}
+
 const ADMIN_ROLES = new Set(['admin', 'superadmin', 'super_admin']);
 
 function requiredModulesForDashboardPath(pathname: string) {
@@ -79,6 +107,7 @@ function safePostLoginPath(request: NextRequest) {
 }
 
 async function canAccessDashboardRoute(profileId: string, role: string | null | undefined, pathname: string) {
+  if (await voucherProxyAccess(profileId, pathname)) return true;
   const requiredEditModule = requiredEditModuleForDashboardPath(pathname);
   const requiredModules = requiredModulesForDashboardPath(pathname);
   if ((!requiredModules && !requiredEditModule) || ADMIN_ROLES.has(role || '')) return true;
@@ -386,7 +415,7 @@ async function proxyRequest(request: NextRequest) {
   const accessIdentityId = customSession?.user.id || user?.id;
   if (accessIdentityId && (pathname.startsWith('/api/') || pathname.startsWith('/admin') || pathname.startsWith('/setup'))) {
     try {
-      if (await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method) && !(await financeManagerMatrixAllowed(accessIdentityId, pathname, request.method))) {
+      if (!(await voucherProxyAccess(accessIdentityId, pathname)) && await isFinanceManager(accessIdentityId) && !financeManagerAllowed(pathname, request.method) && !(await financeManagerMatrixAllowed(accessIdentityId, pathname, request.method))) {
         if (pathname.startsWith('/api/')) {
           return withSecurityHeaders(NextResponse.json({ error: 'Acceso restringido al área de Finanzas' }, { status: 403 }));
         }

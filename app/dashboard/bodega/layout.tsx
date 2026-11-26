@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 // One entry for each real workflow. Secondary tools stay available under "Más".
 const operationItems = [
+  { href: '/dashboard/bodega/vales', label: 'Vales de consumo' },
   { href: '/dashboard/bodega', label: 'Inventario' },
   { href: '/dashboard/bodega/conteo-motil', label: 'Conteo MOTIL' },
   { href: '/dashboard/bodega/materiales-mantenimiento', label: 'Materiales de OT' },
