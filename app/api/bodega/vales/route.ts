@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const org = context.organizationId;
   try {
     const mode = request.nextUrl.searchParams.get('mode');
+    if (mode === 'access') return NextResponse.json({ allowed: true, canRequest: access.can_request }, { headers: { 'Cache-Control': 'private, no-store' } });
     if (mode === 'catalog') {
       const q = (request.nextUrl.searchParams.get('q') || '').slice(0, 80).replace(/[%_,().*"\\]/g, ' ').trim();
       if (q.length < 2) return NextResponse.json({ rows: [] });
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       db.from('profiles').select('id,full_name').eq('organization_id', org).eq('status', 'active').order('full_name').limit(500),
       db.from('warehouses').select('id,name,code').eq('organization_id', org).eq('code', '002'),
       db.from('maintenance_work_orders').select('id,work_order_number,title').eq('organization_id', org).not('created_by', 'is', null).not('status', 'in', '(completed,cancelled,closed)').order('created_at', { ascending: false }).limit(100),
-      db.from('warehouse_voucher_access').select('profile_id,expires_at,profiles(full_name)').eq('organization_id', org).eq('can_request', true).gt('expires_at', new Date().toISOString()).limit(100),
+      db.from('warehouse_voucher_access').select('profile_id,expires_at,profiles!inner(full_name,status)').eq('organization_id', org).eq('can_request', true).eq('profiles.status', 'active').gt('expires_at', new Date().toISOString()).limit(100),
     ]);
     if (error || users.error || warehouses.error || orders.error || requesters.error) throw error || users.error || warehouses.error || orders.error || requesters.error;
     return NextResponse.json({ rows, users: users.data, warehouses: warehouses.data, orders: orders.data, requesters: requesters.data, access, settings, actorId: context.userId }, { headers: { 'Cache-Control': 'private, no-store' } });

@@ -1,45 +1,25 @@
-# Vales Bodega · candidato 26/11
+# Vales de consumo · habilitación en MOTIL
 
-Solicitud explícita: priorizar vales y dar acceso temporal a todos los participantes de la reunión. Desarrollado en rama; ninguna migración, permiso o stock productivo modificado.
+Travis autorizó el 26/11 incorporar directamente la sección en producción y hacer merge del PR #349. La ruta es `/dashboard/bodega/vales`, accesible desde Bodega y mediante acceso nominal en el menú principal.
 
-## Reutilización
+La autorización del módulo se gestiona dentro de MOTIL por organización/perfil, sin depender de una variable externa de piloto. Se conserva el permiso individual y su vencimiento; no se otorga edición general de inventario.
 
-Maestro `canonical.products`, perfiles, OT `maintenance_work_orders`, stock `warehouse_stock` y movimientos `stock_movements`. No usar el QR de posición para autorizar consumo; nuevo proceso de vale con líneas, decisiones y eventos propios. Conteos/revisiones existentes se referencian, no se copian. La aprobación de conteo NO activa inventario: hace falta activación explícita por posición y `deliveries_enabled`.
+## Base de datos
 
-El piloto se habilita con `MOTIL_WAREHOUSE_VOUCHERS_ENABLED=true` exclusivamente en la aplicación de QA y `warehouse_voucher_settings.enabled=true` por organización en su BD aislada. Ambas puertas están cerradas por defecto. No copiar la configuración de QA a producción.
+Migración `20261126143303_warehouse_consumption_vouchers.sql` aplicada en Supabase MOTIL; versión del repositorio conciliada con `schema_migrations`. Agrega tablas de vales/líneas/eventos/configuración/acceso y función transaccional, con RLS y ejecución exclusiva de servicio autenticado. No crea saldos de apertura ni modifica existencias.
 
-## Acceso nominal
+Configuración de La Patagua: solicitudes/aprobaciones habilitadas; entregas de inventario y autorización de fin de semana deshabilitadas. El descuento exige apertura explícita por posición y autorización de entrega, por separado. No se ejecutaron movimientos de stock.
 
-Invitación de Constanza del 24/11 para reunión 26/11: Juan, Constanza, Ariel, Bred Cruz, Cristian Vidal, Daniel, Pedro. Esteban participa según notas tl;dv. La invitación acredita invitados, no presencia efectiva de cada uno.
+Acceso nominal temporal hasta el 31/12/2026 para Juan, Ariel, Daniel, Pedro, Esteban y Cristian Vidal. Todos pueden solicitar; sólo Esteban aprueba/rechaza y tiene capacidad de entrega, actualmente bloqueada por configuración de inventario. No puede autoaprobar su solicitud. Constanza Roco y Bred Cruz siguen pendientes porque no tienen perfil canónico activo; no se inventó cargo ni credencial.
 
-Consulta read-only de perfiles: Juan, Ariel, Cristian, Daniel, Pedro y Esteban tienen perfiles activos de la misma organización. No se encontraron perfiles de Constanza ni Bred por email exacto/nombre; no crear identidad ni dar permisos a coincidencias aproximadas. Alta/autenticación de ambos pendiente.
+## Flujo y reutilización
 
-Preparar accesos nominales en QA con vencimiento 01/01/2027: los seis perfiles encontrados pueden solicitar; sólo Esteban aprueba/entrega. Todos ven sus vales; el encargado ve la bandeja. No otorgar ED de inventario a todos ni alterar la matriz global por cargo. Si Esteban solicita, no puede autoaprobar: necesita un suplente que todavía no está definido. No se concede ese permiso a Juan por ser administrador.
+Reutiliza perfiles, catálogo canónico, OT, conteos, stock y movimientos existentes. Solicitud con receptor, OT, motivo y hasta 15 líneas; cantidades exactas. Bodega decide con motivo. QR de vale aprobado/vigente abre una página autenticada; escanear no descuenta. La entrega física confirmada realiza movimiento, saldo y evento en una transacción. Reintentos idénticos no duplican consumo. Reservas ajenas se preservan.
 
-No se incluye lista privada de UUID/email como seed automático en migración pública. Configurar la lista resuelta mediante sesión administrativa de QA, verificando tenant y perfil activo; el SQL productivo no se ejecuta en este trabajo.
+El identificador de perfil queda en la auditoría del vale. `stock_movements.performed_by` utiliza la identidad de `auth.users` resuelta mediante el vínculo canónico existente; no se confunden ambos UUID. Entregas fraccionarias siguen bloqueadas mientras el stock operativo utilice enteros, sin redondeo.
 
-## Flujo
+## Verificación
 
-Solicitar OT + bodega Central + receptor + motivo + hasta 15 materiales/unidades del catálogo. Cantidad decimal exacta. Identidad solicitante se toma de sesión. Esteban decide con motivo; sólo aprobados y vigentes emiten QR. QR local a MOTIL, sin datos personales ni secretos; requiere login y permiso vigente. Escanear no descuenta. Entrega confirma receptor físico y cantidad; evento, movimiento y saldo en una transacción con bloqueos. Parcial mantiene saldo pendiente. Reintento idéntico único, cambio de contenido con la misma clave rechazado. Rechazo/cancelación sin descuento.
+Build y TypeScript aprobados con heap de 6656 MB. Suite completa aprobada; 13 escenarios SQL/contrato de vales incluyendo identidades distintas, 23 regresiones de límites y escritura verificadas en el bloque previo. Las pruebas PostgreSQL embebidas usan esquema sintético; la contención entre dos conexiones reales y el recorrido humano con cámara permanecen pendientes. No se fabrican solicitudes de prueba en producción.
 
-Fin de semana: solicitudes se pueden preparar; aprobar/entregar queda bloqueado hasta definir la política. No se habilita bypass automático. El 1 de enero exige cobertura específica acordada antes de salida.
-
-## Límites y gates
-
-Stock productivo verificado sigue entero. Se aceptan solicitudes decimales, pero la entrega fraccionaria se bloquea explícitamente hasta integrar y validar la migración decimal existente (candidata 05); no redondear ni duplicar ese desarrollo. La ruta nueva no reserva stock: la aprobación es intención, no garantía de disponibilidad. La entrega revalida disponible descontando reservas existentes y no consume reservas de otra OT.
-
-HOLD: migración representativa, revisión independiente, preview READY y QA autenticado en Opera de usuarios autorizados/denegados. El guard global incorpora acceso nominal exclusivamente a la página y las dos rutas API de vales, incluyendo Finanzas; no abre otras rutas de Bodega. Aplicación de permisos en QA y dos altas pendientes; apertura de stock, decimal y autorización de fin de semana; autorización explícita de producción e inventarios antes de merge/release.
-
-## Verificación ejecutada
-
-- 12 pruebas PASS del contrato y SQL real de esta migración sobre PostgreSQL embebido (PGlite), esquema sintético explícito; no equivale a un clon de producción.
-- 23 regresiones existentes PASS de escrituras inseguras, navegación Bodega y límites de Finanzas.
-- QR SVG generado localmente, sin proveedor externo. Falta escaneo físico y QA autenticado.
-- Las pruebas con dos vales se ejecutaron secuencialmente sobre el último saldo; prueban agotamiento y preservación de reservas, no contención entre dos conexiones reales. Concurrencia real sigue pendiente.
-- 431 versiones de migración únicas. La migración nueva no contiene seeds ni altera tipos/saldos existentes.
-- Build completo PASS con NODE_OPTIONS=--max-old-space-size=6656, incluido TypeScript y postbuild: 2.774 pruebas PASS, cero fallos. El primer intento agotó el heap estándar; no se desactivó la comprobación de tipos. El import inicial del guard rompía una prueba del cron meteorológico; se corrigió y la suite completa volvió a pasar.
-- `scripts/configure-warehouse-voucher-qa.mjs` prepara acceso nominal desde JSON privado por stdin, en base dedicada cuyo nombre contiene QA. Modo seco por defecto; rechaza el host productivo conocido y no crea cuentas. Si falta una identidad, revierte todo. No se ejecutó contra una BD compartida o producción.
-
-## Estado de entrega
-
-Desarrollo y corrección final guardados en commits locales. El primer intento de publicar fue rechazado por revisión automática. Travis autorizó expresamente publicar la rama y continuar con las pruebas el 26/11. La publicación no autoriza merge, producción ni inventarios. Preview y QA autenticado siguen pendientes. Los accesos nominales están preparados mediante el configurador QA, pero no aplicados en un entorno compartido. La publicación de la rama está autorizada; la instalación aislada requiere verificar el entorno y sus accesos antes de operar.
+El correo GitHub consultado se refiere a fallos de otros cambios del 25/11, no al PR #349. Registrar el deployment/SHA final y su estado antes de declarar la sección disponible. La API Vercel devolvió 403 para crear previews; el merge autorizado utiliza la integración Git existente para producción, sin alterar settings de acceso de Vercel.

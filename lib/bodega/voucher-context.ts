@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 
 export async function voucherContext(request: NextRequest) {
-  // Both a deploy-time gate and an explicit per-tenant database gate. Default off.
-  if (process.env.MOTIL_WAREHOUSE_VOUCHERS_ENABLED !== 'true') return { ok: false as const, response: NextResponse.json({ error: 'Los vales están pendientes de habilitación.' }, { status: 503 }) };
+  // Operational access is configured per person and organization in MOTIL.
   const context = await getOrganizationContext(request);
   if (!context.ok) return context;
   const { data: profile, error: profileError } = await context.supabase.from('profiles').select('id,status').eq('id', context.userId).eq('organization_id', context.organizationId).eq('status', 'active').maybeSingle();

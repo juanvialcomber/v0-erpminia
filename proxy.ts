@@ -66,7 +66,7 @@ function isVoucherPath(path: string) {
 }
 // Narrow nominal permission: never grants access to other Bodega routes.
 async function voucherProxyAccess(identityId: string, path: string) {
-  if (!isVoucherPath(path) || process.env.MOTIL_WAREHOUSE_VOUCHERS_ENABLED !== 'true') return false;
+  if (!isVoucherPath(path)) return false;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return false;
   const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });

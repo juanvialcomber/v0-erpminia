@@ -1,4 +1,4 @@
--- No seeds and no stock changes. Enable only in a separately provisioned QA DB.
+-- Operational voucher workflow. No seeds, opening balances or stock changes on installation.
 create table public.warehouse_voucher_settings (
  organization_id uuid primary key references public.organizations(id),
  enabled boolean not null default false,
@@ -81,7 +81,7 @@ declare a public.warehouse_voucher_access; v public.warehouse_consumption_vouche
  cfg public.warehouse_voucher_settings; line jsonb; prod canonical.products;
  ln public.warehouse_consumption_voucher_lines; st public.warehouse_stock;
  previous public.warehouse_consumption_voucher_events; q numeric; rid uuid;
- receiver uuid; result jsonb; ids uuid[]; stock_id uuid; movement_id uuid;
+ receiver uuid; auth_actor uuid; result jsonb; ids uuid[]; stock_id uuid; movement_id uuid;
 begin
  select * into cfg from public.warehouse_voucher_settings where organization_id=p_org for share;
  if cfg.enabled is distinct from true then raise exception 'pilot_disabled'; end if;
@@ -158,9 +158,11 @@ begin
     select * into st from public.warehouse_stock where id=stock_id and organization_id=p_org for update;
     if st.quantity_on_hand is null or st.quantity_reserved is null or st.quantity_reserved<0 or st.quantity_on_hand-st.quantity_reserved<q then raise exception 'insufficient_available'; end if;
     if not exists(select 1 from public.warehouse_voucher_stock_activation activation join public.bodega_motil_stock_counts_v1 c on c.id=activation.count_id join public.bodega_motil_stock_count_reviews_v1 r on r.count_id=c.id where activation.stock_id=st.id and c.organization_id=p_org and c.warehouse_id=v.warehouse_id and c.canonical_product_id=ln.canonical_product_id and r.decision='approved_for_opening') then raise exception 'opening_pending'; end if;
+    select l.auth_user_id into auth_actor from public.auth_profile_identity_links l where l.profile_id=p_actor limit 1;
+    if auth_actor is null and exists(select 1 from auth.users where id=p_actor) then auth_actor:=p_actor; end if;
     update public.warehouse_stock set quantity_on_hand=quantity_on_hand-q,updated_at=now() where id=st.id;
     insert into public.stock_movements(organization_id,stock_id,movement_type,quantity,reference_doc,reference_id,performed_by,reason,work_order_id,canonical_product_id)
-     values(p_org,st.id,'issue',q,'warehouse_consumption_voucher',v.id,p_actor,v.reason,v.work_order_id,ln.canonical_product_id) returning id into movement_id;
+     values(p_org,st.id,'issue',q,'warehouse_consumption_voucher',v.id,auth_actor,v.reason,v.work_order_id,ln.canonical_product_id) returning id into movement_id;
     update public.warehouse_consumption_voucher_lines set delivered=delivered+q where id=ln.id;
     if not exists(select 1 from public.warehouse_consumption_voucher_lines where voucher_id=v.id and delivered<quantity) then
      update public.warehouse_consumption_vouchers set status='delivered' where id=v.id returning * into v;

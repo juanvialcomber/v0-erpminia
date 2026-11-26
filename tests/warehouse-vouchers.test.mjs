@@ -5,20 +5,20 @@ import { PGlite } from '@electric-sql/pglite';
 import { voucherInput } from '../lib/bodega/voucher-input.mjs';
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const [org,requester,approver,receiver,warehouse,ot,product,stock,count]=[1,2,3,4,5,6,7,8,9].map(id);
-const migration=readFileSync(new URL('../supabase/migrations/20261126150000_warehouse_consumption_vouchers.sql',import.meta.url),'utf8');
+const migration=readFileSync(new URL('../supabase/migrations/20261126143303_warehouse_consumption_vouchers.sql',import.meta.url),'utf8');
 async function fixture(){
  const db=new PGlite();
- await db.exec(`create role anon;create role authenticated;create role service_role;create schema canonical;
+ await db.exec(`create role anon;create role authenticated;create role service_role;create schema canonical;create schema auth;create table auth.users(id uuid primary key);create table public.auth_profile_identity_links(profile_id uuid,auth_user_id uuid);
  create table organizations(id uuid primary key);
  create table profiles(id uuid primary key,organization_id uuid,status text);
  create table warehouses(id uuid primary key,organization_id uuid,code text);
  create table maintenance_work_orders(id uuid primary key,organization_id uuid,created_by uuid,status text);
  create table canonical.products(id uuid primary key,organization_id uuid,product_code text,name text,unit text,is_active boolean,validation_status text);
  create table warehouse_stock(id uuid primary key,organization_id uuid,warehouse_id uuid,canonical_product_id uuid,quantity_on_hand integer,quantity_reserved integer,updated_at timestamptz);
- create table stock_movements(id uuid primary key default gen_random_uuid(),organization_id uuid,stock_id uuid,movement_type text,quantity integer,reference_doc text,reference_id uuid,performed_by uuid,reason text,work_order_id uuid,canonical_product_id uuid);
+ create table stock_movements(id uuid primary key default gen_random_uuid(),organization_id uuid,stock_id uuid,movement_type text,quantity integer,reference_doc text,reference_id uuid,performed_by uuid references auth.users(id),reason text,work_order_id uuid,canonical_product_id uuid);
  create table bodega_motil_stock_counts_v1(id uuid primary key,organization_id uuid,warehouse_id uuid,canonical_product_id uuid);
  create table bodega_motil_stock_count_reviews_v1(count_id uuid,decision text);
- insert into organizations values('${org}');
+ insert into organizations values('${org}');insert into auth.users values('${id(30)}');insert into auth_profile_identity_links values('${approver}','${id(30)}');
  insert into profiles values('${requester}','${org}','active'),('${approver}','${org}','active'),('${receiver}','${org}','active');
  insert into warehouses values('${warehouse}','${org}','002');
  insert into maintenance_work_orders values('${ot}','${org}','${approver}','in_progress');
@@ -99,3 +99,5 @@ test('delivery requires explicit activation; completing a voucher prevents anoth
  const v=await approved(db),b=await deliverBody(db,v,200,'2');await db.exec('update warehouse_voucher_settings set deliveries_enabled=false');await assert.rejects(()=>cmd(db,approver,'deliver',b),/delivery_activation_pending/);
  await db.exec('update warehouse_voucher_settings set deliveries_enabled=true');const done=await cmd(db,approver,'deliver',b);assert.equal(done.status,'delivered');assert.equal(await balance(db),0);await assert.rejects(()=>cmd(db,approver,'deliver',{...b,requestId:id(201)}),/invalid_qr_or_state/);
 }finally{await db.close();}});
+
+test('stock movement uses linked auth identity while voucher audit keeps profile actor',async()=>{const db=await fixture();try{const v=await approved(db);await cmd(db,approver,'deliver',await deliverBody(db,v));assert.equal((await db.query("select performed_by from stock_movements")).rows[0].performed_by,id(30));assert.equal((await db.query("select actor_id from warehouse_consumption_voucher_events where action='deliver'")).rows[0].actor_id,approver);}finally{await db.close();}});
