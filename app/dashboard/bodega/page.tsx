@@ -18,6 +18,7 @@ import { useDataSourceStatus } from '@/hooks/use-data-source-status';
 import { LaudusInventoryReadinessCard } from '@/components/integrations/laudus-inventory-readiness-card';
 import { CentralStockCanonicalizationPreview } from '@/components/bodega/central-stock-canonicalization-preview';
 import { LaudusInventoryReconciliationQueue } from '@/components/integrations/laudus-inventory-reconciliation-queue';
+import { LaudusInventoryPriorityQueue } from '@/components/integrations/laudus-inventory-priority-queue';
 import { ProcurementReceiptInbox } from '@/components/procurement/procurement-receipt-inbox';
 
 const fetcher = async (url: string) => {
@@ -121,6 +122,8 @@ export default function BodegaPage() {
         {!negativeStockMode ? <CentralStockCanonicalizationPreview /> : null}
       </div>
     </details> : null}
+
+    {!negativeStockMode ? <LaudusInventoryPriorityQueue /> : null}
 
     {!negativeStockMode ? <LaudusInventoryReconciliationQueue /> : null}
 
