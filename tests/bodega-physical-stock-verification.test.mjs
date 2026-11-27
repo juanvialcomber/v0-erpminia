@@ -71,6 +71,7 @@ function harness({ actor = ESTEBAN, active = true, sourceQuantity = 10, duplicat
     'next/server': { NextResponse: { json(body, options = {}) { return { body, status: options.status || 200 }; } } },
     '@/lib/api/organization-context': { getOrganizationContext: async () => context },
     '@/lib/bodega/stock-search-pattern.mjs': { stockSearchPattern },
+    '@/lib/bodega/stock-verification-policy': { STOCK_VERIFICATION_POLICY: { canonicalMutation: false, sourceOnlyReadOnly: true, physicalCountRequiredForAdjustment: true } },
     '@/lib/api/module-access': { MODULE_KEYS: { BODEGA_INVENTARIO: 'bodega_inventario' }, requireModuleAccess: async (_request, _key, requireWrite) => {
       assert.notEqual(requireWrite, true, 'Stock count role must not depend on broad Bodega edit permission');
       return moduleLevel === 'SR'

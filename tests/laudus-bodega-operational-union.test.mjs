@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const inventory = await readFile(new URL('../app/api/bodega/inventory/route.ts', import.meta.url), 'utf8');
 const stock = await readFile(new URL('../app/api/bodega/stock/route.ts', import.meta.url), 'utf8');
+const policy = await readFile(new URL('../lib/bodega/stock-verification-policy.ts', import.meta.url), 'utf8');
 
 test('bodega inventory uses Laudus operational read model only when authority says laudus_primary', () => {
   assert.match(inventory, /bodega_stock_source_authority_service_v1/);
@@ -37,7 +38,8 @@ test('canonical metadata enrichment is bounded and fallback remains available', 
 });
 
 test('stock API exposes an explicit human-verification policy for discrepancies', () => {
-  assert.match(stock, /physicalCountRequiredForAdjustment: true/);
-  assert.match(stock, /canonicalMutation: false/);
-  assert.match(stock, /sourceOnlyReadOnly: true/);
+  assert.match(stock, /STOCK_VERIFICATION_POLICY/);
+  assert.match(policy, /physicalCountRequiredForAdjustment: true/);
+  assert.match(policy, /canonicalMutation: false/);
+  assert.match(policy, /sourceOnlyReadOnly: true/);
 });
