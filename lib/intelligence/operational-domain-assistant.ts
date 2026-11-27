@@ -60,23 +60,26 @@ async function callOpenAI(args: { instructions: string; input: string }) {
 
 async function buildInventoryEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, freshness, negative, reorder, outOfStock] = await Promise.all([
+  const [overview, freshness, negative, reorder, outOfStock, reconciliation, freshnessSummary] = await Promise.all([
     context.supabase.from('inventory_intelligence_overview_v1').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_inventory_current').select('snapshot_date').eq('organization_id', organizationId).order('snapshot_date', { ascending: false }).limit(1),
     context.supabase.from('inventory_intelligence_position_v1').select('product_code,product_name,family,unit,quantity_on_hand,quantity_reserved,quantity_available,unit_cost,stock_value,stock_status,last_counted_date,warehouse_code,validation_status').eq('organization_id', organizationId).eq('stock_status', 'negative').order('stock_value', { ascending: false }).limit(30),
     context.supabase.from('inventory_intelligence_position_v1').select('product_code,product_name,family,unit,quantity_on_hand,quantity_reserved,quantity_available,unit_cost,stock_value,stock_status,last_counted_date,warehouse_code,validation_status').eq('organization_id', organizationId).eq('stock_status', 'reorder').order('stock_value', { ascending: false }).limit(50),
     context.supabase.from('inventory_intelligence_position_v1').select('product_code,product_name,family,unit,quantity_on_hand,quantity_reserved,quantity_available,unit_cost,stock_value,stock_status,last_counted_date,warehouse_code,validation_status').eq('organization_id', organizationId).eq('stock_status', 'out_of_stock').order('stock_value', { ascending: false }).limit(40),
+    context.supabase.from('laudus_inventory_reconciliation_service_v1').select('sku,description,laudus_stock,motil_stock,quantity_delta,reconciliation_state,source_date_to,laudus_synced_at,motil_updated_at').eq('organization_id', organizationId).neq('reconciliation_state', 'laudus_only_zero').order('quantity_delta', { ascending: false }).limit(120),
+    context.supabase.from('laudus_inventory_freshness_summary_service_v1').select('*').eq('organization_id', organizationId).maybeSingle(),
   ]);
-  const failures = [overview.error, freshness.error, negative.error, reorder.error, outOfStock.error].filter(Boolean);
+  const failures = [overview.error, freshness.error, negative.error, reorder.error, outOfStock.error, reconciliation.error, freshnessSummary.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar inventario canónico');
   return {
     capability: 'inventory',
     sources: ['canonical_inventory_current', 'inventory_intelligence_overview_v1', 'inventory_intelligence_position_v1'],
-    toolsUsed: [{ name: 'read_inventory_overview', mode: 'read' }, { name: 'read_inventory_attention', mode: 'read' }, { name: 'read_inventory_freshness', mode: 'read' }],
+    toolsUsed: [{ name: 'read_inventory_overview', mode: 'read' }, { name: 'read_inventory_attention', mode: 'read' }, { name: 'read_inventory_freshness', mode: 'read' }, { name: 'read_laudus_motil_reconciliation', mode: 'read' }],
     payload: {
       freshness: { latest_snapshot_date: freshness.data?.[0]?.snapshot_date || null, meaning: 'Fecha máxima disponible en canonical_inventory_current; no implica tiempo real.' },
       overview: overview.data || null,
       attention: { negative: negative.data || [], reorder: reorder.data || [], out_of_stock: outOfStock.data || [] },
+      laudus_motil_reconciliation: { summary: freshnessSummary.data || null, rows: reconciliation.data || [] },
       semantics: { stock_status: 'Estado derivado de existencias. No equivale por sí solo a criticidad operacional, riesgo de falla ni prioridad de compra.', value: 'Valorización de inventario según costo registrado; no reemplaza una cotización vigente.' },
     },
   };
@@ -146,7 +149,7 @@ async function buildProductionEvidence(context: OrganizationSuccessContext): Pro
 
 async function buildFinanceEvidence(context: OrganizationSuccessContext): Promise<EvidenceBundle> {
   const organizationId = context.organizationId;
-  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, invoiceCoverageStartQuery, laudusOpenPage1, laudusOpenPage2, maintenanceCost] = await Promise.all([
+  const [overview, costCenters, suppliers, aging, cashForecast, laudusReview, fixedAssetReview, invoiceCoverageStartQuery, laudusOpenPage1, laudusOpenPage2, maintenanceCost, contracts] = await Promise.all([
     context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', organizationId).maybeSingle(),
     context.supabase.from('canonical_finance_cost_centers').select('cost_center_code,event_count,recognized_clp,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(80),
     context.supabase.from('canonical_finance_suppliers').select('supplier_id,supplier_name,purchase_order_count,line_count,committed_clp,first_event_at,last_event_at').eq('organization_id', organizationId).order('committed_clp', { ascending: false }).limit(30),
@@ -177,8 +180,9 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
       .order('outstanding_amount', { ascending: false })
       .range(1000, 1999),
     context.supabase.from('maintenance_cost_by_cost_center_v1').select('cost_center_code,cost_center_name,audited_work_orders,parts_cost,labor_cost,external_cost,total_cost,average_cost_per_work_order,last_closed_at').eq('organization_id', organizationId).order('total_cost', { ascending: false }).limit(40),
+    context.supabase.from('contracts').select('contract_number,title,contractor_name,project_name,contract_value,paid_amount,status,start_date,end_date,compliance_status').eq('organization_id', organizationId).order('end_date', { ascending: true }).limit(100),
   ]);
-  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, invoiceCoverageStartQuery.error, laudusOpenPage1.error, laudusOpenPage2.error, maintenanceCost.error].filter(Boolean);
+  const failures = [overview.error, costCenters.error, suppliers.error, aging.error, cashForecast.error, laudusReview.error, fixedAssetReview.error, invoiceCoverageStartQuery.error, laudusOpenPage1.error, laudusOpenPage2.error, maintenanceCost.error, contracts.error].filter(Boolean);
   if (failures.length) throw new Error((failures[0] as any)?.message || 'No se pudo cargar finanzas canónicas');
   const centers = costCenters.data || [];
   const latestCenterEvent = centers.reduce((latest: string | null, row: any) => { const value = typeof row?.last_event_at === 'string' ? row.last_event_at : null; return value && (!latest || value > latest) ? value : latest; }, null);
@@ -391,6 +395,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         reconciliation_opportunity_maintenance_cost: assetReconciliationOpportunities.reduce((sum, row) => sum + row.maintenance_cost, 0),
       },
       maintenance_cost_by_cost_center: maintenanceCost.data || [],
+      contracts: contracts.data || [],
       semantics: {
         laudus: 'Laudus es fuente financiera trazable. MOTIL prioriza, cruza y explica; no reemplaza la autoridad contable.',
         budget: 'Un presupuesto cero o ausente no debe interpretarse como presupuesto aprobado igual a cero sin validar la fuente contractual/financiera correspondiente.',
@@ -400,6 +405,7 @@ async function buildFinanceEvidence(context: OrganizationSuccessContext): Promis
         statistical_prediction: 'No declarar predicción estadística, anomalía probabilística ni confianza sin modelo validado, backtesting y control de cambios de régimen.',
         asset_economics: 'Para depreciación o reemplazo, usa asset_economics sólo para identidades fuertes. cost_recovery_status distingue backfill histórico de búsqueda documental. asset_reconciliation_opportunities contiene activos MOTIL con alto costo histórico pero identidad Laudus todavía pendiente; úsalo para priorizar conciliación, no para atribuir depreciación o recomendar reemplazo. No calcules valor libro ni ahorro si falta acquisition_cost.',
         cross_source_freshness: 'No mezclar silenciosamente fechas de corte distintas entre overview, centros de costo, Laudus, compras o mantenimiento.',
+        contracts: 'Los contratos son evidencia documental y de compromiso. contract_value y paid_amount no prueban por sí solos factura, pago bancario, avance físico ni cierre contractual.',
       },
     },
   };
