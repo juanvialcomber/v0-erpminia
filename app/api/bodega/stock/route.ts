@@ -5,6 +5,13 @@ import { getOrganizationContext } from '@/lib/api/organization-context';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
 
+const STOCK_VERIFICATION_POLICY = {
+  canonicalMutation: false,
+  sourceOnlyReadOnly: true,
+  physicalCountRequiredForAdjustment: true,
+  meaning: 'Las diferencias Laudus–MOTIL se muestran como evidencia de revisión. No autorizan ajustes automáticos ni equivalen a un conteo físico.',
+} as const;
+
 type CanonicalInventoryRow = {
   id: string;
   sku: string | null;
@@ -263,6 +270,7 @@ async function buildCanonicalStock(
         summary,
         stockSource: 'laudus_operational',
         sourceAuthority: authority as Record<string, unknown>,
+        verificationPolicy: STOCK_VERIFICATION_POLICY,
         ...(pricingWarning ? { pricingWarning } : {}),
       };
     }
@@ -310,6 +318,7 @@ async function buildCanonicalStock(
     summary,
     stockSource: 'canonical_fallback',
     sourceAuthority: authority as Record<string, unknown> | null,
+    verificationPolicy: STOCK_VERIFICATION_POLICY,
     ...(pricingWarning ? { pricingWarning } : {}),
   };
 }
@@ -376,7 +385,7 @@ export async function GET(request: NextRequest) {
       reference_price_count: items.filter((i) => i.reference_unit_cost != null).length,
     };
 
-    return NextResponse.json({ items, summary, dataSource: 'warehouse', ...(pricingWarning ? { pricingWarning } : {}) });
+    return NextResponse.json({ items, summary, dataSource: 'warehouse', verificationPolicy: STOCK_VERIFICATION_POLICY, ...(pricingWarning ? { pricingWarning } : {}) });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'No se pudo obtener el stock';
     return NextResponse.json({
