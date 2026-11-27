@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { danielMasterSource } from '@/lib/finance/daniel-master-source';
+import { answerDanielMaster, danielMasterQuestion } from '@/lib/finance/daniel-master-assistant';
 import type { OrganizationSuccessContext } from '@/lib/api/organization-context';
 import { routeOperationalQuery, type QueryCapability } from '@/lib/intelligence/query-router';
 import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
@@ -430,21 +432,39 @@ function actionRefusal(domain: OperationalAssistantDomain) {
   return `Puedo preparar y explicar la decisión en ${domainLabel(domain)}, pero este asistente no ejecuta mutaciones operacionales. La acción debe realizarse en el flujo autorizado del módulo y con confirmación humana.`;
 }
 
-export async function handleOperationalDomainAssistant(args: { request: NextRequest; context: OrganizationSuccessContext; domain: OperationalAssistantDomain; allowedDomains: OperationalAssistantDomain[]; }) {
+export async function handleOperationalDomainAssistant(args: { request: NextRequest; context: OrganizationSuccessContext; domain: OperationalAssistantDomain; allowedDomains: OperationalAssistantDomain[]; standaloneQuestion?: string; }) {
   const { request, context, domain } = args;
   if (request.method === 'GET') {
     return NextResponse.json({ conversation: null, messages: [], hasMore: false, oldestMessageAt: null, sessionIdleHours: null, memoryCount: 0, cargo: null, persistence: 'stateless_v1' });
   }
   const body = await request.json().catch(() => null);
   if (body?.action === 'archive') return NextResponse.json({ archived: false, conversationId: null });
-  const message = typeof body?.message === 'string' ? body.message.trim() : '';
+  const groundedMessage = typeof body?.message === 'string' ? body.message.trim() : '';
+  const message = args.standaloneQuestion ?? groundedMessage;
   if (!message) return NextResponse.json({ error: 'Escribe una consulta operacional.' }, { status: 400 });
-  if (message.length > MAX_MESSAGE_CHARS) return NextResponse.json({ error: 'La consulta es demasiado extensa.' }, { status: 400 });
+  if (Math.max(message.length, groundedMessage.length) > MAX_MESSAGE_CHARS) return NextResponse.json({ error: 'La consulta es demasiado extensa.' }, { status: 400 });
   const route = routeOperationalQuery(message, { domain });
   if (route.requiresExplicitAuthorization || route.mode === 'action') {
     return NextResponse.json({ answer: actionRefusal(domain), model: null, sources: [], toolsUsed: [], conversationId: null, route, policy: 'READ_ONLY: ninguna mutación se ejecuta desde este runtime conversacional.' });
   }
   try {
+    const masterQuestion = domain === 'finance' && args.allowedDomains.includes('finance')
+      ? danielMasterQuestion(message)
+      : null;
+    if (masterQuestion) {
+      const source = danielMasterSource(context);
+      const master = await source.read();
+      const run = await source.calculate(master);
+      return NextResponse.json({
+        ...answerDanielMaster(masterQuestion, master, run),
+        model: null,
+        sources: [],
+        toolsUsed: [],
+        conversationId: null,
+        route,
+        persistence: 'stateless_v1',
+      });
+    }
     const [skillRuntime, skillPlan] = await Promise.all([
       resolveMotilSkillAvailability(
         context,
@@ -486,7 +506,7 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
 18. Un forecast basado en CxP y due_date es forecast contractual. No lo llames predicción estadística, IA predictiva ni confianza probabilística.
 19. Si el usuario pregunta qué viene, usa cash_forecast y aging. Si pregunta qué se sale del patrón, sólo describe concentraciones, excepciones o faltantes observados salvo que exista un modelo estadístico validado.
 20. Para el gerente de Finanzas, cuando la pregunta sea general responde máximo 3 asuntos en formato MONTO/HECHO → POR QUÉ IMPORTA → EVIDENCIA/FUENTE → SIGUIENTE VALIDACIÓN HUMANA.`;
-    const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${message}`;
+    const input = `RUTA DE CONSULTA\n${JSON.stringify(route)}\n\nPLAN DE SKILLS NO CANÓNICO\n${JSON.stringify(plannedSkills)}\n\nCAPACIDADES SIN PERMISO\n${JSON.stringify(denied)}\n\nEVIDENCIA MOTIL\n${JSON.stringify(evidence)}\n\nPREGUNTA\n${groundedMessage}`;
     const result = await callOpenAI({ instructions, input });
     return NextResponse.json({
       answer: result.text,

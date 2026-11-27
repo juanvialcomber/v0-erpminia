@@ -2,10 +2,14 @@
 
 import { FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Database, FileDown, GitBranch, RotateCcw, Send, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
+import { isDanielMasterEvidenceHref } from '@/lib/finance/daniel-master';
 import { Button } from '@/components/ui/button';
 
 type SourceRef = {
   source?: string;
+  href?: string;
+  label?: string;
   tool?: string;
   mode?: 'read' | 'prepare_only' | string;
 };
@@ -38,6 +42,7 @@ type SpecialistAssistantBodyProps = {
   loadingCopy: string;
   placeholder: string;
   toolCopy?: Record<string, string>;
+  onOpenEvidence: () => void;
 };
 
 type HandoffState = { state: 'sending' | 'done' | 'error'; label: string };
@@ -54,7 +59,7 @@ const DIRECT_EXECUTIVE_HANDOFF_ENDPOINTS = new Set([
 function uniqueEvidenceRefs(refs: SourceRef[]) {
   const unique = new Map<string, SourceRef>();
   for (const ref of refs) {
-    const key = ref.tool ? `tool:${ref.tool}:${ref.mode || 'read'}` : ref.source ? `source:${ref.source}` : '';
+    const key = ref.href || (ref.tool ? `tool:${ref.tool}:${ref.mode || 'read'}` : ref.source ? `source:${ref.source}` : '');
     if (key && !unique.has(key)) unique.set(key, ref);
   }
   return Array.from(unique.values());
@@ -67,6 +72,7 @@ export function SpecialistAssistantBody({
   loadingCopy,
   placeholder,
   toolCopy = {},
+  onOpenEvidence,
 }: SpecialistAssistantBodyProps) {
   const mineAssistant = endpoint === '/api/intelligence/mine-role-assistant';
   const [loaded, setLoaded] = useState(false);
@@ -388,7 +394,10 @@ export function SpecialistAssistantBody({
                 {item.role === 'assistant' && evidenceRefs.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-2 text-[10px] text-muted-foreground">
                     {evidenceRefs.slice(0, 8).map((ref) => {
-                      const label = ref.tool ? (toolCopy[ref.tool] || ref.tool) : ref.source;
+                      const label = ref.label || (ref.tool ? (toolCopy[ref.tool] || ref.tool) : ref.source);
+                      if (ref.href && isDanielMasterEvidenceHref(ref.href)) {
+                        return <Link key={ref.href} href={ref.href} onNavigate={onOpenEvidence} className="rounded-full border border-border px-2 py-1 text-primary underline-offset-2 hover:underline">{label}</Link>;
+                      }
                       return <span key={`${ref.tool || ref.source}:${ref.mode || 'read'}`} className="rounded-full border border-border px-2 py-1">{label}{ref.mode === 'prepare_only' ? ' · preparar' : ''}</span>;
                     })}
                   </div>

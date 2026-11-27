@@ -30,6 +30,8 @@ export type CoreConversationScope = {
 
 export type CoreSourceRef = {
   source?: string;
+  href?: string;
+  label?: string;
   tool?: string;
   mode?: 'read' | 'prepare_only' | string;
 };

@@ -306,6 +306,7 @@ export function SeniorAssistantWidget() {
               loadingCopy={specialist.loadingCopy}
               placeholder={specialist.placeholder}
               toolCopy={specialist.toolCopy}
+              onOpenEvidence={() => setOpen(false)}
             />
           ) : (
             <div className="space-y-4 p-4">

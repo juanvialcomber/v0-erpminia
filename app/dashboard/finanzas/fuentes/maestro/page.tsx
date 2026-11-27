@@ -1,12 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatePanel } from '@/components/ui/state-panel';
+import { DANIEL_METRIC_LABELS } from '@/lib/finance/daniel-master';
 import type { DanielCalculation, DanielCalculationIssue, DanielMaster, DanielMasterCalculationRun, DanielMasterMetric, DanielMasterRow } from '@/lib/finance/daniel-master';
 
 const API = '/api/finance/sources/daniel-master';
@@ -19,32 +21,6 @@ const groups = [
   { domain: 'finance', title: 'Ingresos, costos y resultados' },
   { domain: 'production', title: 'Producción y recuperación' },
 ] as const;
-
-const labels: Record<string, string> = {
-  operating_revenue: 'Ingresos operacionales',
-  concentrate_sales: 'Ventas de concentrado',
-  financial_income: 'Ingresos financieros',
-  other_nonoperating_income: 'Otros ingresos no operacionales',
-  financial_expense: 'Gastos financieros',
-  nonoperating_result_reported: 'Resultado no operacional reportado',
-  pretax_result_reported_incomplete: 'Resultado antes de impuestos (incompleto)',
-  cost_sales: 'Gastos de venta',
-  cost_administration_including_sales: 'Costos de administración y ventas',
-  cost_plant: 'Costos de planta',
-  cost_peumo: 'Costos de Peumo',
-  cost_don_jaime: 'Costos de Don Jaime',
-  cost_mines: 'Costos de minas',
-  cost_exploration: 'Costos de exploración',
-  cost_total_management: 'Costo total de gestión',
-  extracted_peumo: 'Extracción de Peumo',
-  extracted_don_jaime: 'Extracción de Don Jaime',
-  extracted_total: 'Extracción total',
-  treated_dry: 'Mineral tratado',
-  concentrate_produced: 'Concentrado producido',
-  fine_copper_produced: 'Cobre fino producido',
-  recovery_theoretical: 'Recuperación teórica',
-  recovery_effective: 'Recuperación efectiva',
-};
 
 async function fetcher<T>(url: string): Promise<T> {
   const response = await fetch(url, { cache: 'no-store' });
@@ -100,9 +76,32 @@ function CalculationResult({ result, unit }: { result?: DanielCalculation; unit:
 }
 
 export default function DanielMasterPage() {
-  const [selection, setSelection] = useState<{ sheet: string; row?: number; cell?: string } | null>(null);
+  return (
+    <Suspense fallback={<StatePanel tone="loading" title="Cargando el maestro de costos y producción" />}>
+      <DanielMasterContent />
+    </Suspense>
+  );
+}
+
+function DanielMasterContent() {
+  const [manualSelection, setSelection] = useState<{ sheet: string; row?: number; cell?: string } | null>(null);
   const evidenceSection = useRef<HTMLElement>(null);
   const { data, error, isLoading, mutate } = useSWR<DanielMaster>(API, fetcher);
+  const metricId = useSearchParams().get('metric');
+  const linkedMetric = metricId ? data?.metrics.find((metric) => metric.id === metricId) : undefined;
+  const [previousMetricId, setPreviousMetricId] = useState(metricId);
+  if (previousMetricId !== metricId) {
+    setPreviousMetricId(metricId);
+    setSelection(null);
+  }
+  const selection = manualSelection ?? (linkedMetric
+    ? { sheet: linkedMetric.sheet, row: linkedMetric.row, cell: linkedMetric.cell ?? undefined }
+    : null);
+  useEffect(() => {
+    if (!linkedMetric || !evidenceSection.current) return;
+    evidenceSection.current.focus({ preventScroll: true });
+    evidenceSection.current.scrollIntoView({ block: 'start' });
+  }, [linkedMetric]);
   const calculation = useSWRMutation<DanielMasterCalculationRun>(`${API}?calculate=1`, fetcher);
   const results = calculation.data?.results;
   const counts = Object.values(results ?? {}).reduce((totals, result) => {
@@ -183,7 +182,7 @@ export default function DanielMasterPage() {
                   <tbody className="divide-y">
                     {items.map((metric) => (
                       <tr key={metric.id}>
-                        <th scope="row" className="px-4 py-2 font-medium">{labels[metric.code] ?? metric.code}</th>
+                        <th scope="row" className="px-4 py-2 font-medium">{DANIEL_METRIC_LABELS[metric.code] ?? metric.code}</th>
                         <td className="whitespace-nowrap px-4 py-2">{metric.period ? month.format(new Date(metric.period)) : 'Sin período'}</td>
                         <td className="px-4 py-2">
                           <span className="whitespace-nowrap tabular-nums">{displayMetric(metric)}</span>
@@ -215,6 +214,7 @@ export default function DanielMasterPage() {
 
       <section ref={evidenceSection} id="evidencia" aria-labelledby="evidencia-titulo" tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md border p-4">
         <h2 id="evidencia-titulo" className="text-base font-semibold">Evidencia del maestro</h2>
+        {metricId && !linkedMetric && <p className="text-sm text-muted-foreground">El indicador enlazado no está disponible en este maestro.</p>}
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-0 flex-col gap-1 text-sm">
             Hoja
