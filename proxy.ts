@@ -259,6 +259,8 @@ function financeManagerAllowed(path: string, method: string): boolean {
   ]);
   if (financeValueRoutes.has(path)) return true;
 
+  if (path === '/api/finance/sources/daniel-master') return readOnly;
+
   const financeApiAreas = ['assistant','certified','cost-centers','event-ledger','executive','intelligence','payables','sources','suppliers'];
   if (financeApiAreas.some(area => path === `/api/finance/${area}` || path.startsWith(`/api/finance/${area}/`))) return true;
   if (path.startsWith('/api/finance/')) return false;

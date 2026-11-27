@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -99,6 +100,11 @@ export default function FinanceSourcesPage() {
           Muestra de dónde provienen las cifras, qué período cubren y si existe respaldo documental asociado.
         </p>
       </header>
+
+      <Link href="/dashboard/finanzas/fuentes/maestro" className="block rounded-lg border p-4 hover:bg-muted/50">
+        <h2 className="text-sm font-semibold">Maestro de costos y producción</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Revisa el informe de Daniel y las celdas que respaldan cada indicador.</p>
+      </Link>
 
       <section className="grid overflow-hidden rounded-lg border sm:grid-cols-4">
         {[
