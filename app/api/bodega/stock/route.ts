@@ -158,6 +158,7 @@ async function buildCanonicalStock(
   pricingWarning?: string;
   stockSource: string;
   sourceAuthority?: Record<string, unknown> | null;
+  verificationPolicy: typeof STOCK_VERIFICATION_POLICY;
 } | null> {
   const pageSize = 1000;
   let start = 0;
