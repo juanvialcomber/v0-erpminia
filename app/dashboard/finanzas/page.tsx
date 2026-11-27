@@ -10,6 +10,7 @@ import { AssetCandidateReviewSignal } from '@/components/finance/asset-candidate
 const primarySections = [
   ['/dashboard/finanzas/compras', 'Compras', 'Órdenes, recepciones, facturas y pagos'],
   ['/dashboard/finanzas/conciliacion', 'Conciliación', 'Diferencias y revisión de evidencia'],
+  ['/dashboard/finanzas/fuentes/maestro', 'Maestro de costos y producción', 'Indicadores y respaldo del informe de Daniel'],
   ['/dashboard/finanzas/pagos', 'Pagos', 'Vencimientos, pagos y conciliación'],
   ['/dashboard/finanzas/proveedores', 'Proveedores', 'Saldos pendientes por proveedor'],
   ['/dashboard/finanzas/activos', 'Activos', 'Valor, seguro y mantenimiento'],
