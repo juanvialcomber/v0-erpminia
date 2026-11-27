@@ -97,7 +97,7 @@ const CONTEXTS: Array<AssistantContext & { prefixes: string[] }> = [
     capabilities: ['finance'],
     suggestedPrompts: [
       '¿Qué compromisos financieros requieren atención?',
-      '¿Qué costos muestran una excepción relevante?',
+      '¿Qué puedo dar por cerrado en julio y qué requiere mi revisión?',
       '¿Qué información falta para explicar esta variación?',
     ],
   },

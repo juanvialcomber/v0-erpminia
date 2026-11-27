@@ -1,3 +1,4 @@
+import { isDanielMasterEvidenceHref } from '@/lib/finance/daniel-master';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OrganizationSuccessContext } from '@/lib/api/organization-context';
 import {
@@ -50,7 +51,16 @@ function refsFromPayload(payload: any): CoreSourceRef[] {
         .filter((tool: any) => tool && typeof tool.name === 'string')
         .map((tool: any) => ({ tool: tool.name, mode: typeof tool.mode === 'string' ? tool.mode : 'read' }))
     : [];
-  return [...sources, ...tools];
+  const linked: CoreSourceRef[] = [];
+  if (Array.isArray(payload?.evidenceRefs)) {
+    for (const ref of payload.evidenceRefs.slice(0, 8)) {
+      if (ref?.source === 'maestro_daniel' && typeof ref.href === 'string'
+        && typeof ref.label === 'string' && isDanielMasterEvidenceHref(ref.href)) {
+        linked.push({ source: ref.source, href: ref.href, label: ref.label });
+      }
+    }
+  }
+  return [...linked, ...sources, ...tools];
 }
 
 function extractResponseText(payload: any) {
@@ -196,6 +206,7 @@ export async function handlePersistentOperationalDomainAssistant(args: HandlerAr
       context,
       domain,
       allowedDomains: args.allowedDomains,
+      standaloneQuestion: domain === 'finance' ? standaloneMessage : undefined,
     });
     const payload = await operationalResponse.json().catch(() => null);
 

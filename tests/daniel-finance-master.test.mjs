@@ -14,6 +14,23 @@ const compiled = ts.transpileModule(source, {
 const engineSource = readFileSync(new URL('../lib/finance/daniel-master-engine.ts', import.meta.url), 'utf8');
 const engine = await import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(engineSource)).toString('base64'));
 
+function loadModule(path, dependencies = {}) {
+  const { outputText } = ts.transpileModule(readFileSync(new URL(path, import.meta.url), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  });
+  const module = { exports: {} };
+  runInNewContext(outputText, { module, exports: module.exports, require: (name) => dependencies[name] });
+  return module.exports;
+}
+
+const masterSource = loadModule('../lib/finance/daniel-master-source.ts', {
+  '@/lib/finance/daniel-master-engine': engine,
+});
+const sharedMaster = loadModule('../lib/finance/daniel-master.ts');
+const masterAssistant = loadModule('../lib/finance/daniel-master-assistant.ts', {
+  '@/lib/finance/daniel-master': sharedMaster,
+});
+
 function harness({ denied, documentExists = true, failTable, accessOrg = 'org-a', expectedRows = 3 } = {}) {
   const requests = [];
   const supabase = createClient('https://fixture.example', 'fixture-key', {
@@ -62,7 +79,7 @@ function harness({ denied, documentExists = true, failTable, accessOrg = 'org-a'
   const module = { exports: {} };
   const dependencies = {
     'next/server': { NextResponse: Response },
-    '@/lib/finance/daniel-master-engine': engine,
+    '@/lib/finance/daniel-master-source': masterSource,
     '@/lib/api/module-access': {
       MODULE_KEYS: { FIN_FINANZAS: 'fin_finanzas' },
       async requireModuleAccess(_request, key, write) {
@@ -81,7 +98,7 @@ function harness({ denied, documentExists = true, failTable, accessOrg = 'org-a'
     module, exports: module.exports, require: (name) => dependencies[name], console: { error() {} },
   });
   const read = (query = '') => module.exports.GET({ nextUrl: new URL(`https://motil.example/api/finance/sources/daniel-master${query}`) });
-  return { read, requests };
+  return { read, requests, source: masterSource.danielMasterSource({ organizationId: 'org-a', supabase }) };
 }
 
 test('master requires a finance session and consistent organization before consulting Supabase', async () => {
@@ -183,4 +200,42 @@ test('motor reports invalid inputs, division by zero, circular references and un
   for (const [cells, reason, cell] of cases) {
     assert.deepEqual(evaluate(cells, 'E2', 1), { status: 'blocked', reason, cell });
   }
+});
+
+test('assistant answers July directly from the same tenant-scoped source and links the exact metric', async () => {
+  const { source } = harness();
+  const master = await source.read();
+  const calculation = await source.calculate(master);
+  const question = masterAssistant.danielMasterQuestion('¿Qué puedo dar por cerrado en julio y qué requiere mi revisión?');
+  assert.ok(question);
+  const reply = masterAssistant.answerDanielMaster(question, master, calculation);
+  assert.match(reply.answer, /1 fórmulas coinciden/);
+  assert.match(reply.answer, /1 indicadores provisionales/);
+  assert.match(reply.answer, /requiere validación de Finanzas/);
+  assert.match(reply.answer, /discrepancia entre la portada y el archivo/);
+  assert.equal(reply.evidenceRefs[0].href, '/dashboard/finanzas/fuentes/maestro?metric=metric-1#evidencia');
+  assert.equal(sharedMaster.isDanielMasterEvidenceHref(reply.evidenceRefs[0].href), true);
+  assert.equal(sharedMaster.isDanielMasterEvidenceHref('https://external.example/maestro'), false);
+
+  const detail = masterAssistant.answerDanielMaster(
+    masterAssistant.danielMasterQuestion('¿Cuáles fueron los ingresos operacionales provisionales de julio de 2026?'),
+    master, calculation,
+  );
+  assert.match(detail.answer, /EERR · E28/);
+  assert.match(detail.answer, /=E26-E27/);
+  assert.match(detail.answer, /Provisional/);
+});
+
+test('assistant does not use July evidence for another period or intercept inventory and treasury', async () => {
+  const { source } = harness();
+  const master = await source.read();
+  const calculation = await source.calculate(master);
+  for (const query of ['Cierre de junio en el maestro de Daniel', 'Maestro de julio de 2025', 'Maestro de Daniel 2026-09', 'Maestro de Daniel de este mes']) {
+    const result = masterAssistant.answerDanielMaster(masterAssistant.danielMasterQuestion(query), master, calculation);
+    assert.match(result.answer, /No puedo identificar un período/);
+    assert.doesNotMatch(result.answer, /fórmulas coinciden/);
+  }
+  assert.ok(masterAssistant.danielMasterQuestion('¿Cuánto costó operar en julio?').codes.includes('cost_total_management'));
+  assert.equal(masterAssistant.danielMasterQuestion('¿Qué pagos vencen en julio?'), null);
+  assert.equal(masterAssistant.danielMasterQuestion('¿Qué stock estaba negativo en julio?'), null);
 });

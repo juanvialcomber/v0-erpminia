@@ -16,6 +16,9 @@ async function handle(request: NextRequest) {
   ]);
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
+  if (financeAccess.organizationId !== context.organizationId) {
+    return Response.json({ error: 'Organización no autorizada' }, { status: 403 });
+  }
 
   const allowedDomains = ['finance'] as Array<'finance' | 'inventory' | 'procurement' | 'production'>;
   if (inventoryAccess.authorized) allowedDomains.push('inventory');
