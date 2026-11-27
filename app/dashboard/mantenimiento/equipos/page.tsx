@@ -11,6 +11,7 @@ import { EquipmentSheet } from '@/components/maintenance/equipment-sheet';
 import { DataSourceStatusStrip } from '@/components/data/data-source-status-strip';
 import { DataReceptionReadiness } from '@/components/data/data-reception-readiness';
 import { useDataSourceStatus } from '@/hooks/use-data-source-status';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 const assetViews = [
   { href: '/dashboard/mantenimiento/disponibilidad', label: 'Disponibilidad', icon: Activity },
@@ -25,6 +26,7 @@ export default function EquiposPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const sourceStatus = useDataSourceStatus();
+  const { canEdit, ready } = useModuleAccess();
 
   const handleSelectEquipment = (equipment: Equipment) => {
     setSelectedEquipment(equipment);
@@ -79,7 +81,7 @@ export default function EquiposPage() {
 
       <EquipmentList onSelectEquipment={handleSelectEquipment} />
 
-      <EquipmentSheet equipment={selectedEquipment} isOpen={isSheetOpen} onClose={handleCloseSheet} canEdit={true} />
+      <EquipmentSheet equipment={selectedEquipment} isOpen={isSheetOpen} onClose={handleCloseSheet} canEdit={ready && canEdit('mant_operaciones')} />
     </div>
   );
 }
