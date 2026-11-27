@@ -35,3 +35,9 @@ test('canonical metadata enrichment is bounded and fallback remains available', 
   assert.match(inventory, /dataSource: 'canonical_fallback'/);
   assert.match(stock, /stockSource: 'canonical_fallback'/);
 });
+
+test('stock API exposes an explicit human-verification policy for discrepancies', () => {
+  assert.match(stock, /physicalCountRequiredForAdjustment: true/);
+  assert.match(stock, /canonicalMutation: false/);
+  assert.match(stock, /sourceOnlyReadOnly: true/);
+});
