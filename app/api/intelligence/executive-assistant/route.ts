@@ -431,7 +431,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (access.canRead('finance')) {
-      const [overview, centers, suppliers, aging, cashForecast, laudusReview] = await Promise.all([
+      const [overview, centers, suppliers, aging, cashForecast, laudusReview, contracts, stockSummary, stockExceptions] = await Promise.all([
         context.supabase.from('canonical_finance_overview').select('*').eq('organization_id', org).maybeSingle(),
         context.supabase
           .from('canonical_finance_cost_centers')
@@ -457,8 +457,11 @@ export async function POST(request: NextRequest) {
           .eq('organization_id', org)
           .order('currency', { ascending: true }),
         context.supabase.rpc('motil_laudus_finance_review_queue', { p_organization_id: org, p_limit: 10 }),
+        context.supabase.from('contracts').select('contract_number,title,contractor_name,project_name,contract_value,paid_amount,status,start_date,end_date,compliance_status').eq('organization_id', org).order('end_date', { ascending: true }).limit(100),
+        context.supabase.from('laudus_inventory_freshness_summary_service_v1').select('*').eq('organization_id', org).maybeSingle(),
+        context.supabase.from('laudus_inventory_reconciliation_service_v1').select('sku,description,laudus_stock,motil_stock,quantity_delta,reconciliation_state,source_date_to,laudus_synced_at,motil_updated_at').eq('organization_id', org).in('reconciliation_state', ['quantity_mismatch', 'missing_in_motil']).order('quantity_delta', { ascending: false }).limit(50),
       ]);
-      const failed = [overview, centers, suppliers, aging, cashForecast, laudusReview].find((result) => result.error);
+      const failed = [overview, centers, suppliers, aging, cashForecast, laudusReview, contracts, stockSummary, stockExceptions].find((result) => result.error);
       if (failed?.error) throw failed.error;
       evidence.finance = {
         semantics: {
@@ -474,6 +477,8 @@ export async function POST(request: NextRequest) {
         payable_aging: aging.data || [],
         cash_forecast: cashForecast.data || [],
         laudus_review: laudusReview.data || null,
+        contracts: contracts.data || [],
+        stock_reconciliation: { summary: stockSummary.data || null, priority_exceptions: stockExceptions.data || [] },
       };
       [
         'canonical_finance_overview',
@@ -482,6 +487,9 @@ export async function POST(request: NextRequest) {
         'procurement_accounts_payable_aging_summary_v1',
         'procurement_cash_forecast_summary_v1',
         'motil_laudus_finance_review_queue',
+        'contracts',
+        'laudus_inventory_freshness_summary_service_v1',
+        'laudus_inventory_reconciliation_service_v1',
       ].forEach((source) => sources.add(source));
       toolsUsed.push({ name: 'read_executive_finance', mode: 'read' });
     }
