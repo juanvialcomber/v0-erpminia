@@ -5,6 +5,7 @@ import type { OrganizationSuccessContext } from '@/lib/api/organization-context'
 import { routeOperationalQuery, type QueryCapability } from '@/lib/intelligence/query-router';
 import { buildSkillPlan } from '@/lib/motil-ai/skills/orchestrator';
 import { resolveMotilSkillAvailability } from '@/lib/motil-ai/skills/runtime-availability';
+import { deterministicOperationalAnswer } from '@/lib/intelligence/deterministic-operational-answer';
 
 export type OperationalAssistantDomain = 'inventory' | 'procurement' | 'production' | 'finance';
 
@@ -502,6 +503,20 @@ export async function handleOperationalDomainAssistant(args: { request: NextRequ
     const sources = Array.from(new Set(bundles.flatMap((bundle) => bundle.sources)));
     const toolsUsed = bundles.flatMap((bundle) => bundle.toolsUsed);
     const evidence = Object.fromEntries(bundles.map((bundle) => [bundle.capability, bundle.payload]));
+    const deterministic = deterministicOperationalAnswer(groundedMessage, evidence);
+    if (deterministic) {
+      return NextResponse.json({
+        ...deterministic,
+        model: null,
+        conversationId: null,
+        route,
+        deniedCapabilities: denied,
+        skillPlan: plannedSkills,
+        skillSummary: skillRuntime.summary,
+        persistence: 'stateless_v1',
+        policy: 'READ_ONLY: respuesta determinística basada en evidencia canónica; no se ejecutan mutaciones.',
+      });
+    }
     const localLabel = domainLabel(domain);
     const instructions = `Eres el especialista de ${localLabel} dentro de MOTIL Intelligence Core para una operación minera chilena. Tu arquitectura es contexto local primero y expansión transversal sólo cuando aporta evidencia útil.\n\nREGLAS OBLIGATORIAS:\n1. Usa exclusivamente la evidencia canónica incluida en EVIDENCIA MOTIL para afirmaciones operacionales.\n2. Distingue DATO CANÓNICO, INTERPRETACIÓN PROFESIONAL, HIPÓTESIS A REVISAR y SIGUIENTE ACCIÓN cuando corresponda.\n3. Si el usuario pregunta por hoy, ahora o estado actual, declara explícitamente la fecha de frescura disponible. No presentes un snapshot antiguo como tiempo real.\n4. Un stock en reorder/out_of_stock/negative no es por sí solo criticidad operacional, riesgo de falla ni prioridad de compra.\n5. Un estado de orden de compra no autoriza inferir recepción, entrega, pago o cierre si esos hechos no están en la evidencia.\n6. En Producción separa valores reportados por fuente de cálculos determinísticos, respeta fine_coverage_state y no conviertas balances, frecuencias o excepciones en causas raíz o pronósticos.\n7. En Finanzas conserva la fecha de corte de cada proyección; no combines silenciosamente fuentes con distinta frescura. No interpretes presupuesto cero/ausente como presupuesto aprobado igual a cero. No confundas compromiso, gasto reconocido, devengo ni pago.\n8. No inventes precios vigentes, proveedores, lead times, criticidades, repuestos equivalentes, costos, causas, disponibilidad, tonelajes, leyes, recuperaciones, presupuestos ni producción faltante.\n9. Si falta permiso para una capacidad transversal solicitada, dilo de forma breve y limita la conclusión a la evidencia autorizada.\n10. No ejecutes compras, reservas, ajustes de stock, recepciones, aprobaciones, cambios de plan, cierres, pagos ni otra mutación. Puedes preparar una recomendación para validación humana.\n11. Mantén la respuesta operacional, concreta y breve. Prioriza qué sabemos, qué excepción importa, qué falta confirmar y cuál es el siguiente paso de mayor valor.\n12. No expongas JSON crudo ni detalles internos del runtime.
 13. PLAN DE SKILLS es orientación interna, no una fuente. Una skill AVAILABLE puede orientar qué evidencia combinar, pero la afirmación final debe seguir respaldada por EVIDENCIA MOTIL.
