@@ -3,6 +3,7 @@ export const dynamic='force-dynamic';
 import {NextRequest,NextResponse} from 'next/server';
 import {getOrganizationContext} from '@/lib/api/organization-context';
 import {MODULE_KEYS,requireModuleAccess} from '@/lib/api/module-access';
+import { chileTodayISO } from '@/lib/production/source-age.mjs';
 
 // This is a partial, source-reported snapshot of mine extraction and mineral
 // stock, NOT a replacement for assayed plant shifts or certified Cu-fine data.
@@ -94,6 +95,7 @@ export async function GET(request:NextRequest){
     plantStockTons:plantBalance[date]??null,
   }));
   const snapshot={
+    asOfChileDate:chileTodayISO(),
     stats:{
       cutoff:statsDoc?.period_end||null,source:statsDoc?.source_file||null,
       periodStart:stats.find(r=>r.record_type==='extraction_actual_peumo')?.period_start||null,

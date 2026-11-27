@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { calculatePlantPreview, validatePlantEntry } from '@/lib/production/plant-entry-validation.mjs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   PageHeader,
@@ -76,11 +77,6 @@ async function sha256Text(text: string) {
   return sha256Bytes(new TextEncoder().encode(text).buffer);
 }
 
-function numberOrNull(value: string) {
-  const n = Number(value.replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
-}
-
 export default function ProductionDataEntryPage() {
   const [tmFile, setTmFile] = useState<ParsedTmFile | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -94,31 +90,7 @@ export default function ProductionDataEntryPage() {
   const [savingTransport, setSavingTransport] = useState(false);
   const [savingPlant, setSavingPlant] = useState(false);
 
-  const plantPreview = useMemo(() => {
-    const wet = numberOrNull(plant.treatedWetMetricTons);
-    const mineralMoisture = numberOrNull(plant.mineralMoisturePct);
-    const head = numberOrNull(plant.headGrade);
-    const concWet = numberOrNull(plant.concentrateWetMetricTons);
-    const concMoisture = numberOrNull(plant.concentrateMoisturePct);
-    const concGrade = numberOrNull(plant.concentrateGrade);
-    const tail = numberOrNull(plant.tailingsGrade);
-    const dispatchWet = numberOrNull(plant.dispatchedMetricTons);
-    const dispatchMoisture = numberOrNull(plant.dispatchMoisturePct);
-    const dispatchGrade = numberOrNull(plant.dispatchGrade);
-
-    const mineralDry = wet !== null && mineralMoisture !== null ? wet * (1 - mineralMoisture / 100) : null;
-    const feedFine = mineralDry !== null && head !== null ? mineralDry * head / 100 : null;
-    const concentrateDry = concWet !== null && concMoisture !== null ? concWet * (1 - concMoisture / 100) : null;
-    const concentrateFine = concentrateDry !== null && concGrade !== null ? concentrateDry * concGrade / 100 : null;
-    const gradeRecovery = head !== null && concGrade !== null && tail !== null && head !== 0 && concGrade !== tail
-      ? ((head - tail) * concGrade) / ((concGrade - tail) * head) * 100
-      : null;
-    const balanceRecovery = feedFine && concentrateFine !== null ? concentrateFine / feedFine * 100 : null;
-    const dispatchFine = dispatchWet !== null && dispatchMoisture !== null && dispatchGrade !== null
-      ? dispatchWet * (1 - dispatchMoisture / 100) * dispatchGrade / 100
-      : null;
-    return { mineralDry, feedFine, concentrateDry, concentrateFine, gradeRecovery, balanceRecovery, dispatchFine };
-  }, [plant]);
+  const plantPreview = useMemo(() => calculatePlantPreview(plant), [plant]);
 
   async function parseTm2026(file: File) {
     setParsing(true);
@@ -246,23 +218,20 @@ export default function ProductionDataEntryPage() {
   }
 
   async function savePlant() {
+    const validated = validatePlantEntry({ mode: 'plant_metallurgy', ...plant });
+    if (!validated.ok) {
+      toast.error(validated.error || 'Revise los datos del turno antes de guardar');
+      return;
+    }
     setSavingPlant(true);
     try {
-      const optionalNumber = (value: string) => value.trim() === '' ? null : Number(value);
       const response = await fetch('/api/produccion/data-entry', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'plant_metallurgy', operationDate: plant.operationDate, shiftCode: plant.shiftCode,
-          treatedWetMetricTons: Number(plant.treatedWetMetricTons), mineralMoisturePct: Number(plant.mineralMoisturePct), headGrade: Number(plant.headGrade),
-          concentrateGrade: optionalNumber(plant.concentrateGrade), tailingsGrade: optionalNumber(plant.tailingsGrade), galigherGrade: optionalNumber(plant.galigherGrade),
-          concentrateWetMetricTons: optionalNumber(plant.concentrateWetMetricTons), concentrateMoisturePct: optionalNumber(plant.concentrateMoisturePct),
-          dispatchedMetricTons: optionalNumber(plant.dispatchedMetricTons), dispatchMoisturePct: optionalNumber(plant.dispatchMoisturePct), dispatchGrade: optionalNumber(plant.dispatchGrade),
-          lotNumber: plant.lotNumber || null, blendCode: plant.blendCode || null,
-        }),
+        body: JSON.stringify(validated.payload),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'No fue posible guardar el turno');
-      toast.success('Turno guardado con cálculos automáticos');
+      toast.success('Turno registrado. Revise sus resultados antes de usarlos en un cierre.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No fue posible guardar el turno');
     } finally {
@@ -309,7 +278,7 @@ export default function ProductionDataEntryPage() {
         <TabsContent value="plant" className="space-y-5">
           <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
             <Card>
-              <CardHeader><CardTitle className="text-base">Turno Planta / Leyes</CardTitle><CardDescription>Separa humedad del mineral y humedad del concentrado. Todos los cálculos se realizan sobre base seca.</CardDescription></CardHeader>
+              <CardHeader><CardTitle className="text-base">Turno Planta / Leyes</CardTitle><CardDescription>Separa humedad del mineral y humedad del concentrado. Ingrese toneladas húmedas verificadas: una planilla con Tratado TMS no debe copiarse aquí como toneladas húmedas sin la conversión acreditada.</CardDescription></CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {[['operationDate','Fecha','date'],['shiftCode','Turno','text'],['treatedWetMetricTons','Mineral tratado húmedo (t)','number'],['mineralMoisturePct','Humedad mineral (%)','number'],['headGrade','Ley cabeza (%)','number'],['galigherGrade','Ley Galigher (%)','number'],['concentrateWetMetricTons','Concentrado húmedo (t)','number'],['concentrateMoisturePct','Humedad concentrado (%)','number'],['concentrateGrade','Ley concentrado (%)','number'],['tailingsGrade','Ley relave (%)','number'],['dispatchedMetricTons','Despacho húmedo (t)','number'],['dispatchMoisturePct','Humedad despacho (%)','number'],['dispatchGrade','Ley despacho (%)','number'],['lotNumber','Lote','text'],['blendCode','Mezcla / blend','text']].map(([key,label,type]) => <div key={key}><Label htmlFor={`plant-${key}`}>{label}</Label><Input id={`plant-${key}`} type={type} step={type === 'number' ? 'any' : undefined} className="mt-1.5" value={plant[key as keyof typeof plant]} onChange={(event) => setPlant((current) => ({ ...current, [key]: event.target.value }))} /></div>)}
                 <div className="md:col-span-2 xl:col-span-3 flex justify-end"><Button onClick={() => void savePlant()} disabled={savingPlant}>{savingPlant ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar turno y calcular</Button></div>
@@ -317,9 +286,10 @@ export default function ProductionDataEntryPage() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="h-4 w-4" />Cálculo automático</CardTitle><CardDescription>Preview informativo. El servidor recalcula nuevamente al guardar.</CardDescription></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="h-4 w-4" />Cálculo automático</CardTitle><CardDescription>Vista previa no oficial: sólo calcula con mediciones ingresadas; el servidor valida y recalcula al guardar.</CardDescription></CardHeader>
               <CardContent className="space-y-3 text-sm">
                 {[['Mineral seco',format(plantPreview.mineralDry)],['Fino alimentación',format(plantPreview.feedFine)],['Recuperación por leyes',format(plantPreview.gradeRecovery,' %')],['Concentrado seco',format(plantPreview.concentrateDry)],['Fino concentrado',format(plantPreview.concentrateFine)],['Recuperación por balance',format(plantPreview.balanceRecovery,' %')],['Fino despachado',format(plantPreview.dispatchFine)]].map(([label,value]) => <div key={label} className="flex items-center justify-between gap-4 border-b pb-2 last:border-0"><span className="text-muted-foreground">{label}</span><strong>{value}</strong></div>)}
+                {plantPreview.requiresReview ? <p role="alert" className="text-xs text-destructive">Las leyes o el balance entregan una recuperación fuera de 0–100 %. Revisar las mediciones de origen.</p> : null}
                 <p className="pt-2 text-xs text-muted-foreground">Si falta evidencia para una fórmula, Motil muestra “—”. No interpreta ausencia de dato como cero.</p>
               </CardContent>
             </Card>
