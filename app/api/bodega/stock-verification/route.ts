@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
 import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { stockSearchPattern } from '@/lib/bodega/stock-search-pattern.mjs';
+import { STOCK_VERIFICATION_POLICY } from '@/lib/bodega/stock-verification-policy';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const QUANTITY = /^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,6})?$/;
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
           total: states.reduce((sum, key) => sum + counts[key], 0),
         },
         readOnlyStock: true,
+        verificationPolicy: STOCK_VERIFICATION_POLICY,
       });
     }
 
@@ -153,6 +155,7 @@ export async function GET(request: NextRequest) {
       offset,
       limit,
       readOnlyStock: true,
+      verificationPolicy: STOCK_VERIFICATION_POLICY,
     });
   } catch (error) {
     console.error('[bodega/stock-verification][GET]', error);
