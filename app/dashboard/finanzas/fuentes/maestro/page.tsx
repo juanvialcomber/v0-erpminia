@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
@@ -101,7 +101,8 @@ function CalculationResult({ result, unit }: { result?: DanielCalculation; unit:
 
 export default function DanielMasterPage() {
   const [selection, setSelection] = useState<{ sheet: string; row?: number; cell?: string } | null>(null);
-  const { data, error, isLoading } = useSWR<DanielMaster>(API, fetcher);
+  const evidenceSection = useRef<HTMLElement>(null);
+  const { data, error, isLoading, mutate } = useSWR<DanielMaster>(API, fetcher);
   const calculation = useSWRMutation<DanielMasterCalculationRun>(`${API}?calculate=1`, fetcher);
   const results = calculation.data?.results;
   const counts = Object.values(results ?? {}).reduce((totals, result) => {
@@ -117,10 +118,14 @@ export default function DanielMasterPage() {
   const evidence = useSWR<DanielMasterRow>(rowsUrl && row ? `${rowsUrl}&row=${row}` : null, fetcher);
 
   if (isLoading) return <StatePanel tone="loading" title="Cargando el maestro de costos y producción" />;
-  if (error || !data) return <StatePanel tone="error" title="No se pudo cargar el maestro" description={error?.message} />;
+  if (error || !data) return <StatePanel tone="error" title="No se pudo cargar el maestro" description={error?.message} actions={<Button variant="outline" onClick={() => void mutate()}>Reintentar</Button>} />;
   if (!data.document) return <StatePanel title="Esta organización no tiene el maestro registrado" />;
 
   const { document, metrics, sheets } = data;
+  const selectedAddress = selection?.cell;
+  const selectedCell = selectedAddress ? evidence.data?.source_values.cells?.[selectedAddress] : undefined;
+  const selectedValue = selectedCell?.formula ? selectedCell.cached : selectedCell?.value;
+  const evidenceError = rows.error ?? evidence.error;
   const cells = Object.entries(evidence.data?.source_values.cells ?? {})
     .sort(([first], [second]) => first.length - second.length || first.localeCompare(second));
 
@@ -190,7 +195,10 @@ export default function DanielMasterPage() {
                           <a
                             href="#evidencia"
                             className="text-primary underline-offset-4 hover:underline"
-                            onClick={() => setSelection({ sheet: metric.sheet, row: metric.row, cell: metric.cell ?? undefined })}
+                            onClick={() => {
+                              setSelection({ sheet: metric.sheet, row: metric.row, cell: metric.cell ?? undefined });
+                              evidenceSection.current?.focus({ preventScroll: true });
+                            }}
                           >
                             {metric.sheet} · {metric.cell ?? `fila ${metric.row}`}
                           </a>
@@ -205,8 +213,8 @@ export default function DanielMasterPage() {
         );
       })}
 
-      <section id="evidencia" tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md border p-4">
-        <h2 className="text-base font-semibold">Evidencia del maestro</h2>
+      <section ref={evidenceSection} id="evidencia" aria-labelledby="evidencia-titulo" tabIndex={-1} className="scroll-mt-24 space-y-3 rounded-md border p-4">
+        <h2 id="evidencia-titulo" className="text-base font-semibold">Evidencia del maestro</h2>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-0 flex-col gap-1 text-sm">
             Hoja
@@ -238,36 +246,65 @@ export default function DanielMasterPage() {
           )}
         </div>
 
-        {(rows.error || evidence.error) && <StatePanel tone="error" title="No se pudo cargar la evidencia" description={(rows.error ?? evidence.error).message} />}
-        {!(rows.error || evidence.error) && (rows.isLoading || evidence.isLoading) && <StatePanel tone="loading" title="Cargando evidencia" />}
-        {rows.data?.rows.length === 0 && <StatePanel title={sheetInfo?.row_level_materialized ? 'Hoja sin filas' : 'Hoja pendiente de materialización'} />}
-        {cells.length > 0 && (
-          <div className="max-h-[36rem] overflow-auto rounded-md border">
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Celdas de la fila seleccionada</caption>
-              <thead className="sticky top-0 bg-muted text-muted-foreground">
-                <tr>
-                  {['Celda', 'Valor guardado', 'Fórmula original'].map((label) => (
-                    <th key={label} scope="col" className="px-3 py-2 font-medium">{label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {cells.map(([address, cell]) => {
-                  const sourceValue = cell.formula ? cell.cached : cell.value;
-                  return (
-                    <tr key={address} className={selection?.cell === address ? 'bg-primary/10' : undefined}>
-                      <th scope="row" className="px-3 py-2 font-mono font-medium">{address}</th>
-                      <td className="px-3 py-2 tabular-nums">
-                        {sourceValue == null ? '—' : String(sourceValue)}
-                      </td>
-                      <td className="break-all px-3 py-2 font-mono text-xs">{cell.formula ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {evidenceError && (
+          <StatePanel tone="error" title="No se pudo cargar la evidencia" description={evidenceError.message}
+            actions={<Button variant="outline" onClick={() => {
+              if (rows.error) void rows.mutate();
+              if (evidence.error) void evidence.mutate();
+            }}>Reintentar</Button>} />
+        )}
+        {!evidenceError && (rows.isLoading || evidence.isLoading) && <StatePanel tone="loading" title="Cargando evidencia" />}
+        {!evidenceError && rows.data?.rows.length === 0 && <StatePanel title={sheetInfo?.row_level_materialized ? 'Hoja sin filas' : 'Hoja pendiente de materialización'} />}
+        {!evidenceError && selectedAddress && evidence.data && (
+          <div role="status" className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-4">
+            <h3 className="font-semibold">{sheet} · {selectedAddress}</h3>
+            {selectedCell ? (
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-muted-foreground">Valor guardado</dt>
+                  <dd className="break-all font-mono">{selectedValue == null ? '—' : String(selectedValue)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Fórmula original</dt>
+                  <dd className="break-all font-mono">{selectedCell.formula ?? 'Valor ingresado'}</dd>
+                </div>
+              </dl>
+            ) : <p className="text-sm text-muted-foreground">La fila guardada no contiene esta celda.</p>}
           </div>
+        )}
+        {!evidenceError && cells.length > 0 && (
+          <details key={`${sheet}:${row}:${selectedAddress ?? ''}`} open={!selectedAddress}
+            className="rounded-md border">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+              Celdas de la fila {row} ({cells.length})
+            </summary>
+            <div className="max-h-[36rem] overflow-auto border-t">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">Celdas de la fila seleccionada</caption>
+                <thead className="sticky top-0 bg-muted text-muted-foreground">
+                  <tr>
+                    {['Celda', 'Valor guardado', 'Fórmula original'].map((label) => (
+                      <th key={label} scope="col" className="px-3 py-2 font-medium">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {cells.map(([address, cell]) => {
+                    const sourceValue = cell.formula ? cell.cached : cell.value;
+                    return (
+                      <tr key={address} className={selection?.cell === address ? 'bg-primary/10' : undefined}>
+                        <th scope="row" className="px-3 py-2 font-mono font-medium">{address}</th>
+                        <td className="px-3 py-2 tabular-nums">
+                          {sourceValue == null ? '—' : String(sourceValue)}
+                        </td>
+                        <td className="break-all px-3 py-2 font-mono text-xs">{cell.formula ?? '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </details>
         )}
       </section>
     </div>
