@@ -43,6 +43,32 @@ export default function FinancePage() {
       <LaudusFinanceReconciliationQueue />
       <SharedProjectPortfolio />
 
+      <section aria-labelledby="finance-readiness-title" className="rounded-lg border bg-card p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Control de cierre</p>
+            <h2 id="finance-readiness-title" className="mt-1 text-base font-semibold">Estado de la evidencia financiera</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Cada cifra debe conservar fuente, fecha de corte y estado de revisión. Un dato provisional no equivale a un cierre aprobado.
+            </p>
+          </div>
+          <Link href="/dashboard/finanzas/conciliacion" className="text-sm font-medium text-primary underline-offset-4 hover:underline">Abrir cola de conciliación</Link>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['Confirmado', 'Fuente y cálculo coinciden.', 'border-emerald-500/30 bg-emerald-500/5'],
+            ['Revisar', 'Existe una diferencia concreta.', 'border-amber-500/30 bg-amber-500/5'],
+            ['Bloqueado', 'Falta fuente, permiso o evidencia.', 'border-red-500/30 bg-red-500/5'],
+            ['Provisional', 'Dato usable con validación pendiente.', 'border-sky-500/30 bg-sky-500/5'],
+          ].map(([label, description, tone]) => (
+            <div key={label} className={`rounded-md border p-3 ${tone}`}>
+              <p className="text-sm font-semibold">{label}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <PurchaseOrderEvidence />
       <LaudusFinanceControlCard />
 
