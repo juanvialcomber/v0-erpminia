@@ -52,9 +52,10 @@ async function loadOpenPayables(db: SupabaseClient, organizationId: string) {
   for (let from = 0; from < maxRows; from += pageSize) {
     const to = Math.min(from + pageSize - 1, maxRows - 1);
     const result = await db
-      .from('laudus_accounts_payable_service_v1')
+      .from('laudus_accounts_payable_quality_v1')
       .select('external_id,supplier_external_id,document_number,issued_date,due_date,outstanding_amount,currency_code,status')
       .eq('organization_id', organizationId)
+      .eq('quality_status', 'verificado')
       .gt('outstanding_amount', 0)
       .range(from, to);
     if (result.error) throw new Error(result.error.message);
@@ -143,6 +144,8 @@ export async function loadLaudusFinanceControl(
     openPayables,
     overduePayables,
     dueSoonPayables,
+    excludedPayableQualityRows,
+    excludedPayableQualityAmountRows,
     oldestOpenPayableRows,
     openPayableRows,
   ] = await Promise.all([
@@ -179,32 +182,50 @@ export async function loadLaudusFinanceControl(
       .limit(5),
     count(
       db
-        .from('laudus_accounts_payable_service_v1')
+        .from('laudus_accounts_payable_quality_v1')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
+        .eq('quality_status', 'verificado')
         .gt('outstanding_amount', 0),
     ),
     count(
       db
-        .from('laudus_accounts_payable_service_v1')
+        .from('laudus_accounts_payable_quality_v1')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
+        .eq('quality_status', 'verificado')
         .gt('outstanding_amount', 0)
         .lt('due_date', todayKey),
     ),
     count(
       db
-        .from('laudus_accounts_payable_service_v1')
+        .from('laudus_accounts_payable_quality_v1')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', organizationId)
+        .eq('quality_status', 'verificado')
         .gt('outstanding_amount', 0)
         .gte('due_date', todayKey)
         .lt('due_date', sevenDaysFromTodayKey),
     ),
+    count(
+      db
+        .from('laudus_accounts_payable_quality_v1')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .neq('quality_status', 'verificado')
+        .gt('outstanding_amount', 0),
+    ),
     db
-      .from('laudus_accounts_payable_service_v1')
+      .from('laudus_accounts_payable_quality_v1')
+      .select('outstanding_amount')
+      .eq('organization_id', organizationId)
+      .neq('quality_status', 'verificado')
+      .gt('outstanding_amount', 0),
+    db
+      .from('laudus_accounts_payable_quality_v1')
       .select('external_id,supplier_external_id,document_number,issued_date,due_date,outstanding_amount,currency_code,status')
       .eq('organization_id', organizationId)
+      .eq('quality_status', 'verificado')
       .gt('outstanding_amount', 0)
       .order('due_date', { ascending: true, nullsFirst: false })
       .limit(5),
@@ -214,6 +235,7 @@ export async function loadLaudusFinanceControl(
   if (creditNoteRows.error) throw new Error(creditNoteRows.error.message);
   if (latestAccounting.error) throw new Error(latestAccounting.error.message);
   if (pendingPaymentRows.error) throw new Error(pendingPaymentRows.error.message);
+  if (excludedPayableQualityAmountRows.error) throw new Error(excludedPayableQualityAmountRows.error.message);
   if (oldestOpenPayableRows.error) throw new Error(oldestOpenPayableRows.error.message);
 
   const supplierIds = Array.from(
@@ -232,6 +254,11 @@ export async function loadLaudusFinanceControl(
       String(row.external_id || ''),
       String(row.name || row.legal_name || row.external_id || 'Proveedor'),
     ]),
+  );
+
+  const excludedPayableQualityAmountClp = (excludedPayableQualityAmountRows.data || []).reduce(
+    (sum, row: any) => sum + Number(row.outstanding_amount || 0),
+    0,
   );
 
   const creditNoteAmount = (creditNoteRows.data || []).reduce(
@@ -427,6 +454,12 @@ export async function loadLaudusFinanceControl(
       severeAgingSharePct,
       topSupplierSharePct,
       historicalTrendAvailable: false,
+      qualityGate: {
+        includedStatus: 'verificado',
+        excludedOpenItems: excludedPayableQualityRows,
+        excludedOpenAmountClp: excludedPayableQualityAmountClp,
+        semantics: 'invalid or incomplete Laudus payables are excluded from executive exposure until reviewed',
+      },
       latestSync: latestPayablesSync,
       oldestOpenItems: (oldestOpenPayableRows.data || []).map((row: any) => ({
         externalId: String(row.external_id || ''),
