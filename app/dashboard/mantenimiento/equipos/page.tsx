@@ -27,6 +27,7 @@ export default function EquiposPage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const sourceStatus = useDataSourceStatus();
   const { canEdit, ready } = useModuleAccess();
+  const canManageAssets = ready && canEdit('mant_operaciones');
 
   const handleSelectEquipment = (equipment: Equipment) => {
     setSelectedEquipment(equipment);
@@ -55,7 +56,7 @@ export default function EquiposPage() {
               {assetViews.map(({ href, label, icon: Icon }) => <DropdownMenuItem key={href} asChild><Link href={href}><Icon className="h-4 w-4" />{label}</Link></DropdownMenuItem>)}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button asChild><Link href="/dashboard/mantenimiento/equipos/importar"><Upload className="mr-2 h-4 w-4" />Importar activos</Link></Button>
+          {canManageAssets ? <Button asChild><Link href="/dashboard/mantenimiento/equipos/importar"><Upload className="mr-2 h-4 w-4" />Importar activos</Link></Button> : null}
         </div>
       </section>
 
@@ -81,7 +82,7 @@ export default function EquiposPage() {
 
       <EquipmentList onSelectEquipment={handleSelectEquipment} />
 
-      <EquipmentSheet equipment={selectedEquipment} isOpen={isSheetOpen} onClose={handleCloseSheet} canEdit={ready && canEdit('mant_operaciones')} />
+      <EquipmentSheet equipment={selectedEquipment} isOpen={isSheetOpen} onClose={handleCloseSheet} canEdit={canManageAssets} />
     </div>
   );
 }
