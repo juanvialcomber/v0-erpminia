@@ -44,23 +44,23 @@ DECLARE
     select array_agg(id) into ids
       from public.warehouse_stock
       where organization_id=p_org and warehouse_id=v.warehouse_id and canonical_product_id=ln.canonical_product_id;
-    stock_id := null;
+    v_stock_id := null;
     if coalesce(cardinality(ids),0)=1 then
-      stock_id := ids[1];
-      select * into st from public.warehouse_stock where id=stock_id and organization_id=p_org for update;
+      v_stock_id := ids[1];
+      select * into st from public.warehouse_stock where id=v_stock_id and organization_id=p_org for update;
     end if;
     select coalesce(max(reconciliation_state),'missing_source')
       into source_state
       from public.bodega_inventory_operational_service_v1
       where organization_id=p_org and canonical_product_id=ln.canonical_product_id;
-    is_stock_reconciled := stock_id is not null
+    is_stock_reconciled := v_stock_id is not null
       and source_state='aligned'
       and exists(
         select 1
         from public.warehouse_voucher_stock_activation activation
         join public.bodega_motil_stock_counts_v1 c on c.id=activation.count_id
         join public.bodega_motil_stock_count_reviews_v1 r on r.count_id=c.id
-        where activation.stock_id=stock_id
+        where activation.stock_id=v_stock_id
           and c.organization_id=p_org
           and c.warehouse_id=v.warehouse_id
           and c.canonical_product_id=ln.canonical_product_id
@@ -93,7 +93,7 @@ DECLARE
         canonical_product_id,quantity,unit,source_reconciliation_state,
         reconciliation_reason,created_by,request_id
       ) values (
-        p_org,v.id,ln.id,stock_id,v.warehouse_id,ln.canonical_product_id,
+        p_org,v.id,ln.id,v_stock_id,v.warehouse_id,ln.canonical_product_id,
         q,ln.unit,source_state,reconciliation_reason,p_actor,rid
       );
       movement_id := null;
@@ -117,7 +117,7 @@ BEGIN
   patched_definition := replace(
     current_definition,
     'stock_id uuid; movement_id uuid;',
-    'stock_id uuid; movement_id uuid; is_stock_reconciled boolean; source_state text; reconciliation_reason text;'
+    'v_stock_id uuid; movement_id uuid; is_stock_reconciled boolean; source_state text; reconciliation_reason text;'
   );
   IF patched_definition=current_definition THEN
     RAISE EXCEPTION 'could not extend deployed RPC declarations';
