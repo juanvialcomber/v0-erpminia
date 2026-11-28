@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     const reconciledPositions = new Set<string>();
     const sourceStates = new Map<string, string>();
     if (productIds.length) {
+      // Missing or unaligned Laudus/MOTIL state is treated as unreconciled, never as zero stock.
       const source = await db.from('bodega_inventory_operational_service_v1').select('canonical_product_id,reconciliation_state').eq('organization_id', org).in('canonical_product_id', productIds);
       if (!source.error) for (const row of source.data || []) sourceStates.set(row.canonical_product_id, row.reconciliation_state);
     }
