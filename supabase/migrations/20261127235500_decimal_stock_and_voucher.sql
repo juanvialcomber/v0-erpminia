@@ -74,7 +74,7 @@ BEGIN
   LEFT JOIN information_schema.views iv ON iv.table_schema = n.nspname AND iv.table_name = c.relname;
 
   CREATE TEMP TABLE _decimal_stock_view_columns ON COMMIT DROP AS
-  SELECT v.oid AS view_oid, a.attnum, a.attname, col_description(v.oid,a.attnum) AS comment,
+  SELECT view_row.oid AS view_oid, a.attnum, a.attname, col_description(view_row.oid,a.attnum) AS comment,
          a.attacl AS acl
   FROM _decimal_stock_views view_row
   JOIN pg_attribute a ON a.attrelid = view_row.oid AND a.attnum > 0 AND NOT a.attisdropped;
@@ -246,8 +246,8 @@ BEGIN
     RAISE EXCEPTION 'decimal migration postcondition failed: canonical quantity types are inconsistent';
   END IF;
   IF EXISTS (
-    SELECT 1 FROM _decimal_stock_views v
-    WHERE to_regclass(format('%I.%I',v.nspname,v.relname)) IS NULL
+    SELECT 1 FROM _decimal_stock_views view_row
+    WHERE to_regclass(format('%I.%I',view_row.nspname,view_row.relname)) IS NULL
   ) THEN
     RAISE EXCEPTION 'decimal migration postcondition failed: a dependent view was not restored';
   END IF;
