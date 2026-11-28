@@ -76,8 +76,8 @@ BEGIN
   CREATE TEMP TABLE _decimal_stock_view_columns ON COMMIT DROP AS
   SELECT v.oid AS view_oid, a.attnum, a.attname, col_description(v.oid,a.attnum) AS comment,
          a.attacl AS acl
-  FROM _decimal_stock_views v
-  JOIN pg_attribute a ON a.attrelid = v.oid AND a.attnum > 0 AND NOT a.attisdropped;
+  FROM _decimal_stock_views view_row
+  JOIN pg_attribute a ON a.attrelid = view_row.oid AND a.attnum > 0 AND NOT a.attisdropped;
 
   SELECT col_description('public.warehouse_stock'::regclass,a.attnum),a.attacl
     INTO v_available_comment,v_available_acl
