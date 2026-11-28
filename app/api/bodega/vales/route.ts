@@ -17,7 +17,31 @@ export async function GET(request: NextRequest) {
       if (q.length < 2) return NextResponse.json({ rows: [] });
       const { data, error } = await db.from('canonical_products_v1').select('id,product_code,name,unit').eq('organization_id', org).eq('is_active', true).eq('validation_status', 'valid').or(`product_code.ilike.%${q}%,name.ilike.%${q}%`).limit(30);
       if (error) throw error;
-      return NextResponse.json({ rows: data });
+      const productIds = (data || []).map(product => product.id);
+      let stockContext = new Map<string, {
+        operational_quantity: string | number | null;
+        legacy_motil_quantity: string | number | null;
+        quantity_delta: string | number | null;
+        reconciliation_state: string;
+        laudus_stock_date: string | null;
+        laudus_synced_at: string | null;
+      }>();
+      let stockContextUnavailable = false;
+      if (productIds.length) {
+        const snapshot = await db.from('bodega_inventory_operational_service_v1')
+          .select('canonical_product_id,operational_quantity,legacy_motil_quantity,quantity_delta,reconciliation_state,laudus_stock_date,laudus_synced_at')
+          .eq('organization_id', org)
+          .in('canonical_product_id', productIds);
+        if (snapshot.error) stockContextUnavailable = true;
+        else stockContext = new Map((snapshot.data || []).map(row => [row.canonical_product_id, row]));
+      }
+      const rows = (data || []).map(product => ({
+        ...product,
+        inventoryContext: stockContextUnavailable
+          ? { reconciliation_state: 'source_unavailable', operational_quantity: null, legacy_motil_quantity: null, quantity_delta: null, laudus_stock_date: null, laudus_synced_at: null }
+          : stockContext.get(product.id) || { reconciliation_state: 'missing_source', operational_quantity: null, legacy_motil_quantity: null, quantity_delta: null, laudus_stock_date: null, laudus_synced_at: null },
+      }));
+      return NextResponse.json({ rows });
     }
     let query = db.from('warehouse_consumption_vouchers').select('*,warehouse_consumption_voucher_lines(*)').eq('organization_id', org);
     if (!access.can_approve && !access.can_deliver) query = query.eq('requested_by', context.userId);
