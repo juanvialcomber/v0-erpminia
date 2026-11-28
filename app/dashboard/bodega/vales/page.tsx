@@ -6,11 +6,39 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 type Person = { id: string; full_name: string };
-type Product = { id: string; product_code: string; name: string; unit: string };
+type InventoryContext = { operational_quantity: string | number | null; legacy_motil_quantity: string | number | null; quantity_delta: string | number | null; reconciliation_state: string; laudus_stock_date: string | null; laudus_synced_at: string | null };
+type Product = { id: string; product_code: string; name: string; unit: string; inventoryContext?: InventoryContext };
 type Line = { id: string; canonical_product_id:string; product_name: string; product_code: string; unit: string; quantity: string; delivered: string; stockReconciled?: boolean; stockReconciliationPending?: boolean };
 type Voucher = { id: string; folio: number; status: string; requested_by: string; receiver_id: string; work_order_id: string; reason: string; decision_reason: string; expires_at: string; created_at: string; qr_reference: string; warehouse_consumption_voucher_lines: Line[] };
 type Data = { requesters: {profile_id:string;expires_at:string;profiles:{full_name:string}}[]; rows: Voucher[]; users: Person[]; warehouses: {id:string;name:string}[]; orders: {id:string;work_order_number:string;title:string}[]; actorId: string; access: {can_request:boolean;can_approve:boolean;can_deliver:boolean}; settings: {deliveries_enabled:boolean} };
 const labels: Record<string,string> = { pending:'Por aprobar', approved:'Aprobado', rejected:'Rechazado', delivered:'Entregado', cancelled:'Anulado' };
+function formatQuantity(value: string | number | null | undefined) {
+ if(value===null||value===undefined)return 'sin dato';
+ const quantity=Number(value);
+ return Number.isFinite(quantity)?quantity.toLocaleString('es-CL',{maximumFractionDigits:6}):'sin dato';
+}
+function inventorySummary(context?: InventoryContext,unit?:string) {
+ const sourceDate=context?.laudus_stock_date||context?.laudus_synced_at;
+ const date=sourceDate?new Date(sourceDate).toLocaleString('es-CL',{timeZone:'America/Santiago'}):'fecha no informada';
+ const state=context?.reconciliation_state||'missing_source';
+ const states:Record<string,string>={
+  aligned:'Laudus y MOTIL aparecen alineados.',
+  quantity_mismatch:'Hay una diferencia entre Laudus y MOTIL.',
+  laudus_only_zero:'Laudus informa cero; no hay saldo MOTIL conciliado.',
+  missing_in_motil:'El material no tiene registro correspondiente en MOTIL.',
+  missing_source:'No hay dato de conciliación para este material.',
+  source_unavailable:'La referencia de inventario no está disponible ahora.',
+ };
+ const laudus=formatQuantity(context?.operational_quantity);
+ const motil=formatQuantity(context?.legacy_motil_quantity);
+ return {state, message:states[state]||'Revisa el estado de conciliación con Bodega.', detail:`Laudus: ${laudus}${unit?' '+unit:''} · MOTIL: ${motil}${unit?' '+unit:''} · fecha Laudus: ${date}`};
+}
+function requestQuantityWarning(quantity:string,context?:InventoryContext) {
+ const requested=Number(quantity.replace(',','.'));
+ const reported=Number(context?.operational_quantity);
+ if(context?.reconciliation_state!=='aligned'||!Number.isFinite(requested)||!Number.isFinite(reported)||requested<=reported)return '';
+ return `La solicitud supera el saldo referencial de Laudus (${formatQuantity(reported)}). Confirma la cantidad con Bodega; este dato no reserva materiales.`;
+}
 async function fetcher(url:string) { const r=await fetch(url,{cache:'no-store'}); const d=await r.json(); if(!r.ok) throw new Error(d.error); return d; }
 export default function ValesPage() {
  const [qr,setQr]=useState('');
@@ -48,8 +76,8 @@ export default function ValesPage() {
    <Label htmlFor="receiver">Quién retirará los materiales</Label><select id="receiver" className="w-full border rounded bg-background p-2" required value={receiver} onChange={e=>setReceiver(e.target.value)}><option value="">Selecciona receptor</option>{data.users.map(p=><option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
    <Label htmlFor="reason">Motivo</Label><Input id="reason" required minLength={3} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/>
    <Label htmlFor="material">Material</Label><div className="flex gap-2"><Input id="material" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Código o nombre"/><Button type="button" variant="outline" disabled={search.trim().length<2} onClick={findProducts}>Buscar</Button></div>
-   {products.length>0&&<ul className="max-h-64 overflow-y-auto border rounded p-2">{products.map(p=><li key={p.id}><Button type="button" variant="ghost" disabled={lines.length>=15||lines.some(l=>l.id===p.id)} onClick={()=>{setLines([...lines,{...p,quantity:'1'}]);setProducts([]);setSearch('');}}>{p.product_code} · {p.name} ({p.unit})</Button></li>)}</ul>}
-   {lines.map((l,i)=><div key={l.id} className="grid grid-cols-[1fr_6rem_auto] gap-2 items-center"><span>{l.product_code} · {l.name} ({l.unit})</span><Input aria-label={'Cantidad de '+l.name} inputMode="decimal" required value={l.quantity} onChange={e=>setLines(lines.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/><Button type="button" variant="ghost" onClick={()=>setLines(lines.filter(x=>x.id!==l.id))}>Quitar</Button></div>)}
+   {products.length>0&&<div className="max-h-80 overflow-y-auto border rounded p-2 space-y-3">{products.map(p=>{const inventory=inventorySummary(p.inventoryContext,p.unit);return <article key={p.id} className="border-b pb-2 last:border-0"><Button type="button" variant="ghost" className="h-auto whitespace-normal text-left" disabled={lines.length>=15||lines.some(l=>l.id===p.id)} onClick={()=>{setLines([...lines,{...p,quantity:'1'}]);setProducts([]);setSearch('');}}>{p.product_code} · {p.name} ({p.unit})</Button><p className="px-3 text-xs text-muted-foreground">{inventory.detail}</p><p className={inventory.state==='aligned'?'px-3 text-xs text-emerald-700':'px-3 text-xs text-amber-800'}>{inventory.message}</p></article>})}<p className="text-xs text-muted-foreground">Referencia informativa: no reserva materiales ni confirma existencia física. Bodega valida el saldo antes de descontarlo.</p></div>}
+   {lines.map((l,i)=>{const inventory=inventorySummary(l.inventoryContext,l.unit);return <div key={l.id} className="grid grid-cols-[1fr_6rem_auto] gap-2 items-center"><div><span>{l.product_code} · {l.name} ({l.unit})</span><p className="text-xs text-muted-foreground">{inventory.detail}</p><p className={inventory.state==='aligned'?'text-xs text-emerald-700':'text-xs text-amber-800'}>{inventory.message}</p>{requestQuantityWarning(l.quantity,l.inventoryContext)&&<p role="alert" className="text-xs text-amber-800">{requestQuantityWarning(l.quantity,l.inventoryContext)}</p>}</div><Input aria-label={'Cantidad de '+l.name} inputMode="decimal" required value={l.quantity} onChange={e=>setLines(lines.map((x,j)=>j===i?{...x,quantity:e.target.value}:x))}/><Button type="button" variant="ghost" onClick={()=>setLines(lines.filter(x=>x.id!==l.id))}>Quitar</Button></div>})}
    <p className="text-sm">Solicita: {person(data.actorId)} · Bodega Central · {lines.length}/15 materiales</p>
    <Button disabled={busy||!lines.length||!data.warehouses.length}>{busy?'Registrando…':'Enviar a Bodega'}</Button>
   </form>}
