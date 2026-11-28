@@ -34,7 +34,36 @@ export async function GET(request: NextRequest) {
       db.from('warehouse_voucher_access').select('profile_id,expires_at,profiles!inner(full_name,status)').eq('organization_id', org).eq('can_request', true).eq('profiles.status', 'active').gt('expires_at', new Date().toISOString()).limit(100),
     ]);
     if (error || users.error || warehouses.error || orders.error || requesters.error) throw error || users.error || warehouses.error || orders.error || requesters.error;
-    return NextResponse.json({ rows, users: users.data, warehouses: warehouses.data, orders: orders.data, requesters: requesters.data, access, settings, actorId: context.userId }, { headers: { 'Cache-Control': 'private, no-store' } });
+    const voucherRows = rows || [];
+    const productIds = Array.from(new Set(voucherRows.flatMap((v: any) => (v.warehouse_consumption_voucher_lines || []).map((line: any) => line.canonical_product_id))));
+    const warehouseIds = Array.from(new Set(voucherRows.map((v: any) => v.warehouse_id)));
+    const reconciledPositions = new Set<string>();
+    if (productIds.length && warehouseIds.length) {
+      const positions = await db.from('warehouse_stock').select('id,warehouse_id,canonical_product_id').eq('organization_id', org).in('warehouse_id', warehouseIds).in('canonical_product_id', productIds);
+      if (!positions.error && positions.data?.length) {
+        const stockIds = positions.data.map((position: any) => position.id);
+        const activations = await db.from('warehouse_voucher_stock_activation').select('stock_id,count_id').in('stock_id', stockIds);
+        const countIds = Array.from(new Set((activations.data || []).map((activation: any) => activation.count_id)));
+        const reviews = !activations.error && countIds.length
+          ? await db.from('bodega_motil_stock_count_reviews_v1').select('count_id').eq('organization_id', org).eq('decision', 'approved_for_opening').in('count_id', countIds)
+          : { data: [], error: activations.error };
+        if (!activations.error && !reviews.error) {
+          const approvedCounts = new Set((reviews.data || []).map((review: any) => review.count_id));
+          const approvedStocks = new Set((activations.data || []).filter((activation: any) => approvedCounts.has(activation.count_id)).map((activation: any) => activation.stock_id));
+          for (const position of positions.data) {
+            if (approvedStocks.has(position.id)) reconciledPositions.add(position.warehouse_id + ':' + position.canonical_product_id);
+          }
+        }
+      }
+    }
+    const rowsWithStockStatus = voucherRows.map((voucher: any) => ({
+      ...voucher,
+      warehouse_consumption_voucher_lines: (voucher.warehouse_consumption_voucher_lines || []).map((line: any) => ({
+        ...line,
+        stockReconciled: reconciledPositions.has(voucher.warehouse_id + ':' + line.canonical_product_id),
+      })),
+    }));
+    return NextResponse.json({ rows: rowsWithStockStatus, users: users.data, warehouses: warehouses.data, orders: orders.data, requesters: requesters.data, access, settings, actorId: context.userId }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch {
     return NextResponse.json({ error: 'No se pudieron cargar los vales.' }, { status: 503 });
   }
@@ -64,6 +93,7 @@ export async function POST(request: NextRequest) {
       weekend_policy_pending: 'La autorización de fin de semana está pendiente de definición.',
       delivery_activation_pending: 'Las entregas aún no están habilitadas.',
       decimal_stock_contract_pending: 'La entrega fraccionaria requiere validar primero el contrato decimal de inventario.',
+      stock_reconciliation_ack_required: 'Confirma que conoces la advertencia: el stock aún no está conciliado físicamente.',
       insufficient_available: 'No hay existencia disponible suficiente.',
       opening_pending: 'Falta la apertura verificada de este material.',
       idempotency_conflict: 'Este intento ya fue utilizado con otros datos. Actualiza el vale.',
