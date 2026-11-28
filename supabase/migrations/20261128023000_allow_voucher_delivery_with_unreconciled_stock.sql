@@ -11,6 +11,7 @@ CREATE TABLE public.warehouse_voucher_stock_reconciliation_queue (
   quantity numeric(20,6) NOT NULL CHECK (quantity > 0),
   unit text NOT NULL,
   source_reconciliation_state text NOT NULL,
+  reconciliation_reason text NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
   created_by uuid NOT NULL REFERENCES public.profiles(id),
   request_id uuid NOT NULL,
@@ -65,6 +66,15 @@ DECLARE
           and c.canonical_product_id=ln.canonical_product_id
           and r.decision='approved_for_opening'
       );
+    if not is_stock_reconciled then
+      if stock_id is null then
+        reconciliation_reason := 'missing_or_ambiguous_warehouse_position';
+      elsif source_state <> 'aligned' then
+        reconciliation_reason := 'laudus_motil_stock_mismatch';
+      else
+        reconciliation_reason := 'physical_count_not_approved';
+      end if;
+    end if;
     if is_stock_reconciled then
       if st.quantity_on_hand is null or st.quantity_reserved is null or st.quantity_reserved<0 or st.quantity_on_hand-st.quantity_reserved<q then
         raise exception 'insufficient_available';
@@ -81,10 +91,10 @@ DECLARE
       insert into public.warehouse_voucher_stock_reconciliation_queue(
         organization_id,voucher_id,voucher_line_id,stock_id,warehouse_id,
         canonical_product_id,quantity,unit,source_reconciliation_state,
-        created_by,request_id
+        reconciliation_reason,created_by,request_id
       ) values (
         p_org,v.id,ln.id,stock_id,v.warehouse_id,ln.canonical_product_id,
-        q,ln.unit,source_state,p_actor,rid
+        q,ln.unit,source_state,reconciliation_reason,p_actor,rid
       );
       movement_id := null;
     end if;
@@ -107,7 +117,7 @@ BEGIN
   patched_definition := replace(
     current_definition,
     'stock_id uuid; movement_id uuid;',
-    'stock_id uuid; movement_id uuid; is_stock_reconciled boolean; source_state text;'
+    'stock_id uuid; movement_id uuid; is_stock_reconciled boolean; source_state text; reconciliation_reason text;'
   );
   IF patched_definition=current_definition THEN
     RAISE EXCEPTION 'could not extend deployed RPC declarations';
