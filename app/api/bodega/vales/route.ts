@@ -61,9 +61,9 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-    const rowsWithStockStatus = voucherRows.map((voucher: any) => ({
+    const rowsWithStockStatus = voucherRows.map(voucher => ({
       ...voucher,
-      warehouse_consumption_voucher_lines: (voucher.warehouse_consumption_voucher_lines || []).map((line: any) => ({
+      warehouse_consumption_voucher_lines: (voucher.warehouse_consumption_voucher_lines || []).map(line => ({
         ...line,
         stockReconciled: reconciledPositions.has(voucher.warehouse_id + ':' + line.canonical_product_id),
       })),
@@ -100,7 +100,6 @@ export async function POST(request: NextRequest) {
       decimal_stock_contract_pending: 'La entrega fraccionaria requiere validar primero el contrato decimal de inventario.',
       stock_reconciliation_ack_required: 'Confirma que conoces la advertencia: el stock aún no está conciliado físicamente.',
       insufficient_available: 'No hay existencia disponible suficiente.',
-      opening_pending: 'Falta la apertura verificada de este material.',
       idempotency_conflict: 'Este intento ya fue utilizado con otros datos. Actualiza el vale.',
       voucher_expired: 'El vale venció. Solicita uno nuevo.',
       invalid_state: 'El vale cambió de estado. Actualiza la lista.',
