@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrganizationContext } from '@/lib/api/organization-context';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { orgHasCanonicalData } from '@/lib/api/canonical';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
 
@@ -325,6 +326,9 @@ async function buildCanonicalStock(
 }
 
 export async function GET(request: NextRequest) {
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
+  if (!access.authorized) return access.response;
+
   const context = await getOrganizationContext(request);
   if (!context.ok) return context.response;
 
