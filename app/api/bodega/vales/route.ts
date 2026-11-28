@@ -50,8 +50,13 @@ export async function GET(request: NextRequest) {
         if (!activations.error && !reviews.error) {
           const approvedCounts = new Set((reviews.data || []).map((review: any) => review.count_id));
           const approvedStocks = new Set((activations.data || []).filter((activation: any) => approvedCounts.has(activation.count_id)).map((activation: any) => activation.stock_id));
+          const positionsByKey = new Map<string, any[]>();
           for (const position of positions.data) {
-            if (approvedStocks.has(position.id)) reconciledPositions.add(position.warehouse_id + ':' + position.canonical_product_id);
+            const key = position.warehouse_id + ':' + position.canonical_product_id;
+            positionsByKey.set(key, [...(positionsByKey.get(key) || []), position]);
+          }
+          for (const [key, matches] of positionsByKey) {
+            if (matches.length === 1 && approvedStocks.has(matches[0].id)) reconciledPositions.add(key);
           }
         }
       }
