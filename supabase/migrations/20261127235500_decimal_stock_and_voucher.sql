@@ -66,12 +66,12 @@ BEGIN
   )
   SELECT vs.depth, c.oid, n.nspname, c.relname, c.relowner,
          c.reloptions, c.relacl, pg_get_viewdef(c.oid, true) AS definition,
-         coalesce(pv.check_option, 'NONE') AS check_option,
+         coalesce(iv.check_option, 'NONE') AS check_option,
          obj_description(c.oid, 'pg_class') AS object_comment
   FROM view_set vs
   JOIN pg_class c ON c.oid = vs.view_oid
   JOIN pg_namespace n ON n.oid = c.relnamespace
-  LEFT JOIN pg_views pv ON pv.schemaname = n.nspname AND pv.viewname = c.relname;
+  LEFT JOIN information_schema.views iv ON iv.table_schema = n.nspname AND iv.table_name = c.relname;
 
   CREATE TEMP TABLE _decimal_stock_view_columns ON COMMIT DROP AS
   SELECT v.oid AS view_oid, a.attnum, a.attname, col_description(v.oid,a.attnum) AS comment,
