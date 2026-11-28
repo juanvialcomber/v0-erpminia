@@ -6,6 +6,7 @@ import { AlertCircle, ArrowRight, Download, RefreshCw, Wrench } from 'lucide-rea
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useModuleAccess } from '@/hooks/use-module-access';
 
 type ComponentIntervention = {
   id: string;
@@ -60,6 +61,8 @@ function daysLabel(days?: number | null) {
 
 export function ComponentesMayoresBoard() {
   const { data, error, isLoading, mutate } = useSWR<ComponentsMayoresResponse>('/api/maintenance/componentes-mayores', fetcher);
+  const { canEdit, ready } = useModuleAccess();
+  const canManageComponents = ready && canEdit('mant_operaciones');
   const summary: ComponentSummary = data?.summary || { totalTemplates: 0, totalComponents: 0, degraded: 0, failures: 0 };
   const groups: ComponentGroup[] = Array.isArray(data?.componentsByTemplate) ? data.componentsByTemplate : [];
 
@@ -71,12 +74,12 @@ export function ComponentesMayoresBoard() {
           <p className="mt-2 text-muted-foreground">Estado real de componentes críticos por vehículo y plantilla técnica.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" className="gap-2">
+          {canManageComponents ? <Button asChild variant="outline" className="gap-2">
             <Link href="/dashboard/mantenimiento/componentes-mayores/importar">
               <Download className="h-4 w-4" />
               Importar Excel
             </Link>
-          </Button>
+          </Button> : null}
           <Button variant="outline" onClick={() => void mutate()} className="gap-2">
             <RefreshCw className="h-4 w-4" />
             Recargar
