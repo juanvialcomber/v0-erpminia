@@ -12,6 +12,11 @@ Configuración de La Patagua: solicitudes/aprobaciones habilitadas; entregas de 
 
 Acceso nominal temporal hasta el 31/12/2026 para Juan, Ariel, Daniel, Pedro, Esteban y Cristian Vidal. Todos pueden solicitar; sólo Esteban aprueba/rechaza y tiene capacidad de entrega, actualmente bloqueada por configuración de inventario. No puede autoaprobar su solicitud. Constanza Roco y Bred Cruz siguen pendientes porque no tienen perfil canónico activo; no se inventó cargo ni credencial.
 
+## Entregas con stock pendiente de conciliación
+La política operativa del PR #366 permite confirmar una entrega física aunque el saldo no esté conciliado, con advertencia amarilla y acuse explícito del encargado. Si falta posición única ligada a Bodega Central, apertura física aprobada o alineación Laudus/MOTIL, la entrega y cantidad quedan en una cola restringida de conciliación; no se descuenta ni se inventa stock canónico. Al quedar conciliado y aprobado, las entregas descuentan el saldo y generan movimiento normal. Se mantienen autorización nominal, QR autenticado, receptor, confirmación física, expiración, idempotencia y reserva.
+
+Estado anterior a desplegar #366: `deliveries_enabled=false`; la capacidad `can_deliver` ya pertenece sólo a Esteban. Tras integrar y aplicar la migración se habilitará esa configuración, sin otorgar nuevos permisos. Las autorizaciones de fin de semana permanecen desactivadas.
+
 ## Flujo y reutilización
 
 Reutiliza perfiles, catálogo canónico, OT, conteos, stock y movimientos existentes. Solicitud con receptor, OT, motivo y hasta 15 líneas; cantidades exactas. Bodega decide con motivo. QR de vale aprobado/vigente abre una página autenticada; escanear no descuenta. La entrega física confirmada realiza movimiento, saldo y evento en una transacción. Reintentos idénticos no duplican consumo. Reservas ajenas se preservan.
