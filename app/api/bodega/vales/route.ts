@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
       db.from('warehouse_voucher_access').select('profile_id,expires_at,profiles!inner(full_name,status)').eq('organization_id', org).eq('can_request', true).eq('profiles.status', 'active').gt('expires_at', new Date().toISOString()).limit(100),
     ]);
     if (error || users.error || warehouses.error || orders.error || requesters.error) throw error || users.error || warehouses.error || orders.error || requesters.error;
-    const voucherRows = rows || [];
+    const voucherRows = (rows || []) as Array<{
+      warehouse_id: string;
+      warehouse_consumption_voucher_lines: Array<{ id: string; canonical_product_id: string }>;
+      [key: string]: unknown;
+    }>;
     const productIds = Array.from(new Set(voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.canonical_product_id))));
     const warehouseIds = Array.from(new Set(voucherRows.map(v => v.warehouse_id)));
     const lineIds = voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.id));
