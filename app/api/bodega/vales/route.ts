@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
     const voucherRows = rows || [];
     const productIds = Array.from(new Set(voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.canonical_product_id))));
     const warehouseIds = Array.from(new Set(voucherRows.map(v => v.warehouse_id)));
+    const lineIds = voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.id));
+    const pendingQueueLines = new Set<string>();
+    if (lineIds.length) {
+      const pendingQueue = await db.from('warehouse_voucher_stock_reconciliation_queue').select('voucher_line_id').eq('organization_id', org).eq('status', 'pending').in('voucher_line_id', lineIds);
+      if (!pendingQueue.error) for (const row of pendingQueue.data || []) pendingQueueLines.add(row.voucher_line_id);
+    }
     const reconciledPositions = new Set<string>();
     const sourceStates = new Map<string, string>();
     if (productIds.length) {
@@ -72,6 +78,7 @@ export async function GET(request: NextRequest) {
         ...line,
         sourceReconciliationState: sourceStates.get(line.canonical_product_id) || 'missing_source',
         stockReconciled: reconciledPositions.has(voucher.warehouse_id + ':' + line.canonical_product_id) && sourceStates.get(line.canonical_product_id) === 'aligned',
+        stockReconciliationPending: pendingQueueLines.has(line.id),
       })),
     }));
     return NextResponse.json({ rows: rowsWithStockStatus, users: users.data, warehouses: warehouses.data, orders: orders.data, requesters: requesters.data, access, settings, actorId: context.userId }, { headers: { 'Cache-Control': 'private, no-store' } });
