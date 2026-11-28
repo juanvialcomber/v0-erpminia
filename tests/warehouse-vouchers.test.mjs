@@ -30,6 +30,15 @@ async function fixture(){
  insert into bodega_motil_stock_count_reviews_v1 values('${count}','approved_for_opening');
  insert into bodega_inventory_operational_service_v1 values('${org}','${product}','aligned');`);
  await db.exec(migration);
+ await db.exec(`alter table warehouse_stock alter column quantity_on_hand type numeric using quantity_on_hand::numeric;
+ alter table warehouse_stock alter column quantity_reserved type numeric using quantity_reserved::numeric;
+ alter table stock_movements alter column quantity type numeric using quantity::numeric;
+ do $decimal$ declare f text; patched text; begin
+  select pg_get_functiondef('public.warehouse_voucher_command_v1(uuid,uuid,text,jsonb)'::regprocedure) into f;
+  patched:=replace(f,'if q<>trunc(q) then raise exception ''decimal_stock_contract_pending''; end if;','');
+  if patched=f then raise exception 'integer-only decimal guard not found'; end if;
+  execute patched;
+ end $decimal$;`);
  await db.exec(reconciliationMigration);
  await db.exec(`insert into warehouse_voucher_settings values('${org}',true,true,true);
  insert into warehouse_voucher_access values('${org}','${requester}',true,false,false,now()+interval '1 day','synthetic'),('${org}','${approver}',true,true,true,now()+interval '1 day','synthetic');
@@ -40,7 +49,7 @@ const body=(rid=10,quantity='2')=>({requestId:id(rid),warehouseId:warehouse,work
 async function cmd(db,actor,action,payload,organization=org){const r=await db.query('select warehouse_voucher_command_v1($1,$2,$3,$4) result',[organization,actor,action,JSON.stringify(payload)]);return r.rows[0].result;}
 async function approved(db,rid=10,quantity='2'){const v=await cmd(db,requester,'create',body(rid,quantity));await cmd(db,approver,'approve',{requestId:id(rid+100),voucherId:v.id,reason:'Aprobado QA'});return (await db.query('select * from warehouse_consumption_vouchers where id=$1',[v.id])).rows[0];}
 async function deliverBody(db,v,rid=200,quantity='1'){const l=(await db.query('select id from warehouse_consumption_voucher_lines where voucher_id=$1',[v.id])).rows[0];return {requestId:id(rid),voucherId:v.id,lineId:l.id,qrReference:v.qr_reference,receiverId:receiver,physicalConfirmed:true,quantity};}
-async function balance(db){return (await db.query('select quantity_on_hand from warehouse_stock')).rows[0].quantity_on_hand;}
+async function balance(db){return Number((await db.query('select quantity_on_hand from warehouse_stock')).rows[0].quantity_on_hand);}
 
 test('wire contract preserves decimals; rejects duplicate products, exponent, zero and missing receiver',()=>{
  assert.equal(voucherInput({...body(),lines:[{productId:product,quantity:'0,75'}]}).lines[0].quantity,'0.75');
@@ -80,17 +89,20 @@ test('two competing vouchers cannot consume same last stock; reserved stock pres
  await cmd(db,approver,'deliver',await deliverBody(db,a));await assert.rejects(async()=>cmd(db,approver,'deliver',await deliverBody(db,b,201)),/insufficient_available/);assert.equal(await balance(db),0);
  await db.exec('update warehouse_stock set quantity_on_hand=2,quantity_reserved=2');await assert.rejects(async()=>cmd(db,approver,'deliver',await deliverBody(db,b,202)),/insufficient_available/);
 }finally{await db.close();}});
-test('fractional input stays exact; unverified physical delivery queues without changing stock',async()=>{const db=await fixture();try{
- const v=await approved(db,10,'0.75');const fractional=await deliverBody(db,v,200,'0.75');await assert.rejects(()=>cmd(db,approver,'deliver',fractional),/decimal_stock_contract_pending/);assert.equal(await balance(db),2);
+test('fractional delivery remains exact; unreconciled handoff queues without changing canonical stock',async()=>{const db=await fixture();try{
+ const v=await approved(db,10,'0.75');const fractional=await deliverBody(db,v,200,'0.75');
+ await cmd(db,approver,'deliver',fractional);assert.equal(await balance(db),1.25);
+ assert.equal(Number((await db.query('select quantity from stock_movements')).rows[0].quantity),0.75);
+ assert.equal(Number((await db.query('select delivered from warehouse_consumption_voucher_lines where voucher_id=$1',[v.id])).rows[0].delivered),0.75);
  const w=await approved(db,11,'1');await db.exec('delete from warehouse_voucher_stock_activation');const pending=await deliverBody(db,w,201);
- await assert.rejects(()=>cmd(db,approver,'deliver',pending),/stock_reconciliation_ack_required/);assert.equal(await balance(db),2);
- const delivered=await cmd(db,approver,'deliver',{...pending,unreconciledStockConfirmed:true});assert.equal(delivered.status,'delivered');assert.equal(await balance(db),2);
+ await assert.rejects(()=>cmd(db,approver,'deliver',pending),/stock_reconciliation_ack_required/);assert.equal(await balance(db),1.25);
+ const delivered=await cmd(db,approver,'deliver',{...pending,unreconciledStockConfirmed:true});assert.equal(delivered.status,'delivered');assert.equal(await balance(db),1.25);
  assert.equal((await db.query('select count(*)::int n from warehouse_voucher_stock_reconciliation_queue where status=\'pending\'')).rows[0].n,1);
- assert.equal((await db.query('select count(*)::int n from stock_movements')).rows[0].n,0);
+ assert.equal((await db.query('select count(*)::int n from stock_movements')).rows[0].n,1);
  const x=await approved(db,12,'1');await db.exec("update bodega_inventory_operational_service_v1 set reconciliation_state='quantity_mismatch'");
  const unaligned=await deliverBody(db,x,202);await assert.rejects(()=>cmd(db,approver,'deliver',unaligned),/stock_reconciliation_ack_required/);
  await cmd(db,approver,'deliver',{...unaligned,unreconciledStockConfirmed:true});
- assert.equal(await balance(db),2);assert.equal((await db.query('select count(*)::int n from warehouse_voucher_stock_reconciliation_queue where status=\'pending\'')).rows[0].n,2);
+ assert.equal(await balance(db),1.25);assert.equal((await db.query('select count(*)::int n from warehouse_voucher_stock_reconciliation_queue where status=\'pending\'')).rows[0].n,2);
 }finally{await db.close();}});
 test('failed movement rolls back stock and line; rejected/cancelled/expired cannot deliver',async()=>{const db=await fixture();try{
  const v=await approved(db);const b=await deliverBody(db,v);await db.exec("alter table stock_movements add constraint forced_failure check(false)");await assert.rejects(()=>cmd(db,approver,'deliver',b));assert.equal(await balance(db),2);assert.equal((await db.query('select delivered from warehouse_consumption_voucher_lines')).rows[0].delivered,'0.000000');
