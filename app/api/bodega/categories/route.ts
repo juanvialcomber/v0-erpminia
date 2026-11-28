@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { resolveAuthContext } from '@/lib/api/auth-session';
+import { MODULE_KEYS, requireModuleAccess } from '@/lib/api/module-access';
 import { canonicalCategory, getCategoryColor } from '@/lib/bodega-normalization';
 import { isStockBelowMinimum } from '@/lib/inventory-alerts';
 
@@ -38,11 +38,11 @@ function summarize(rows: CategoryRow[]) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await resolveAuthContext(request);
-  if (!auth) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  const access = await requireModuleAccess(request, MODULE_KEYS.BODEGA_INVENTARIO);
+  if (!access.authorized) return access.response;
 
   const supabase = getSupabaseServerClient();
-  const orgId = auth.organizationId;
+  const orgId = access.organizationId;
 
   const canonicalResult = await supabase
     .from('canonical_inventory_current')
