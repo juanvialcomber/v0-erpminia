@@ -35,11 +35,41 @@ export async function GET(request: NextRequest) {
         if (snapshot.error) stockContextUnavailable = true;
         else stockContext = new Map((snapshot.data || []).map(row => [row.canonical_product_id, row]));
       }
+
+      const workOrderId = request.nextUrl.searchParams.get('workOrderId');
+      const duplicateByProduct = new Map<string, Array<{ folio: number; status: string; remainingQuantity: string | number }>>();
+      let duplicateCheckUnavailable = false;
+      if (workOrderId && uuid(workOrderId)) {
+        let activeVoucherQuery = db.from('warehouse_consumption_vouchers')
+          .select('folio,status,requested_by,warehouse_consumption_voucher_lines(canonical_product_id,quantity,delivered)')
+          .eq('organization_id', org)
+          .eq('work_order_id', workOrderId)
+          .in('status', ['pending', 'approved'])
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (!access.can_approve && !access.can_deliver) activeVoucherQuery = activeVoucherQuery.eq('requested_by', context.userId);
+        const { data: activeVouchers, error: activeVoucherError } = await activeVoucherQuery;
+        if (activeVoucherError) duplicateCheckUnavailable = true;
+        else for (const voucher of activeVouchers || []) {
+          for (const line of voucher.warehouse_consumption_voucher_lines || []) {
+            const remaining = Number(line.quantity) - Number(line.delivered);
+            if (remaining <= 0) continue;
+            duplicateByProduct.set(line.canonical_product_id, [
+              ...(duplicateByProduct.get(line.canonical_product_id) || []),
+              { folio: voucher.folio, status: voucher.status, remainingQuantity: remaining },
+            ]);
+          }
+        }
+      }
       const rows = (data || []).map(product => ({
         ...product,
         inventoryContext: stockContextUnavailable
           ? { reconciliation_state: 'source_unavailable', operational_quantity: null, legacy_motil_quantity: null, quantity_delta: null, laudus_stock_date: null, laudus_synced_at: null }
           : stockContext.get(product.id) || { reconciliation_state: 'missing_source', operational_quantity: null, legacy_motil_quantity: null, quantity_delta: null, laudus_stock_date: null, laudus_synced_at: null },
+        duplicateWorkOrderId: workOrderId && uuid(workOrderId) ? workOrderId : null,
+        duplicateCheckUnavailable,
+        existingVouchers: duplicateByProduct.get(product.id) || [],
       }));
       return NextResponse.json({ rows });
     }
