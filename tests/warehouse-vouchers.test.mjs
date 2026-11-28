@@ -6,6 +6,7 @@ import { voucherInput } from '../lib/bodega/voucher-input.mjs';
 const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const [org,requester,approver,receiver,warehouse,ot,product,stock,count]=[1,2,3,4,5,6,7,8,9].map(id);
 const migration=readFileSync(new URL('../supabase/migrations/20261126143303_warehouse_consumption_vouchers.sql',import.meta.url),'utf8');
+const reconciliationMigration=readFileSync(new URL('../supabase/migrations/20261128023000_allow_voucher_delivery_with_unreconciled_stock.sql',import.meta.url),'utf8');
 async function fixture(){
  const db=new PGlite();
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema canonical;create schema auth;create table auth.users(id uuid primary key);create table public.auth_profile_identity_links(profile_id uuid,auth_user_id uuid);
@@ -27,6 +28,7 @@ async function fixture(){
  insert into bodega_motil_stock_counts_v1 values('${count}','${org}','${warehouse}','${product}');
  insert into bodega_motil_stock_count_reviews_v1 values('${count}','approved_for_opening');`);
  await db.exec(migration);
+ await db.exec(reconciliationMigration);
  await db.exec(`insert into warehouse_voucher_settings values('${org}',true,true,true);
  insert into warehouse_voucher_access values('${org}','${requester}',true,false,false,now()+interval '1 day','synthetic'),('${org}','${approver}',true,true,true,now()+interval '1 day','synthetic');
  insert into warehouse_voucher_stock_activation(stock_id,count_id,activated_by) values('${stock}','${count}','${approver}');`);
@@ -76,9 +78,11 @@ test('two competing vouchers cannot consume same last stock; reserved stock pres
  await cmd(db,approver,'deliver',await deliverBody(db,a));await assert.rejects(async()=>cmd(db,approver,'deliver',await deliverBody(db,b,201)),/insufficient_available/);assert.equal(await balance(db),0);
  await db.exec('update warehouse_stock set quantity_on_hand=2,quantity_reserved=2');await assert.rejects(async()=>cmd(db,approver,'deliver',await deliverBody(db,b,202)),/insufficient_available/);
 }finally{await db.close();}});
-test('fractional delivery blocks rather than integer rounding; inactive opening denied',async()=>{const db=await fixture();try{
- const v=await approved(db,10,'0.75');const b=await deliverBody(db,v,200,'0.75');await assert.rejects(()=>cmd(db,approver,'deliver',b),/decimal_stock_contract_pending/);assert.equal(await balance(db),2);
- const w=await approved(db,11,'1');await db.exec('delete from warehouse_voucher_stock_activation');await assert.rejects(async()=>cmd(db,approver,'deliver',await deliverBody(db,w,201)),/opening_pending/);
+test('fractional input remains exact; unreconciled physical delivery warns and requires acknowledgment',async()=>{const db=await fixture();try{
+ const v=await approved(db,10,'0.75');const fractional=await deliverBody(db,v,200,'0.75');await assert.rejects(()=>cmd(db,approver,'deliver',fractional),/decimal_stock_contract_pending/);assert.equal(await balance(db),2);
+ const w=await approved(db,11,'1');await db.exec('delete from warehouse_voucher_stock_activation');const pending=await deliverBody(db,w,201);
+ await assert.rejects(()=>cmd(db,approver,'deliver',pending),/stock_reconciliation_ack_required/);assert.equal(await balance(db),2);
+ const delivered=await cmd(db,approver,'deliver',{...pending,unreconciledStockConfirmed:true});assert.equal(delivered.status,'delivered');assert.equal(await balance(db),1);
 }finally{await db.close();}});
 test('failed movement rolls back stock and line; rejected/cancelled/expired cannot deliver',async()=>{const db=await fixture();try{
  const v=await approved(db);const b=await deliverBody(db,v);await db.exec("alter table stock_movements add constraint forced_failure check(false)");await assert.rejects(()=>cmd(db,approver,'deliver',b));assert.equal(await balance(db),2);assert.equal((await db.query('select delivered from warehouse_consumption_voucher_lines')).rows[0].delivered,'0.000000');
