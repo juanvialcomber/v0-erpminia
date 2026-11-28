@@ -35,22 +35,22 @@ export async function GET(request: NextRequest) {
     ]);
     if (error || users.error || warehouses.error || orders.error || requesters.error) throw error || users.error || warehouses.error || orders.error || requesters.error;
     const voucherRows = rows || [];
-    const productIds = Array.from(new Set(voucherRows.flatMap((v: any) => (v.warehouse_consumption_voucher_lines || []).map((line: any) => line.canonical_product_id))));
-    const warehouseIds = Array.from(new Set(voucherRows.map((v: any) => v.warehouse_id)));
+    const productIds = Array.from(new Set(voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.canonical_product_id))));
+    const warehouseIds = Array.from(new Set(voucherRows.map(v => v.warehouse_id)));
     const reconciledPositions = new Set<string>();
     if (productIds.length && warehouseIds.length) {
       const positions = await db.from('warehouse_stock').select('id,warehouse_id,canonical_product_id').eq('organization_id', org).in('warehouse_id', warehouseIds).in('canonical_product_id', productIds);
       if (!positions.error && positions.data?.length) {
-        const stockIds = positions.data.map((position: any) => position.id);
+        const stockIds = positions.data.map(position => position.id);
         const activations = await db.from('warehouse_voucher_stock_activation').select('stock_id,count_id').in('stock_id', stockIds);
-        const countIds = Array.from(new Set((activations.data || []).map((activation: any) => activation.count_id)));
+        const countIds = Array.from(new Set((activations.data || []).map(activation => activation.count_id)));
         const reviews = !activations.error && countIds.length
           ? await db.from('bodega_motil_stock_count_reviews_v1').select('count_id').eq('organization_id', org).eq('decision', 'approved_for_opening').in('count_id', countIds)
           : { data: [], error: activations.error };
         if (!activations.error && !reviews.error) {
-          const approvedCounts = new Set((reviews.data || []).map((review: any) => review.count_id));
-          const approvedStocks = new Set((activations.data || []).filter((activation: any) => approvedCounts.has(activation.count_id)).map((activation: any) => activation.stock_id));
-          const positionsByKey = new Map<string, any[]>();
+          const approvedCounts = new Set((reviews.data || []).map(review => review.count_id));
+          const approvedStocks = new Set((activations.data || []).filter(activation => approvedCounts.has(activation.count_id)).map(activation => activation.stock_id));
+          const positionsByKey = new Map<string, NonNullable<typeof positions.data>>();
           for (const position of positions.data) {
             const key = position.warehouse_id + ':' + position.canonical_product_id;
             positionsByKey.set(key, [...(positionsByKey.get(key) || []), position]);
