@@ -67,7 +67,7 @@ DECLARE
           and r.decision='approved_for_opening'
       );
     if not is_stock_reconciled then
-      if stock_id is null then
+      if v_stock_id is null then
         reconciliation_reason := 'missing_or_ambiguous_warehouse_position';
       elsif source_state <> 'aligned' then
         reconciliation_reason := 'laudus_motil_stock_mismatch';
