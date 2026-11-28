@@ -38,6 +38,11 @@ export async function GET(request: NextRequest) {
     const productIds = Array.from(new Set(voucherRows.flatMap(v => (v.warehouse_consumption_voucher_lines || []).map(line => line.canonical_product_id))));
     const warehouseIds = Array.from(new Set(voucherRows.map(v => v.warehouse_id)));
     const reconciledPositions = new Set<string>();
+    const sourceStates = new Map<string, string>();
+    if (productIds.length) {
+      const source = await db.from('bodega_inventory_operational_service_v1').select('canonical_product_id,reconciliation_state').eq('organization_id', org).in('canonical_product_id', productIds);
+      if (!source.error) for (const row of source.data || []) sourceStates.set(row.canonical_product_id, row.reconciliation_state);
+    }
     if (productIds.length && warehouseIds.length) {
       const positions = await db.from('warehouse_stock').select('id,warehouse_id,canonical_product_id').eq('organization_id', org).in('warehouse_id', warehouseIds).in('canonical_product_id', productIds);
       if (!positions.error && positions.data?.length) {
@@ -65,7 +70,8 @@ export async function GET(request: NextRequest) {
       ...voucher,
       warehouse_consumption_voucher_lines: (voucher.warehouse_consumption_voucher_lines || []).map(line => ({
         ...line,
-        stockReconciled: reconciledPositions.has(voucher.warehouse_id + ':' + line.canonical_product_id),
+        sourceReconciliationState: sourceStates.get(line.canonical_product_id) || 'missing_source',
+        stockReconciled: reconciledPositions.has(voucher.warehouse_id + ':' + line.canonical_product_id) && sourceStates.get(line.canonical_product_id) === 'aligned',
       })),
     }));
     return NextResponse.json({ rows: rowsWithStockStatus, users: users.data, warehouses: warehouses.data, orders: orders.data, requesters: requesters.data, access, settings, actorId: context.userId }, { headers: { 'Cache-Control': 'private, no-store' } });
